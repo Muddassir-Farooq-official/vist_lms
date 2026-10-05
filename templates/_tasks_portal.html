@@ -1,0 +1,139 @@
+{# Tasks between staff -- the same screen in every staff portal; the administration also gets the review, tracking and "all tasks" tabs. #}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="inbox" role="tab" aria-selected="true"><span id="tk-tab-inbox">Assigned to me</span></button>
+  <button class="portal-tab" data-tab="sent" role="tab" aria-selected="false"><span>Assigned by me</span></button>
+  <button class="portal-tab" data-tab="new" role="tab" aria-selected="false"><span>Assign a task</span></button>
+  <button class="portal-tab" data-tab="mine" role="tab" aria-selected="false"><span>My progress</span></button>
+  {% if is_admin %}
+  <button class="portal-tab" data-tab="flags" role="tab" aria-selected="false"><span id="tk-tab-flags">Flagged for review</span></button>
+  <button class="portal-tab" data-tab="staff" role="tab" aria-selected="false"><span>Staff progress</span></button>
+  <button class="portal-tab" data-tab="all" role="tab" aria-selected="false"><span>All tasks</span></button>
+  {% endif %}
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="inbox">
+  <section class="sh-card">
+    <div class="rv-chips" id="tk-inbox-chips"></div>
+    <div id="tk-inbox" class="asg-list" aria-live="polite"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
+    <p class="empty-state" id="tk-inbox-empty" hidden>Nobody has assigned you anything here.</p>
+  </section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="sent" hidden>
+  <section class="sh-card">
+    <div class="rv-chips" id="tk-sent-chips"></div>
+    <div id="tk-sent" class="asg-list"></div>
+    <p class="empty-state" id="tk-sent-empty" hidden>You have not assigned any tasks yet.</p>
+  </section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="new" hidden>
+  <section class="sh-card">
+    <div class="sh-card-head"><h2 id="tk-form-title">Assign a task</h2></div>
+    <p class="panel-hint">The person you choose can accept it, or reject it with a reason. The deadline must be <strong>at least 3 hours</strong> from now.</p>
+    <form id="tk-form" class="form-grid two-col" novalidate>
+      <div class="form-field two-span"><label for="tk-person-search">Who should do it?</label>
+        <input id="tk-person-search" class="text-input" type="search" placeholder="Type a name or job title to narrow the list&hellip;" autocomplete="off" />
+        <select id="tk-assignee" class="select-input" size="6" aria-label="Staff member"></select>
+        <small id="tk-picked" class="field-hint" aria-live="polite"></small></div>
+      <div class="form-field two-span"><label for="tk-title">Task</label><input id="tk-title" class="text-input" maxlength="200" placeholder="e.g. Prepare the exam hall for Monday" /></div>
+      <div class="form-field two-span"><label for="tk-desc">Details</label><textarea id="tk-desc" class="text-input" rows="5" maxlength="5000" placeholder="What exactly needs to be done, and what does &ldquo;done&rdquo; look like?"></textarea></div>
+      <div class="form-field"><label for="tk-deadline">Deadline</label><input id="tk-deadline" class="text-input" type="datetime-local" />
+        <small class="field-hint" id="tk-deadline-hint">At least 3 hours from now.</small></div>
+      <div class="form-field"><label for="tk-priority">Priority</label>
+        <select id="tk-priority" class="select-input"><option value="NORMAL">Normal</option><option value="LOW">Low</option><option value="HIGH">High</option><option value="URGENT">Urgent</option></select></div>
+      <p id="tk-followup" class="rules-note two-span" hidden></p>
+      <p id="tk-error" class="dash-alert error two-span" hidden></p>
+      <div class="form-actions two-span"><button type="button" class="role-btn" id="tk-create">Assign task</button></div>
+    </form>
+  </section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="mine" hidden>
+  <section class="sh-card" id="tk-mine"></section>
+</div>
+
+{% if is_admin %}
+<div class="portal-tab-panel" data-tab-panel="flags" hidden>
+  <section class="sh-card">
+    <p class="panel-hint">Tasks that the person who assigned them, or the person who received them, asked the administration to review. Open one to read both sides and decide.</p>
+    <div id="tk-flags" class="asg-list"></div>
+    <p class="empty-state" id="tk-flags-empty" hidden>Nothing is waiting for review.</p>
+  </section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="staff" hidden>
+  <section class="sh-card">
+    <div class="rv-chips" id="tk-staff-chips"></div>
+    <div id="tk-staff-totals"></div>
+    <div class="table-scroll"><table class="tk-table" id="tk-staff-table">
+      <thead><tr><th>Staff member</th><th title="Tasks they were given">Received</th><th title="Accepted">Accepted</th><th title="Rejected">Rejected</th><th title="Completed by the deadline">On time</th>
+        <th title="Completed after the deadline">Late</th><th title="Not finished and past the deadline">Overdue</th><th title="On time, out of everything completed or overdue">On-time %</th>
+        <th title="Accepted, out of accepted + rejected">Accepted %</th><th title="Tasks they gave to others">Assigned</th></tr></thead>
+      <tbody id="tk-staff-body"></tbody></table></div>
+    <p class="empty-state" id="tk-staff-empty" hidden>No tasks in this period.</p>
+    <details class="asg-help"><summary>How are these numbers worked out?</summary>
+      <ul><li><b>Received</b>: tasks assigned to the person in the period.</li><li><b>On time</b>: finished by the deadline. <b>Late</b>: finished after it.</li>
+      <li><b>Overdue</b>: still open (including never answered) and the deadline has passed.</li><li><b>On-time %</b> = on time &divide; (completed + overdue). Rejected and cancelled tasks are not counted against anyone.</li>
+      <li><b>Accepted %</b> = accepted &divide; (accepted + rejected).</li></ul></details>
+  </section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="all" hidden>
+  <section class="sh-card">
+    <div class="ann-toolbar">
+      <input id="al-q" class="text-input" type="search" placeholder="Search title, reference or name&hellip;" aria-label="Search" />
+      <select id="al-status" class="select-input" aria-label="Status"><option value="">Any status</option><option value="PENDING">Waiting for an answer</option><option value="ACCEPTED">Accepted</option>
+        <option value="REJECTED">Rejected</option><option value="COMPLETED">Completed</option><option value="CANCELLED">Cancelled</option></select>
+      <select id="al-days" class="select-input" aria-label="Period"><option value="30">Last 30 days</option><option value="60">Last 60 days</option><option value="90">Last 90 days</option><option value="0">All time</option></select>
+      <label class="ann-unread-toggle"><input type="checkbox" id="al-overdue" /> Overdue only</label>
+    </div>
+    <div id="al-list" class="asg-list"></div>
+    <p class="empty-state" id="al-empty" hidden>No tasks match.</p>
+    <button type="button" class="ann-more" id="al-more" hidden>Show more</button>
+  </section>
+</div>
+{% endif %}
+
+<dialog id="tk-modal" class="modal modal-wide" aria-labelledby="tk-title-view">
+  <div class="modal-body">
+    <div class="ann-detail-badges" id="tk-badges"></div>
+    <h2 id="tk-title-view"></h2>
+    <div class="tk-people" id="tk-people"></div>
+    <div class="asg-deadline" id="tk-deadline-box"></div>
+    <h3 class="modal-subhead">What needs doing</h3>
+    <p class="cd-text" id="tk-desc-view"></p>
+    <div id="tk-outcome"></div>
+    <ol class="cc-timeline" id="tk-timeline"></ol>
+    <div id="tk-flags-view"></div>
+    <h3 class="modal-subhead">Conversation</h3>
+    <div class="thread" id="tk-thread"></div>
+    <div class="form-field" id="tk-comment-wrap"><label for="tk-comment">Add a message</label><textarea id="tk-comment" class="text-input" rows="2" maxlength="2000"></textarea>
+      <button type="button" class="role-btn small-btn secondary-btn" id="tk-comment-send">Send message</button></div>
+    <p id="tk-modal-error" class="dash-alert error" hidden></p>
+    <div class="decision-bar" id="tk-actions"></div>
+    <button id="tk-close" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+
+<dialog id="tk-act" class="modal" aria-labelledby="tk-act-title">
+  <div class="modal-body">
+    <h2 id="tk-act-title"></h2>
+    <p class="cc-meta" id="tk-act-intro"></p>
+    <div class="form-field" id="tk-act-select-wrap" hidden><label for="tk-act-select" id="tk-act-select-label"></label><select id="tk-act-select" class="select-input"></select></div>
+    <div class="form-field" id="tk-act-date-wrap" hidden><label for="tk-act-date" id="tk-act-date-label"></label><input id="tk-act-date" class="text-input" type="datetime-local" /></div>
+    <div class="form-field" id="tk-act-text-wrap"><label for="tk-act-text" id="tk-act-text-label"></label><textarea id="tk-act-text" class="text-input" rows="4" maxlength="2000"></textarea></div>
+    <p id="tk-act-error" class="dash-alert error" hidden></p>
+    <div class="form-actions"><button type="button" class="role-btn" id="tk-act-ok">OK</button></div>
+    <button id="tk-act-cancel" class="back-link modal-close-btn" type="button">Cancel</button>
+  </div>
+</dialog>
+
+<dialog id="tk-person" class="modal modal-wide" aria-labelledby="tk-person-title">
+  <div class="modal-body">
+    <h2 id="tk-person-title"></h2>
+    <div class="rv-chips" id="tk-person-chips"></div>
+    <div id="tk-person-body"></div>
+    <button id="tk-person-close" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>

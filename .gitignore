@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.env.*
+!.env
+!.env.production
+.pytest_cache/
+*.egg-info/
+var/storage/
+backups/
+.mypy_cache/
+.ruff_cache/

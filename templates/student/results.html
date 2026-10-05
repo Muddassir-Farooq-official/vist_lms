@@ -1,0 +1,20 @@
+{% extends "student/_base.html" %}
+{% block title %}My Results{% endblock %}
+{% block page_title %}My Results{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Your marks and outcome for every subject. A subject's results appear here once they have been checked and published.</div>{% endblock %}
+
+{% block content %}
+<section class="panel results-summary" id="results-summary" hidden>
+  <div class="rsum-tiles" id="rsum-tiles"></div>
+  <a class="role-btn" id="rsum-download" href="/api/v1/results/me/transcript.pdf" data-download="result-card.pdf" data-label="file">Download my result card (PDF)</a>
+</section>
+
+<section class="panel">
+  <div id="results-list"></div>
+  <p class="empty-state" id="results-empty" hidden>No results yet.</p>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/student-results.js"></script>
+{% endblock %}

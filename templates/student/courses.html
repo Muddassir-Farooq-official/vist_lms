@@ -1,0 +1,66 @@
+{% extends "student/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}My Courses{% endblock %}
+{% block page_title %}My Courses{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Enroll in your current semester's courses, or retake one you've taken before.</div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="mine" role="tab" aria-selected="true"><span>My courses</span></button>
+  <button class="portal-tab" data-tab="available" role="tab" aria-selected="false"><span>Available this semester</span></button>
+  <button class="portal-tab" data-tab="browse" role="tab" aria-selected="false"><span>Browse other terms</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="mine">
+<section class="sh-card" aria-labelledby="mc-h1">
+  <div class="sh-card-head"><h2 id="mc-h1">My enrollments</h2><a class="see-all" href="/dashboard/student/attendance">My attendance</a></div>
+  <div id="my-enrollments-grid" class="course-grid" aria-live="polite"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
+  <p class="empty-state" id="my-enrollments-empty" hidden>You are not enrolled in anything yet.</p>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="available" hidden>
+<section class="sh-card" aria-labelledby="mc-h2">
+  <div class="sh-card-head"><h2 id="mc-h2">Available for my semester</h2></div>
+  <p class="panel-hint">Open courses matching your current program and semester &mdash; this is what you will usually enroll in.</p>
+  <div id="eligible-offerings-grid" class="course-grid"></div>
+  <p class="empty-state" id="eligible-offerings-empty" hidden>Nothing is open for your semester right now. Check back later, or ask the office.</p>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="browse" hidden>
+<section class="sh-card" aria-labelledby="mc-h3">
+  <div class="sh-card-head"><h2 id="mc-h3">Browse other terms</h2></div>
+  <div class="rules-note">
+    <strong>What you can enroll in here</strong>
+    <ul>
+      <li><b>Retaking a course</b> you took before (passed, failed or dropped): you can join any open offering of it, in any term, straight away. No approval is needed.</li>
+      <li><b>A new course</b> must be in your program and your current semester, so those appear under &ldquo;Available this semester&rdquo;. Other new courses show here greyed out with the reason.</li>
+      <li>Courses the office has closed for enrollment are not shown. Seat limits, timetable clashes and your credit-hour limit always apply.</li>
+    </ul>
+  </div>
+  <div class="toolbar">
+    <select id="term-label-input" class="select-input"><option value="">Select a term...</option></select>
+    <button type="button" class="role-btn secondary-btn" id="refresh-terms-btn">Refresh</button>
+    <button type="button" class="role-btn" id="browse-term-btn">Load</button>
+  </div>
+  <div id="browse-offerings-grid" class="course-grid"></div>
+  <p class="empty-state" id="browse-offerings-empty" hidden>Select a term above and tap Load.</p>
+  <p id="enroll-error" class="dash-alert error" hidden></p>
+</section>
+</div>
+<dialog id="materials-modal" class="modal modal-wide">
+  <div class="modal-body">
+    <h2 id="materials-title"></h2>
+    <div id="materials-syllabus"></div>
+    <h3 class="modal-subhead">Class Sessions</h3>
+    <div id="materials-lectures"></div>
+    <p class="empty-state" id="materials-empty" hidden>No class sessions yet.</p>
+    <button id="close-materials-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/student-courses.js"></script>
+{% endblock %}

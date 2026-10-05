@@ -1,0 +1,15 @@
+{% extends "library/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Tasks{% endblock %}
+{% block page_title %}Tasks{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Give work to colleagues and receive it. Every task, answer and deadline is recorded.</div>{% endblock %}
+
+{% block content %}
+{% include "_tasks_portal.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/student-ui.js"></script>
+<script src="/static/js/charts.js"></script>
+<script src="/static/js/tasks-portal.js"></script>
+{% endblock %}

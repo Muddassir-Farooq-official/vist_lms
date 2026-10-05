@@ -1,0 +1,36 @@
+{# Shared navigation for every portal: the grouped side menu, and the bottom
+   bar phones use. Items come from app/main.py (group / mobile / short). #}
+{% from "_icons.html" import nav_icon %}
+
+{% macro drawer_nav(items, active, label, admin_back=False) %}
+<nav class="drawer-nav" aria-label="{{ label }}">
+  {% if admin_back %}
+  <a id="back-to-admin" class="drawer-link back-link-admin" href="/dashboard/admin" hidden>
+    {{ nav_icon("dashboard") }}<span>&larr; Back to Admin</span>
+  </a>
+  {% endif %}
+  {% set ns = namespace(group=None) %}
+  {% for item in items if item.enabled %}
+    {% if item.group and item.group != ns.group %}
+      <div class="drawer-group" role="presentation">{{ item.group }}</div>
+    {% endif %}
+    {% set ns.group = item.group %}
+    <a href="{{ item.href }}" class="drawer-link{% if item.slug == active %} active{% endif %}"{% if item.slug == active %} aria-current="page"{% endif %}>
+      {{ nav_icon(item.icon) }}<span>{{ item.label }}</span>
+    </a>
+  {% endfor %}
+</nav>
+{% endmacro %}
+
+{% macro bottom_nav(items, active) %}
+<nav class="bottom-nav" aria-label="Quick navigation">
+  {% for item in items if item.enabled and item.mobile %}
+    <a href="{{ item.href }}" class="bottom-link{% if item.slug == active %} active{% endif %}"{% if item.slug == active %} aria-current="page"{% endif %}>
+      {{ nav_icon(item.icon) }}<span>{{ item.short or item.label }}</span>
+    </a>
+  {% endfor %}
+  <button type="button" class="bottom-link" id="bottom-more" aria-label="More menu">
+    {{ nav_icon("menu") }}<span>More</span>
+  </button>
+</nav>
+{% endmacro %}

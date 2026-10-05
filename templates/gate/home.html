@@ -1,0 +1,44 @@
+{% extends "gate/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Gate{% endblock %}
+{% block page_title %}Gate{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Find a student or a member of staff, then mark them in or out.</div>{% endblock %}
+
+{% block content %}
+<section class="gate-summary" id="g-summary" aria-label="Today at a glance">
+  <div class="gs"><strong id="gs-inside">&mdash;</strong><span>Inside now</span><small id="gs-inside-sub"></small></div>
+  <div class="gs"><strong id="gs-in">&mdash;</strong><span>Marked in today</span><small id="gs-in-sub"></small></div>
+  <div class="gs late"><strong id="gs-late">&mdash;</strong><span>Late today</span><small id="gs-late-sub"></small></div>
+  <div class="gs"><strong id="gs-miss">&mdash;</strong><span>Staff not here yet</span><small>expected today</small></div>
+</section>
+
+<section class="sh-card gate-panel">
+  <div class="gate-search">
+    <input id="g-q" class="text-input" type="search" inputmode="search" placeholder="Search by name, roll number or employee code&hellip;" autocomplete="off" autofocus aria-label="Search" />
+    <button type="button" class="role-btn secondary-btn" id="g-filter-toggle" aria-expanded="false">Filters</button>
+  </div>
+  <div class="rv-chips" id="g-kind" role="tablist" aria-label="Who">
+    <button type="button" class="chip active" data-kind="">Everyone</button><button type="button" class="chip" data-kind="STUDENT">Students</button><button type="button" class="chip" data-kind="EMPLOYEE">Staff</button>
+  </div>
+  <div class="rv-chips" id="g-state" role="tablist" aria-label="Where they are">
+    <button type="button" class="chip active" data-state="">Any</button><button type="button" class="chip" data-state="INSIDE">Inside</button><button type="button" class="chip" data-state="LATE">Late</button>
+    <button type="button" class="chip" data-state="NOT_ARRIVED">Not arrived</button><button type="button" class="chip" data-state="LEFT">Left</button>
+  </div>
+  <div class="gate-filters" id="g-filters" hidden>
+    <div class="form-field"><label for="g-program">Program</label><select id="g-program" class="select-input"><option value="">Any program</option></select></div>
+    <div class="form-field"><label for="g-semester">Semester</label><select id="g-semester" class="select-input"><option value="">Any semester</option></select></div>
+    <div class="form-field"><label for="g-role">Job title (staff)</label><select id="g-role" class="select-input"><option value="">Any job title</option></select></div>
+    <button type="button" class="role-btn small-btn secondary-btn" id="g-clear">Clear filters</button>
+  </div>
+
+  <p class="cc-meta" id="g-count" aria-live="polite"></p>
+  <div id="g-list" class="gate-list" aria-live="polite"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div><div class="skeleton-line"></div></div></div>
+  <p class="empty-state" id="g-empty" hidden>Nobody matches. Try fewer letters or clear the filters.</p>
+  <button type="button" class="ann-more" id="g-more" hidden>Show more</button>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/student-ui.js"></script>
+<script src="/static/js/gate-home.js"></script>
+{% endblock %}

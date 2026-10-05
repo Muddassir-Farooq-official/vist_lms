@@ -1,0 +1,95 @@
+{% extends "faculty/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}My Profile{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Your record as held by the institute. Contact the office to correct any personal detail.</div>{% endblock %}
+
+{% block content %}
+<section class="sh-card profile-hero" aria-label="About me">
+  <div class="profile-avatar" id="ph-avatar" aria-hidden="true">?</div>
+  <div>
+    <h2 id="ph-name">Loading&hellip;</h2>
+    <p id="ph-sub"></p>
+    <div class="profile-pills" id="ph-pills"></div>
+  </div>
+</section>
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="details" role="tab" aria-selected="true"><span>Personal details</span></button>
+  <button class="portal-tab" data-tab="quals" role="tab" aria-selected="false"><span>Qualifications</span></button>
+  <button class="portal-tab" data-tab="certs" role="tab" aria-selected="false"><span>Certificates</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="details">
+<section class="panel">
+  <div class="profile-photo-row">
+    <div class="profile-photo-frame" id="my-photo-frame">
+      <span class="profile-photo-placeholder">No Photo</span>
+    </div>
+    <div class="profile-photo-actions">
+      <input type="file" id="my-photo-input" accept="image/jpeg,image/png,image/webp" />
+      <button type="button" class="role-btn small-btn" id="my-photo-upload-btn">Upload / Replace</button>
+      <a href="#" class="role-btn small-btn" id="my-photo-download-link" target="_blank" rel="noopener" hidden>Download Photo</a>
+      <button type="button" class="danger-btn small-btn" id="my-photo-remove-btn" hidden>Remove</button>
+    </div>
+  </div>
+  <p id="my-photo-error" class="dash-alert error" hidden></p>
+</section>
+<section class="panel">
+  <div class="panel-header">
+    <div class="panel-header-left">
+      <div class="panel-icon-badge">{{ nav_icon("user") }}</div>
+      <h2>Personal Details</h2>
+    </div>
+  </div>
+  <dl class="detail-list" id="my-profile-details"></dl>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="quals" hidden>
+<section class="panel">
+  <div class="panel-header">
+    <div class="panel-header-left">
+      <div class="panel-icon-badge">{{ nav_icon("graduation-cap") }}</div>
+      <h2>Qualifications</h2>
+    </div>
+  </div>
+  <table class="dash-table" id="my-qualifications-table">
+    <thead><tr><th>Degree</th><th>Institution</th><th>Year</th><th>Marks / Grade</th><th></th></tr></thead>
+    <tbody id="my-qualifications-tbody"></tbody>
+  </table>
+  <p class="empty-state" id="my-qualifications-empty" hidden>No qualifications added yet.</p>
+
+  <form id="add-qualification-form" class="form-grid two-col">
+    <div class="form-field"><label for="q-degree">Degree / Certificate</label><input type="text" id="q-degree" class="text-input" maxlength="150" required /></div>
+    <div class="form-field"><label for="q-institution">Institution</label><input type="text" id="q-institution" class="text-input" maxlength="200" required /></div>
+    <div class="form-field"><label for="q-year">Year Completed</label><input type="number" id="q-year" class="text-input" min="1950" max="2100" /></div>
+    <div class="form-field"><label for="q-marks">Marks / Grade</label><input type="text" id="q-marks" class="text-input" maxlength="50" placeholder="e.g. 85% or 3.8 GPA" /></div>
+    <div class="form-actions two-span"><button type="submit" class="role-btn" id="add-qualification-submit">Add Qualification</button></div>
+  </form>
+  <p id="qualification-error" class="dash-alert error" hidden></p>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="certs" hidden>
+<section class="panel">
+  <div class="panel-header">
+    <div class="panel-header-left">
+      <div class="panel-icon-badge">{{ nav_icon("cloud-upload") }}</div>
+      <h2>Certificates (combined PDF)</h2>
+    </div>
+  </div>
+  <p class="panel-hint">Upload one PDF containing all your degree/certificate scans — this replaces any previous upload.</p>
+  <div class="profile-photo-actions">
+    <input type="file" id="my-certificate-input" accept="application/pdf" />
+    <button type="button" class="role-btn small-btn" id="my-certificate-upload-btn">Upload / Replace</button>
+    <a href="#" class="role-btn small-btn" id="my-certificate-download-link" target="_blank" rel="noopener" hidden>Download Certificate PDF</a>
+    <button type="button" class="danger-btn small-btn" id="my-certificate-remove-btn" hidden>Remove</button>
+  </div>
+  <p id="my-certificate-error" class="dash-alert error" hidden></p>
+</section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/my-profile.js"></script>
+{% endblock %}

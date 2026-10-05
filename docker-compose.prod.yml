@@ -1,0 +1,61 @@
+# Production stack for the VPS. The database is NOT here: it is the remote
+# Postgres named in the server's .env (the REAL database).
+name: vist-lms
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Runs "alembic upgrade head" against the REAL database, then exits.
+  # scripts/deploy.sh runs it explicitly before restarting the app.
+  migrate:
+    image: vist-lms:latest
+    command: ["alembic", "upgrade", "head"]
+    env_file: .env
+    restart: "no"
+    profiles: ["tools"]
+
+  app:
+    image: vist-lms:latest
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      # nginx runs on the host, so the app must trust its X-Forwarded-For header
+      # (otherwise every user shows up with the same IP in logs and rate limits).
+      FORWARDED_ALLOW_IPS: "*"
+    # Only reachable from the VPS itself; nginx exposes it to the internet.
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./var/storage:/app/var/storage
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # Background worker for CSV imports (jobs queue in Redis).
+  worker:
+    image: vist-lms:latest
+    restart: unless-stopped
+    command: ["rq", "worker", "--url", "redis://redis:6379/0", "imports"]
+    env_file: .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./var/storage:/app/var/storage
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  redis_data:

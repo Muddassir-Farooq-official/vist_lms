@@ -1,0 +1,115 @@
+{% extends "library/_base.html" %}
+{% block title %}Nursing Journals{% endblock %}
+{% block page_title %}Nursing Journals{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Print and digital journal titles — separate from the general book catalogue.</div>{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <div class="toolbar">
+    <input type="text" id="search-input" class="text-input" placeholder="Search title, author, ISSN..." />
+    <button id="open-add-book" class="role-btn" type="button">+ Add Journal</button>
+  </div>
+
+  <table class="dash-table" id="books-table">
+    <thead><tr><th>Title</th><th>Author / Publisher</th><th class="num">Copies</th><th class="num">Available</th><th></th></tr></thead>
+    <tbody id="books-tbody"></tbody>
+  </table>
+  <p class="empty-state" id="books-empty" hidden>No journals match this search.</p>
+
+  <div class="pager" id="pager">
+    <button id="prev-page" class="page-btn" type="button">&larr; Prev</button>
+    <span id="page-info" class="page-info"></span>
+    <button id="next-page" class="page-btn" type="button">Next &rarr;</button>
+  </div>
+</section>
+
+<dialog id="book-modal" class="modal modal-wide">
+  <div class="modal-body">
+    <h2 id="book-modal-title"></h2>
+    <form id="edit-book-form" class="form-grid two-col">
+      <div class="form-field"><label for="eb-title">Title</label><input type="text" id="eb-title" class="text-input" required maxlength="255" /></div>
+      <div class="form-field"><label for="eb-author">Author / Editor</label><input type="text" id="eb-author" class="text-input" required maxlength="255" /></div>
+      <div class="form-field"><label for="eb-isbn">ISSN</label><input type="text" id="eb-isbn" class="text-input" /></div>
+      <div class="form-field"><label for="eb-category">Category</label><input type="text" id="eb-category" class="text-input" value="Nursing" /></div>
+      <div class="form-field"><label for="eb-publisher">Publisher</label><input type="text" id="eb-publisher" class="text-input" /></div>
+      <div class="form-field"><label for="eb-year">Year</label><input type="number" id="eb-year" class="text-input" min="1000" max="2100" /></div>
+      <div class="form-field"><label for="eb-volume">Volume</label><input type="text" id="eb-volume" class="text-input" maxlength="30" /></div>
+      <div class="form-field"><label for="eb-issue-number">Issue Number</label><input type="text" id="eb-issue-number" class="text-input" maxlength="30" /></div>
+      <div class="form-field"><label for="eb-shelf">Shelf Location</label><input type="text" id="eb-shelf" class="text-input" /></div>
+      <div class="form-field two-span"><label for="eb-description">Description</label><input type="text" id="eb-description" class="text-input" /></div>
+      <div class="form-field">
+        <label for="eb-edition-type">Edition</label>
+        <select id="eb-edition-type" class="select-input">
+          <option value="PHYSICAL">Physical only</option>
+          <option value="DIGITAL">Digital only</option>
+          <option value="BOTH">Physical &amp; Digital</option>
+        </select>
+      </div>
+      <div class="form-field"><label for="eb-cover">Cover Image URL</label><input type="text" id="eb-cover" class="text-input" placeholder="https://..." /></div>
+      <div class="form-field two-span"><label for="eb-digital-url">Digital File URL (leave blank if uploading a PDF below)</label><input type="text" id="eb-digital-url" class="text-input" placeholder="https://..." /></div>
+      <div class="form-actions two-span"><button type="submit" class="role-btn" id="edit-book-submit">Save Changes</button></div>
+    </form>
+    <p id="book-modal-error" class="dash-alert error" hidden></p>
+    <p id="book-modal-success" class="success-text" hidden></p>
+
+    <h3 class="modal-subhead">Digital File</h3>
+    <p class="panel-hint" id="digital-file-status">No digital file.</p>
+    <div class="inline-form">
+      <input type="file" id="digital-file-input" accept="application/pdf" />
+      <button id="upload-digital-file-btn" class="role-btn" type="button">Upload PDF</button>
+      <button id="remove-digital-file-btn" class="danger-btn" type="button" hidden>Remove File</button>
+    </div>
+    <p id="digital-file-error" class="dash-alert error" hidden></p>
+
+    <h3 class="modal-subhead">Physical Copies (<span id="copies-count">0</span>)</h3>
+    <table class="dash-table" id="copies-table">
+      <thead><tr><th>Accession Code</th><th>Status</th><th>Notes</th><th></th></tr></thead>
+      <tbody id="copies-tbody"></tbody>
+    </table>
+    <div class="inline-form">
+      <input type="number" id="add-copies-count" class="text-input small-input" placeholder="Count" min="1" max="200" value="1" />
+      <button id="add-copies-btn" class="role-btn" type="button">Add Copies</button>
+    </div>
+
+    <button id="close-book-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+
+<dialog id="add-book-modal" class="modal modal-wide">
+  <div class="modal-body">
+    <h2>Add Journal</h2>
+    <form id="add-book-form" class="form-grid two-col">
+      <div class="form-field"><label for="ab-title">Title</label><input type="text" id="ab-title" class="text-input" required maxlength="255" /></div>
+      <div class="form-field"><label for="ab-author">Author / Editor</label><input type="text" id="ab-author" class="text-input" required maxlength="255" /></div>
+      <div class="form-field"><label for="ab-isbn">ISSN (optional)</label><input type="text" id="ab-isbn" class="text-input" /></div>
+      <div class="form-field"><label for="ab-category">Category</label><input type="text" id="ab-category" class="text-input" value="Nursing" /></div>
+      <div class="form-field"><label for="ab-publisher">Publisher (optional)</label><input type="text" id="ab-publisher" class="text-input" /></div>
+      <div class="form-field"><label for="ab-year">Year (optional)</label><input type="number" id="ab-year" class="text-input" min="1000" max="2100" /></div>
+      <div class="form-field"><label for="ab-volume">Volume (optional)</label><input type="text" id="ab-volume" class="text-input" maxlength="30" /></div>
+      <div class="form-field"><label for="ab-issue-number">Issue Number (optional)</label><input type="text" id="ab-issue-number" class="text-input" maxlength="30" /></div>
+      <div class="form-field"><label for="ab-shelf">Shelf Location (optional)</label><input type="text" id="ab-shelf" class="text-input" /></div>
+      <div class="form-field"><label for="ab-copies">Initial Physical Copies</label><input type="number" id="ab-copies" class="text-input" min="0" max="500" value="0" /></div>
+      <div class="form-field">
+        <label for="ab-edition-type">Edition</label>
+        <select id="ab-edition-type" class="select-input">
+          <option value="PHYSICAL">Physical only</option>
+          <option value="DIGITAL">Digital only</option>
+          <option value="BOTH">Physical &amp; Digital</option>
+        </select>
+      </div>
+      <div class="form-field"><label for="ab-cover">Cover Image URL (optional)</label><input type="text" id="ab-cover" class="text-input" placeholder="https://..." /></div>
+      <div class="form-field"><label for="ab-digital-url">Digital File URL (optional &mdash; or upload a PDF after creating)</label><input type="text" id="ab-digital-url" class="text-input" placeholder="https://..." /></div>
+      <div class="form-field two-span"><label for="ab-description">Description (optional)</label><input type="text" id="ab-description" class="text-input" /></div>
+      <div class="form-actions two-span"><button type="submit" class="role-btn" id="add-book-submit">Add Journal</button></div>
+    </form>
+    <p id="add-book-error" class="dash-alert error" hidden></p>
+    <p id="add-book-success" class="success-text" hidden></p>
+    <button id="close-add-book-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>window.LIBRARY_JOURNAL_MODE = true;</script>
+<script src="/static/js/library-catalogue.js"></script>
+{% endblock %}

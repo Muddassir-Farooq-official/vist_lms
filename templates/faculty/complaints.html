@@ -1,0 +1,142 @@
+{% extends "faculty/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Feedback &amp; Complaints{% endblock %}
+{% block page_title %}Feedback &amp; Complaints{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">File a complaint against a student or staff member, and track your own.</div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="overview" role="tab" aria-selected="true"><span>Overview</span></button>
+  <button class="portal-tab" data-tab="mine" role="tab" aria-selected="false"><span>My complaints</span></button>
+  <button class="portal-tab" data-tab="new" role="tab" aria-selected="false"><span>File a complaint</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="overview">
+  <section class="sh-card" aria-labelledby="co-mine-h">
+    <div class="sh-card-head"><h2 id="co-mine-h">Your complaints</h2><a class="see-all" href="#new" id="co-file-link">File a complaint</a></div>
+    <div class="kpi-grid kpi-grid-4">
+      <div class="kpi"><span class="kpi-label">Filed by you</span><strong class="kpi-value" id="co-mine-total">&mdash;</strong><span class="kpi-sub">all time</span></div>
+      <div class="kpi"><span class="kpi-label">Open</span><strong class="kpi-value" id="co-mine-open">&mdash;</strong><span class="kpi-sub">waiting for a decision</span></div>
+      <div class="kpi"><span class="kpi-label">Resolved</span><strong class="kpi-value" id="co-mine-resolved">&mdash;</strong><span class="kpi-sub">closed with a decision</span></div>
+      <div class="kpi"><span class="kpi-label">Filed anonymously</span><strong class="kpi-value" id="co-mine-anon">&mdash;</strong><span class="kpi-sub">your name is hidden</span></div>
+    </div>
+  </section>
+
+  <section class="sh-card" aria-labelledby="co-all-h">
+    <div class="sh-card-head"><h2 id="co-all-h">How complaints are handled at the institute</h2></div>
+    <p class="panel-hint">Totals for everyone, with no names and nothing that identifies a person. Each complaint itself is private: only the person who filed it and the administrator can read it.</p>
+    <div class="kpi-grid kpi-grid-4">
+      <div class="kpi"><span class="kpi-label">Complaints filed</span><strong class="kpi-value" id="co-all-total">&mdash;</strong><span class="kpi-sub" id="co-all-total-sub"></span></div>
+      <div class="kpi"><span class="kpi-label">Still open</span><strong class="kpi-value" id="co-all-open">&mdash;</strong><span class="kpi-sub" id="co-all-open-sub"></span></div>
+      <div class="kpi"><span class="kpi-label">Resolved</span><strong class="kpi-value" id="co-all-rate">&mdash;</strong><span class="kpi-sub">of decided complaints</span></div>
+      <div class="kpi"><span class="kpi-label">Average time to close</span><strong class="kpi-value" id="co-all-avg">&mdash;</strong><span class="kpi-sub">resolved or dismissed</span></div>
+    </div>
+    <div class="chart-grid">
+      <section class="sh-card flat"><div class="sh-card-head"><h2>By status</h2></div><div id="co-chart-status"></div></section>
+      <section class="sh-card flat"><div class="sh-card-head"><h2>Why people complain</h2></div><div id="co-chart-reason"></div></section>
+      <section class="sh-card flat chart-wide"><div class="sh-card-head"><h2>Filed and closed, last 12 weeks</h2></div><div id="co-chart-weekly"></div></section>
+    </div>
+  </section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="mine" hidden>
+<section class="panel">
+  <div class="panel-header">
+    <div class="panel-header-left">
+      <div class="panel-icon-badge">{{ nav_icon("dashboard") }}</div>
+      <h2>My Complaints</h2>
+    </div>
+  </div>
+  <div id="my-complaints-list" class="complaint-list" aria-live="polite"></div>
+  <p class="empty-state" id="my-complaints-empty" hidden>You haven't filed any complaints.</p>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="new" hidden>
+<section class="panel">
+  <div class="panel-header">
+    <div class="panel-header-left">
+      <div class="panel-icon-badge">{{ nav_icon("ban") }}</div>
+      <h2>File a Complaint</h2>
+    </div>
+  </div>
+  <form id="complaint-form" class="form-grid two-col">
+    <div class="form-field">
+      <label for="complaint-target-type">Complaint against</label>
+      <select id="complaint-target-type" class="select-input" required>
+        <option value="">Choose...</option>
+        <option value="STUDENT">Student</option>
+        <option value="EMPLOYEE:TEACHER">Faculty</option>
+        <option value="EMPLOYEE:">Admin / Staff</option>
+      </select>
+    </div>
+    <div class="form-field">
+      <label for="complaint-target-search">Search by name / roll no / employee code</label>
+      <input type="text" id="complaint-target-search" class="text-input" autocomplete="off" disabled required />
+      <div id="complaint-target-results" class="search-results-dropdown" hidden></div>
+      <input type="hidden" id="complaint-target-id" />
+    </div>
+    <div class="form-field">
+      <label for="complaint-reason">Reason</label>
+      <select id="complaint-reason" class="select-input" required>
+        <option value="">Choose...</option>
+      </select>
+    </div>
+    <div class="form-field" id="complaint-custom-reason-wrap" hidden>
+      <label for="complaint-custom-reason">Please specify</label>
+      <input type="text" id="complaint-custom-reason" class="text-input" maxlength="255" />
+    </div>
+    <div class="form-field two-span">
+      <label for="complaint-description">Details</label>
+      <textarea id="complaint-description" class="text-input" rows="4" minlength="10" maxlength="2000" required placeholder="Describe what happened, when, and any other relevant details (at least 10 characters)."></textarea>
+    </div>
+    <div class="form-field two-span">
+      <label class="anon-option" for="complaint-anonymous">
+        <input type="checkbox" id="complaint-anonymous" />
+        <span><strong>File anonymously</strong>
+          <small>Your name is hidden from everyone, including the person you are complaining about. Only the administrator can look up who filed it, and every look-up is recorded. You will still see this complaint under &ldquo;My complaints&rdquo; and can withdraw it.</small></span>
+      </label>
+    </div>
+    <div class="form-actions two-span"><button type="submit" class="role-btn" id="complaint-submit">Submit Complaint</button></div>
+  </form>
+  <p id="complaint-error" class="dash-alert error" hidden></p>
+  <p id="complaint-success" class="success-text" hidden></p>
+</section>
+</div>
+
+<dialog id="complaint-detail-modal" class="modal modal-wide" aria-labelledby="cd-title">
+  <div class="modal-body">
+    <div class="ann-detail-badges" id="cd-badges"></div>
+    <h2 id="cd-title"></h2>
+    <p class="cc-meta" id="cd-meta"></p>
+    <ol class="cc-timeline" id="cd-timeline"></ol>
+    <h3 class="modal-subhead">What you wrote</h3>
+    <p class="cd-text" id="cd-text"></p>
+    <div id="cd-note"></div>
+    <p class="cd-privacy" id="cd-privacy"></p>
+    <div class="cc-actions" id="cd-actions"></div>
+    <button id="cd-close" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+
+<dialog id="complaint-action-modal" class="modal">
+  <div class="modal-body">
+    <h2 id="complaint-action-title"></h2>
+    <p id="complaint-action-summary" class="panel-hint"></p>
+    <form id="complaint-action-form" class="form-grid">
+      <div class="form-field two-span">
+        <label for="complaint-action-note">Note (optional)</label>
+        <input type="text" id="complaint-action-note" class="text-input" maxlength="500" />
+      </div>
+      <div class="form-actions two-span"><button type="submit" class="role-btn" id="complaint-action-submit">Confirm</button></div>
+    </form>
+    <p id="complaint-action-error" class="dash-alert error" hidden></p>
+    <button id="close-complaint-action-modal" class="back-link modal-close-btn" type="button">Cancel</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/charts.js"></script>
+<script src="/static/js/complaints-portal.js"></script>
+{% endblock %}

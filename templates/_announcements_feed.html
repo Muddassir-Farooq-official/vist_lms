@@ -1,0 +1,29 @@
+{# Official announcements for the person signed in -- the same screen in every portal. #}
+<section class="sh-card ann-panel" aria-label="Announcements">
+  <div class="ann-toolbar">
+    <input id="ann-search" class="text-input" type="search" placeholder="Search announcements&hellip;" aria-label="Search announcements" />
+    <select id="ann-category" class="select-input" aria-label="Category">
+      <option value="">All categories</option>
+      <option value="GENERAL">General</option><option value="ACADEMIC">Academic</option><option value="EXAMINATION">Examinations</option>
+      <option value="ADMISSIONS">Admissions</option><option value="FEES">Fees</option><option value="EVENT">Events</option>
+      <option value="HOLIDAY">Holidays</option><option value="SAFETY">Safety &amp; security</option>
+    </select>
+    <label class="ann-unread-toggle"><input type="checkbox" id="ann-unread" /> Unread only</label>
+    <button type="button" class="role-btn small-btn secondary-btn" id="ann-readall">Mark all as read</button>
+  </div>
+  <div id="ann-list" class="ann-list" aria-live="polite"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div><div class="skeleton-line"></div></div></div>
+  <button type="button" class="ann-more" id="ann-more" hidden>Show older announcements</button>
+  <p class="empty-state" id="ann-empty" hidden>There are no announcements here yet.</p>
+</section>
+
+<dialog id="ann-modal" class="modal modal-wide" aria-labelledby="ann-modal-title">
+  <div class="modal-body">
+    <div class="ann-detail-badges" id="ann-modal-badges"></div>
+    <h2 id="ann-modal-title"></h2>
+    <div class="ann-issuer" id="ann-modal-issuer"></div>
+    <div class="ann-body" id="ann-modal-body"></div>
+    <div id="ann-modal-files"></div>
+    <p class="ann-audience" id="ann-modal-audience"></p>
+    <button id="ann-modal-close" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>

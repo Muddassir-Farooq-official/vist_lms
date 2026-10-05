@@ -1,0 +1,15 @@
+{% extends "admin/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Tasks{% endblock %}
+{% block page_title %}Tasks{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Assign work, resolve flagged tasks, and see who delivers on time, who is late and who turned work down, and why.</div>{% endblock %}
+
+{% block content %}
+{% with is_admin=True %}{% include "_tasks_portal.html" %}{% endwith %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/student-ui.js"></script>
+<script src="/static/js/charts.js"></script>
+<script src="/static/js/tasks-portal.js"></script>
+{% endblock %}

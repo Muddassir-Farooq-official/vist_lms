@@ -1,0 +1,7 @@
+{% extends "library/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}My payslips{% endblock %}
+{% block page_title %}My payslips{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Your monthly salary slips, with every allowance and deduction.</div>{% endblock %}
+{% block content %}{% include "shared/payslips_content.html" %}{% endblock %}
+{% block extra_scripts %}<script src="/static/js/payslips-staff.js"></script>{% endblock %}

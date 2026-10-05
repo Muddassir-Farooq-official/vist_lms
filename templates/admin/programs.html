@@ -1,0 +1,79 @@
+{% extends "admin/_base.html" %}
+{% block title %}Programs{% endblock %}
+{% block page_title %}Programs{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="all" role="tab" aria-selected="true"><span>All programs</span></button>
+  <button class="portal-tab" data-tab="add" role="tab" aria-selected="false"><span>Add a program</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="all">
+<section class="panel">
+  <h2>All Programs</h2>
+  <div id="programs-table-wrap">
+    <table class="dash-table" id="programs-list-table">
+      <thead><tr><th>Code</th><th>Name</th><th class="num">Duration</th><th class="num">Semesters</th><th>Status</th><th></th></tr></thead>
+      <tbody id="programs-list-tbody"></tbody>
+    </table>
+    <p class="empty-state" id="programs-list-empty" hidden>No programs yet — add one above.</p>
+  </div>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="add" hidden>
+<section class="panel">
+  <h2>Add Program</h2>
+  <form id="create-program-form" class="form-grid two-col">
+    <div class="form-field">
+      <label for="p-code">Code</label>
+      <input type="text" id="p-code" class="text-input" placeholder="BSN" required maxlength="20" />
+    </div>
+    <div class="form-field">
+      <label for="p-name">Name</label>
+      <input type="text" id="p-name" class="text-input" placeholder="BS Nursing" required maxlength="150" />
+    </div>
+    <div class="form-field">
+      <label for="p-years">Duration (years)</label>
+      <input type="number" id="p-years" class="text-input" min="1" max="10" required />
+    </div>
+    <div class="form-field">
+      <label for="p-semesters">Total Semesters</label>
+      <input type="number" id="p-semesters" class="text-input" min="1" max="20" required />
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="role-btn" id="create-program-btn">Create Program</button>
+    </div>
+  </form>
+  <p id="create-error" class="dash-alert error" hidden></p>
+  <p id="create-success" class="success-text" hidden></p>
+</section>
+</div>
+
+<dialog id="edit-program-modal" class="modal">
+  <div class="modal-body">
+    <h2>Edit Program</h2>
+    <p class="panel-hint" id="edit-program-code-hint"></p>
+    <form id="edit-program-form" class="form-grid">
+      <div class="form-field"><label for="ep-name">Name</label><input type="text" id="ep-name" class="text-input" required maxlength="150" /></div>
+      <div class="form-field"><label for="ep-years">Duration (years)</label><input type="number" id="ep-years" class="text-input" min="1" max="10" required /></div>
+      <div class="form-field"><label for="ep-semesters">Total Semesters</label><input type="number" id="ep-semesters" class="text-input" min="1" max="20" required /></div>
+      <div class="form-field">
+        <label for="ep-active">Status</label>
+        <select id="ep-active" class="select-input">
+          <option value="true">Active</option>
+          <option value="false">Inactive</option>
+        </select>
+      </div>
+      <div class="form-actions"><button type="submit" class="role-btn" id="edit-program-submit">Save Changes</button></div>
+    </form>
+    <p id="edit-program-error" class="dash-alert error" hidden></p>
+    <p id="edit-program-success" class="success-text" hidden></p>
+    <button id="close-edit-program-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/programs.js"></script>
+{% endblock %}

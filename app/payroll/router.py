@@ -1,0 +1,186 @@
+from __future__ import annotations
+
+import uuid
+from datetime import date
+from decimal import Decimal
+
+from fastapi import APIRouter, Depends
+from fastapi.responses import Response
+from pydantic import BaseModel, Field
+
+from app.accounts.models import PaymentMethod
+from app.accounts.schemas import ReasonIn
+from app.auth.permissions import Permissions
+from app.core.database import get_db
+from app.core.dependencies import CurrentUser, get_current_user, require_permission
+from app.payroll.models import AdvanceStatus, PayItemCalc, PayItemKind
+from app.payroll.payslip_pdf import render_payslip_pdf
+from app.payroll.service import PayrollService
+
+router = APIRouter(prefix="/payroll", tags=["payroll"])
+view = require_permission(Permissions.PAYROLL_VIEW)
+manage = require_permission(Permissions.PAYROLL_MANAGE)
+approve = require_permission(Permissions.PAYROLL_APPROVE)
+SECURITY = {"X-Content-Type-Options": "nosniff"}
+
+
+class PayItemIn(BaseModel):
+    employee_id: uuid.UUID
+    kind: PayItemKind
+    name: str = Field(min_length=2, max_length=80)
+    calc: PayItemCalc = PayItemCalc.FIXED
+    value: Decimal = Field(gt=0, le=10_000_000)
+    valid_from: date | None = None
+    valid_until: date | None = None
+
+
+class PayItemUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=80)
+    value: Decimal | None = Field(default=None, gt=0, le=10_000_000)
+    is_active: bool | None = None
+    valid_from: date | None = None
+    valid_until: date | None = None
+
+
+class AdvanceIn(BaseModel):
+    employee_id: uuid.UUID
+    amount: Decimal = Field(gt=0, le=10_000_000)
+    monthly_recovery: Decimal = Field(gt=0, le=10_000_000)
+    reason: str = Field(min_length=3, max_length=300)
+    payment_method: PaymentMethod
+    reference_no: str | None = Field(default=None, max_length=80)
+    granted_on: date
+
+
+class RunIn(BaseModel):
+    month: date
+
+
+class PayslipEdit(BaseModel):
+    unpaid_days: Decimal | None = Field(default=None, ge=0, le=31)
+    adjustment: Decimal | None = Field(default=None, ge=-10_000_000, le=10_000_000)
+    adjustment_note: str | None = Field(default=None, max_length=200)
+    held: bool | None = None
+    held_reason: str | None = Field(default=None, max_length=200)
+
+
+class PayIn(BaseModel):
+    payment_method: PaymentMethod
+    paid_date: date
+    reference_no: str | None = Field(default=None, max_length=80)
+
+
+# ============================================================ pay items and advances
+@router.get("/employees", summary="Search current staff, with their basic salary (for choosing who a pay item or advance is for)")
+async def employees(q: str | None = None, current_user: CurrentUser = Depends(view), db=Depends(get_db)) -> list[dict]:
+    return await PayrollService(db).employees(q)
+
+
+@router.get("/items", summary="Recurring allowances and deductions")
+async def items(employee_id: uuid.UUID | None = None, current_user: CurrentUser = Depends(view), db=Depends(get_db)) -> list[dict]:
+    return await PayrollService(db).pay_items(employee_id)
+
+
+@router.post("/items", status_code=201, summary="Add an allowance or deduction to an employee's pay")
+async def add_item(payload: PayItemIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    service = PayrollService(db)
+    i = await service.add_pay_item(payload.model_dump(), actor_id=current_user.id)
+    return next(r for r in await service.pay_items(payload.employee_id) if r["id"] == i.id)
+
+
+@router.patch("/items/{item_id}", summary="Change or switch off a pay item")
+async def edit_item(item_id: uuid.UUID, payload: PayItemUpdate, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    service = PayrollService(db)
+    i = await service.update_pay_item(item_id, payload.model_dump(exclude_unset=True), actor_id=current_user.id)
+    return next(r for r in await service.pay_items(i.employee_id) if r["id"] == i.id)
+
+
+@router.get("/advances", summary="Salary advances and what is still owed on each")
+async def advances(employee_id: uuid.UUID | None = None, status: AdvanceStatus | None = None, current_user: CurrentUser = Depends(view), db=Depends(get_db)) -> list[dict]:
+    return await PayrollService(db).advances(employee_id, status)
+
+
+@router.post("/advances", status_code=201, summary="Pay an employee an advance; it is recovered from their next payslips")
+async def grant_advance(payload: AdvanceIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    service = PayrollService(db)
+    a = await service.grant_advance(actor_id=current_user.id, employee_id=payload.employee_id, amount=payload.amount, monthly_recovery=payload.monthly_recovery, reason=payload.reason,
+                                    method=payload.payment_method, reference=payload.reference_no, granted_on=payload.granted_on)
+    return next(r for r in await service.advances(payload.employee_id, None) if r["id"] == a.id)
+
+
+# ============================================================ the monthly run
+@router.get("/runs", summary="Payroll runs, newest month first")
+async def runs(current_user: CurrentUser = Depends(view), db=Depends(get_db)) -> list[dict]:
+    return await PayrollService(db).runs()
+
+
+@router.post("/runs", status_code=201, summary="Prepare payroll for a month: one payslip per employee, worked out from salary, pay items, bonuses and advances")
+async def prepare(payload: RunIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    service = PayrollService(db)
+    run, skipped = await service.prepare(payload.month, actor_id=current_user.id)
+    return {**await service.run_detail(run.id), "skipped": skipped}
+
+
+@router.get("/runs/{run_id}", summary="One run with every payslip")
+async def run_detail(run_id: uuid.UUID, current_user: CurrentUser = Depends(view), db=Depends(get_db)) -> dict:
+    return await PayrollService(db).run_detail(run_id)
+
+
+@router.post("/runs/{run_id}/recalculate", summary="Work the draft out again from the latest salaries, pay items and bonuses (your unpaid days and adjustments are kept)")
+async def recalculate(run_id: uuid.UUID, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    service = PayrollService(db)
+    await service.recalculate(run_id, actor_id=current_user.id)
+    return await service.run_detail(run_id)
+
+
+@router.patch("/runs/{run_id}/payslips/{payslip_id}", summary="Set unpaid days, an adjustment, or hold a payslip back (draft only)")
+async def edit_payslip(run_id: uuid.UUID, payslip_id: uuid.UUID, payload: PayslipEdit, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    service = PayrollService(db)
+    await service.update_payslip(run_id, payslip_id, payload.model_dump(exclude_unset=True), actor_id=current_user.id)
+    return await service.run_detail(run_id)
+
+
+@router.post("/runs/{run_id}/approve", summary="Approve a draft run (administration)")
+async def approve_run(run_id: uuid.UUID, current_user: CurrentUser = Depends(approve), db=Depends(get_db)) -> dict:
+    service = PayrollService(db)
+    await service.approve(run_id, admin_id=current_user.id)
+    return await service.run_detail(run_id)
+
+
+@router.post("/runs/{run_id}/pay", summary="Pay an approved run: it becomes one salary expense in the books, and everyone is sent their payslip")
+async def pay_run(run_id: uuid.UUID, payload: PayIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    service = PayrollService(db)
+    await service.pay(run_id, actor_id=current_user.id, method=payload.payment_method, reference=payload.reference_no, paid_date=payload.paid_date)
+    return await service.run_detail(run_id)
+
+
+@router.post("/runs/{run_id}/cancel", summary="Cancel a run that has not been paid")
+async def cancel_run(run_id: uuid.UUID, payload: ReasonIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    service = PayrollService(db)
+    await service.cancel(run_id, actor_id=current_user.id, reason=payload.reason)
+    return await service.run_detail(run_id)
+
+
+@router.post("/runs/{run_id}/reverse-payment", summary="Reverse a payment made by mistake (administration)")
+async def reverse(run_id: uuid.UUID, payload: ReasonIn, current_user: CurrentUser = Depends(approve), db=Depends(get_db)) -> dict:
+    service = PayrollService(db)
+    await service.reverse_payment(run_id, admin_id=current_user.id, reason=payload.reason)
+    return await service.run_detail(run_id)
+
+
+# ============================================================ payslips
+@router.get("/me", summary="My own payslips (paid months only)")
+async def my_payslips(current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> list[dict]:
+    return await PayrollService(db).my_payslips(current_user.id)
+
+
+@router.get("/payslips/{payslip_id}", summary="One payslip in full (its owner once paid, or the accounts office)")
+async def payslip(payslip_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    return await PayrollService(db).payslip_detail(payslip_id, viewer_user_id=current_user.id, can_view_all=Permissions.PAYROLL_VIEW in current_user.permissions)
+
+
+@router.get("/payslips/{payslip_id}/pdf", summary="A payslip as a PDF")
+async def payslip_pdf(payslip_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> Response:
+    p = await PayrollService(db).payslip_detail(payslip_id, viewer_user_id=current_user.id, can_view_all=Permissions.PAYROLL_VIEW in current_user.permissions)
+    return Response(content=render_payslip_pdf(p), media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="payslip-{p["employee_code"]}-{p["month"]:%Y-%m}.pdf"', **SECURITY})

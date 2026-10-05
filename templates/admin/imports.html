@@ -1,0 +1,75 @@
+{% extends "admin/_base.html" %}
+{% block title %}CSV Imports{% endblock %}
+{% block page_title %}CSV Imports{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="upload" role="tab" aria-selected="true"><span>Upload CSV</span></button>
+  <button class="portal-tab" data-tab="history" role="tab" aria-selected="false"><span>Import history</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="upload">
+<section class="panel">
+  <h2>Upload Student CSV</h2>
+
+  <div class="instruction-banner">
+    <p class="instruction-title">Before you upload:</p>
+    <ul class="instruction-list">
+      <li>The header row must match exactly — download the template below rather than typing headers by hand.</li>
+      <li><strong>Required:</strong> first_name, last_name, date_of_birth, gender, cnic, contact_no, marital_status, religion, nationality, guardian_name, guardian_cnic, relation_with_guardian, emergency_contact_no, present_address, province, district, city.</li>
+      <li><strong>Optional:</strong> guardian_contact_no, program, roll_number, admission_fee_paid, enrollment_date.</li>
+      <li>CNIC format: <code>12345-1234567-1</code>. Phone format: <code>03XXXXXXXXX</code> or <code>+923XXXXXXXXX</code>. Dates: <code>YYYY-MM-DD</code>.</li>
+      <li>Use the <strong>.xlsx template</strong> if you're editing in Excel — its phone/CNIC columns are pre-formatted as Text so Excel can't corrupt them, even across hundreds of rows you add yourself. The plain .csv template only protects its one example row.</li>
+      <li><strong>If any row fails validation, the entire file is rejected</strong> — nothing is imported until every row is fixed. Check Import History below for the exact row/field errors.</li>
+      <li>New student accounts are created automatically with a default password, forced to change on first login.</li>
+    </ul>
+    <div class="template-download-row">
+      <a href="/api/v1/imports/students/template.xlsx" class="role-btn template-download-btn" download>
+        Download Template (.xlsx &mdash; recommended)
+      </a>
+      <a href="/api/v1/imports/students/template" class="back-link" download>Download plain .csv instead</a>
+    </div>
+    <p class="panel-hint" style="margin-top: 10px;">
+      This system only accepts <strong>.csv</strong> uploads. Fill in the .xlsx template, then use Excel's <em>Save As &rarr; CSV</em> before uploading &mdash; because the columns were already Text-formatted, that save keeps leading zeros intact.
+    </p>
+  </div>
+
+  <form id="upload-form" class="upload-row">
+    <input type="file" id="csv-file-input" accept=".csv" required />
+    <button type="submit" class="role-btn" id="upload-btn">Upload &amp; Import</button>
+  </form>
+  <p id="upload-error" class="dash-alert error" hidden></p>
+  <p id="upload-status" class="upload-status" hidden></p>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="history" hidden>
+<section class="panel">
+  <h2>Import History</h2>
+  <div id="jobs-table-wrap">
+    <table class="dash-table" id="jobs-table">
+      <thead><tr><th>File</th><th>Status</th><th class="num">Rows</th><th>When</th><th></th></tr></thead>
+      <tbody id="jobs-tbody"></tbody>
+    </table>
+    <p class="empty-state" id="jobs-empty" hidden>No imports yet.</p>
+  </div>
+</section>
+</div>
+
+<dialog id="errors-modal" class="modal">
+  <div class="modal-body">
+    <h2>Row Errors</h2>
+    <div id="errors-list-wrap">
+      <table class="dash-table" id="errors-table">
+        <thead><tr><th>Row</th><th>Field</th><th>Message</th></tr></thead>
+        <tbody id="errors-tbody"></tbody>
+      </table>
+    </div>
+    <button id="close-errors-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/imports.js"></script>
+{% endblock %}

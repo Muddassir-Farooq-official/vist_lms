@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#2454d6" />
+  <title>Sign in &mdash; VIST LMS</title>
+  <link rel="stylesheet" href="/static/css/theme.css" />
+  <!-- While the person types, quietly fetch what every portal page needs, so
+       the page they land on appears instantly after sign-in. -->
+  <link rel="prefetch" href="/static/css/dashboard.css" as="style" />
+  <link rel="prefetch" href="/static/js/admin-common.js" as="script" />
+</head>
+<body class="auth-body">
+  <main class="auth-shell">
+    <section class="auth-card" aria-labelledby="auth-title">
+      <div class="auth-brand">
+        <span class="auth-logo" aria-hidden="true">V</span>
+        <span class="auth-brand-text">
+          <strong>VIST LMS</strong>
+          <small>Vertex Institute of Science &amp; Technology</small>
+        </span>
+      </div>
+
+      <h1 id="auth-title">Sign in</h1>
+      <p class="auth-sub">Students use their roll number. Staff use their employee code.</p>
+
+      <form id="login-form" novalidate>
+        <div class="auth-field">
+          <label for="username">Username</label>
+          <input class="auth-input" type="text" id="username" name="username" autocomplete="username"
+                 autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next"
+                 inputmode="text" aria-describedby="username-error" required autofocus />
+          <p class="auth-field-error" id="username-error" hidden></p>
+        </div>
+
+        <div class="auth-field">
+          <label for="password">Password</label>
+          <div class="auth-pw">
+            <input class="auth-input" type="password" id="password" name="password" autocomplete="current-password"
+                   enterkeyhint="go" aria-describedby="password-error" required />
+            <button type="button" class="auth-pw-toggle" id="pw-toggle" aria-controls="password" aria-pressed="false">Show</button>
+          </div>
+          <p class="auth-field-error" id="password-error" hidden></p>
+        </div>
+
+        <p class="auth-error" id="login-error" role="alert" hidden></p>
+
+        <button type="submit" class="auth-submit" id="submit-btn">
+          <span class="auth-spinner" aria-hidden="true"></span>
+          <span id="submit-label">Sign in</span>
+        </button>
+      </form>
+
+      <p class="auth-help">Forgot your password? Ask the administration office to reset it for you.</p>
+    </section>
+    <p class="auth-foot">&copy; Vertex Institute of Science &amp; Technology</p>
+  </main>
+
+  <script src="/static/js/login.js"></script>
+</body>
+</html>

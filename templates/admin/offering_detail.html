@@ -1,0 +1,140 @@
+{% extends "admin/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Offering Details{% endblock %}
+{% block page_title %}<span id="offering-page-title">Offering Details</span>{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle"><a href="/dashboard/admin/courses" class="back-link">&larr; Back to Courses</a></div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="overview" role="tab" aria-selected="true"><span>Overview</span></button>
+  <button class="portal-tab" data-tab="syllabus" role="tab" aria-selected="false"><span>Syllabus</span></button>
+  <button class="portal-tab" data-tab="timetable" role="tab" aria-selected="false"><span>Timetable</span></button>
+  <button class="portal-tab" data-tab="sessions" role="tab" aria-selected="false"><span>Class sessions</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="overview">
+<section class="panel">
+  <div class="panel-header">
+    <div class="panel-header-left">
+      <div class="panel-icon-badge">{{ nav_icon("graduation-cap") }}</div>
+      <h2>Overview</h2>
+    </div>
+  </div>
+  <dl class="detail-list" id="offering-summary"></dl>
+</section>
+<section class="panel">
+  <div class="panel-header">
+    <div class="panel-header-left">
+      <div class="panel-icon-badge">{{ nav_icon("dashboard") }}</div>
+      <h2>Term Dates</h2>
+    </div>
+  </div>
+  <p class="panel-hint">Required before a timetable slot can be added below — these set how many weeks of class sessions get generated.</p>
+  <div class="form-grid two-col">
+    <div class="form-field"><label for="term-start-input">Term Start Date</label><input type="date" id="term-start-input" class="text-input" /></div>
+    <div class="form-field"><label for="term-end-input">Term End Date</label><input type="date" id="term-end-input" class="text-input" /></div>
+    <div class="form-actions two-span"><button type="button" class="role-btn small-btn" id="term-dates-save-btn">Save Term Dates</button></div>
+  </div>
+  <p id="term-dates-error" class="dash-alert error" hidden></p>
+  <p id="term-dates-success" class="dash-alert" hidden></p>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="syllabus" hidden>
+<section class="panel">
+  <div class="panel-header">
+    <div class="panel-header-left">
+      <div class="panel-icon-badge">{{ nav_icon("issue-return") }}</div>
+      <h2>Course Syllabus / Overview Document</h2>
+    </div>
+  </div>
+  <p class="panel-hint">The single overall course outline — grading policy, textbooks, weekly schedule at a glance. Different from the per-session files below.</p>
+  <div class="profile-photo-actions">
+    <input type="file" id="syllabus-input" accept="application/pdf" />
+    <button type="button" class="role-btn small-btn" id="syllabus-upload-btn">Upload / Replace</button>
+    <a href="#" class="role-btn small-btn" id="syllabus-download-link" target="_blank" rel="noopener" hidden>Download</a>
+    <button type="button" class="danger-btn small-btn" id="syllabus-remove-btn" hidden>Remove</button>
+  </div>
+  <p id="syllabus-error" class="dash-alert error" hidden></p>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="timetable" hidden>
+<section class="panel">
+  <div class="panel-header">
+    <div class="panel-header-left">
+      <div class="panel-icon-badge">{{ nav_icon("dashboard") }}</div>
+      <h2>Timetable — Recurring Weekly Slots</h2>
+    </div>
+  </div>
+  <p class="panel-hint">Add a recurring weekly slot (e.g. every Monday, Period 1). This automatically generates one dated class session per matching week between the offering's term start/end dates, and is checked against every other slot in the institute for room, teacher, and student-batch conflicts.</p>
+  <table class="dash-table" id="timetable-slots-table">
+    <thead><tr><th>Day</th><th>Time</th><th>Room</th><th></th></tr></thead>
+    <tbody id="timetable-slots-tbody"></tbody>
+  </table>
+  <p class="empty-state" id="timetable-slots-empty" hidden>No recurring slots yet.</p>
+  <form id="add-slot-form" class="form-grid two-col">
+    <div class="form-field">
+      <label for="ts-day">Day of Week</label>
+      <select id="ts-day" class="select-input" required>
+        <option value="MONDAY">Monday</option>
+        <option value="TUESDAY">Tuesday</option>
+        <option value="WEDNESDAY">Wednesday</option>
+        <option value="THURSDAY">Thursday</option>
+        <option value="FRIDAY">Friday</option>
+        <option value="SATURDAY">Saturday</option>
+        <option value="SUNDAY">Sunday</option>
+      </select>
+    </div>
+    <div class="form-field"><label for="ts-room">Room</label><input type="text" id="ts-room" class="text-input" maxlength="50" required placeholder="e.g. Room 204" /></div>
+    <div class="form-field two-span">
+      <label for="ts-period">Period</label>
+      <select id="ts-period" class="select-input" required></select>
+    </div>
+    <div class="form-actions two-span"><button type="submit" class="role-btn" id="add-slot-submit">Add Slot</button></div>
+  </form>
+  <p id="add-slot-error" class="dash-alert error" hidden></p>
+  <p id="add-slot-success" class="dash-alert" hidden></p>
+
+  <h4 style="margin-top:20px">Or: Auto-Assign</h4>
+  <p class="panel-hint">Tell it how many sessions/week this course needs and a room — it finds a non-conflicting period, spread across the week, and creates all the slots at once. A simple assigner, not a full optimizer: it tries one period at a time and stops at the first one with enough free weekdays.</p>
+  <form id="auto-assign-form" class="form-grid two-col">
+    <div class="form-field"><label for="aa-sessions-per-week">Sessions per Week</label><input type="number" id="aa-sessions-per-week" class="text-input" min="1" max="5" required /></div>
+    <div class="form-field"><label for="aa-room">Room</label><input type="text" id="aa-room" class="text-input" maxlength="50" required placeholder="e.g. Room 204" /></div>
+    <div class="form-actions two-span"><button type="submit" class="role-btn" id="auto-assign-submit">Auto-Assign</button></div>
+  </form>
+  <p id="auto-assign-error" class="dash-alert error" hidden></p>
+  <p id="auto-assign-success" class="dash-alert" hidden></p>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="sessions" hidden>
+<section class="panel">
+  <div class="panel-header">
+    <div class="panel-header-left">
+      <div class="panel-icon-badge">{{ nav_icon("dashboard") }}</div>
+      <h2>Generated Class Sessions</h2>
+    </div>
+  </div>
+  <p class="panel-hint">One row per actual dated occurrence. Edit a session to reschedule just that date, or cancel it (e.g. for a holiday) without affecting any other session. Add a resource as an uploaded file or a link (e.g. Slides).</p>
+  <div id="content-lock-bar" class="lock-bar">
+    <div id="lock-status" class="lock-status"></div>
+    <div class="plan-actions">
+      <button type="button" class="role-btn small-btn secondary-btn" id="lock-past-btn">Lock past classes</button>
+      <button type="button" class="role-btn small-btn secondary-btn" id="lock-course-btn">Lock whole course</button>
+      <button type="button" class="role-btn small-btn" id="unlock-all-btn">Unlock everything</button>
+    </div>
+    <p class="panel-hint">Locked content stays visible to the teacher, students and you, but the teacher cannot change or delete it. &ldquo;Lock past classes&rdquo; protects old lectures while the teacher keeps preparing upcoming ones. You can lock or unlock any time, and you are never blocked yourself.</p>
+    <p id="lock-error" class="dash-alert error" hidden></p>
+  </div>
+  <div id="coverage-summary" class="plan-summary"></div>
+  <div id="class-sessions-list"></div>
+  <p class="empty-state" id="class-sessions-empty" hidden>No sessions generated yet &mdash; add a timetable slot above.</p>
+</section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>window.OFFERING_ID = {{ offering_id | tojson }};</script>
+<script src="/static/js/admin-offering-detail.js"></script>
+{% endblock %}

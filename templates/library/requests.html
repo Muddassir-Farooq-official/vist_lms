@@ -1,0 +1,46 @@
+{% extends "library/_base.html" %}
+{% block title %}Borrow Requests{% endblock %}
+{% block page_title %}Borrow Requests{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Requests submitted by students and faculty through their own portal.</div>{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <div class="toolbar">
+    <select id="status-filter" class="select-input">
+      <option value="PENDING" selected>Pending</option>
+      <option value="APPROVED">Approved</option>
+      <option value="REJECTED">Rejected</option>
+      <option value="CANCELLED">Cancelled</option>
+      <option value="">All</option>
+    </select>
+  </div>
+
+  <table class="dash-table" id="requests-table">
+    <thead><tr><th>Title</th><th>Requested By</th><th>Class / Semester</th><th>Note</th><th>Requested</th><th>Status</th><th></th></tr></thead>
+    <tbody id="requests-tbody"></tbody>
+  </table>
+  <p class="empty-state" id="requests-empty" hidden>No requests here.</p>
+</section>
+
+<dialog id="decision-modal" class="modal">
+  <div class="modal-body">
+    <h2 id="decision-modal-title">Decision</h2>
+    <p id="decision-modal-book" class="panel-hint"></p>
+    <form id="decision-form" class="form-grid">
+      <div class="form-field two-span">
+        <label for="decision-note">Note (optional)</label>
+        <input type="text" id="decision-note" class="text-input" maxlength="255" />
+      </div>
+      <div class="form-actions two-span">
+        <button type="submit" class="role-btn" id="decision-submit">Confirm</button>
+      </div>
+    </form>
+    <p id="decision-modal-error" class="dash-alert error" hidden></p>
+    <button id="close-decision-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/library-requests.js"></script>
+{% endblock %}

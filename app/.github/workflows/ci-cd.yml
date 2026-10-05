@@ -1,0 +1,145 @@
+name: CI/CD
+
+# Every push / PR: run checks.  Push to main AND checks pass: deploy to the VPS.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:        # lets you press "Run workflow" to redeploy manually
+
+env:
+  PYTHON_VERSION: "3.12"
+  APP_DIR: /opt/vist-lms     # folder on the VPS
+
+jobs:
+  test:
+    name: Tests + migrations
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: vist_lms_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/vist_lms_test
+      DATABASE_URL_SYNC: postgresql+psycopg://postgres:postgres@localhost:5432/vist_lms_test
+      REDIS_URL: redis://localhost:6379/0
+      JWT_SECRET: ci-test-secret-not-used-anywhere-real-32bytes-minimum
+      COOKIE_SECURE: "false"
+      APP_ENV: test
+      DEBUG: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+      - name: Create pg_trgm extension
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d vist_lms_test \
+            -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm;'
+
+      # --- Migration safety net: these stop a broken migration BEFORE it can touch the real DB ---
+      - name: Exactly one migration head (no forked history)
+        run: |
+          alembic heads
+          test "$(alembic heads | grep -c '(head)')" -eq 1
+      - name: Migrations apply cleanly on a blank database
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/vist_lms_migcheck
+          DATABASE_URL_SYNC: postgresql+psycopg://postgres:postgres@localhost:5432/vist_lms_migcheck
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -c 'CREATE DATABASE vist_lms_migcheck;'
+          alembic upgrade head
+      - name: Models match migrations (report only)
+        # Warns if a model was changed without a migration. Report-only because two
+        # small pre-existing differences exist today; remove continue-on-error once fixed.
+        continue-on-error: true
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/vist_lms_migcheck
+          DATABASE_URL_SYNC: postgresql+psycopg://postgres:postgres@localhost:5432/vist_lms_migcheck
+        run: alembic check
+
+      - name: Run tests
+        run: pytest -v
+
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+
+  typecheck:
+    name: Type check (mypy)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: mypy app/
+
+  deploy:
+    name: Deploy to VPS
+    needs: test                       # only runs if tests + migration checks passed
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: production-deploy        # never two deploys at once
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+
+      - name: Copy code to the VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          rsync -az --delete \
+            --exclude '.git/' --exclude '.github/' --exclude 'tests/' \
+            --exclude '__pycache__/' --exclude '/.env' --exclude '/var/' --exclude '/backups/' \
+            ./ "$VPS_USER@$VPS_HOST:$APP_DIR/"
+
+      - name: Run the deploy script on the VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: ssh "$VPS_USER@$VPS_HOST" "cd $APP_DIR && bash scripts/deploy.sh"

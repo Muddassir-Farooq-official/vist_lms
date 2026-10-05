@@ -1,0 +1,71 @@
+{% extends "library/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Library Dashboard{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Catalogue, inventory, and borrowing at a glance.</div>{% endblock %}
+
+{% block content %}
+<section class="stat-grid" aria-label="Library overview">
+  <div class="stat-card stat-card--blue">
+    <div class="stat-icon-badge">{{ nav_icon("library") }}</div>
+    <span class="stat-label">Total Titles</span>
+    <span class="stat-value" id="stat-titles">&mdash;</span>
+  </div>
+  <div class="stat-card stat-card--teal">
+    <div class="stat-icon-badge">{{ nav_icon("grid") }}</div>
+    <span class="stat-label">Total Copies</span>
+    <span class="stat-value" id="stat-total-copies">&mdash;</span>
+  </div>
+  <div class="stat-card stat-card--green">
+    <div class="stat-icon-badge">{{ nav_icon("check-circle") }}</div>
+    <span class="stat-label">Available</span>
+    <span class="stat-value" id="stat-available">&mdash;</span>
+  </div>
+  <div class="stat-card stat-card--orange">
+    <div class="stat-icon-badge">{{ nav_icon("issue-return") }}</div>
+    <span class="stat-label">Issued</span>
+    <span class="stat-value" id="stat-issued">&mdash;</span>
+  </div>
+  <div class="stat-card stat-card--red">
+    <div class="stat-icon-badge">{{ nav_icon("clock") }}</div>
+    <span class="stat-label">Overdue</span>
+    <span class="stat-value" id="stat-overdue">&mdash;</span>
+  </div>
+</section>
+
+<div class="dash-columns">
+  <section class="panel">
+    <div class="panel-header">
+      <div class="panel-header-left">
+        <div class="panel-icon-badge">{{ nav_icon("issue-return") }}</div>
+        <h2>Recent Issues</h2>
+      </div>
+      <a href="/dashboard/library/issue-return" class="view-all-link">View all {{ nav_icon("arrow-right") }}</a>
+    </div>
+    <table class="dash-table" id="recent-issues-table">
+      <thead><tr><th>Book</th><th>Borrower</th><th>Due</th></tr></thead>
+      <tbody id="recent-issues-tbody"></tbody>
+    </table>
+    <p class="empty-state" id="recent-issues-empty" hidden>No issues yet.</p>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <div class="panel-header-left">
+        <div class="panel-icon-badge">{{ nav_icon("check-circle") }}</div>
+        <h2>Recent Returns</h2>
+      </div>
+      <a href="/dashboard/library/issue-return" class="view-all-link">View all {{ nav_icon("arrow-right") }}</a>
+    </div>
+    <table class="dash-table" id="recent-returns-table">
+      <thead><tr><th>Book</th><th>Borrower</th><th>Returned</th></tr></thead>
+      <tbody id="recent-returns-tbody"></tbody>
+    </table>
+    <p class="empty-state" id="recent-returns-empty" hidden>No returns yet.</p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/library-dashboard.js"></script>
+{% endblock %}

@@ -1,0 +1,341 @@
+{% extends "admin/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Employees{% endblock %}
+{% block page_title %}Employees{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist">
+  <button class="portal-tab active" data-tab="list" role="tab">{{ nav_icon("employees") }}<span>Employees</span></button>
+  <button class="portal-tab" data-tab="jobroles" role="tab">{{ nav_icon("settings") }}<span>Job Roles</span></button>
+</div>
+
+<!-- ============ JOB ROLES ============ -->
+<div class="portal-tab-panel" data-tab-panel="jobroles" hidden>
+<section class="panel">
+  <h2>Job Roles</h2>
+  <p class="panel-hint">Define job titles before adding employees. Each job role maps to a system access role.</p>
+  <form id="create-jobrole-form" class="form-grid two-col">
+    <div class="form-field"><label for="jr-code">Code</label><input type="text" id="jr-code" class="text-input" placeholder="TCH" required maxlength="30" /></div>
+    <div class="form-field"><label for="jr-title">Title</label><input type="text" id="jr-title" class="text-input" placeholder="Teacher" required maxlength="100" /></div>
+    <div class="form-field">
+      <label for="jr-default-role">System Access Role</label>
+      <select id="jr-default-role" class="select-input" required>
+        <option value="">Select&hellip;</option>
+        <option value="TEACHER">Teacher</option>
+        <option value="ACCOUNTS_OFFICER">Accounts Officer</option>
+        <option value="LIBRARIAN">Librarian</option>
+        <option value="HOSTEL_WARDEN">Hostel Warden</option>
+        <option value="ADMIN">Administrator</option>
+      </select>
+    </div>
+    <div class="form-actions"><button type="submit" class="role-btn" id="create-jobrole-btn">Add Job Role</button></div>
+  </form>
+  <p id="jobrole-error" class="dash-alert error" hidden></p>
+  <table class="dash-table" id="jobroles-table">
+    <thead><tr><th>Code</th><th>Title</th><th>Access Role</th><th>Status</th><th></th></tr></thead>
+    <tbody id="jobroles-tbody"></tbody>
+  </table>
+</section>
+</div>
+
+<dialog id="edit-jobrole-modal" class="modal">
+  <div class="modal-body">
+    <h2>Edit Job Role</h2>
+    <p class="panel-hint" id="edit-jobrole-code-hint"></p>
+    <form id="edit-jobrole-form" class="form-grid">
+      <div class="form-field"><label for="ejr-title">Title</label><input type="text" id="ejr-title" class="text-input" required maxlength="100" /></div>
+      <div class="form-field">
+        <label for="ejr-default-role">System Access Role</label>
+        <select id="ejr-default-role" class="select-input" required>
+          <option value="TEACHER">Teacher</option>
+          <option value="ACCOUNTS_OFFICER">Accounts Officer</option>
+          <option value="LIBRARIAN">Librarian</option>
+          <option value="HOSTEL_WARDEN">Hostel Warden</option>
+          <option value="ADMIN">Administrator</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label for="ejr-active">Status</label>
+        <select id="ejr-active" class="select-input">
+          <option value="true">Active</option>
+          <option value="false">Inactive</option>
+        </select>
+      </div>
+      <div class="form-actions"><button type="submit" class="role-btn" id="edit-jobrole-submit">Save Changes</button></div>
+    </form>
+    <p id="edit-jobrole-error" class="dash-alert error" hidden></p>
+    <p id="edit-jobrole-success" class="success-text" hidden></p>
+    <button id="close-edit-jobrole-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+
+<!-- ============ EMPLOYEES ============ -->
+<div class="portal-tab-panel" data-tab-panel="list">
+<section class="panel">
+  <div class="toolbar">
+    <input type="text" id="search-input" class="text-input" placeholder="Search name, CNIC, phone..." />
+    <select id="status-filter" class="select-input">
+      <option value="">All statuses</option>
+      <option value="ACTIVE">Active</option>
+      <option value="ON_LEAVE">On Leave</option>
+      <option value="TERMINATED">Terminated</option>
+    </select>
+    <button id="open-add-employee" class="role-btn" type="button">+ Add Employee</button>
+    <button id="open-import-employees" class="role-btn secondary-btn" type="button">Import CSV</button>
+    <a id="export-employees-link" class="role-btn secondary-btn" href="/api/v1/employees/export" download>Export CSV</a>
+  </div>
+
+  <div id="employees-table-wrap">
+    <table class="dash-table" id="employees-table">
+      <thead><tr><th>Employee Code</th><th>Name</th><th>Status</th><th></th></tr></thead>
+      <tbody id="employees-tbody"></tbody>
+    </table>
+    <p class="empty-state" id="employees-empty" hidden>No employees match this search.</p>
+  </div>
+
+  <div class="pager" id="pager">
+    <button id="prev-page" class="page-btn" type="button">&larr; Prev</button>
+    <span id="page-info" class="page-info"></span>
+    <button id="next-page" class="page-btn" type="button">Next &rarr;</button>
+  </div>
+</section>
+</div>
+
+<dialog id="employee-modal" class="modal modal-wide">
+  <div class="modal-body">
+    <h2 id="modal-name"></h2>
+
+    <div class="profile-photo-row">
+      <div class="profile-photo-frame" id="modal-photo-frame">
+        <span class="profile-photo-placeholder">No Photo</span>
+      </div>
+      <div class="profile-photo-actions">
+        <input type="file" id="modal-photo-input" accept="image/jpeg,image/png,image/webp" />
+        <button type="button" class="role-btn small-btn" id="modal-photo-upload-btn">Upload / Replace</button>
+        <a href="#" class="role-btn small-btn" id="modal-photo-download-link" target="_blank" rel="noopener" hidden>Download Photo</a>
+        <button type="button" class="danger-btn small-btn" id="modal-photo-remove-btn" hidden>Remove</button>
+      </div>
+    </div>
+    <p id="modal-photo-error" class="dash-alert error" hidden></p>
+
+    <div class="form-actions">
+      <button type="button" class="role-btn" id="open-full-profile-btn">View Full Profile</button>
+    </div>
+
+    <dl class="detail-list" id="modal-details"></dl>
+
+    <h3 class="modal-subhead">Edit Details</h3>
+    <form id="edit-employee-form" class="form-grid two-col">
+      <div class="form-field"><label for="ee-contact">Contact No.</label><input type="text" id="ee-contact" class="text-input" placeholder="03XXXXXXXXX" /></div>
+      <div class="form-field"><label for="ee-department">Department</label><input type="text" id="ee-department" class="text-input" /></div>
+      <div class="form-field"><label for="ee-religion">Religion</label><select id="ee-religion" class="select-input"></select></div>
+      <div class="form-field"><label for="ee-province">Province</label><select id="ee-province" class="select-input"></select></div>
+      <div class="form-field"><label for="ee-district">District</label><select id="ee-district" class="select-input"></select></div>
+      <div class="form-field"><label for="ee-city">City</label><select id="ee-city" class="select-input"></select></div>
+      <div class="form-field two-span"><label for="ee-address">Address</label><input type="text" id="ee-address" class="text-input" maxlength="255" /></div>
+      <div class="form-field"><label for="ee-first-name">First Name</label><input type="text" id="ee-first-name" class="text-input" maxlength="100" /></div>
+      <div class="form-field"><label for="ee-last-name">Last Name</label><input type="text" id="ee-last-name" class="text-input" maxlength="100" /></div>
+      <div class="form-field"><label for="ee-dob">Date of Birth</label><input type="date" id="ee-dob" class="text-input" /></div>
+      <div class="form-field"><label for="ee-gender">Gender</label><select id="ee-gender" class="select-input"><option>Male</option><option>Female</option><option>Other</option></select></div>
+      <div class="form-field"><label for="ee-hire-date">Hire Date</label><input type="date" id="ee-hire-date" class="text-input" /></div>
+      <div class="form-field"><label for="ee-employment-type">Employment Type</label><select id="ee-employment-type" class="select-input"><option value="">Not set</option><option value="PERMANENT">Permanent</option><option value="CONTRACT">Contract</option><option value="VISITING">Visiting</option><option value="PART_TIME">Part time</option></select></div>
+      <div class="form-field"><label for="ee-email">Email</label><input type="email" id="ee-email" class="text-input" maxlength="255" /></div>
+      <div class="form-field"><label for="ee-blood-group">Blood Group</label><select id="ee-blood-group" class="select-input"><option value="">Unknown</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></div>
+      <div class="form-field"><label for="ee-marital">Marital Status</label><select id="ee-marital" class="select-input"><option value="">Not set</option><option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option></select></div>
+      <div class="form-field"><label for="ee-emergency-name">Emergency Contact Name</label><input type="text" id="ee-emergency-name" class="text-input" maxlength="150" /></div>
+      <div class="form-field"><label for="ee-emergency-no">Emergency Contact No.</label><input type="text" id="ee-emergency-no" class="text-input" placeholder="03XXXXXXXXX" /></div>
+      <div class="form-actions two-span"><button type="submit" class="role-btn" id="edit-employee-submit">Save Details</button></div>
+    </form>
+    <p id="edit-employee-success" class="success-text" hidden></p>
+
+    <div class="modal-status-change">
+      <label for="change-job-role">Job role (promotion / transfer)</label>
+      <select id="change-job-role" class="select-input"></select>
+      <input type="text" id="change-job-role-reason" class="text-input" placeholder="Reason (optional)" style="max-width:220px;" />
+      <button id="change-job-role-btn" class="role-btn" type="button">Change Job Role</button>
+      <button id="clearance-btn" class="role-btn" type="button">Check Clearance</button>
+    </div>
+    <div id="clearance-result" class="panel-hint" hidden></div>
+
+    <div class="modal-status-change">
+      <label for="new-status">Change status</label>
+      <select id="new-status" class="select-input">
+        <option value="ACTIVE">Active</option>
+        <option value="ON_LEAVE">On Leave</option>
+        <option value="TERMINATED">Terminated</option>
+      </select>
+      <button id="save-status" class="role-btn" type="button">Update Status</button>
+    </div>
+
+    <div class="modal-reset-row">
+      <input type="password" id="new-employee-password" class="text-input" placeholder="New password (min 10 characters)" style="max-width: 260px;" />
+      <button id="reset-employee-password-btn" class="danger-btn" type="button">Set New Password</button>
+      <span id="reset-employee-password-confirm" class="success-text" hidden>Password updated.</span>
+    </div>
+    <p id="reset-employee-password-error" class="dash-alert error" hidden></p>
+
+    <h3 class="modal-subhead">Salary History</h3>
+    <table class="dash-table" id="salary-history-table">
+      <thead><tr><th>Amount</th><th>From</th><th>To</th><th>Type</th></tr></thead>
+      <tbody id="salary-history-tbody"></tbody>
+    </table>
+    <div class="inline-form">
+      <select id="increment-type" class="select-input">
+        <option value="FIXED_AMOUNT">Fixed amount</option>
+        <option value="PERCENTAGE">Percentage</option>
+      </select>
+      <input type="number" id="increment-value" class="text-input small-input" placeholder="Value" step="0.01" min="0.01" />
+      <input type="text" id="increment-reason" class="text-input" placeholder="Reason (optional)" />
+      <button id="apply-increment-btn" class="role-btn" type="button">Apply</button>
+    </div>
+
+    <h3 class="modal-subhead">Bonuses</h3>
+    <table class="dash-table" id="bonuses-table">
+      <thead><tr><th>Amount</th><th>Reason</th><th>Date</th></tr></thead>
+      <tbody id="bonuses-tbody"></tbody>
+    </table>
+    <div class="inline-form">
+      <input type="number" id="bonus-amount" class="text-input small-input" placeholder="Amount" step="0.01" min="0.01" />
+      <input type="text" id="bonus-reason" class="text-input" placeholder="Reason" />
+      <button id="award-bonus-btn" class="role-btn" type="button">Award</button>
+    </div>
+
+    <p id="modal-error" class="dash-alert error" hidden></p>
+    <p id="modal-success" class="success-text" hidden></p>
+    <button id="close-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+
+<dialog id="import-employees-modal" class="modal">
+  <div class="modal-body">
+    <h2>Import Employees from CSV</h2>
+    <p class="panel-hint">Load existing staff in one go. If ANY row has a problem, nothing is imported and every problem is listed by row number. All imported staff get the same initial password below and must change it at first login. <a href="/api/v1/employees/import-template" download>Download CSV template</a></p>
+    <div class="form-field"><label for="import-emp-file">CSV file</label><input type="file" id="import-emp-file" accept=".csv,text/csv" /></div>
+    <div class="form-field"><label for="import-emp-password">Initial password for these staff (min 10 characters)</label><input type="text" id="import-emp-password" class="text-input" autocomplete="off" /></div>
+    <div class="form-actions"><button id="import-emp-submit" class="role-btn" type="button">Import</button></div>
+    <p id="import-emp-error" class="dash-alert error" hidden></p>
+    <div id="import-emp-errors" class="panel-hint" hidden></div>
+    <p id="import-emp-success" class="success-text" hidden></p>
+    <button id="close-import-employees-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+
+<dialog id="add-employee-modal" class="modal modal-wide">
+  <div class="modal-body">
+    <h2>Add Employee</h2>
+    <form id="add-employee-form" class="form-grid two-col">
+      <h3 class="form-section">Personal details</h3>
+      <div class="form-field"><label for="ae-first-name">First Name</label><input type="text" id="ae-first-name" class="text-input" required maxlength="100" /></div>
+      <div class="form-field"><label for="ae-last-name">Last Name</label><input type="text" id="ae-last-name" class="text-input" required maxlength="100" /></div>
+      <div class="form-field"><label for="ae-dob">Date of Birth</label><input type="date" id="ae-dob" class="text-input" required /></div>
+      <div class="form-field">
+        <label for="ae-gender">Gender</label>
+        <select id="ae-gender" class="select-input" required>
+          <option value="">Select&hellip;</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="form-field"><label for="ae-cnic">CNIC</label><input type="text" id="ae-cnic" class="text-input" placeholder="12345-1234567-1" required /></div>
+      <div class="form-field"><label for="ae-contact">Contact No.</label><input type="text" id="ae-contact" class="text-input" placeholder="03XXXXXXXXX" required /></div>
+      <h3 class="form-section">Job</h3>
+      <div class="form-field"><label for="ae-hire-date">Hire Date</label><input type="date" id="ae-hire-date" class="text-input" required /></div>
+      <div class="form-field"><label for="ae-department">Department (optional)</label><input type="text" id="ae-department" class="text-input" /></div>
+      <div class="form-field">
+        <label for="ae-job-role">Job Role</label>
+        <select id="ae-job-role" class="select-input" required><option value="">Select&hellip;</option></select>
+      </div>
+      <div class="form-field"><label for="ae-base-salary">Base Salary</label><input type="number" id="ae-base-salary" class="text-input" step="0.01" min="0" required /></div>
+      <h3 class="form-section">Address</h3>
+      <div class="form-field"><label for="ae-religion">Religion (optional)</label><select id="ae-religion" class="select-input"><option value="">Select&hellip;</option></select></div>
+      <div class="form-field"><label for="ae-province">Province (optional)</label><select id="ae-province" class="select-input"><option value="">Select&hellip;</option></select></div>
+      <div class="form-field"><label for="ae-district">District (optional)</label><select id="ae-district" class="select-input"><option value="">Choose a province first&hellip;</option></select></div>
+      <div class="form-field"><label for="ae-city">City (optional)</label><select id="ae-city" class="select-input"><option value="">Select&hellip;</option></select></div>
+      <div class="form-field two-span"><label for="ae-address">Address (optional)</label><input type="text" id="ae-address" class="text-input" maxlength="255" /></div>
+      <h3 class="form-section">Optional</h3>
+      <div class="form-field"><label for="ae-employment-type">Employment Type</label><select id="ae-employment-type" class="select-input"><option value="">Not set</option><option value="PERMANENT">Permanent</option><option value="CONTRACT">Contract</option><option value="VISITING">Visiting</option><option value="PART_TIME">Part time</option></select></div>
+      <div class="form-field"><label for="ae-email">Email (optional)</label><input type="email" id="ae-email" class="text-input" maxlength="255" /></div>
+      <div class="form-field"><label for="ae-blood-group">Blood Group (optional)</label><select id="ae-blood-group" class="select-input"><option value="">Unknown</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></div>
+      <div class="form-field"><label for="ae-marital">Marital Status (optional)</label><select id="ae-marital" class="select-input"><option value="">Not set</option><option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option></select></div>
+      <div class="form-field"><label for="ae-emergency-name">Emergency Contact Name (optional)</label><input type="text" id="ae-emergency-name" class="text-input" maxlength="150" /></div>
+      <div class="form-field"><label for="ae-emergency-no">Emergency Contact No. (optional)</label><input type="text" id="ae-emergency-no" class="text-input" placeholder="03XXXXXXXXX" /></div>
+      <h3 class="form-section">Login</h3>
+      <div class="form-field two-span"><label for="ae-password">Password (set by admin, min 10 characters)</label><input type="password" id="ae-password" class="text-input" minlength="10" required /></div>
+      <div class="form-actions two-span"><button type="submit" class="role-btn" id="add-employee-submit">Create Employee</button></div>
+    </form>
+    <p id="add-employee-error" class="dash-alert error" hidden></p>
+    <p id="add-employee-success" class="success-text" hidden></p>
+    <button id="close-add-employee-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+
+<dialog id="full-profile-modal" class="modal modal-wide">
+  <div class="modal-body">
+    <h2 id="fp-name"></h2>
+    <p id="fp-error" class="dash-alert error" hidden></p>
+
+    <h3 class="modal-subhead">Personal &amp; Employment</h3>
+    <dl class="detail-list" id="fp-core"></dl>
+
+    <h3 class="modal-subhead">Qualifications</h3>
+    <table class="dash-table" id="fp-qualifications-table">
+      <thead><tr><th>Degree</th><th>Institution</th><th>Year</th><th>Marks/Grade</th></tr></thead>
+      <tbody id="fp-qualifications-tbody"></tbody>
+    </table>
+    <p class="empty-state" id="fp-qualifications-empty" hidden>None on record.</p>
+
+    <h3 class="modal-subhead">Salary History</h3>
+    <table class="dash-table" id="fp-salary-table">
+      <thead><tr><th>Base Salary</th><th>Effective From</th><th>Effective To</th><th>Reason</th></tr></thead>
+      <tbody id="fp-salary-tbody"></tbody>
+    </table>
+
+    <h3 class="modal-subhead">Bonuses</h3>
+    <table class="dash-table" id="fp-bonuses-table">
+      <thead><tr><th>Amount</th><th>Reason</th><th>Awarded</th></tr></thead>
+      <tbody id="fp-bonuses-tbody"></tbody>
+    </table>
+    <p class="empty-state" id="fp-bonuses-empty" hidden>None on record.</p>
+
+    <div id="fp-teaching-section" hidden>
+      <h3 class="modal-subhead">Teaching</h3>
+      <dl class="detail-list" id="fp-teaching"></dl>
+    </div>
+
+    <h3 class="modal-subhead">Summary</h3>
+    <section class="stat-grid" aria-label="Cross-module summary">
+      <div class="stat-card">
+        <span class="stat-label">Fees Outstanding</span>
+        <span class="stat-value" id="fp-fee-outstanding">&mdash;</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Active Loans</span>
+        <span class="stat-value" id="fp-library-active">&mdash;</span>
+      </div>
+      <div class="stat-card stat-card--red">
+        <span class="stat-label">Overdue Loans</span>
+        <span class="stat-value" id="fp-library-overdue">&mdash;</span>
+      </div>
+      <div class="stat-card stat-card--red">
+        <span class="stat-label">Fines Pending</span>
+        <span class="stat-value" id="fp-fine-pending">&mdash;</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Complaints Filed</span>
+        <span class="stat-value" id="fp-complaints-filed">&mdash;</span>
+      </div>
+      <div class="stat-card stat-card--red">
+        <span class="stat-label">Complaints Against</span>
+        <span class="stat-value" id="fp-complaints-against">&mdash;</span>
+      </div>
+    </section>
+
+    <button id="close-full-profile-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/employees.js"></script>
+{% endblock %}

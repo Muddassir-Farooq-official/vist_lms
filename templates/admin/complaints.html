@@ -1,0 +1,111 @@
+{% extends "admin/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Complaints{% endblock %}
+{% block page_title %}Complaints{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Every complaint filed, across every role, with per-person patterns highlighted.</div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="overview" role="tab" aria-selected="true"><span>Overview</span></button>
+  <button class="portal-tab" data-tab="all" role="tab" aria-selected="false"><span>All complaints</span></button>
+  <button class="portal-tab" data-tab="people" role="tab" aria-selected="false"><span>By person</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="overview">
+  <div class="kpi-grid" aria-live="polite">
+    <div class="kpi"><span class="kpi-label">Open</span><strong class="kpi-value" id="kpi-open">&mdash;</strong><span class="kpi-sub" id="kpi-open-sub"></span></div>
+    <div class="kpi"><span class="kpi-label">Under review</span><strong class="kpi-value" id="kpi-review">&mdash;</strong><span class="kpi-sub">being looked into</span></div>
+    <div class="kpi"><span class="kpi-label">Closed</span><strong class="kpi-value" id="kpi-closed">&mdash;</strong><span class="kpi-sub" id="kpi-closed-sub"></span></div>
+    <div class="kpi"><span class="kpi-label">Average time to close</span><strong class="kpi-value" id="kpi-avg">&mdash;</strong><span class="kpi-sub">resolved or dismissed</span></div>
+    <div class="kpi"><span class="kpi-label">Filed, last 30 days</span><strong class="kpi-value" id="kpi-30">&mdash;</strong><span class="kpi-sub" id="kpi-30-sub"></span></div>
+    <div class="kpi"><span class="kpi-label">Filed anonymously</span><strong class="kpi-value" id="kpi-anon">&mdash;</strong><span class="kpi-sub" id="kpi-anon-sub"></span></div>
+  </div>
+
+  <div class="chart-grid">
+    <section class="sh-card"><div class="sh-card-head"><h2>Complaints by status</h2></div><div id="chart-status"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div></section>
+    <section class="sh-card"><div class="sh-card-head"><h2>Why people complain</h2></div><div id="chart-reason"></div></section>
+    <section class="sh-card chart-wide"><div class="sh-card-head"><h2>Filed and closed, last 12 weeks</h2></div><div id="chart-weekly"></div></section>
+    <section class="sh-card"><div class="sh-card-head"><h2>Who files them</h2></div><div id="chart-filedby"></div></section>
+    <section class="sh-card"><div class="sh-card-head"><h2>Who they are about</h2></div><div id="chart-against"></div></section>
+  </div>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="all" hidden>
+<section class="panel">
+  <div class="toolbar">
+    <select id="filter-status" class="select-input">
+      <option value="">All statuses</option>
+      <option value="SUBMITTED">Submitted</option>
+      <option value="UNDER_REVIEW">Under Review</option>
+      <option value="RESOLVED">Resolved</option>
+      <option value="DISMISSED">Dismissed</option>
+      <option value="WITHDRAWN">Withdrawn</option>
+    </select>
+    <select id="filter-target-type" class="select-input">
+      <option value="">All targets</option>
+      <option value="STUDENT">Students</option>
+      <option value="EMPLOYEE">Employees</option>
+    </select>
+    <select id="filter-reason" class="select-input">
+      <option value="">All reasons</option>
+    </select>
+    <select id="filter-anon" class="select-input">
+      <option value="">Named and anonymous</option>
+      <option value="anon">Anonymous only</option>
+      <option value="named">Named only</option>
+    </select>
+  </div>
+
+  <table class="dash-table" id="complaints-table">
+    <thead><tr><th>Against</th><th>Filed By</th><th>Reason</th><th>Status</th><th>Filed</th><th></th></tr></thead>
+    <tbody id="complaints-tbody"></tbody>
+  </table>
+  <p class="empty-state" id="complaints-empty" hidden>No complaints match this filter.</p>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="people" hidden>
+<section class="panel">
+  <div class="panel-header">
+    <div class="panel-header-left">
+      <div class="panel-icon-badge">{{ nav_icon("ban") }}</div>
+      <h2>Complaints by Person</h2>
+    </div>
+  </div>
+  <p class="panel-hint">People with 3 or more complaints are highlighted in red as a pattern worth reviewing.</p>
+  <div id="analytics-chart" class="bar-chart"></div>
+  <p class="empty-state" id="analytics-empty" hidden>No complaints have been filed yet.</p>
+</section>
+</div>
+
+<dialog id="complaint-detail-modal" class="modal modal-wide">
+  <div class="modal-body">
+    <h2>Complaint Detail</h2>
+    <dl class="detail-list" id="complaint-detail-fields"></dl>
+
+    <h3 class="modal-subhead">Update Status</h3>
+    <form id="complaint-status-form" class="form-grid">
+      <div class="form-field">
+        <label for="complaint-status-select">New Status</label>
+        <select id="complaint-status-select" class="select-input">
+          <option value="UNDER_REVIEW">Under Review</option>
+          <option value="RESOLVED">Resolved</option>
+          <option value="DISMISSED">Dismissed</option>
+        </select>
+      </div>
+      <div class="form-field two-span">
+        <label for="complaint-status-note">Note (optional)</label>
+        <input type="text" id="complaint-status-note" class="text-input" maxlength="500" />
+      </div>
+      <div class="form-actions two-span"><button type="submit" class="role-btn" id="complaint-status-submit">Update Status</button></div>
+    </form>
+    <p id="complaint-detail-error" class="dash-alert error" hidden></p>
+    <button id="close-complaint-detail-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/charts.js"></script>
+<script src="/static/js/complaints-admin.js"></script>
+{% endblock %}

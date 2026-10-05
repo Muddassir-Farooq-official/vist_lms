@@ -1,0 +1,14 @@
+{% extends "student/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Announcements{% endblock %}
+{% block page_title %}Announcements{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Official notices from the institute, with their attachments.</div>{% endblock %}
+
+{% block content %}
+{% include "_announcements_feed.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/announcement-ui.js"></script>
+<script src="/static/js/announcements-feed.js"></script>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "faculty/_base.html" %}
+{% block title %}Attendance{% endblock %}
+{% block page_title %}Attendance{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Mark attendance within 15 minutes of a session's start time. Outside that window, ask admin to mark it for you.</div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="take" role="tab" aria-selected="true"><span>Take attendance</span></button>
+  <button class="portal-tab" data-tab="requests" role="tab" aria-selected="false"><span>My correction requests</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="take">
+<section class="panel">
+  <div class="toolbar">
+    <select id="term-label-input" class="select-input">
+      <option value="">All terms</option>
+    </select>
+  </div>
+  <select id="offering-select" class="select-input" style="margin-top:12px">
+    <option value="">— Choose a course —</option>
+  </select>
+
+  <div id="session-picker-area" hidden>
+    <div class="form-field" style="margin-top:16px">
+      <label for="session-select">Select Class Session</label>
+      <select id="session-select" class="select-input"></select>
+    </div>
+    <div id="session-details" class="panel-hint" hidden></div>
+    <div id="window-notice" class="dash-alert" hidden></div>
+
+    <div class="form-actions" id="roster-tools" hidden>
+      <button type="button" class="role-btn small-btn" id="mark-all-present-btn">Mark all present</button>
+      <button type="button" class="role-btn small-btn" id="mark-all-absent-btn">Mark all absent</button>
+    </div>
+    <table class="dash-table" id="roster-table" hidden>
+      <thead><tr><th>Student</th><th>Attendance</th></tr></thead>
+      <tbody id="roster-tbody"></tbody>
+    </table>
+
+    <div class="form-field" id="correction-reason-field" hidden>
+      <label for="correction-reason-input">The marking window has closed. Give a reason and send this register to the admin for approval:</label>
+      <input type="text" id="correction-reason-input" class="text-input" maxlength="500" placeholder="e.g. Forgot to submit; was invigilating an exam" />
+    </div>
+
+    <div class="form-field checkbox-field" id="topic-completed-field" hidden>
+      <label><input type="checkbox" id="topic-completed-checkbox" /> Today's topic was fully covered</label>
+    </div>
+
+    <div class="form-actions" id="save-actions" hidden>
+      <button type="button" class="role-btn" id="save-attendance-btn">Save Attendance</button>
+      <a class="role-btn" id="register-csv-link" href="#" download hidden>Download register (CSV)</a>
+    </div>
+    <p id="attendance-error" class="dash-alert error" hidden></p>
+    <p id="attendance-success" class="dash-alert" hidden></p>
+  </div>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="requests" hidden>
+<section class="panel" id="my-requests-panel">
+  <div class="panel-header"><div class="panel-header-left"><h2>My Correction Requests</h2></div></div>
+  <p class="panel-hint">Requests you sent to the admin for classes whose marking window had closed.</p>
+  <div id="my-requests-list" class="complaint-list" aria-live="polite"></div>
+  <p class="empty-state" id="my-requests-empty" hidden>You have not sent any correction requests.</p>
+</section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/attendance-common.js"></script>
+<script src="/static/js/faculty-attendance.js"></script>
+{% endblock %}

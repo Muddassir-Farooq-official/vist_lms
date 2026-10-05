@@ -1,0 +1,40 @@
+{% extends "library/_base.html" %}
+{% block title %}Journals &amp; E-Resources{% endblock %}
+{% block page_title %}Journals &amp; E-Resources{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Same live search students and faculty have &mdash; for helping someone at the desk without logging in as them.</div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="journals" role="tab" aria-selected="true"><span>Journal search</span></button>
+  <button class="portal-tab" data-tab="eres" role="tab" aria-selected="false"><span>E-resources</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="journals">
+<section class="panel">
+  <h2>Journal Search</h2>
+  <p class="panel-hint">Live search across PubMed, PubMed Central, and DOAJ.</p>
+  <form id="journal-search-form" class="catalogue-toolbar">
+    <input type="text" id="journal-search-q" class="text-input" placeholder="Search nursing and health literature..." required minlength="2" style="flex:1;min-width:240px" />
+    <label class="cat-checkbox"><input type="checkbox" class="journal-source" value="pubmed" checked /> PubMed</label>
+    <label class="cat-checkbox"><input type="checkbox" class="journal-source" value="pmc" checked /> PMC</label>
+    <label class="cat-checkbox"><input type="checkbox" class="journal-source" value="doaj" checked /> DOAJ</label>
+    <button type="submit" class="role-btn" id="journal-search-submit">Search</button>
+  </form>
+  <p id="journal-search-error" class="dash-alert error" hidden></p>
+  <div id="journal-source-errors"></div>
+  <div class="journal-results" id="journal-results"></div>
+  <p class="empty-state" id="journal-results-empty">Search above for journal articles and abstracts.</p>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="eres" hidden>
+<section class="panel">
+  <h2>E-Resources</h2>
+  <div class="eresource-grid" id="eresource-grid"></div>
+</section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/library-journals-staff.js"></script>
+{% endblock %}

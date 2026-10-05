@@ -1,0 +1,36 @@
+{# The weekly timetable "sheet" (times down the side, weekdays across) with filters and PDF download.
+   Include it on any portal page; the server decides what each person may see. #}
+<section class="panel tt-panel" id="weekly-timetable">
+  <div class="tt-head">
+    <div class="tt-head-text">
+      <h2>Weekly timetable</h2>
+      <p id="tt-title" class="tt-title">Loading&hellip;</p>
+    </div>
+    <a id="tt-pdf" class="role-btn secondary-btn tt-pdf" href="#" data-download="timetable.pdf" data-label="PDF">&#8595; Download PDF</a>
+  </div>
+
+  <details class="tt-filter-box" id="tt-filter-box" open>
+  <summary>Filters <span id="tt-filter-count" class="tt-filter-count"></span></summary>
+  <div class="tt-filters" id="tt-filters">
+    <label class="tt-filter" data-filter="term"><span>Term</span><select id="tt-term" class="select-input"></select></label>
+    <label class="tt-filter" data-filter="program" hidden><span>Class / program</span><select id="tt-program" class="select-input"><option value="">All classes</option></select></label>
+    <label class="tt-filter" data-filter="semester" hidden><span>Semester</span><select id="tt-semester" class="select-input"><option value="">All semesters</option></select></label>
+    <label class="tt-filter" data-filter="section" hidden><span>Section</span><select id="tt-section" class="select-input"><option value="">All sections</option></select></label>
+    <label class="tt-filter" data-filter="teacher" hidden><span>Teacher</span><select id="tt-teacher" class="select-input"><option value="">All teachers</option></select></label>
+    <label class="tt-filter" data-filter="room" hidden><span>Room</span><input id="tt-room" class="text-input" type="text" maxlength="50" placeholder="e.g. R-101" /></label>
+    <button type="button" id="tt-reset" class="tt-reset" hidden>Clear filters</button>
+  </div>
+  </details>
+
+  <div class="tt-daytabs" id="tt-daytabs" role="tablist" aria-label="Choose a day"></div>
+
+  <div class="tt-sheet is-loading" aria-busy="true">
+    <table class="tt-grid" id="tt-grid" aria-label="Weekly timetable">
+      <thead></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <p id="tt-day-empty" class="empty-state tt-day-empty" hidden></p>
+  <p id="tt-empty" class="empty-state" hidden></p>
+  <p id="tt-error" class="dash-alert error" hidden></p>
+</section>

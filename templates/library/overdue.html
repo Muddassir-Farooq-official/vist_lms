@@ -1,0 +1,32 @@
+{% extends "library/_base.html" %}
+{% block title %}Overdue{% endblock %}
+{% block page_title %}Overdue Loans{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Currently overdue, oldest due date first.</div>{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <table class="dash-table" id="overdue-table">
+    <thead><tr><th>Title</th><th>Accession Code</th><th>Borrower</th><th>Due Date</th><th>Days Overdue</th><th></th></tr></thead>
+    <tbody id="overdue-tbody"></tbody>
+  </table>
+  <p class="empty-state" id="overdue-empty" hidden>Nothing overdue right now.</p>
+</section>
+
+<dialog id="overdue-fine-modal" class="modal">
+  <div class="modal-body">
+    <h2>Issue a Fine for Overdue Return</h2>
+    <p id="overdue-fine-summary" class="panel-hint"></p>
+    <form id="overdue-fine-form" class="form-grid">
+      <div class="form-field"><label for="overdue-fine-amount">Amount</label><input type="number" id="overdue-fine-amount" class="text-input" min="1" step="0.01" required /></div>
+      <div class="form-field two-span"><label for="overdue-fine-reason">Reason</label><input type="text" id="overdue-fine-reason" class="text-input" maxlength="500" required /></div>
+      <div class="form-actions two-span"><button type="submit" class="role-btn" id="overdue-fine-submit">Issue Fine</button></div>
+    </form>
+    <p id="overdue-fine-error" class="dash-alert error" hidden></p>
+    <button id="close-overdue-fine-modal" class="back-link modal-close-btn" type="button">Cancel</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/library-overdue.js"></script>
+{% endblock %}

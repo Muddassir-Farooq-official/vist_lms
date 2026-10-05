@@ -1,0 +1,13 @@
+{% extends "gate/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Applications{% endblock %}
+{% block page_title %}Applications{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Apply to the administration for leave, a certificate or anything else, and follow it to a decision.</div>{% endblock %}
+
+{% block content %}
+{% include "_applications_portal.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/applications-portal.js"></script>
+{% endblock %}

@@ -1,0 +1,81 @@
+{% extends "library/_base.html" %}
+{% block title %}Issue & Return{% endblock %}
+{% block page_title %}Issue &amp; Return{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="issue" role="tab" aria-selected="true"><span>Issue a book</span></button>
+  <button class="portal-tab" data-tab="issued" role="tab" aria-selected="false"><span>Currently issued</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="issue">
+<section class="panel">
+  <h2>Issue a Book</h2>
+
+  <div class="form-field">
+    <label for="issue-book-search">1. Search for a book</label>
+    <input type="text" id="issue-book-search" class="text-input" placeholder="Search title or author..." />
+  </div>
+  <div id="issue-book-results" class="chip-list"></div>
+
+  <div class="form-field" style="margin-top: 14px;">
+    <label for="issue-copy-select">2. Pick an available copy</label>
+    <select id="issue-copy-select" class="select-input" disabled><option value="">Search and select a book first&hellip;</option></select>
+  </div>
+
+  <div class="form-field" style="margin-top: 14px;">
+    <label for="issue-borrower-search">3. Search for a borrower</label>
+    <input type="text" id="issue-borrower-search" class="text-input" placeholder="Search student or employee name..." />
+  </div>
+  <div id="issue-borrower-results" class="chip-list"></div>
+  <p id="selected-borrower" class="panel-hint" hidden></p>
+
+  <div class="form-field" style="margin-top: 14px; max-width: 220px;">
+    <label for="issue-due-date">4. Due date</label>
+    <input type="date" id="issue-due-date" class="text-input" />
+  </div>
+
+  <div class="form-actions" style="margin-top: 16px;">
+    <button id="issue-submit-btn" class="role-btn" type="button" disabled>Issue Book</button>
+  </div>
+  <p id="issue-error" class="dash-alert error" hidden></p>
+  <p id="issue-success" class="success-text" hidden></p>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="issued" hidden>
+<section class="panel">
+  <h2>Currently Issued</h2>
+  <table class="dash-table" id="active-issues-table">
+    <thead><tr><th>Book</th><th>Copy</th><th>Borrower</th><th>Due</th><th></th></tr></thead>
+    <tbody id="active-issues-tbody"></tbody>
+  </table>
+  <p class="empty-state" id="active-issues-empty" hidden>No books currently issued.</p>
+</section>
+</div>
+
+<dialog id="return-modal" class="modal">
+  <div class="modal-body">
+    <h2>Return Book</h2>
+    <p class="panel-hint" id="return-book-hint"></p>
+    <div class="form-field">
+      <label for="return-condition">Condition notes (optional)</label>
+      <input type="text" id="return-condition" class="text-input" placeholder="e.g. minor wear, or 'damaged: torn cover'" />
+    </div>
+    <div class="form-field checkbox-field">
+      <label><input type="checkbox" id="return-is-lost" /> Borrower reported this copy lost</label>
+    </div>
+    <div class="form-field">
+      <label for="return-fine">Fine amount (Rs.)</label>
+      <input type="number" id="return-fine" class="text-input" min="0" step="0.01" />
+    </div>
+    <div class="form-actions"><button id="return-submit-btn" class="role-btn" type="button">Confirm Return</button></div>
+    <p id="return-error" class="dash-alert error" hidden></p>
+    <button id="close-return-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/library-issue-return.js"></script>
+{% endblock %}

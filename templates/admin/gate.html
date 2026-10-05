@@ -1,0 +1,136 @@
+{% extends "admin/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Gate{% endblock %}
+{% block page_title %}Gate{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Set when staff and students are expected, see who is late, and decide late-arrival fines for students.</div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="log" role="tab" aria-selected="true"><span>Gate log</span></button>
+  <button class="portal-tab" data-tab="fines" role="tab" aria-selected="false"><span id="ga-tab-fines">Fines to approve</span></button>
+  <button class="portal-tab" data-tab="staff" role="tab" aria-selected="false"><span>Staff timings</span></button>
+  <button class="portal-tab" data-tab="students" role="tab" aria-selected="false"><span>Student rules</span></button>
+  <button class="portal-tab" data-tab="report" role="tab" aria-selected="false"><span>Lateness report</span></button>
+</div>
+
+<!-- ============================= the log -->
+<div class="portal-tab-panel" data-tab-panel="log">
+  <section class="sh-card">
+    <div class="ann-toolbar">
+      <input id="al-q" class="text-input" type="search" placeholder="Search name, roll number or code&hellip;" aria-label="Search" />
+      <input id="al-day" class="text-input" type="date" aria-label="Day" />
+      <label class="ann-unread-toggle"><input type="checkbox" id="al-late" /> Late only</label>
+    </div>
+    <div class="rv-chips" id="al-kind"><button type="button" class="chip active" data-kind="">Everyone</button><button type="button" class="chip" data-kind="STUDENT">Students</button><button type="button" class="chip" data-kind="EMPLOYEE">Staff</button></div>
+    <p class="cc-meta" id="al-count"></p>
+    <div id="al-list" class="gate-list"></div>
+    <p class="empty-state" id="al-empty" hidden>Nobody was marked in on this day.</p>
+  </section>
+</div>
+
+<!-- ============================= fines -->
+<div class="portal-tab-panel" data-tab-panel="fines" hidden>
+  <section class="sh-card">
+    <p class="panel-hint">Students who arrive late are fined by the hour (every started hour counts). The fine is only a <b>request</b> until you approve it here. You may change the amount. Once approved, the student sees it in their fines.</p>
+    <div class="rv-chips" id="af-status"><button type="button" class="chip active" data-s="PENDING_APPROVAL">Waiting for you</button><button type="button" class="chip" data-s="APPROVED">Approved</button><button type="button" class="chip" data-s="REJECTED">Not charged</button></div>
+    <div id="af-list" class="asg-list"></div>
+    <p class="empty-state" id="af-empty" hidden>Nothing here.</p>
+  </section>
+</div>
+
+<!-- ============================= staff timings -->
+<div class="portal-tab-panel" data-tab-panel="staff" hidden>
+  <section class="sh-card">
+    <div class="sh-card-head"><h2>Default timing for staff</h2></div>
+    <p class="panel-hint">Used for any employee who has no timing of their own below. Staff who arrive late are shown in red at the gate. <b>Staff are never fined.</b></p>
+    <form id="sd-form" class="form-grid two-col" novalidate>
+      <div class="form-field"><label for="sd-in">Arrive by</label><input id="sd-in" class="text-input" type="time" /></div>
+      <div class="form-field"><label for="sd-out">Leave at</label><input id="sd-out" class="text-input" type="time" /></div>
+      <div class="form-field"><label for="sd-grace">Grace (minutes)</label><input id="sd-grace" class="text-input" type="number" min="0" max="180" /><small class="field-hint">Arriving within this many minutes after the time is not late.</small></div>
+      <div class="form-field"><label>Working days</label><div id="sd-days" class="dayboxes"></div></div>
+      <p id="sd-error" class="dash-alert error two-span" hidden></p>
+      <div class="form-actions two-span"><button type="button" class="role-btn" id="sd-save">Save default timing</button></div>
+    </form>
+  </section>
+  <section class="sh-card">
+    <div class="sh-card-head"><h2>Each employee's timing</h2></div>
+    <div class="ann-toolbar">
+      <input id="st-q" class="text-input" type="search" placeholder="Search name, code or job title&hellip;" aria-label="Search" />
+      <select id="st-role" class="select-input" aria-label="Job title"><option value="">All job titles</option></select>
+      <button type="button" class="role-btn secondary-btn" id="st-bulk-open">Set timing for many&hellip;</button>
+    </div>
+    <div id="st-list" class="auth-list"></div>
+    <p class="empty-state" id="st-empty" hidden>No employees match.</p>
+  </section>
+</div>
+
+<!-- ============================= student rules -->
+<div class="portal-tab-panel" data-tab-panel="students" hidden>
+  <section class="sh-card">
+    <div class="sh-card-head"><h2>Rules for all students</h2></div>
+    <p class="panel-hint">One timing for every student. A student who arrives after the grace period is late; the fine is the hourly rate for every started hour, counted from the arrival time.</p>
+    <form id="sr-form" class="form-grid two-col" novalidate>
+      <div class="form-field"><label for="sr-in">Students arrive by</label><input id="sr-in" class="text-input" type="time" /></div>
+      <div class="form-field"><label for="sr-out">Students may leave from <small class="field-hint inline">(optional)</small></label><input id="sr-out" class="text-input" type="time" /></div>
+      <div class="form-field"><label for="sr-grace">Grace (minutes)</label><input id="sr-grace" class="text-input" type="number" min="0" max="180" /></div>
+      <div class="form-field"><label>School days</label><div id="sr-days" class="dayboxes"></div></div>
+      <div class="form-field"><label for="sr-rate">Fine per late hour (Rs.)</label><input id="sr-rate" class="text-input" type="number" min="0" step="1" /></div>
+      <div class="form-field"><label for="sr-max">Most one student can be fined in a day (Rs.) <small class="field-hint inline">(optional)</small></label><input id="sr-max" class="text-input" type="number" min="0" step="1" placeholder="No limit" /></div>
+      <div class="form-field two-span"><label class="check-row"><input type="checkbox" id="sr-auto" /> <span>Ask me to approve a fine automatically when a student is marked in late</span></label>
+        <small class="field-hint">If this is off, late students are still shown in red, but no fine request is created.</small></div>
+      <div class="form-field two-span rules-note" id="sr-example"></div>
+      <p id="sr-error" class="dash-alert error two-span" hidden></p>
+      <div class="form-actions two-span"><button type="button" class="role-btn" id="sr-save">Save student rules</button></div>
+    </form>
+  </section>
+</div>
+
+<!-- ============================= report -->
+<div class="portal-tab-panel" data-tab-panel="report" hidden>
+  <section class="sh-card">
+    <div class="rv-chips" id="rp-days"><button type="button" class="chip active" data-d="30">Last 30 days</button><button type="button" class="chip" data-d="60">Last 60 days</button><button type="button" class="chip" data-d="90">Last 90 days</button><button type="button" class="chip" data-d="0">All time</button></div>
+    <div class="rv-chips" id="rp-kind"><button type="button" class="chip active" data-k="">Students and staff</button><button type="button" class="chip" data-k="STUDENT">Students</button><button type="button" class="chip" data-k="EMPLOYEE">Staff</button></div>
+    <div id="rp-tiles"></div>
+    <div class="chart-grid"><section class="sh-card flat chart-wide"><div class="sh-card-head"><h2>Late arrivals week by week</h2></div><div id="rp-chart"></div></section></div>
+    <h3 class="modal-subhead">Who is late most often</h3>
+    <div class="table-scroll"><table class="tk-table" id="rp-table"><thead><tr><th>Name</th><th>Days present</th><th>Days late</th><th>Total late</th><th>Average</th><th>Longest</th><th>Fines approved</th><th>Fines waiting</th></tr></thead><tbody id="rp-body"></tbody></table></div>
+    <p class="empty-state" id="rp-empty" hidden>Nobody was late in this period.</p>
+  </section>
+</div>
+
+<!-- ============================= dialogs -->
+<dialog id="ge-modal" class="modal" aria-labelledby="ge-title"><div class="modal-body">
+  <h2 id="ge-title">Correct the times</h2><p class="cc-meta" id="ge-who"></p>
+  <div class="form-field"><label for="ge-in">Arrived at</label><input id="ge-in" class="text-input" type="time" /></div>
+  <div class="form-field"><label for="ge-out">Left at</label><input id="ge-out" class="text-input" type="time" /><label class="check-row"><input type="checkbox" id="ge-clear" /> <span>Not left yet (clear the leaving time)</span></label></div>
+  <div class="form-field"><label for="ge-note">Reason for the correction</label><input id="ge-note" class="text-input" maxlength="500" /></div>
+  <p class="field-hint">Lateness, and any fine request that has not been decided, are worked out again from the new times.</p>
+  <p id="ge-error" class="dash-alert error" hidden></p>
+  <div class="form-actions"><button type="button" class="role-btn" id="ge-save">Save correction</button></div>
+  <button id="ge-close" class="back-link modal-close-btn" type="button">Cancel</button></div></dialog>
+
+<dialog id="gt-modal" class="modal" aria-labelledby="gt-title"><div class="modal-body">
+  <h2 id="gt-title">Timing</h2><p class="cc-meta" id="gt-who"></p>
+  <div id="gt-scope-wrap" class="form-field" hidden><label for="gt-scope">Apply to</label><select id="gt-scope" class="select-input"><option value="ALL">Every active employee</option><option value="JOB_ROLE">Everyone with one job title</option></select>
+    <select id="gt-role" class="select-input" hidden></select></div>
+  <div class="form-field"><label for="gt-in">Arrive by</label><input id="gt-in" class="text-input" type="time" /></div>
+  <div class="form-field"><label for="gt-out">Leave at</label><input id="gt-out" class="text-input" type="time" /></div>
+  <div class="form-field"><label>Working days</label><div id="gt-days" class="dayboxes"></div></div>
+  <p id="gt-error" class="dash-alert error" hidden></p>
+  <div class="form-actions"><button type="button" class="role-btn" id="gt-save">Save</button></div>
+  <button id="gt-close" class="back-link modal-close-btn" type="button">Cancel</button></div></dialog>
+
+<dialog id="gn-modal" class="modal" aria-labelledby="gn-title"><div class="modal-body">
+  <h2 id="gn-title">Do not charge this fine</h2><p class="cc-meta" id="gn-who"></p>
+  <div class="form-field"><label for="gn-note">Reason (the record keeps it)</label><textarea id="gn-note" class="text-input" rows="3" maxlength="500"></textarea></div>
+  <p id="gn-error" class="dash-alert error" hidden></p>
+  <div class="form-actions"><button type="button" class="danger-btn" id="gn-ok">Do not charge</button></div>
+  <button id="gn-close" class="back-link modal-close-btn" type="button">Cancel</button></div></dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/student-ui.js"></script>
+<script src="/static/js/charts.js"></script>
+<script src="/static/js/gate-ui.js"></script>
+<script src="/static/js/gate-admin.js"></script>
+{% endblock %}

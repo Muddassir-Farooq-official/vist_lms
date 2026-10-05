@@ -1,0 +1,36 @@
+{% extends "student/_base.html" %}
+{% block title %}My Attendance{% endblock %}
+{% block page_title %}My Attendance{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Your attendance in every course you're currently enrolled in.</div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="summary" role="tab" aria-selected="true"><span>Summary</span></button>
+  <button class="portal-tab" data-tab="history" role="tab" aria-selected="false"><span>Class by class</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="summary">
+<section class="sh-card" aria-labelledby="at-h1">
+  <div class="sh-card-head"><h2 id="at-h1">Overall attendance</h2></div>
+  <div id="att-overall"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
+  <p id="attendance-risk-notice" class="dash-alert error" hidden></p>
+</section>
+<section class="sh-card" aria-labelledby="at-h2">
+  <div class="sh-card-head"><h2 id="at-h2">By course</h2></div>
+  <div id="att-grid" class="course-grid"></div>
+  <p class="empty-state" id="attendance-empty" hidden>You are not currently enrolled in anything.</p>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="history" hidden>
+<section class="sh-card" id="history-panel">
+  <div class="sh-card-head"><h2 id="history-title">History</h2><button type="button" class="see-all" id="history-close">&larr; Back to summary</button></div>
+  <div id="history-list" class="history-list"></div>
+  <p class="empty-state" id="history-empty" hidden>No classes have been recorded yet.</p>
+</section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/student-attendance.js"></script>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "faculty/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Assignments{% endblock %}
+{% block page_title %}Assignments{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Set work for your classes, receive Google Drive links before the deadline, then accept or reject each one.</div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="list" role="tab" aria-selected="true"><span>My assignments</span></button>
+  <button class="portal-tab" data-tab="review" role="tab" aria-selected="false"><span id="tab-review">Review submissions</span></button>
+  <button class="portal-tab" data-tab="new" role="tab" aria-selected="false"><span>New assignment</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="list">
+  <section class="sh-card">
+    <div class="ann-toolbar">
+      <select id="tl-course" class="select-input" aria-label="Class"><option value="">All my classes</option></select>
+      <button type="button" class="role-btn" id="tl-new">+ New assignment</button>
+    </div>
+    <div id="tl-list" class="asg-list" aria-live="polite"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
+    <p class="empty-state" id="tl-empty" hidden>You have not set any assignments yet.</p>
+  </section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="review" hidden>
+  <section class="sh-card">
+    <div id="rv-empty-pick" class="home-empty">Choose an assignment on the first tab and press &ldquo;Review&rdquo;.</div>
+    <div id="rv-body" hidden>
+      <div class="sh-card-head"><div><h2 id="rv-title"></h2><p class="cc-meta" id="rv-meta"></p></div><a class="see-all" href="#list" id="rv-back">&larr; All assignments</a></div>
+      <div class="rv-chips" id="rv-chips" role="tablist"></div>
+      <div id="rv-rows" class="rv-rows" aria-live="polite"></div>
+      <p class="empty-state" id="rv-empty" hidden>Nobody in this group.</p>
+    </div>
+  </section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="new" hidden>
+  <section class="sh-card">
+    <div class="sh-card-head"><h2>Set a new assignment</h2></div>
+    <form id="as-form" class="form-grid two-col" novalidate>
+      <div class="form-field two-span"><label for="as-course">Class</label><select id="as-course" class="select-input"></select></div>
+      <div class="form-field two-span"><label for="as-title">Title</label><input id="as-title" class="text-input" maxlength="200" placeholder="e.g. Lab report 1" /></div>
+      <div class="form-field two-span"><label for="as-instructions">Instructions</label>
+        <textarea id="as-instructions" class="text-input" rows="7" maxlength="5000" placeholder="What should students do? What should the document contain?"></textarea></div>
+      <div class="form-field"><label for="as-deadline">Deadline</label><input id="as-deadline" class="text-input" type="datetime-local" />
+        <small class="field-hint">After this moment nobody can hand in or change their link.</small></div>
+      <div class="form-field"><label>Students hand in</label><p class="field-hint" style="margin:6px 0 0">A Google Drive link with <strong>view access</strong>. Their link is checked when they submit.</p></div>
+      <p id="as-error" class="dash-alert error two-span" hidden></p>
+      <div class="form-actions two-span"><button type="button" class="role-btn" id="as-create">Set assignment and notify students</button></div>
+    </form>
+  </section>
+</div>
+
+<dialog id="ed-modal" class="modal" aria-labelledby="ed-heading">
+  <div class="modal-body">
+    <h2 id="ed-heading">Edit assignment</h2>
+    <div class="form-field"><label for="ed-title">Title</label><input id="ed-title" class="text-input" maxlength="200" /></div>
+    <div class="form-field"><label for="ed-instructions">Instructions</label><textarea id="ed-instructions" class="text-input" rows="6" maxlength="5000"></textarea></div>
+    <div class="form-field"><label for="ed-deadline">Deadline</label><input id="ed-deadline" class="text-input" type="datetime-local" />
+      <small class="field-hint">A later deadline reopens it for everyone. An earlier one closes it.</small></div>
+    <p id="ed-error" class="dash-alert error" hidden></p>
+    <div class="form-actions"><button type="button" class="role-btn" id="ed-save">Save changes</button></div>
+    <button id="ed-close" class="back-link modal-close-btn" type="button">Cancel</button>
+  </div>
+</dialog>
+
+<dialog id="rj-modal" class="modal" aria-labelledby="rj-heading">
+  <div class="modal-body">
+    <h2 id="rj-heading">Send it back</h2>
+    <p class="cc-meta" id="rj-who"></p>
+    <div class="form-field"><label for="rj-reason">Why? (the student sees this)</label><textarea id="rj-reason" class="text-input" rows="4" maxlength="1000" placeholder="e.g. The link asks for access. Share it with &ldquo;Anyone with the link&rdquo; and submit again."></textarea></div>
+    <p class="asg-private" id="rj-warn" hidden>The deadline has passed, so the student <strong>cannot</strong> hand it in again unless you extend the deadline.</p>
+    <p id="rj-error" class="dash-alert error" hidden></p>
+    <div class="form-actions"><button type="button" class="danger-btn" id="rj-send">Reject</button></div>
+    <button id="rj-close" class="back-link modal-close-btn" type="button">Cancel</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/faculty-assignments.js"></script>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "student/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Home{% endblock %}
+{% block page_title %}Home{% endblock %}
+
+{% block content %}
+{% set skeleton %}<div class="skeleton-stack" aria-label="Loading"><div class="skeleton-line"></div><div class="skeleton-line short"></div><div class="skeleton-line"></div></div>{% endset %}
+<div class="home sh" data-home="student">
+  <header class="home-hero">
+    <h2 id="home-greeting">Welcome</h2>
+    <p id="home-date" class="home-date"></p>
+  </header>
+
+  <div class="sh-grid has-news">
+    <section class="sh-card sh-classes" aria-labelledby="sh-classes-h">
+      <div class="sh-card-head"><h2 id="sh-classes-h">Your next classes</h2><a class="see-all" href="/dashboard/student/timetable">Full timetable</a></div>
+      <div id="sh-class-grid" class="sh-class-grid" aria-live="polite">{{ skeleton }}</div>
+    </section>
+
+    <section class="sh-card sh-news" aria-labelledby="sh-news-h">
+      <div class="sh-card-head"><h2 id="sh-news-h">Announcements</h2><a class="see-all" href="/dashboard/student/announcements">View all</a></div>
+      <div id="sh-news">{{ skeleton }}</div>
+    </section>
+
+    <section class="sh-card sh-attendance" aria-labelledby="sh-att-h">
+      <div class="sh-card-head"><h2 id="sh-att-h">Your attendance</h2><a class="see-all" href="/dashboard/student/attendance">Details</a></div>
+      <div id="sh-att">{{ skeleton }}</div>
+    </section>
+
+    <section class="sh-card sh-alerts" aria-labelledby="sh-alerts-h">
+      <div class="sh-card-head"><h2 id="sh-alerts-h">Alerts &amp; deadlines</h2></div>
+      <div id="sh-alerts">{{ skeleton }}</div>
+    </section>
+
+    <section class="sh-card sh-courses" aria-labelledby="sh-courses-h">
+      <div class="sh-card-head"><h2 id="sh-courses-h">Your courses overview</h2><a class="see-all" href="/dashboard/student/courses">Details</a></div>
+      <div id="sh-courses">{{ skeleton }}</div>
+    </section>
+
+    <section class="sh-card sh-quick" aria-labelledby="sh-quick-h">
+      <div class="sh-card-head"><h2 id="sh-quick-h">Quick actions</h2></div>
+      <div class="sh-quick-grid">
+        <a class="sh-action" href="/api/v1/academics/timetable/weekly.pdf" data-download="timetable.pdf" data-label="PDF">{{ nav_icon("clock") }}<span>Download timetable (PDF)</span></a>
+        <a class="sh-action" href="/dashboard/student/library">{{ nav_icon("library") }}<span>Borrow a book</span></a>
+        <a class="sh-action" href="/dashboard/student/assignments">{{ nav_icon("exams") }}<span>Assignments</span></a>
+        <a class="sh-action" href="/dashboard/student/complaints">{{ nav_icon("ban") }}<span>Feedback &amp; complaints</span></a>
+        <a class="sh-action" href="/dashboard/student/fines">{{ nav_icon("fees") }}<span>My fines</span></a>
+        <a class="sh-action" href="/dashboard/student/profile">{{ nav_icon("user") }}<span>My profile</span></a>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/portal-home.js"></script>
+{% endblock %}

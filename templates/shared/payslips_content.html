@@ -1,0 +1,15 @@
+<section class="sh-card">
+  <p class="panel-hint">Your salary slip for each month appears here once that month's salary has been paid.</p>
+  <div id="ps-list" class="auth-list" aria-live="polite"></div>
+  <p class="empty-state" id="ps-empty" hidden>No payslips yet. They appear here after each month's salary is paid.</p>
+</section>
+
+<dialog id="pv-modal" class="modal" aria-labelledby="pv-title"><div class="modal-body">
+  <h2 id="pv-title"></h2><p class="cc-meta" id="pv-meta"></p>
+  <div class="chart-grid">
+    <div><h3 class="modal-subhead">Earnings</h3><div id="pv-earn" class="auth-list"></div></div>
+    <div><h3 class="modal-subhead">Deductions</h3><div id="pv-ded" class="auth-list"></div></div>
+  </div>
+  <div class="ps-net" id="pv-net"></div>
+  <div class="form-actions"><a class="role-btn" id="pv-pdf" href="#" data-download="payslip.pdf" data-label="file">Download PDF</a></div>
+  <button id="pv-close" class="back-link modal-close-btn" type="button">Close</button></div></dialog>

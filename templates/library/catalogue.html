@@ -1,0 +1,82 @@
+{% extends "library/_base.html" %}
+{% block title %}Catalogue{% endblock %}
+{% block page_title %}Catalogue{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <div class="toolbar">
+    <input type="text" id="search-input" class="text-input" placeholder="Search title, author, ISBN..." />
+    <button id="open-add-book" class="role-btn" type="button">+ Add Book</button>
+  </div>
+
+  <table class="dash-table" id="books-table">
+    <thead><tr><th>Code</th><th>Title</th><th>Author</th><th class="num">Copies</th><th class="num">Available</th><th></th></tr></thead>
+    <tbody id="books-tbody"></tbody>
+  </table>
+  <p class="empty-state" id="books-empty" hidden>No books match this search.</p>
+
+  <div class="pager" id="pager">
+    <button id="prev-page" class="page-btn" type="button">&larr; Prev</button>
+    <span id="page-info" class="page-info"></span>
+    <button id="next-page" class="page-btn" type="button">Next &rarr;</button>
+  </div>
+</section>
+
+<dialog id="book-modal" class="modal modal-wide">
+  <div class="modal-body">
+    <h2 id="book-modal-title"></h2>
+    <form id="edit-book-form" class="form-grid two-col">
+      <div class="form-field"><label for="eb-title">Title</label><input type="text" id="eb-title" class="text-input" required maxlength="255" /></div>
+      <div class="form-field"><label for="eb-author">Author</label><input type="text" id="eb-author" class="text-input" required maxlength="255" /></div>
+      <div class="form-field"><label for="eb-isbn">ISBN</label><input type="text" id="eb-isbn" class="text-input" /></div>
+      <div class="form-field"><label for="eb-category">Category</label><input type="text" id="eb-category" class="text-input" /></div>
+      <div class="form-field"><label for="eb-publisher">Publisher</label><input type="text" id="eb-publisher" class="text-input" /></div>
+      <div class="form-field"><label for="eb-year">Publication Year</label><input type="number" id="eb-year" class="text-input" min="1000" max="2100" /></div>
+      <div class="form-field"><label for="eb-shelf">Shelf Location</label><input type="text" id="eb-shelf" class="text-input" /></div>
+      <div class="form-field"><label for="eb-cover">Cover Image URL</label><input type="text" id="eb-cover" class="text-input" placeholder="https://..." /></div>
+      <div class="form-field two-span"><label for="eb-description">Description</label><input type="text" id="eb-description" class="text-input" /></div>
+      <div class="form-actions two-span"><button type="submit" class="role-btn" id="edit-book-submit">Save Changes</button></div>
+    </form>
+    <p id="book-modal-error" class="dash-alert error" hidden></p>
+    <p id="book-modal-success" class="success-text" hidden></p>
+
+    <h3 class="modal-subhead">Copies (<span id="copies-count">0</span>)</h3>
+    <table class="dash-table" id="copies-table">
+      <thead><tr><th>Accession Code</th><th>Status</th><th>Notes</th><th></th></tr></thead>
+      <tbody id="copies-tbody"></tbody>
+    </table>
+    <div class="inline-form">
+      <input type="number" id="add-copies-count" class="text-input small-input" placeholder="Count" min="1" max="200" value="1" />
+      <button id="add-copies-btn" class="role-btn" type="button">Add Copies</button>
+    </div>
+
+    <button id="close-book-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+
+<dialog id="add-book-modal" class="modal modal-wide">
+  <div class="modal-body">
+    <h2>Add Book</h2>
+    <form id="add-book-form" class="form-grid two-col">
+      <div class="form-field"><label for="ab-title">Title</label><input type="text" id="ab-title" class="text-input" required maxlength="255" /></div>
+      <div class="form-field"><label for="ab-author">Author</label><input type="text" id="ab-author" class="text-input" required maxlength="255" /></div>
+      <div class="form-field"><label for="ab-isbn">ISBN (optional)</label><input type="text" id="ab-isbn" class="text-input" /></div>
+      <div class="form-field"><label for="ab-category">Category (optional)</label><input type="text" id="ab-category" class="text-input" /></div>
+      <div class="form-field"><label for="ab-publisher">Publisher (optional)</label><input type="text" id="ab-publisher" class="text-input" /></div>
+      <div class="form-field"><label for="ab-year">Publication Year (optional)</label><input type="number" id="ab-year" class="text-input" min="1000" max="2100" /></div>
+      <div class="form-field"><label for="ab-shelf">Shelf Location (optional)</label><input type="text" id="ab-shelf" class="text-input" /></div>
+      <div class="form-field"><label for="ab-copies">Initial Copies</label><input type="number" id="ab-copies" class="text-input" min="0" max="500" value="1" /></div>
+      <div class="form-field"><label for="ab-cover">Cover Image URL (optional)</label><input type="text" id="ab-cover" class="text-input" placeholder="https://..." /></div>
+      <div class="form-field two-span"><label for="ab-description">Description (optional)</label><input type="text" id="ab-description" class="text-input" /></div>
+      <div class="form-actions two-span"><button type="submit" class="role-btn" id="add-book-submit">Add Book</button></div>
+    </form>
+    <p id="add-book-error" class="dash-alert error" hidden></p>
+    <p id="add-book-success" class="success-text" hidden></p>
+    <button id="close-add-book-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/library-catalogue.js"></script>
+{% endblock %}

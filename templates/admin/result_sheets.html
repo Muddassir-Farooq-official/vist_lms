@@ -1,0 +1,68 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN,EXAM_CONTROLLER{% endblock %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Result approval{% endblock %}
+{% block page_title %}Result approval{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Teachers submit each course's marks. Check them, approve or send them back, then publish. Students see nothing until you publish.</div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="SUBMITTED" role="tab" aria-selected="true"><span id="rs-tab-SUBMITTED">Waiting for approval</span></button>
+  <button class="portal-tab" data-tab="APPROVED" role="tab" aria-selected="false"><span id="rs-tab-APPROVED">Ready to publish</span></button>
+  <button class="portal-tab" data-tab="PUBLISHED" role="tab" aria-selected="false"><span id="rs-tab-PUBLISHED">Published</span></button>
+  <button class="portal-tab" data-tab="RETURNED" role="tab" aria-selected="false"><span id="rs-tab-RETURNED">Sent back</span></button>
+  <button class="portal-tab" data-tab="CARDS" role="tab" aria-selected="false"><span>Result cards</span></button>
+  <button class="portal-tab" data-tab="SCALE" role="tab" aria-selected="false"><span>Grading scale</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="SUBMITTED"><section class="sh-card"><div id="rs-list-SUBMITTED" class="asg-list"></div><p class="empty-state" id="rs-empty-SUBMITTED" hidden>Nothing is waiting for approval.</p></section></div>
+<div class="portal-tab-panel" data-tab-panel="APPROVED" hidden><section class="sh-card">
+  <div class="ann-toolbar"><p class="panel-hint" style="margin:0;flex:1">Approved and waiting. Publish them one by one, or all together on result day.</p><button type="button" class="role-btn" id="rs-publish-all">Publish everything approved</button></div>
+  <div id="rs-list-APPROVED" class="asg-list"></div><p class="empty-state" id="rs-empty-APPROVED" hidden>Nothing is waiting to be published.</p></section></div>
+<div class="portal-tab-panel" data-tab-panel="PUBLISHED" hidden><section class="sh-card"><div id="rs-list-PUBLISHED" class="asg-list"></div><p class="empty-state" id="rs-empty-PUBLISHED" hidden>Nothing has been published yet.</p></section></div>
+<div class="portal-tab-panel" data-tab-panel="RETURNED" hidden><section class="sh-card"><div id="rs-list-RETURNED" class="asg-list"></div><p class="empty-state" id="rs-empty-RETURNED" hidden>Nothing has been sent back.</p></section></div>
+
+<div class="portal-tab-panel" data-tab-panel="CARDS" hidden><section class="sh-card">
+  <p class="panel-hint">Find a student to see, or download as a PDF, their result card: every published result term by term, with GPA and CGPA.</p>
+  <div class="ann-toolbar"><input id="rc-q" class="text-input" type="search" placeholder="Search by name or roll number&hellip;" aria-label="Search students" autocomplete="off" /></div>
+  <div id="rc-list" class="auth-list"></div><p class="empty-state" id="rc-empty" hidden>Type a name or roll number.</p>
+</section></div>
+
+<div class="portal-tab-panel" data-tab-panel="SCALE" hidden><section class="sh-card">
+  <div class="sh-card-head"><h2>Grading scale</h2></div>
+  <p class="panel-hint">A student who <b>passes</b> gets the highest grade whose &ldquo;from&rdquo; percentage they reach. A student who <b>fails</b> (low marks, or attendance below the limit) always gets the failing grade. GPA is the average of grade points weighted by credit hours. <b>Changing the scale does not change results that are already published.</b></p>
+  <div class="table-scroll"><table class="tk-table" id="gs-table"><thead><tr><th>Grade</th><th>From (%)</th><th>Grade points</th><th>Passing</th><th></th></tr></thead><tbody id="gs-body"></tbody></table></div>
+  <div class="form-actions" style="margin-top:12px"><button type="button" class="role-btn secondary-btn" id="gs-add">+ Add a grade</button><button type="button" class="role-btn" id="gs-save">Save the grading scale</button><button type="button" class="role-btn secondary-btn" id="gs-reset">Start again from the standard scale</button></div>
+  <p id="gs-error" class="dash-alert error" hidden></p><p id="gs-warning" class="dash-alert" hidden></p>
+</section></div>
+
+<dialog id="rc-modal" class="modal modal-wide" aria-labelledby="rc-title"><div class="modal-body">
+  <h2 id="rc-title"></h2><p class="cc-meta" id="rc-meta"></p>
+  <div id="rc-summary" class="kpi-grid kpi-grid-6"></div>
+  <div id="rc-terms"></div>
+  <div class="form-actions"><a class="role-btn" id="rc-pdf" href="#" data-download="result-card.pdf" data-label="file">Download PDF</a></div>
+  <button id="rc-close" class="back-link modal-close-btn" type="button">Close</button></div></dialog>
+
+<dialog id="rs-modal" class="modal modal-wide" aria-labelledby="rs-title"><div class="modal-body">
+  <div class="ann-detail-badges" id="rs-badges"></div>
+  <h2 id="rs-title"></h2><p class="cc-meta" id="rs-meta"></p>
+  <div id="rs-note"></div>
+  <div id="rs-stats" class="kpi-grid kpi-grid-6"></div>
+  <p class="panel-hint" id="rs-projection" hidden>The Result column is a <b>projection</b>: what each student's result will be if this is published. Nothing is decided until then. A student whose attendance is below the threshold can only fail.</p>
+  <div class="table-scroll"><table class="tk-table rs-table" id="rs-table"><thead id="rs-thead"></thead><tbody id="rs-tbody"></tbody></table></div>
+  <p id="rs-error" class="dash-alert error" hidden></p>
+  <div class="decision-bar" id="rs-actions"></div>
+  <button id="rs-close" class="back-link modal-close-btn" type="button">Close</button></div></dialog>
+
+<dialog id="rs-act" class="modal" aria-labelledby="rs-act-title"><div class="modal-body">
+  <h2 id="rs-act-title"></h2><p class="cc-meta" id="rs-act-intro"></p>
+  <div class="form-field" id="rs-act-num-wrap" hidden><label for="rs-act-num" id="rs-act-num-label"></label><input id="rs-act-num" class="text-input" type="number" step="0.01" min="0" /></div>
+  <div class="form-field"><label for="rs-act-text" id="rs-act-text-label"></label><textarea id="rs-act-text" class="text-input" rows="3" maxlength="1000"></textarea></div>
+  <p id="rs-act-error" class="dash-alert error" hidden></p>
+  <div class="form-actions"><button type="button" class="role-btn" id="rs-act-ok">OK</button></div>
+  <button id="rs-act-cancel" class="back-link modal-close-btn" type="button">Cancel</button></div></dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/result-sheets-admin.js"></script>
+{% endblock %}

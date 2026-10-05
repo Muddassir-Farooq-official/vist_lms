@@ -1,0 +1,74 @@
+{# Apply to the administration and follow your applications -- the same screen in every portal. #}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="mine" role="tab" aria-selected="true"><span id="ap-tab-mine">My applications</span></button>
+  <button class="portal-tab" data-tab="new" role="tab" aria-selected="false"><span>New application</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="mine">
+  <section class="sh-card">
+    <div class="ann-toolbar">
+      <select id="ap-filter" class="select-input" aria-label="Show">
+        <option value="">All my applications</option><option value="OPEN">Still open</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option>
+      </select>
+      <button type="button" class="role-btn" id="ap-new">+ New application</button>
+    </div>
+    <div id="ap-list" class="asg-list" aria-live="polite"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
+    <p class="empty-state" id="ap-empty" hidden>You have not applied for anything yet.</p>
+  </section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="new" hidden>
+  <section class="sh-card">
+    <div class="sh-card-head"><h2>Apply to the administration</h2></div>
+    <form id="ap-form" class="form-grid two-col" novalidate>
+      <div class="form-field two-span"><label for="ap-type">What are you applying for?</label><select id="ap-type" class="select-input"></select></div>
+      <div class="form-field two-span" id="ap-type-hint" hidden></div>
+
+      <div id="ap-dates" class="two-span ap-dates" hidden>
+        <div class="form-field"><label for="ap-from">From</label><input id="ap-from" class="text-input" type="date" /></div>
+        <div class="form-field"><label for="ap-to">To (last day)</label><input id="ap-to" class="text-input" type="date" /></div>
+        <p class="field-hint" id="ap-days"></p>
+      </div>
+
+      <div class="form-field two-span"><label for="ap-subject">Subject</label><input id="ap-subject" class="text-input" maxlength="200" placeholder="A few words, e.g. Leave for a family wedding" /></div>
+      <div class="form-field two-span"><label for="ap-details">Details</label>
+        <textarea id="ap-details" class="text-input" rows="6" maxlength="5000" placeholder="Explain what you are asking for and why."></textarea></div>
+
+      <div class="form-field two-span">
+        <label id="ap-files-label">Documents (optional)</label>
+        <label class="drop-zone" for="ap-files"><strong>Choose files</strong> <span>or drop them here</span>
+          <small>PDF, images, Word, Excel or PowerPoint &middot; up to 15 MB each &middot; at most 5 files</small></label>
+        <input id="ap-files" type="file" multiple hidden accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx" />
+        <ul id="ap-picked" class="ann-files"></ul>
+      </div>
+      <p id="ap-error" class="dash-alert error two-span" hidden></p>
+      <div class="form-actions two-span"><button type="button" class="role-btn" id="ap-submit">Submit application</button></div>
+    </form>
+  </section>
+</div>
+
+<dialog id="ap-modal" class="modal modal-wide" aria-labelledby="ap-title">
+  <div class="modal-body">
+    <div class="ann-detail-badges" id="ap-badges"></div>
+    <h2 id="ap-title"></h2>
+    <p class="cc-meta" id="ap-meta"></p>
+    <ol class="cc-timeline" id="ap-timeline"></ol>
+    <div id="ap-decision"></div>
+    <h3 class="modal-subhead">Your request</h3>
+    <p class="cd-text" id="ap-details-view"></p>
+    <div id="ap-files-view"></div>
+    <h3 class="modal-subhead">Conversation</h3>
+    <div class="thread" id="ap-thread"></div>
+    <div id="ap-reply-wrap">
+      <div class="form-field"><label for="ap-reply">Reply to the administration</label><textarea id="ap-reply" class="text-input" rows="3" maxlength="2000"></textarea></div>
+      <div class="reply-actions">
+        <label class="role-btn small-btn secondary-btn" for="ap-reply-file">+ Add a document</label>
+        <input id="ap-reply-file" type="file" multiple hidden accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx" />
+        <button type="button" class="role-btn small-btn" id="ap-send">Send reply</button>
+        <button type="button" class="danger-btn small-btn" id="ap-withdraw">Withdraw application</button>
+      </div>
+    </div>
+    <p id="ap-modal-error" class="dash-alert error" hidden></p>
+    <button id="ap-close" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>

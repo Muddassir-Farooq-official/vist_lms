@@ -1,0 +1,142 @@
+{% extends "faculty/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Library{% endblock %}
+{% block page_title %}Library{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Your loans, the book catalogue, and free research resources.</div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist">
+  <button class="portal-tab active" data-tab="borrowed" role="tab"><span>Borrowed now</span></button>
+  <button class="portal-tab" data-tab="requests" role="tab"><span>My requests</span></button>
+  <button class="portal-tab" data-tab="history" role="tab"><span>History</span></button>
+  <button class="portal-tab" data-tab="catalogue" role="tab">{{ nav_icon("grid") }}<span>Catalogue</span></button>
+  <button class="portal-tab" data-tab="journals" role="tab">{{ nav_icon("library") }}<span>Journals</span></button>
+  <button class="portal-tab" data-tab="eresources" role="tab">{{ nav_icon("cloud-upload") }}<span>E-Resources</span></button>
+</div>
+
+<!-- ============ MY LIBRARY ============ -->
+<div class="portal-tab-panel" data-tab-panel="borrowed">
+<section class="panel">
+    <div class="panel-header">
+      <div class="panel-header-left">
+        <div class="panel-icon-badge">{{ nav_icon("issue-return") }}</div>
+        <h2>Currently Allotted to Me</h2>
+      </div>
+    </div>
+    <table class="dash-table" id="active-loans-table">
+      <thead><tr><th>Title</th><th>Accession Code</th><th>Issued</th><th>Due</th><th>Status</th><th></th></tr></thead>
+      <tbody id="active-loans-tbody"></tbody>
+    </table>
+    <p class="empty-state" id="active-loans-empty" hidden>Nothing is currently allotted to you.</p>
+  </section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="requests" hidden>
+<section class="panel">
+    <div class="panel-header">
+      <div class="panel-header-left">
+        <div class="panel-icon-badge">{{ nav_icon("dashboard") }}</div>
+        <h2>My Requests</h2>
+      </div>
+    </div>
+    <table class="dash-table" id="requests-table">
+      <thead><tr><th>Title</th><th>Note</th><th>Status</th><th></th></tr></thead>
+      <tbody id="requests-tbody"></tbody>
+    </table>
+    <p class="empty-state" id="requests-empty" hidden>You haven't requested anything yet. Find a title in the Catalogue tab.</p>
+  </section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="history" hidden>
+<section class="panel">
+    <div class="panel-header">
+      <div class="panel-header-left">
+        <div class="panel-icon-badge">{{ nav_icon("check-circle") }}</div>
+        <h2>Past Loans</h2>
+      </div>
+    </div>
+    <table class="dash-table" id="history-loans-table">
+      <thead><tr><th>Title</th><th>Issued</th><th>Returned</th><th>Status</th></tr></thead>
+      <tbody id="history-loans-tbody"></tbody>
+    </table>
+    <p class="empty-state" id="history-loans-empty" hidden>No past loans yet.</p>
+  </section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="catalogue" hidden>
+  <section class="panel">
+    <div class="catalogue-toolbar">
+      <input type="text" id="cat-search" class="text-input" placeholder="Search title, author, ISBN..." />
+      <label class="cat-checkbox"><input type="checkbox" id="cat-available-only" /> Available now only</label>
+    </div>
+    <div class="book-grid" id="book-grid"></div>
+    <p class="empty-state" id="book-grid-empty" hidden>No books match your search.</p>
+    <div class="pager" id="cat-pager">
+      <button id="cat-prev-page" class="page-btn" type="button">&larr; Prev</button>
+      <span id="cat-page-info" class="page-info"></span>
+      <button id="cat-next-page" class="page-btn" type="button">Next &rarr;</button>
+    </div>
+  </section>
+</div>
+
+<!-- ============ JOURNALS ============ -->
+<div class="portal-tab-panel" data-tab-panel="journals" hidden>
+  <section class="panel">
+    <p class="panel-hint">Live search across PubMed, PubMed Central, and DOAJ &mdash; results come straight from those services, nothing here is locally curated.</p>
+    <form id="journal-search-form" class="catalogue-toolbar">
+      <input type="text" id="journal-search-q" class="text-input" placeholder="Search nursing and health literature..." required minlength="2" style="flex:1;min-width:240px" />
+      <label class="cat-checkbox"><input type="checkbox" class="journal-source" value="pubmed" checked /> PubMed</label>
+      <label class="cat-checkbox"><input type="checkbox" class="journal-source" value="pmc" checked /> PMC</label>
+      <label class="cat-checkbox"><input type="checkbox" class="journal-source" value="doaj" checked /> DOAJ</label>
+      <button type="submit" class="role-btn" id="journal-search-submit">Search</button>
+    </form>
+    <p id="journal-search-error" class="dash-alert error" hidden></p>
+    <div id="journal-source-errors"></div>
+    <div class="journal-results" id="journal-results"></div>
+    <p class="empty-state" id="journal-results-empty">Search above for journal articles and abstracts.</p>
+  </section>
+</div>
+
+<!-- ============ E-RESOURCES ============ -->
+<div class="portal-tab-panel" data-tab-panel="eresources" hidden>
+  <section class="panel">
+    <p class="panel-hint">Free and open-access research resources. Institutional resources (CINAHL, Cochrane) will appear here once VIST has access configured.</p>
+    <div class="eresource-grid" id="eresource-grid"></div>
+  </section>
+</div>
+
+<dialog id="borrow-request-modal" class="modal">
+  <div class="modal-body">
+    <h2>Request to Borrow</h2>
+    <p id="borrow-request-book-title" class="panel-hint"></p>
+    <form id="borrow-request-form" class="form-grid">
+      <div class="form-field two-span">
+        <label for="borrow-request-note">Note for the librarian (optional)</label>
+        <input type="text" id="borrow-request-note" class="text-input" maxlength="255" placeholder="e.g. Need it for a Semester 5 assignment" />
+      </div>
+      <div class="form-actions two-span">
+        <button type="submit" class="role-btn" id="borrow-request-submit">Submit Request</button>
+      </div>
+    </form>
+    <p id="borrow-request-error" class="dash-alert error" hidden></p>
+    <button id="close-borrow-request-modal" class="back-link modal-close-btn" type="button">Cancel</button>
+  </div>
+</dialog>
+
+<dialog id="book-detail-modal" class="modal modal-wide">
+  <div class="modal-body">
+    <h2 id="book-detail-title"></h2>
+    <div id="book-detail-cover-wrap" class="book-detail-cover-wrap"></div>
+    <dl class="detail-list" id="book-detail-fields"></dl>
+    <p id="book-detail-availability" class="panel-hint"></p>
+    <div class="form-actions">
+      <button type="button" class="role-btn" id="book-detail-request-btn">Request to Borrow</button>
+    </div>
+    <button id="close-book-detail-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/library-portal.js"></script>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "admin/_base.html" %}
+{% block title %}Settings{% endblock %}
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Account</h2>
+  <dl class="detail-list" id="account-details">
+    <dt>Username</dt><dd id="acct-username">&mdash;</dd>
+    <dt>Roles</dt><dd id="acct-roles">&mdash;</dd>
+  </dl>
+</section>
+
+<section class="panel">
+  <h2>Change Password</h2>
+  <form id="change-password-form" class="form-grid">
+    <div class="form-field">
+      <label for="current-password">Current Password</label>
+      <input type="password" id="current-password" class="text-input" required autocomplete="current-password" />
+    </div>
+    <div class="form-field">
+      <label for="new-password">New Password</label>
+      <input type="password" id="new-password" class="text-input" required minlength="10" autocomplete="new-password" />
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="role-btn" id="change-password-btn">Update Password</button>
+    </div>
+  </form>
+  <p id="password-error" class="dash-alert error" hidden></p>
+  <p id="password-success" class="success-text" hidden></p>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/settings.js"></script>
+{% endblock %}

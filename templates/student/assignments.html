@@ -1,0 +1,68 @@
+{% extends "student/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Assignments{% endblock %}
+{% block page_title %}Assignments{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Work set by your teachers. Hand in a Google Drive link before the deadline.</div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="todo" role="tab" aria-selected="true"><span id="tab-todo">To do</span></button>
+  <button class="portal-tab" data-tab="done" role="tab" aria-selected="false"><span id="tab-done">Handed in</span></button>
+  <button class="portal-tab" data-tab="closed" role="tab" aria-selected="false"><span id="tab-closed">Closed</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="todo">
+  <div id="asg-todo" class="asg-list" aria-live="polite"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div><div class="skeleton-line"></div></div></div>
+  <p class="empty-state" id="asg-todo-empty" hidden>Nothing to do right now. You are all caught up.</p>
+</div>
+<div class="portal-tab-panel" data-tab-panel="done" hidden>
+  <div id="asg-done" class="asg-list"></div>
+  <p class="empty-state" id="asg-done-empty" hidden>You have not handed anything in yet.</p>
+</div>
+<div class="portal-tab-panel" data-tab-panel="closed" hidden>
+  <p class="panel-hint">Assignments whose deadline has passed without an accepted submission. You can no longer hand these in.</p>
+  <div id="asg-closed" class="asg-list"></div>
+  <p class="empty-state" id="asg-closed-empty" hidden>Nothing here.</p>
+</div>
+
+<dialog id="asg-modal" class="modal modal-wide" aria-labelledby="asg-title">
+  <div class="modal-body">
+    <div class="ann-detail-badges" id="asg-badges"></div>
+    <h2 id="asg-title"></h2>
+    <p class="cc-meta" id="asg-meta"></p>
+    <div class="asg-deadline" id="asg-deadline"></div>
+    <h3 class="modal-subhead">What to do</h3>
+    <div class="ann-body" id="asg-instructions"></div>
+    <div id="asg-feedback"></div>
+
+    <section id="asg-form-wrap">
+      <h3 class="modal-subhead" id="asg-form-title">Hand in your work</h3>
+      <details class="asg-help"><summary>How do I get the right link?</summary>
+        <ol>
+          <li>Upload your work to <strong>Google Drive</strong> (or create it in Google Docs).</li>
+          <li>Right-click it and choose <strong>Share</strong>.</li>
+          <li>Under <strong>General access</strong> choose <strong>&ldquo;Anyone with the link&rdquo;</strong> and set the role to <strong>Viewer</strong>.</li>
+          <li>Press <strong>Copy link</strong> and paste it below.</li>
+        </ol>
+        <p>If your teacher cannot open the link, your work may be sent back.</p>
+      </details>
+      <div class="form-field"><label for="asg-url">Google Drive link</label><input id="asg-url" class="text-input" type="url" inputmode="url" placeholder="https://drive.google.com/file/d/…" autocomplete="off" /></div>
+      <div class="form-field"><label for="asg-note">Note to your teacher (optional)</label><textarea id="asg-note" class="text-input" rows="2" maxlength="500" placeholder="Anything your teacher should know"></textarea></div>
+      <div id="asg-private" class="asg-private" hidden>
+        <strong>This link looks private.</strong>
+        <p id="asg-private-text"></p>
+        <button type="button" class="role-btn small-btn secondary-btn" id="asg-anyway">Submit it anyway</button>
+      </div>
+      <p id="asg-error" class="dash-alert error" hidden></p>
+      <div class="form-actions"><button type="button" class="role-btn" id="asg-submit">Submit</button></div>
+    </section>
+
+    <section id="asg-readonly" hidden></section>
+    <button id="asg-close" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/student-assignments.js"></script>
+{% endblock %}

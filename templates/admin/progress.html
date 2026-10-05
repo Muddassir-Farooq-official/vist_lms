@@ -1,0 +1,18 @@
+{% extends "admin/_base.html" %}
+{% block title %}Progress{% endblock %}
+{% block page_title %}Teacher Progress{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">How far each teacher actually is through their course versus where they should be by now, based on topics marked complete.</div>{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <table class="dash-table" id="progress-table">
+    <thead><tr><th>Teacher</th><th>Course</th><th>Term</th><th>Sessions Due</th><th>Completed</th><th>Missing</th><th>%</th><th>Status</th></tr></thead>
+    <tbody id="progress-tbody"></tbody>
+  </table>
+  <p class="empty-state" id="progress-empty" hidden>No teachers have any scheduled sessions yet.</p>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/admin-progress.js"></script>
+{% endblock %}

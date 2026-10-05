@@ -1,0 +1,107 @@
+{% extends "admin/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block allowed_roles %}ADMIN,ACCOUNTS_OFFICER{% endblock %}
+{% block title %}Payroll{% endblock %}
+{% block page_title %}Payroll{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Pay staff each month: salary, allowances, bonuses and deductions, with a payslip for everyone.</div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="runs" role="tab" aria-selected="true"><span>Monthly payroll</span></button>
+  <button class="portal-tab" data-tab="items" role="tab" aria-selected="false"><span>Allowances &amp; deductions</span></button>
+  <button class="portal-tab" data-tab="advances" role="tab" aria-selected="false"><span>Salary advances</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="runs">
+  <section class="sh-card">
+    <div class="ann-toolbar"><p class="panel-hint" style="margin:0;flex:1">Prepare a month, adjust anything that needs it (unpaid days, extras), then the administration approves it and the accounts office pays it. Everyone gets their payslip when it is paid.</p>
+      <input id="pr-month" class="text-input" type="month" aria-label="Month" /><button type="button" class="role-btn" id="pr-prepare">Prepare payroll</button></div>
+    <p id="pr-prep-error" class="dash-alert error" hidden></p>
+    <div class="table-scroll"><table class="tk-table"><thead><tr><th>Month</th><th>Status</th><th class="num">Employees</th><th class="num">Gross</th><th class="num">Deductions</th><th class="num">Net pay</th></tr></thead><tbody id="rn-body"></tbody></table></div>
+    <p class="empty-state" id="rn-empty" hidden>No payroll has been prepared yet.</p>
+  </section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="items" hidden>
+  <section class="sh-card">
+    <p class="panel-hint">Things added to or taken from someone's pay every month: house rent, medical, transport, provident fund, income tax. They are included automatically when you prepare payroll.</p>
+    <div class="form-field"><label for="it-emp">Employee</label><input id="it-emp" class="text-input" type="search" placeholder="Search by name or employee code&hellip;" autocomplete="off" /><div id="it-emp-list" class="picker-list"></div></div>
+    <div id="it-panel" hidden>
+      <h3 class="modal-subhead" id="it-title"></h3>
+      <div class="table-scroll"><table class="tk-table"><thead><tr><th>Item</th><th>Type</th><th>How it is worked out</th><th class="num">Amount</th><th>Active</th></tr></thead><tbody id="it-body"></tbody></table></div>
+      <form id="it-form" class="form-grid two-col" novalidate>
+        <div class="form-field"><label for="it-kind">This is</label><select id="it-kind" class="select-input"><option value="ALLOWANCE">An allowance (added to pay)</option><option value="DEDUCTION">A deduction (taken from pay)</option></select></div>
+        <div class="form-field"><label for="it-name">Name</label><input id="it-name" class="text-input" maxlength="80" placeholder="e.g. House rent, Provident fund" /></div>
+        <div class="form-field"><label for="it-calc">Worked out as</label><select id="it-calc" class="select-input"><option value="FIXED">A fixed amount (Rs.)</option><option value="PERCENT_OF_BASE">A percentage of basic salary (%)</option></select></div>
+        <div class="form-field"><label for="it-value">Value</label><input id="it-value" class="text-input" type="number" min="0.01" step="0.01" /></div>
+        <p id="it-error" class="dash-alert error two-span" hidden></p>
+        <div class="form-actions two-span"><button type="button" class="role-btn" id="it-add">Add to this employee's pay</button></div>
+      </form>
+    </div>
+  </section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="advances" hidden>
+  <section class="sh-card">
+    <div class="sh-card-head"><h2>Pay an advance</h2></div>
+    <p class="panel-hint">Money paid to a member of staff before payday. It is paid now (and recorded as an expense) and then taken back a little at a time from their payslips.</p>
+    <form id="ad-form" class="form-grid two-col" novalidate>
+      <div class="form-field two-span"><label for="ad-emp">Employee</label><input id="ad-emp" class="text-input" type="search" placeholder="Search by name or employee code&hellip;" autocomplete="off" /><div id="ad-emp-list" class="picker-list"></div></div>
+      <div class="form-field"><label for="ad-amount">Advance (Rs.)</label><input id="ad-amount" class="text-input" type="number" min="1" step="0.01" /></div>
+      <div class="form-field"><label for="ad-rec">Taken back each month (Rs.)</label><input id="ad-rec" class="text-input" type="number" min="1" step="0.01" /></div>
+      <div class="form-field"><label for="ad-method">Paid by</label><select id="ad-method" class="select-input"><option value="CASH">Cash</option><option value="BANK_TRANSFER">Bank transfer</option><option value="CHEQUE">Cheque</option><option value="ONLINE">Online</option></select></div>
+      <div class="form-field"><label for="ad-ref">Cheque no. / reference <small class="field-hint inline">(for cheques and transfers)</small></label><input id="ad-ref" class="text-input" maxlength="80" /></div>
+      <div class="form-field"><label for="ad-date">Date paid</label><input id="ad-date" class="text-input" type="date" /></div>
+      <div class="form-field"><label for="ad-reason">Reason</label><input id="ad-reason" class="text-input" maxlength="300" /></div>
+      <p id="ad-error" class="dash-alert error two-span" hidden></p>
+      <div class="form-actions two-span"><button type="button" class="role-btn" id="ad-save">Pay the advance</button></div>
+    </form>
+  </section>
+  <section class="sh-card">
+    <div class="sh-card-head"><h2>Advances</h2></div>
+    <div class="table-scroll"><table class="tk-table"><thead><tr><th>Employee</th><th>Date</th><th class="num">Advance</th><th class="num">Each month</th><th class="num">Still owed</th><th>Status</th></tr></thead><tbody id="ad-body"></tbody></table></div>
+    <p class="empty-state" id="ad-empty" hidden>No advances yet.</p>
+  </section>
+</div>
+
+<dialog id="rd-modal" class="modal modal-wide" aria-labelledby="rd-title"><div class="modal-body">
+  <div class="ann-detail-badges" id="rd-badges"></div><h2 id="rd-title"></h2><p class="cc-meta" id="rd-meta"></p>
+  <div id="rd-tiles"></div><div id="rd-problems"></div>
+  <div class="table-scroll"><table class="tk-table"><thead><tr><th>Employee</th><th class="num">Basic</th><th class="num">Gross</th><th class="num">Deductions</th><th class="num">Net</th><th>Notes</th><th></th></tr></thead><tbody id="rd-body"></tbody></table></div>
+  <p id="rd-error" class="dash-alert error" hidden></p>
+  <div class="decision-bar" id="rd-actions"></div>
+  <button id="rd-close" class="back-link modal-close-btn" type="button">Close</button></div></dialog>
+
+<dialog id="sl-modal" class="modal" aria-labelledby="sl-title"><div class="modal-body">
+  <h2 id="sl-title"></h2><p class="cc-meta" id="sl-sub"></p>
+  <div class="form-field"><label for="sl-unpaid">Unpaid days <small class="field-hint inline">(whole or half days)</small></label><input id="sl-unpaid" class="text-input" type="number" min="0" step="0.5" /></div>
+  <div class="form-field"><label for="sl-adj">Extra pay or deduction (Rs.) <small class="field-hint inline">(+ adds, \u2212 takes away)</small></label><input id="sl-adj" class="text-input" type="number" step="0.01" /></div>
+  <div class="form-field"><label for="sl-note">What it is for</label><input id="sl-note" class="text-input" maxlength="200" placeholder="e.g. Overtime, Library fine" /></div>
+  <div class="form-field"><label class="check-row"><input type="checkbox" id="sl-hold" /> <span>Hold this payslip back (do not pay it in this run)</span></label></div>
+  <div class="form-field" id="sl-hold-wrap" hidden><label for="sl-hold-reason">Why is it held?</label><input id="sl-hold-reason" class="text-input" maxlength="200" /></div>
+  <div id="sl-lines" class="cc-meta"></div>
+  <p id="sl-error" class="dash-alert error" hidden></p>
+  <div class="form-actions"><button type="button" class="role-btn" id="sl-save">Save</button></div>
+  <button id="sl-close" class="back-link modal-close-btn" type="button">Cancel</button></div></dialog>
+
+<dialog id="pp-modal" class="modal" aria-labelledby="pp-title"><div class="modal-body">
+  <h2 id="pp-title">Pay the salaries</h2><p class="cc-meta" id="pp-for"></p>
+  <div class="form-field"><label for="pp-method">Paid by</label><select id="pp-method" class="select-input"><option value="BANK_TRANSFER">Bank transfer</option><option value="CASH">Cash</option><option value="CHEQUE">Cheque</option><option value="ONLINE">Online</option></select></div>
+  <div class="form-field"><label for="pp-ref">Cheque no. / reference <small class="field-hint inline">(for cheques and transfers)</small></label><input id="pp-ref" class="text-input" maxlength="80" /></div>
+  <div class="form-field"><label for="pp-date">Date paid</label><input id="pp-date" class="text-input" type="date" /></div>
+  <p class="panel-hint">This records the net salaries as one expense in the books and sends every employee their payslip.</p>
+  <p id="pp-error" class="dash-alert error" hidden></p>
+  <div class="form-actions"><button type="button" class="role-btn" id="pp-ok">Record the payment</button></div>
+  <button id="pp-cancel" class="back-link modal-close-btn" type="button">Cancel</button></div></dialog>
+
+<dialog id="pa-ask" class="modal" aria-labelledby="pa-ask-title"><div class="modal-body">
+  <h2 id="pa-ask-title"></h2><p class="cc-meta" id="pa-ask-intro"></p>
+  <div class="form-field"><label for="pa-ask-text">Reason (kept on record)</label><textarea id="pa-ask-text" class="text-input" rows="3" maxlength="500"></textarea></div>
+  <p id="pa-ask-error" class="dash-alert error" hidden></p>
+  <div class="form-actions"><button type="button" class="role-btn" id="pa-ask-ok">OK</button></div>
+  <button id="pa-ask-cancel" class="back-link modal-close-btn" type="button">Cancel</button></div></dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/payroll.js"></script>
+{% endblock %}

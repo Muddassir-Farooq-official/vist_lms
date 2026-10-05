@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VIST LMS</title>
+  <link rel="stylesheet" href="/static/css/theme.css" />
+</head>
+<body>
+  {% from "_icons.html" import role_icon %}
+  <div class="wrap">
+    <div class="hero">
+      <h1>Vertex Institute of <span class="accent">Science &amp; Technology</span></h1>
+      <p>Learning Management System — choose your role below to sign in.</p>
+    </div>
+
+    <div class="role-grid">
+      {% for role in roles %}
+      <div class="role-card">
+        <div class="role-icon">{{ role_icon(role.slug) }}</div>
+        <h2>{{ role.label }}</h2>
+        <p>{{ role.description }}</p>
+        <a class="role-btn" href="/login/{{ role.slug }}">Sign in <span class="arrow">&rarr;</span></a>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="footer-note">VIST LMS &middot; Phase A</div>
+  </div>
+</body>
+</html>

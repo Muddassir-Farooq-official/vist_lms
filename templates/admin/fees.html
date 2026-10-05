@@ -1,0 +1,180 @@
+{% extends "admin/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block allowed_roles %}ADMIN,ACCOUNTS_OFFICER{% endblock %}
+{% block title %}Fees{% endblock %}
+{% block page_title %}Fees{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Fee types, structures, collections, and dues — one place for the whole institute.</div>{% endblock %}
+
+{% block content %}
+<section class="stat-grid" id="fee-stat-grid" aria-label="Fee overview">
+  <div class="stat-card stat-card--green">
+    <div class="stat-icon-badge">{{ nav_icon("check-circle") }}</div>
+    <span class="stat-label">Total Collected</span>
+    <span class="stat-value" id="stat-collected">&mdash;</span>
+  </div>
+  <div class="stat-card stat-card--blue">
+    <div class="stat-icon-badge">{{ nav_icon("fees") }}</div>
+    <span class="stat-label">Total Charged</span>
+    <span class="stat-value" id="stat-charged">&mdash;</span>
+  </div>
+  <div class="stat-card stat-card--orange">
+    <div class="stat-icon-badge">{{ nav_icon("clock") }}</div>
+    <span class="stat-label">Outstanding</span>
+    <span class="stat-value" id="stat-outstanding">&mdash;</span>
+  </div>
+  <div class="stat-card stat-card--red">
+    <div class="stat-icon-badge">{{ nav_icon("ban") }}</div>
+    <span class="stat-label">Overdue (incl. fines)</span>
+    <span class="stat-value" id="stat-overdue">&mdash;</span>
+    <span class="stat-trend" id="stat-overdue-count"></span>
+  </div>
+  <div class="stat-card stat-card--teal">
+    <div class="stat-icon-badge">{{ nav_icon("grid") }}</div>
+    <span class="stat-label">Active Structures</span>
+    <span class="stat-value" id="stat-structures">&mdash;</span>
+  </div>
+</section>
+
+<div class="portal-tabs" role="tablist">
+  <button class="portal-tab active" data-tab="types" role="tab">{{ nav_icon("fees") }}<span>Fee Types</span></button>
+  <button class="portal-tab" data-tab="structures" role="tab">{{ nav_icon("grid") }}<span>Fee Structures</span></button>
+  <button class="portal-tab" data-tab="assignments" role="tab">{{ nav_icon("check-circle") }}<span>Assignments</span></button>
+</div>
+
+<!-- ============ FEE TYPES ============ -->
+<div class="portal-tab-panel" data-tab-panel="types">
+<section class="panel" id="fee-types-section">
+  <div class="panel-header">
+    <div class="panel-header-left">
+      <div class="panel-icon-badge">{{ nav_icon("fees") }}</div>
+      <h2>Fee Types</h2>
+    </div>
+  </div>
+  <p class="panel-hint">The catalogue of what the institute can charge for — Exam Fee, Clinical Fee, Library Fee, Tuition, or anything else.</p>
+  <form id="create-fee-type-form" class="form-grid two-col">
+    <div class="form-field"><label for="ft-code">Code</label><input type="text" id="ft-code" class="text-input" placeholder="CLINICAL" required maxlength="30" /></div>
+    <div class="form-field"><label for="ft-name">Name</label><input type="text" id="ft-name" class="text-input" placeholder="Clinical Fee" required maxlength="100" /></div>
+    <div class="form-field two-span"><label for="ft-description">Description (optional)</label><input type="text" id="ft-description" class="text-input" /></div>
+    <div class="form-actions"><button type="submit" class="role-btn" id="create-fee-type-submit">Add Fee Type</button></div>
+  </form>
+  <p id="fee-type-error" class="dash-alert error" hidden></p>
+  <table class="dash-table" id="fee-types-table">
+    <thead><tr><th>Code</th><th>Name</th><th>Description</th><th>Status</th></tr></thead>
+    <tbody id="fee-types-tbody"></tbody>
+  </table>
+  <p class="empty-state" id="fee-types-empty" hidden>No fee types yet.</p>
+</section>
+</div>
+
+<!-- ============ FEE STRUCTURES ============ -->
+<div class="portal-tab-panel" data-tab-panel="structures" hidden>
+<section class="panel" id="fee-structures-section">
+  <div class="panel-header">
+    <div class="panel-header-left">
+      <div class="panel-icon-badge">{{ nav_icon("grid") }}</div>
+      <h2>Fee Structures</h2>
+    </div>
+  </div>
+  <p class="panel-hint">A configured charge: which fee type, which term, how much, how it's split, the late fee rate, and which program(s) it applies to. Activating one auto-charges every currently matching active student/employee.</p>
+  <form id="create-structure-form" class="form-grid two-col">
+    <div class="form-field">
+      <label for="fs-type">Fee Type</label>
+      <select id="fs-type" class="select-input" required><option value="">Select&hellip;</option></select>
+    </div>
+    <div class="form-field"><label for="fs-name">Structure Name</label><input type="text" id="fs-name" class="text-input" placeholder="Clinical Fee — Fall 2026 (BSN)" required maxlength="150" /></div>
+    <div class="form-field"><label for="fs-term">Term Label</label><input type="text" id="fs-term" class="text-input" placeholder="Fall 2026" required maxlength="50" /></div>
+    <div class="form-field"><label for="fs-amount">Total Amount</label><input type="number" id="fs-amount" class="text-input" min="0.01" step="0.01" required /></div>
+    <div class="form-field"><label for="fs-installments">Installments (1 = pay in full)</label><input type="number" id="fs-installments" class="text-input" min="1" max="24" value="1" required /></div>
+    <div class="form-field"><label for="fs-interval">Months Between Installments</label><input type="number" id="fs-interval" class="text-input" min="1" max="12" value="1" required /></div>
+    <div class="form-field"><label for="fs-effective">First Installment Due</label><input type="date" id="fs-effective" class="text-input" required /></div>
+    <div class="form-field"><label for="fs-late-fee">Late Fee (per day, optional)</label><input type="number" id="fs-late-fee" class="text-input" min="0" step="0.01" placeholder="e.g. 200" /></div>
+    <div class="form-field two-span checkbox-field">
+      <label><input type="checkbox" id="fs-applies-students" checked /> Applies to students</label>
+      &nbsp;&nbsp;
+      <label><input type="checkbox" id="fs-applies-employees" /> Applies to employees</label>
+    </div>
+    <div class="form-field two-span">
+      <label for="fs-course">Subject/Course (optional &mdash; makes this a subject-level fee)</label>
+      <select id="fs-course" class="select-input"><option value="">None &mdash; use Programs/Semesters below instead</option></select>
+      <p class="panel-hint">If set, this fee is charged on every enrollment in that specific course &mdash; including retakes &mdash; for whichever students actually enroll in it, regardless of their program or semester. Leave as None for the usual program/semester scoping below; you can't use both at once.</p>
+    </div>
+    <div class="form-field two-span">
+      <label>Programs (leave all unchecked for institute-wide)</label>
+      <div id="fs-programs-list" class="chip-list"></div>
+    </div>
+    <div class="form-field two-span">
+      <label>Semesters (leave all unchecked for every semester)</label>
+      <div id="fs-semesters-list" class="chip-list"></div>
+    </div>
+    <div class="form-actions two-span"><button type="submit" class="role-btn" id="create-structure-submit">Create Structure (Draft)</button></div>
+  </form>
+  <p id="structure-error" class="dash-alert error" hidden></p>
+  <p id="structure-success" class="success-text" hidden></p>
+
+  <table class="dash-table" id="structures-table">
+    <thead><tr><th>Name</th><th>Type</th><th>Term</th><th class="num">Amount</th><th>Scope</th><th>Status</th><th></th></tr></thead>
+    <tbody id="structures-tbody"></tbody>
+  </table>
+  <p class="empty-state" id="structures-empty" hidden>No fee structures yet.</p>
+</section>
+</div>
+
+<!-- ============ ASSIGNMENTS ============ -->
+<div class="portal-tab-panel" data-tab-panel="assignments" hidden>
+<section class="panel">
+  <div class="panel-header">
+    <div class="panel-header-left">
+      <div class="panel-icon-badge">{{ nav_icon("check-circle") }}</div>
+      <h2>Fee Assignments</h2>
+    </div>
+  </div>
+  <table class="dash-table" id="assignments-table">
+    <thead><tr><th>Payer</th><th>Fee</th><th class="num">Charged</th><th class="num">Paid</th><th class="num">Due Now</th><th>Standing</th><th></th></tr></thead>
+    <tbody id="assignments-tbody"></tbody>
+  </table>
+  <p class="empty-state" id="assignments-empty" hidden>No fee assignments yet.</p>
+</section>
+</div>
+
+
+<dialog id="assignment-modal" class="modal modal-wide">
+  <div class="modal-body">
+    <h2 id="assignment-modal-title"></h2>
+    <dl class="detail-list" id="assignment-detail-list"></dl>
+
+    <div class="inline-form">
+      <input type="number" id="payment-amount" class="text-input small-input" placeholder="Amount" min="0.01" step="0.01" />
+      <input type="text" id="payment-description" class="text-input" placeholder="Description (optional)" />
+      <button id="record-payment-btn" class="role-btn" type="button">Record Payment</button>
+    </div>
+
+    <div class="modal-status-change">
+      <label for="assignment-status-select">Change status</label>
+      <select id="assignment-status-select" class="select-input">
+        <option value="ACTIVE">Active</option>
+        <option value="WAIVED">Waived</option>
+        <option value="CANCELLED">Cancelled</option>
+      </select>
+      <button id="save-assignment-status-btn" class="role-btn" type="button">Update Status</button>
+    </div>
+
+    <p id="assignment-modal-error" class="dash-alert error" hidden></p>
+    <p id="assignment-modal-success" class="success-text" hidden></p>
+
+    <h3 class="modal-subhead">Ledger</h3>
+    <p class="panel-hint">If a fee structure has a late fee configured, "Post Late Fee" charges whatever's newly accrued on that installment as a real, payable fine \u2014 safe to click repeatedly, it never double-charges.</p>
+    <table class="dash-table" id="ledger-table">
+      <thead><tr><th>Type</th><th class="num">Amount</th><th>Due</th><th>Description</th><th></th></tr></thead>
+      <tbody id="ledger-tbody"></tbody>
+    </table>
+    <p id="late-fee-error" class="dash-alert error" hidden></p>
+    <p id="late-fee-success" class="success-text" hidden></p>
+
+    <button id="close-assignment-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/fees.js"></script>
+{% endblock %}

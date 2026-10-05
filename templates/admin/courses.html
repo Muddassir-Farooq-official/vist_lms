@@ -1,0 +1,257 @@
+{% extends "admin/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Courses{% endblock %}
+{% block page_title %}Courses{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Course catalog, curriculum placement, term offerings, and materials.</div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist">
+  <button class="portal-tab active" data-tab="catalog" role="tab">{{ nav_icon("graduation-cap") }}<span>Catalog</span></button>
+  <button class="portal-tab" data-tab="curriculum" role="tab">{{ nav_icon("programs") }}<span>Curriculum</span></button>
+  <button class="portal-tab" data-tab="offerings" role="tab">{{ nav_icon("issue-return") }}<span>Offerings</span></button>
+  <button class="portal-tab" data-tab="performance" role="tab">{{ nav_icon("payroll") }}<span>Performance</span></button>
+</div>
+
+<!-- ============ CATALOG ============ -->
+<div class="portal-tab-panel" data-tab-panel="catalog">
+  <section class="panel">
+    <div class="panel-header">
+      <div class="panel-header-left">
+        <div class="panel-icon-badge">{{ nav_icon("graduation-cap") }}</div>
+        <h2>Course Catalog</h2>
+      </div>
+      <button type="button" class="role-btn" id="open-add-course">+ Add Course</button>
+    </div>
+    <p class="panel-hint">Every course an institute-wide catalog entry — link it into one or more programs' curricula in the Curriculum tab.</p>
+    <table class="dash-table" id="courses-table">
+      <thead><tr><th>Code</th><th>Title</th><th>Credit Hours</th><th>Status</th><th></th></tr></thead>
+      <tbody id="courses-tbody"></tbody>
+    </table>
+  </section>
+</div>
+
+<!-- ============ CURRICULUM ============ -->
+<div class="portal-tab-panel" data-tab-panel="curriculum" hidden>
+  <section class="panel">
+    <div class="panel-header">
+      <div class="panel-header-left">
+        <div class="panel-icon-badge">{{ nav_icon("programs") }}</div>
+        <h2>Program Curriculum</h2>
+      </div>
+    </div>
+    <div class="toolbar">
+      <select id="curriculum-program-select" class="select-input"><option value="">Select a program&hellip;</option></select>
+    </div>
+    <table class="dash-table" id="curriculum-table">
+      <thead><tr><th>Semester</th><th>Course</th><th>Credit Hours</th></tr></thead>
+      <tbody id="curriculum-tbody"></tbody>
+    </table>
+    <p class="empty-state" id="curriculum-empty" hidden>Select a program to see its curriculum.</p>
+
+    <h3 class="modal-subhead">Add Course to Curriculum</h3>
+    <form id="link-course-form" class="form-grid two-col">
+      <div class="form-field">
+        <label for="lc-course">Course</label>
+        <select id="lc-course" class="select-input" required><option value="">Select&hellip;</option></select>
+      </div>
+      <div class="form-field">
+        <label for="lc-semester">Semester Number</label>
+        <select id="lc-semester" class="select-input" required>
+          <option value="">Select&hellip;</option>
+          <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+          <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+          <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+          <option value="10">10</option>
+        </select>
+      </div>
+      <div class="form-actions two-span"><button type="submit" class="role-btn" id="link-course-submit">Add to Curriculum</button></div>
+    </form>
+    <p id="link-course-error" class="dash-alert error" hidden></p>
+  </section>
+</div>
+
+<!-- ============ OFFERINGS & MATERIALS ============ -->
+<div class="portal-tab-panel" data-tab-panel="offerings" hidden>
+  <section class="panel">
+    <div class="panel-header">
+      <div class="panel-header-left">
+        <div class="panel-icon-badge">{{ nav_icon("issue-return") }}</div>
+        <h2>Term Offerings</h2>
+      </div>
+      <button type="button" class="role-btn" id="open-add-offering">+ Create Offering</button>
+    </div>
+    <p class="panel-hint">Click any row's <strong>Manage</strong> button to open its own page — syllabus, timetable, and class sessions.</p>
+    <div class="toolbar">
+      <select id="term-label-input" class="select-input"><option value="">Select a term&hellip;</option></select>
+      <button type="button" class="role-btn small-btn" id="refresh-terms-btn" title="Refresh the list of terms">&#8635;</button>
+      <button type="button" class="role-btn" id="load-offerings-btn">Load</button>
+      <button type="button" class="role-btn secondary-btn" id="check-readiness-btn">Check Term Readiness</button>
+      <button type="button" class="role-btn secondary-btn" id="open-generate-offerings">Open a Semester</button>
+      <button type="button" class="role-btn secondary-btn" id="open-auto-schedule">Auto-schedule Term</button>
+      <button type="button" class="role-btn secondary-btn" id="open-copy-timetable">Copy Timetable</button>
+      <button type="button" class="danger-btn" id="end-semester-btn">End Semester</button>
+    </div>
+    <div id="readiness-panel" class="panel-hint" hidden></div>
+    <table class="dash-table" id="offerings-table">
+      <thead><tr><th>Course</th><th>Section</th><th>Credit Hours</th><th>Teacher</th><th>Enrolled / Seats</th><th>Open?</th><th></th></tr></thead>
+      <tbody id="offerings-tbody"></tbody>
+    </table>
+    <p class="empty-state" id="offerings-empty" hidden>Select a term above to see its offerings, or create a new one.</p>
+    <p id="end-semester-error" class="dash-alert error" hidden></p>
+    <p id="end-semester-success" class="success-text" hidden></p>
+  </section>
+</div>
+
+<!-- ============ TEACHER PERFORMANCE ============ -->
+<div class="portal-tab-panel" data-tab-panel="performance" hidden>
+  <section class="panel">
+    <div class="panel-header">
+      <div class="panel-header-left">
+        <div class="panel-icon-badge">{{ nav_icon("payroll") }}</div>
+        <h2>Teacher Performance</h2>
+      </div>
+      <button type="button" class="role-btn small-btn" id="refresh-performance-btn">Refresh</button>
+    </div>
+    <p class="panel-hint">Pass rate only counts enrollments with a recorded outcome — enrollments still in progress or awaiting grading aren't counted either way.</p>
+    <table class="dash-table" id="performance-table">
+      <thead><tr><th>Teacher</th><th>Courses Taught</th><th>Students Taught</th><th>Passed</th><th>Failed</th><th>Pass Rate</th><th>Complaints Against</th></tr></thead>
+      <tbody id="performance-tbody"></tbody>
+    </table>
+    <p class="empty-state" id="performance-empty" hidden>No teacher is currently assigned to any course offering.</p>
+  </section>
+</div>
+
+<dialog id="add-course-modal" class="modal">
+  <div class="modal-body">
+    <h2>Add Course</h2>
+    <form id="add-course-form" class="form-grid">
+      <div class="form-field"><label for="ac-code">Code</label><input type="text" id="ac-code" class="text-input" required maxlength="20" placeholder="e.g. NUR201" /></div>
+      <div class="form-field"><label for="ac-title">Title</label><input type="text" id="ac-title" class="text-input" required maxlength="200" /></div>
+      <div class="form-field"><label for="ac-credit-hours">Credit Hours</label><input type="number" id="ac-credit-hours" class="text-input" min="1" max="10" required /></div>
+      <div class="form-field two-span"><label for="ac-description">Description (optional)</label><input type="text" id="ac-description" class="text-input" maxlength="1000" /></div>
+      <div class="form-actions two-span"><button type="submit" class="role-btn" id="add-course-submit">Add Course</button></div>
+    </form>
+    <p id="add-course-error" class="dash-alert error" hidden></p>
+    <button id="close-add-course-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+
+<dialog id="edit-course-modal" class="modal">
+  <div class="modal-body">
+    <h2>Edit Course</h2>
+    <p id="ec-code-hint" class="panel-hint"></p>
+    <form id="edit-course-form" class="form-grid">
+      <div class="form-field"><label for="ec-title">Title</label><input type="text" id="ec-title" class="text-input" required maxlength="200" /></div>
+      <div class="form-field"><label for="ec-credit-hours">Credit Hours</label><input type="number" id="ec-credit-hours" class="text-input" min="1" max="10" required /></div>
+      <div class="form-field two-span"><label for="ec-description">Description (optional)</label><input type="text" id="ec-description" class="text-input" maxlength="1000" /></div>
+      <div class="form-field">
+        <label for="ec-active">Status</label>
+        <select id="ec-active" class="select-input"><option value="true">Active</option><option value="false">Inactive</option></select>
+      </div>
+      <div class="form-actions two-span"><button type="submit" class="role-btn" id="edit-course-submit">Save Changes</button></div>
+    </form>
+    <p id="edit-course-error" class="dash-alert error" hidden></p>
+    <button id="close-edit-course-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+
+<dialog id="generate-offerings-modal" class="modal">
+  <div class="modal-body">
+    <h2>Open a Semester</h2>
+    <p class="panel-hint">Creates one offering for EVERY course in the program's curriculum for that semester. Courses that already have this section are skipped, so it is safe to run twice.</p>
+    <form id="generate-offerings-form" class="form-grid">
+      <div class="form-field"><label for="go-program">Program</label><select id="go-program" class="select-input" required><option value="">Select&hellip;</option></select></div>
+      <div class="form-field"><label for="go-semester">Semester</label><input type="number" id="go-semester" class="text-input" min="1" max="20" required /></div>
+      <div class="form-field"><label for="go-term">Term Label</label><input type="text" id="go-term" class="text-input" required maxlength="50" placeholder="e.g. Fall 2026" /></div>
+      <div class="form-field"><label for="go-section">Section / Shift</label><input type="text" id="go-section" class="text-input" maxlength="30" value="A" /></div>
+      <div class="form-field"><label for="go-start">Term Start</label><input type="date" id="go-start" class="text-input" required /></div>
+      <div class="form-field"><label for="go-end">Term End</label><input type="date" id="go-end" class="text-input" required /></div>
+      <div class="form-field"><label for="go-capacity">Seats per course (optional)</label><input type="number" id="go-capacity" class="text-input" min="1" max="2000" /></div>
+      <div class="form-field"><label><input type="checkbox" id="go-open" /> Open for student self-enrollment</label></div>
+      <div class="form-actions two-span"><button type="submit" class="role-btn" id="go-submit">Create Offerings</button></div>
+    </form>
+    <p id="go-error" class="dash-alert error" hidden></p>
+    <p id="go-success" class="success-text" hidden></p>
+    <button id="close-generate-offerings-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+
+<dialog id="batch-enroll-modal" class="modal">
+  <div class="modal-body">
+    <h2 id="be-title">Enroll Students</h2>
+    <p class="panel-hint">Enrolls every ACTIVE student matching the filters, even while self-enrollment is closed. Curriculum, credit-hour, seat and timetable-clash rules still apply, and anyone who cannot be enrolled is listed with the reason.</p>
+    <div class="form-grid">
+      <div class="form-field"><label for="be-program">Program</label><select id="be-program" class="select-input"><option value="">Any</option></select></div>
+      <div class="form-field"><label for="be-semester">Semester</label><input type="number" id="be-semester" class="text-input" min="1" max="20" /></div>
+      <div class="form-field"><label for="be-section">Student section (optional)</label><input type="text" id="be-section" class="text-input" maxlength="30" /></div>
+      <div class="form-actions"><button type="button" class="role-btn" id="be-submit">Enroll</button></div>
+    </div>
+    <p id="be-error" class="dash-alert error" hidden></p>
+    <div id="be-result" class="panel-hint" hidden></div>
+    <button id="close-batch-enroll-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+
+<dialog id="auto-schedule-modal" class="modal">
+  <div class="modal-body">
+    <h2>Auto-schedule the whole term</h2>
+    <p class="panel-hint">Gives a weekly timetable to <strong>every course of the selected term that does not have one yet</strong>. Each course is placed at a time when its teacher, its students and a room are all free. Courses that already have a timetable are left alone, so it is safe to run again.</p>
+    <div class="form-grid">
+      <div class="form-field"><label for="as-term">Term</label><input type="text" id="as-term" class="text-input" readonly /></div>
+      <div class="form-field"><label for="as-rooms">Rooms to use (separate with commas)</label><input type="text" id="as-rooms" class="text-input" placeholder="R-101, R-102, LAB-1" maxlength="400" /></div>
+      <div class="form-field"><label for="as-per-week">Classes per week (optional)</label><input type="number" id="as-per-week" class="text-input" min="1" max="5" placeholder="Default: the course credit hours" /></div>
+      <div class="form-actions"><button type="button" class="role-btn" id="as-run">Create the timetable</button></div>
+    </div>
+    <p id="as-error" class="dash-alert error" hidden></p>
+    <div id="as-result" class="panel-hint" hidden></div>
+    <button id="close-auto-schedule-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+
+<dialog id="copy-timetable-modal" class="modal">
+  <div class="modal-body">
+    <h2>Copy last term&rsquo;s timetable</h2>
+    <p class="panel-hint">Repeats the weekly times and rooms of the <strong>same course and section</strong> from an earlier term into the selected term. Anything that clashes, or did not run before, is listed so you can place it by hand.</p>
+    <div class="form-grid">
+      <div class="form-field"><label for="ct-source">Copy from</label><select id="ct-source" class="select-input"></select></div>
+      <div class="form-field"><label for="ct-target">Into</label><input type="text" id="ct-target" class="text-input" readonly /></div>
+      <div class="form-actions"><button type="button" class="role-btn" id="ct-run">Copy the timetable</button></div>
+    </div>
+    <p id="ct-error" class="dash-alert error" hidden></p>
+    <div id="ct-result" class="panel-hint" hidden></div>
+    <button id="close-copy-timetable-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+
+<dialog id="add-offering-modal" class="modal">
+  <div class="modal-body">
+    <h2>Create Course Offering</h2>
+    <form id="add-offering-form" class="form-grid">
+      <div class="form-field">
+        <label for="ao-course">Course</label>
+        <select id="ao-course" class="select-input" required><option value="">Select&hellip;</option></select>
+      </div>
+      <div class="form-field"><label for="ao-term">Term Label</label><input type="text" id="ao-term" class="text-input" required maxlength="50" placeholder="e.g. Fall 2026" /></div>
+      <div class="form-field"><label for="ao-section">Section / Shift</label><input type="text" id="ao-section" class="text-input" maxlength="30" value="A" placeholder="A, B, Morning, Evening" /></div>
+      <div class="form-field"><label for="ao-capacity">Seats (optional)</label><input type="number" id="ao-capacity" class="text-input" min="1" max="2000" placeholder="unlimited" /></div>
+      <div class="form-field"><label for="ao-term-start">Term Start Date</label><input type="date" id="ao-term-start" class="text-input" /></div>
+      <div class="form-field"><label for="ao-term-end">Term End Date</label><input type="date" id="ao-term-end" class="text-input" /></div>
+      <p class="panel-hint two-span">Term dates are required before a timetable slot can be added to this offering later.</p>
+      <div class="form-field two-span">
+        <label for="ao-teacher-search">Assign Teacher (optional, search by name/employee code)</label>
+        <input type="text" id="ao-teacher-search" class="text-input" autocomplete="off" />
+        <div id="ao-teacher-results" class="search-results-dropdown" hidden></div>
+        <input type="hidden" id="ao-teacher-id" />
+      </div>
+      <div class="form-actions two-span"><button type="submit" class="role-btn" id="add-offering-submit">Create Offering</button></div>
+    </form>
+    <p id="add-offering-error" class="dash-alert error" hidden></p>
+    <button id="close-add-offering-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/courses.js"></script>
+{% endblock %}

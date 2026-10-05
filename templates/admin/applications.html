@@ -1,0 +1,107 @@
+{% extends "admin/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Applications{% endblock %}
+{% block page_title %}Applications{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Leave and other requests from students and employees. Review, ask questions, approve or reject.</div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="queue" role="tab" aria-selected="true"><span id="tab-queue">Needs action</span></button>
+  <button class="portal-tab" data-tab="all" role="tab" aria-selected="false"><span>All applications</span></button>
+  <button class="portal-tab" data-tab="overview" role="tab" aria-selected="false"><span>Overview</span></button>
+  <button class="portal-tab" data-tab="types" role="tab" aria-selected="false"><span>Application types</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="queue">
+  <section class="sh-card">
+    <p class="panel-hint">Applications nobody has looked at yet, oldest first.</p>
+    <div id="q-list" class="asg-list" aria-live="polite"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
+    <p class="empty-state" id="q-empty" hidden>Nothing is waiting. You are all caught up.</p>
+  </section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="all" hidden>
+  <section class="sh-card">
+    <div class="ann-toolbar">
+      <input id="f-q" class="text-input" type="search" placeholder="Search name, roll no., reference or subject&hellip;" aria-label="Search" />
+      <select id="f-status" class="select-input" aria-label="Status"><option value="">Any status</option><option value="SUBMITTED">Waiting</option><option value="UNDER_REVIEW">Under review</option>
+        <option value="MORE_INFO_NEEDED">Needs more information</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option><option value="WITHDRAWN">Withdrawn</option></select>
+      <select id="f-type" class="select-input" aria-label="Type"><option value="">Any type</option></select>
+      <select id="f-kind" class="select-input" aria-label="From"><option value="">Students and employees</option><option value="STUDENT">Students</option><option value="EMPLOYEE">Employees</option></select>
+    </div>
+    <div id="a-list" class="asg-list"></div>
+    <p class="empty-state" id="a-empty" hidden>No applications match.</p>
+    <button type="button" class="ann-more" id="a-more" hidden>Show more</button>
+  </section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="overview" hidden>
+  <div class="kpi-grid" aria-live="polite">
+    <div class="kpi"><span class="kpi-label">Waiting</span><strong class="kpi-value" id="k-wait">&mdash;</strong><span class="kpi-sub" id="k-wait-sub"></span></div>
+    <div class="kpi"><span class="kpi-label">Under review</span><strong class="kpi-value" id="k-review">&mdash;</strong><span class="kpi-sub" id="k-info-sub"></span></div>
+    <div class="kpi"><span class="kpi-label">Approved</span><strong class="kpi-value" id="k-approved">&mdash;</strong><span class="kpi-sub">all time</span></div>
+    <div class="kpi"><span class="kpi-label">Rejected</span><strong class="kpi-value" id="k-rejected">&mdash;</strong><span class="kpi-sub" id="k-rate-sub"></span></div>
+    <div class="kpi"><span class="kpi-label">Time to decide</span><strong class="kpi-value" id="k-avg">&mdash;</strong><span class="kpi-sub">on average</span></div>
+    <div class="kpi"><span class="kpi-label">All applications</span><strong class="kpi-value" id="k-total">&mdash;</strong><span class="kpi-sub" id="k-withdrawn-sub"></span></div>
+  </div>
+  <div class="chart-grid">
+    <section class="sh-card"><div class="sh-card-head"><h2>By status</h2></div><div id="c-status"></div></section>
+    <section class="sh-card"><div class="sh-card-head"><h2>What people apply for</h2></div><div id="c-type"></div></section>
+    <section class="sh-card chart-wide"><div class="sh-card-head"><h2>Received and decided, last 12 weeks</h2></div><div id="c-week"></div></section>
+    <section class="sh-card"><div class="sh-card-head"><h2>Who applies</h2></div><div id="c-kind"></div></section>
+  </div>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="types" hidden>
+  <section class="sh-card">
+    <div class="sh-card-head"><h2>What people can apply for</h2></div>
+    <p class="panel-hint">These are the choices students and employees see. Switch one off to hide it; existing applications keep their type.</p>
+    <form id="t-form" class="type-form" novalidate>
+      <input id="t-name" class="text-input" maxlength="120" placeholder="New type, e.g. Casual leave" aria-label="Name" />
+      <input id="t-desc" class="text-input" maxlength="2000" placeholder="Help text the applicant sees (optional)" aria-label="Help text" />
+      <div class="type-flags">
+        <label><input type="checkbox" id="t-students" checked /> Students</label><label><input type="checkbox" id="t-employees" checked /> Employees</label>
+        <label><input type="checkbox" id="t-dates" /> Needs dates</label><label><input type="checkbox" id="t-attach" /> Needs a document</label>
+        <label>Yearly limit <input id="t-limit" class="text-input tiny" type="number" min="1" max="366" placeholder="days" /></label>
+      </div>
+      <button type="submit" class="role-btn">Add type</button>
+    </form>
+    <p id="t-error" class="dash-alert error" hidden></p>
+    <div id="t-list" class="auth-list"></div>
+  </section>
+</div>
+
+<dialog id="rv-modal" class="modal modal-wide" aria-labelledby="rv-title">
+  <div class="modal-body">
+    <div class="ann-detail-badges" id="rv-badges"></div>
+    <h2 id="rv-title"></h2>
+    <p class="cc-meta" id="rv-meta"></p>
+    <div class="ann-issuer" id="rv-applicant"></div>
+    <div id="rv-usage"></div>
+    <h3 class="modal-subhead">Request</h3>
+    <p class="cd-text" id="rv-details"></p>
+    <div id="rv-files"></div>
+    <div id="rv-others"></div>
+    <h3 class="modal-subhead">Conversation</h3>
+    <div class="thread" id="rv-thread"></div>
+    <div class="form-field"><label for="rv-note">Your message or decision note</label>
+      <textarea id="rv-note" class="text-input" rows="3" maxlength="2000" placeholder="Required to ask a question or to reject. Optional when approving."></textarea></div>
+    <p id="rv-decided" class="cd-privacy" hidden></p>
+    <p id="rv-error" class="dash-alert error" hidden></p>
+    <div class="decision-bar" id="rv-actions">
+      <button type="button" class="role-btn small-btn secondary-btn" data-act="START_REVIEW">Start review</button>
+      <button type="button" class="role-btn small-btn secondary-btn" data-act="REQUEST_INFO">Ask for more information</button>
+      <button type="button" class="role-btn small-btn" data-act="APPROVE">Approve</button>
+      <button type="button" class="danger-btn small-btn" data-act="REJECT">Reject</button>
+      <button type="button" class="role-btn small-btn secondary-btn" id="rv-message">Send message only</button>
+    </div>
+    <button id="rv-close" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/student-ui.js"></script>
+<script src="/static/js/charts.js"></script>
+<script src="/static/js/applications-admin.js"></script>
+{% endblock %}

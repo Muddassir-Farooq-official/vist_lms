@@ -1,0 +1,35 @@
+{% extends "faculty/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}My Fines{% endblock %}
+{% block page_title %}My Fines{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Any fine issued against you, from any source, and its status.</div>{% endblock %}
+
+{% block content %}
+<section class="stat-grid" aria-label="Fine balance">
+  <div class="stat-card stat-card--red">
+    <div class="stat-icon-badge">{{ nav_icon("fees") }}</div>
+    <span class="stat-label">Pending</span>
+    <span class="stat-value" id="fine-stat-pending">&mdash;</span>
+  </div>
+  <div class="stat-card stat-card--green">
+    <div class="stat-icon-badge">{{ nav_icon("check-circle") }}</div>
+    <span class="stat-label">Paid</span>
+    <span class="stat-value" id="fine-stat-paid">&mdash;</span>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon-badge">{{ nav_icon("clock") }}</div>
+    <span class="stat-label">Waived</span>
+    <span class="stat-value" id="fine-stat-waived">&mdash;</span>
+  </div>
+</section>
+
+<section class="sh-card" aria-labelledby="fn-h">
+  <div class="sh-card-head"><h2 id="fn-h">All my fines</h2></div>
+  <div id="my-fines-grid" class="fine-list"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
+  <p class="empty-state" id="my-fines-empty" hidden>You have no fines.</p>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/my-fines.js"></script>
+{% endblock %}

@@ -1,0 +1,294 @@
+{% extends "admin/_base.html" %}
+{% block title %}Students{% endblock %}
+{% block page_title %}Students{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <div class="toolbar">
+    <input type="text" id="search-input" class="text-input" placeholder="Search name, CNIC, roll number, phone..." />
+    <select id="status-filter" class="select-input">
+      <option value="">All statuses</option>
+      <option value="ACTIVE">Active</option>
+      <option value="SUSPENDED">Suspended</option>
+      <option value="GRADUATED">Graduated</option>
+      <option value="DROPPED">Dropped</option>
+    </select>
+    <button id="open-add-student" class="role-btn" type="button">+ Add Student</button>
+    <button id="open-advance-semester" class="role-btn secondary-btn" type="button">Advance Semester</button>
+    <a id="export-students-link" class="role-btn secondary-btn" href="/api/v1/students/export" download>Export CSV</a>
+  </div>
+
+  <div id="students-table-wrap">
+    <table class="dash-table" id="students-table">
+      <thead><tr><th>Name</th><th>Roll No.</th><th>Status</th><th></th></tr></thead>
+      <tbody id="students-tbody"></tbody>
+    </table>
+    <p class="empty-state" id="students-empty" hidden>No students match this search.</p>
+  </div>
+
+  <div class="pager" id="pager">
+    <button id="prev-page" class="page-btn" type="button">&larr; Prev</button>
+    <span id="page-info" class="page-info"></span>
+    <button id="next-page" class="page-btn" type="button">Next &rarr;</button>
+  </div>
+</section>
+
+<dialog id="student-modal" class="modal modal-wide">
+  <div class="modal-body">
+    <h2 id="modal-name"></h2>
+
+    <div class="profile-photo-row">
+      <div class="profile-photo-frame" id="modal-photo-frame">
+        <span class="profile-photo-placeholder">No Photo</span>
+      </div>
+      <div class="profile-photo-actions">
+        <input type="file" id="modal-photo-input" accept="image/jpeg,image/png,image/webp" />
+        <button type="button" class="role-btn small-btn" id="modal-photo-upload-btn">Upload / Replace</button>
+        <a href="#" class="role-btn small-btn" id="modal-photo-download-link" target="_blank" rel="noopener" hidden>Download Photo</a>
+        <button type="button" class="danger-btn small-btn" id="modal-photo-remove-btn" hidden>Remove</button>
+      </div>
+    </div>
+    <p id="modal-photo-error" class="dash-alert error" hidden></p>
+
+    <div class="form-actions">
+      <button type="button" class="role-btn" id="open-full-profile-btn">View Full Profile</button>
+      <a class="role-btn" id="print-slip-link" href="#" target="_blank" rel="noopener">Print Admission Slip</a>
+    </div>
+
+    <dl class="detail-list" id="modal-details"></dl>
+
+    <h3 class="modal-subhead">Edit Details</h3>
+    <form id="edit-student-form" class="form-grid two-col">
+      <div class="form-field"><label for="es-contact">Contact No.</label><input type="text" id="es-contact" class="text-input" placeholder="03XXXXXXXXX" /></div>
+      <div class="form-field">
+        <label for="es-marital">Marital Status</label>
+        <select id="es-marital" class="select-input">
+          <option value="Single">Single</option>
+          <option value="Married">Married</option>
+          <option value="Divorced">Divorced</option>
+          <option value="Widowed">Widowed</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label for="es-religion">Religion</label>
+        <select id="es-religion" class="select-input"></select>
+      </div>
+      <div class="form-field"><label for="es-nationality">Nationality</label><input type="text" id="es-nationality" class="text-input" maxlength="50" /></div>
+      <div class="form-field">
+        <label for="es-program">Program</label>
+        <select id="es-program" class="select-input"><option value="">None</option></select>
+      </div>
+      <div class="form-field"><label for="es-semester">Current Semester</label><input type="number" id="es-semester" class="text-input" min="1" max="20" placeholder="e.g. 3" /></div>
+      <div class="form-field"><label for="es-section">Section / Shift</label><input type="text" id="es-section" class="text-input" maxlength="30" /></div>
+      <div class="form-field"><label for="es-first-name">First Name</label><input type="text" id="es-first-name" class="text-input" maxlength="100" /></div>
+      <div class="form-field"><label for="es-last-name">Last Name</label><input type="text" id="es-last-name" class="text-input" maxlength="100" /></div>
+      <div class="form-field"><label for="es-dob">Date of Birth</label><input type="date" id="es-dob" class="text-input" /></div>
+      <div class="form-field"><label for="es-gender">Gender</label><select id="es-gender" class="select-input"><option>Male</option><option>Female</option><option>Other</option></select></div>
+      <div class="form-field"><label for="es-admission-session">Admission Session</label><input type="text" id="es-admission-session" class="text-input" maxlength="50" /></div>
+      <div class="form-field"><label for="es-admission-category">Admission Category</label><input type="text" id="es-admission-category" class="text-input" maxlength="50" /></div>
+      <div class="form-field"><label for="es-email">Email</label><input type="email" id="es-email" class="text-input" maxlength="255" /></div>
+      <div class="form-field"><label for="es-blood-group">Blood Group</label>
+        <select id="es-blood-group" class="select-input"><option value="">Unknown</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select>
+      </div>
+      <div class="form-field"><label for="es-roll">Roll Number (system-generated, also the login username)</label><input type="text" id="es-roll" class="text-input" readonly disabled /></div>
+      <div class="form-field two-span"><label for="es-address">Present Address</label><input type="text" id="es-address" class="text-input" maxlength="255" /></div>
+      <div class="form-field">
+        <label for="es-province">Province</label>
+        <select id="es-province" class="select-input"></select>
+      </div>
+      <div class="form-field">
+        <label for="es-district">District</label>
+        <select id="es-district" class="select-input"></select>
+      </div>
+      <div class="form-field">
+        <label for="es-city">City</label>
+        <select id="es-city" class="select-input"></select>
+      </div>
+      <div class="form-actions two-span"><button type="submit" class="role-btn" id="edit-student-submit">Save Changes</button></div>
+    </form>
+    <p id="edit-student-success" class="success-text" hidden></p>
+
+    <div class="modal-status-change">
+      <label for="new-status">Change status</label>
+      <select id="new-status" class="select-input">
+        <option value="ACTIVE">Active</option>
+        <option value="SUSPENDED">Suspended</option>
+        <option value="GRADUATED">Graduated</option>
+        <option value="DROPPED">Dropped</option>
+      </select>
+      <button id="save-status" class="role-btn" type="button">Update Status</button>
+    </div>
+    <div class="modal-reset-row">
+      <button id="reset-password-btn" class="danger-btn" type="button">Reset Password to Default</button>
+      <span id="reset-password-confirm" class="success-text" hidden>Password reset to the default.</span>
+    </div>
+    <p id="modal-error" class="dash-alert error" hidden></p>
+    <button id="close-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+
+<dialog id="add-student-modal" class="modal modal-wide">
+  <div class="modal-body">
+    <h2>Add Student</h2>
+    <form id="add-student-form" class="form-grid two-col">
+      <h3 class="form-section">Personal details</h3>
+      <div class="form-field"><label for="as-first-name">First Name</label><input type="text" id="as-first-name" class="text-input" required maxlength="100" /></div>
+      <div class="form-field"><label for="as-last-name">Last Name</label><input type="text" id="as-last-name" class="text-input" required maxlength="100" /></div>
+      <div class="form-field"><label for="as-dob">Date of Birth</label><input type="date" id="as-dob" class="text-input" required /></div>
+      <div class="form-field">
+        <label for="as-gender">Gender</label>
+        <select id="as-gender" class="select-input" required>
+          <option value="">Select&hellip;</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="form-field"><label for="as-cnic">CNIC</label><input type="text" id="as-cnic" class="text-input" placeholder="12345-1234567-1" required /></div>
+      <div class="form-field"><label for="as-contact">Contact No.</label><input type="text" id="as-contact" class="text-input" placeholder="03XXXXXXXXX" required /></div>
+      <div class="form-field">
+        <label for="as-marital">Marital Status</label>
+        <select id="as-marital" class="select-input" required>
+          <option value="">Select&hellip;</option>
+          <option value="Single">Single</option>
+          <option value="Married">Married</option>
+          <option value="Divorced">Divorced</option>
+          <option value="Widowed">Widowed</option>
+        </select>
+      </div>
+      <div class="form-field"><label for="as-religion">Religion</label><select id="as-religion" class="select-input" required></select></div>
+      <div class="form-field"><label for="as-nationality">Nationality</label><input type="text" id="as-nationality" class="text-input" required maxlength="50" value="Pakistani" /></div>
+
+      <h3 class="form-section">Guardian &amp; emergency contact</h3>
+      <div class="form-field"><label for="as-guardian-name">Guardian Name</label><input type="text" id="as-guardian-name" class="text-input" required maxlength="150" /></div>
+      <div class="form-field"><label for="as-guardian-cnic">Guardian CNIC</label><input type="text" id="as-guardian-cnic" class="text-input" placeholder="12345-1234567-1" required /></div>
+      <div class="form-field"><label for="as-guardian-contact">Guardian Contact (optional)</label><input type="text" id="as-guardian-contact" class="text-input" placeholder="03XXXXXXXXX" /></div>
+      <div class="form-field"><label for="as-relation">Relation with Guardian</label><input type="text" id="as-relation" class="text-input" required maxlength="50" value="Father" /></div>
+      <div class="form-field"><label for="as-emergency">Emergency Contact No.</label><input type="text" id="as-emergency" class="text-input" placeholder="03XXXXXXXXX" required /></div>
+
+      <h3 class="form-section">Address</h3>
+      <div class="form-field two-span"><label for="as-address">Present Address</label><input type="text" id="as-address" class="text-input" required maxlength="255" /></div>
+      <div class="form-field"><label for="as-province">Province</label><select id="as-province" class="select-input" required></select></div>
+      <div class="form-field"><label for="as-district">District</label><select id="as-district" class="select-input" required></select></div>
+      <div class="form-field"><label for="as-city">City</label><select id="as-city" class="select-input" required></select></div>
+
+      <h3 class="form-section">Admission</h3>
+      <div class="form-field">
+        <label for="as-program">Program (optional)</label>
+        <select id="as-program" class="select-input"><option value="">None</option></select>
+      </div>
+      <div class="form-field"><label for="as-section">Section / Shift</label><input type="text" id="as-section" class="text-input" maxlength="30" placeholder="A, B, Morning, Evening" /></div>
+      <div class="form-field"><label for="as-semester">Starting Semester (defaults to 1)</label><input type="number" id="as-semester" class="text-input" min="1" max="20" placeholder="1" /></div>
+      <div class="form-field"><label for="as-enrollment-date">Enrollment Date</label><input type="date" id="as-enrollment-date" class="text-input" /></div>
+      <div class="form-field"><label for="as-admission-session">Admission Session</label><input type="text" id="as-admission-session" class="text-input" maxlength="50" placeholder="e.g. Fall 2026" /></div>
+      <div class="form-field"><label for="as-admission-category">Admission Category</label><input type="text" id="as-admission-category" class="text-input" maxlength="50" placeholder="e.g. Open Merit" /></div>
+      <h3 class="form-section">Optional</h3>
+      <div class="form-field"><label for="as-email">Email (optional)</label><input type="email" id="as-email" class="text-input" maxlength="255" /></div>
+      <div class="form-field"><label for="as-blood-group">Blood Group (optional)</label>
+        <select id="as-blood-group" class="select-input"><option value="">Unknown</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select>
+      </div>
+      <p class="panel-hint two-span">Roll number is generated automatically once the program is known (or assigned later if left blank now) and will also be this student's login username.</p>
+
+      <div class="form-actions two-span">
+        <button type="submit" class="role-btn" id="add-student-submit">Create Student</button>
+      </div>
+    </form>
+    <p id="add-student-error" class="dash-alert error" hidden></p>
+    <p id="add-student-success" class="success-text" hidden></p>
+    <button id="close-add-student-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+
+<dialog id="advance-semester-modal" class="modal">
+  <div class="modal-body">
+    <h2>Advance Semester</h2>
+    <p class="panel-hint">Bumps current semester by 1 for eligible active students. Use Preview first: it shows exactly who will be held back and why (courses still in progress, overdue fees, already at final semester). Nothing changes until you press Advance.</p>
+    <div class="form-field">
+      <label for="advance-program-select">Program</label>
+      <select id="advance-program-select" class="select-input">
+        <option value="">All programs</option>
+      </select>
+    </div>
+    <div class="form-field"><label><input type="checkbox" id="advance-skip-open" checked /> Hold back students whose courses are still in progress</label></div>
+    <div class="form-field"><label><input type="checkbox" id="advance-skip-fees" /> Hold back students with overdue fees</label></div>
+    <div class="form-actions">
+      <button id="preview-advance-semester-btn" class="role-btn" type="button">Preview</button>
+      <button id="confirm-advance-semester-btn" class="role-btn" type="button">Advance</button>
+    </div>
+    <div id="advance-preview" class="panel-hint" hidden></div>
+    <p id="advance-semester-error" class="dash-alert error" hidden></p>
+    <p id="advance-semester-success" class="success-text" hidden></p>
+    <button id="close-advance-semester-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+
+<dialog id="full-profile-modal" class="modal modal-wide">
+  <div class="modal-body">
+    <h2 id="fp-name"></h2>
+    <p id="fp-error" class="dash-alert error" hidden></p>
+
+    <h3 class="modal-subhead">Personal &amp; Academic</h3>
+    <dl class="detail-list" id="fp-core"></dl>
+
+    <h3 class="modal-subhead">Guardian(s)</h3>
+    <table class="dash-table" id="fp-guardians-table">
+      <thead><tr><th>Name</th><th>CNIC</th><th>Contact</th><th>Relation</th></tr></thead>
+      <tbody id="fp-guardians-tbody"></tbody>
+    </table>
+
+    <h3 class="modal-subhead">Emergency Contact(s)</h3>
+    <table class="dash-table" id="fp-emergency-table">
+      <thead><tr><th>Name</th><th>Contact</th><th>Relation</th></tr></thead>
+      <tbody id="fp-emergency-tbody"></tbody>
+    </table>
+
+    <h3 class="modal-subhead">Qualifications</h3>
+    <table class="dash-table" id="fp-qualifications-table">
+      <thead><tr><th>Degree</th><th>Institution</th><th>Year</th><th>Marks/Grade</th></tr></thead>
+      <tbody id="fp-qualifications-tbody"></tbody>
+    </table>
+    <p class="empty-state" id="fp-qualifications-empty" hidden>None on record.</p>
+
+    <h3 class="modal-subhead">Academic History (Enrollments)</h3>
+    <table class="dash-table" id="fp-enrollments-table">
+      <thead><tr><th>Course</th><th>Credit Hours</th><th>Term</th><th>Status</th><th>Outcome</th><th>Retake?</th></tr></thead>
+      <tbody id="fp-enrollments-tbody"></tbody>
+    </table>
+    <p class="empty-state" id="fp-enrollments-empty" hidden>No enrollment history yet.</p>
+
+    <h3 class="modal-subhead">Summary</h3>
+    <section class="stat-grid" aria-label="Cross-module summary">
+      <div class="stat-card">
+        <span class="stat-label">Fees Outstanding</span>
+        <span class="stat-value" id="fp-fee-outstanding">&mdash;</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Active Loans</span>
+        <span class="stat-value" id="fp-library-active">&mdash;</span>
+      </div>
+      <div class="stat-card stat-card--red">
+        <span class="stat-label">Overdue Loans</span>
+        <span class="stat-value" id="fp-library-overdue">&mdash;</span>
+      </div>
+      <div class="stat-card stat-card--red">
+        <span class="stat-label">Fines Pending</span>
+        <span class="stat-value" id="fp-fine-pending">&mdash;</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Complaints Filed</span>
+        <span class="stat-value" id="fp-complaints-filed">&mdash;</span>
+      </div>
+      <div class="stat-card stat-card--red">
+        <span class="stat-label">Complaints Against</span>
+        <span class="stat-value" id="fp-complaints-against">&mdash;</span>
+      </div>
+    </section>
+
+    <button id="close-full-profile-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/students.js"></script>
+{% endblock %}

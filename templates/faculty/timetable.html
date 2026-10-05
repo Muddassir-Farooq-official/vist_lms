@@ -1,0 +1,31 @@
+{% extends "faculty/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}My Timetable{% endblock %}
+{% block page_title %}My Timetable{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Your week at a glance, by class and semester. Download it as a PDF to print or share.</div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="weekly" role="tab" aria-selected="true"><span>Weekly timetable</span></button>
+  <button class="portal-tab" data-tab="upcoming" role="tab" aria-selected="false"><span>Upcoming classes</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="weekly">
+{% include "_weekly_timetable.html" %}
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="upcoming" hidden>
+<section class="sh-card" aria-labelledby="fu-h">
+  <div class="sh-card-head"><h2 id="fu-h">Upcoming classes</h2>
+    <a class="see-all" id="add-all-calendar" href="/api/v1/academics/timetable/calendar.ics" data-download="my-timetable.ics" data-label="calendar file">Add all to my calendar</a></div>
+  <div class="toolbar"><select id="term-label-input" class="select-input"><option value="">All terms</option></select></div>
+  <div id="upcoming-grid" class="sh-class-grid" aria-live="polite"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
+  <p class="empty-state" id="my-schedule-empty" hidden>No upcoming classes.</p>
+</section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/weekly-timetable.js"></script>
+<script src="/static/js/faculty-timetable.js"></script>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends "admin/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Timetable{% endblock %}
+{% block page_title %}Timetable{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">See the weekly timetable for any class, semester, section or teacher, and download it as a PDF. To add or remove a slot for a course, open that course from the Courses page.</div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="weekly" role="tab" aria-selected="true"><span>Weekly view</span></button>
+  <button class="portal-tab" data-tab="slots" role="tab" aria-selected="false"><span>All slots</span></button>
+  <button class="portal-tab" data-tab="periods" role="tab" aria-selected="false"><span>Daily periods</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="weekly">
+{% include "_weekly_timetable.html" %}
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="periods" hidden>
+<section class="panel">
+  <div class="panel-header">
+    <div class="panel-header-left">
+      <div class="panel-icon-badge">{{ nav_icon("dashboard") }}</div>
+      <h2>Daily Periods</h2>
+    </div>
+  </div>
+  <p class="panel-hint">Define the institute's fixed daily period structure once — e.g. Period 1: 08:00&ndash;08:50. Every timetable slot (manual or auto-assigned) picks from these instead of typing arbitrary times.</p>
+  <table class="dash-table" id="periods-table">
+    <thead><tr><th>Period</th><th>Time</th><th></th></tr></thead>
+    <tbody id="periods-tbody"></tbody>
+  </table>
+  <p class="empty-state" id="periods-empty" hidden>No periods defined yet.</p>
+  <form id="add-period-form" class="form-grid two-col">
+    <div class="form-field"><label for="period-number">Period Number</label><input type="number" id="period-number" class="text-input" min="1" required /></div>
+    <div class="form-field"></div>
+    <div class="form-field"><label for="period-start">Start Time</label><input type="time" id="period-start" class="text-input" required /></div>
+    <div class="form-field"><label for="period-end">End Time</label><input type="time" id="period-end" class="text-input" required /></div>
+    <div class="form-actions two-span"><button type="submit" class="role-btn" id="add-period-submit">Add Period</button></div>
+  </form>
+  <p id="add-period-error" class="dash-alert error" hidden></p>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="slots" hidden>
+<section class="panel">
+  <div class="panel-header">
+    <div class="panel-header-left">
+      <div class="panel-icon-badge">{{ nav_icon("dashboard") }}</div>
+      <h2>Institute Timetable</h2>
+    </div>
+  </div>
+  <p class="panel-hint">Every recurring weekly slot across every course offering, in one list — use this to spot a free room or a teacher's full week at a glance. To add or remove a slot, open that course from the Courses page.</p>
+  <div class="toolbar">
+    <select id="timetable-day-filter" class="select-input">
+      <option value="">All days</option>
+      <option value="MONDAY">Monday</option>
+      <option value="TUESDAY">Tuesday</option>
+      <option value="WEDNESDAY">Wednesday</option>
+      <option value="THURSDAY">Thursday</option>
+      <option value="FRIDAY">Friday</option>
+      <option value="SATURDAY">Saturday</option>
+      <option value="SUNDAY">Sunday</option>
+    </select>
+    <input type="text" id="timetable-room-filter" class="text-input" placeholder="Filter by room..." />
+  </div>
+  <table class="dash-table" id="institute-timetable-table">
+    <thead><tr><th>Day</th><th>Time</th><th>Course</th><th>Term</th><th>Teacher</th><th>Room</th></tr></thead>
+    <tbody id="institute-timetable-tbody"></tbody>
+  </table>
+  <p class="empty-state" id="institute-timetable-empty" hidden>No timetable slots exist yet.</p>
+</section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/weekly-timetable.js"></script>
+<script src="/static/js/admin-timetable.js"></script>
+{% endblock %}

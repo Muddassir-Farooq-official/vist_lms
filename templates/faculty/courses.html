@@ -1,0 +1,53 @@
+{% extends "faculty/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}My Courses{% endblock %}
+{% block page_title %}My Courses{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Courses you teach. Add each class's topic, slides, notes and links here — students see them straight away. Times and rooms are set by the admin.</div>{% endblock %}
+
+{% block content %}
+<section class="sh-card" aria-labelledby="fc-h">
+  <div class="sh-card-head"><h2 id="fc-h">Courses I teach</h2><a class="see-all" href="/dashboard/faculty/attendance">Take attendance</a></div>
+  <div id="my-offerings-grid" class="course-grid" aria-live="polite"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
+  <p class="empty-state" id="my-offerings-empty" hidden>You have no assigned courses yet.</p>
+</section>
+
+<dialog id="manage-offering-modal" class="modal modal-wide">
+  <div class="modal-body">
+    <h2 id="manage-offering-title"></h2>
+
+    <p id="lock-banner" class="lock-banner" hidden>🔒 The admin has locked this course's content. You can view everything, but not change or delete it. You can still mark topics as covered.</p>
+    <p id="content-error" class="dash-alert error" hidden></p>
+    <p id="content-success" class="success-text" hidden></p>
+
+    <h3 class="modal-subhead">Syllabus</h3>
+    <div id="syllabus-view"></div>
+    <div class="plan-actions">
+      <label class="role-btn small-btn secondary-btn file-btn">Upload / replace syllabus (PDF)<input type="file" id="syllabus-file" accept="application/pdf,.pdf" hidden /></label>
+      <button type="button" class="danger-btn small-btn" id="syllabus-remove" hidden>Remove</button>
+    </div>
+
+    <h3 class="modal-subhead">Course plan &mdash; topic, slides and notes for each class</h3>
+    <details class="paste-plan">
+      <summary>Have a list of topics? Paste them all at once</summary>
+      <p class="panel-hint">One topic per line. They fill the upcoming classes in order, and you can still edit each one afterwards.</p>
+      <textarea id="plan-paste" class="text-input" rows="6" placeholder="Week 1 &ndash; Introduction&#10;Week 2 &ndash; Variables and types&#10;Week 3 &ndash; Loops"></textarea>
+      <button type="button" class="role-btn small-btn" id="plan-apply">Fill classes with these topics</button>
+    </details>
+    <div id="plan-summary" class="plan-summary"></div>
+    <div id="lectures-list"></div>
+    <p class="empty-state" id="lectures-empty" hidden>No classes yet &mdash; they appear here once the admin has set the timetable for this course.</p>
+
+    <h3 class="modal-subhead">Roster</h3>
+    <table class="dash-table" id="roster-table">
+      <thead><tr><th>Student</th><th>Roll No.</th><th>Status</th><th>Retake?</th><th>Attendance %</th></tr></thead>
+      <tbody id="roster-tbody"></tbody>
+    </table>
+
+    <button id="close-manage-offering-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/faculty-courses.js"></script>
+{% endblock %}

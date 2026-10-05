@@ -1,0 +1,97 @@
+name: vist-lms
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vist_lms
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: vist_lms
+    volumes:
+      - vist_lms_pgdata:/var/lib/postgresql/data
+      - ./docker/init-extensions.sql:/docker-entrypoint-initdb.d/init-extensions.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vist_lms -d vist_lms"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build: .
+    command: ["alembic", "upgrade", "head"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://vist_lms:changeme@db:5432/vist_lms
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    build: .
+    restart: unless-stopped
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://vist_lms:changeme@db:5432/vist_lms
+      DATABASE_URL_SYNC: postgresql+psycopg://vist_lms:changeme@db:5432/vist_lms
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app
+      - ./var/storage:/app/var/storage
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    build: .
+    restart: unless-stopped
+    # Real RQ worker — processes jobs enqueued by app/core/queue.py
+    # (currently just CSV imports; the same queue/worker can take more
+    # job types later without any infrastructure changes). `app/imports`
+    # is the only argument RQ needs beyond the queue name: it has to be
+    # able to import app.imports.tasks (and anything that imports), same
+    # as the web process, so it shares the app/ codebase and env — see
+    # the `volumes` and `env_file` below, identical to the `app` service.
+    command: ["rq", "worker", "--url", "redis://redis:6379/0", "imports"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://vist_lms:changeme@db:5432/vist_lms
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./app:/app/app
+      - ./var/storage:/app/var/storage
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    # Deliberately NOT profile-gated (unlike the placeholder this
+    # replaced) — the worker is functionally required for CSV import to
+    # do anything now; gating it behind an opt-in profile would mean a
+    # plain `docker compose up` silently leaves every import stuck in
+    # PENDING with no obvious error.
+
+volumes:
+  vist_lms_pgdata:

@@ -1,0 +1,32 @@
+<section class="sh-card">
+  <div class="ann-toolbar"><p class="panel-hint" style="margin:0;flex:1">Need something bought for the institute? Ask here. The administration approves it, then the accounts office orders it and tells you when it arrives.</p><button type="button" class="role-btn" id="pr-new">+ Ask for something</button></div>
+  <div class="rv-chips" id="pr-filter">
+    <button type="button" class="chip active" data-s="">All</button><button type="button" class="chip" data-s="REQUESTED">Waiting</button><button type="button" class="chip" data-s="APPROVED">Approved</button>
+    <button type="button" class="chip" data-s="ORDERED">On order</button><button type="button" class="chip" data-s="RECEIVED">Arrived</button><button type="button" class="chip" data-s="PAID">Done</button>
+  </div>
+  <div id="pr-list" class="asg-list" aria-live="polite"></div>
+  <p class="empty-state" id="pr-empty" hidden>You have not asked for anything yet.</p>
+</section>
+
+<dialog id="pr-modal" class="modal modal-wide" aria-labelledby="pr-title"><div class="modal-body">
+  <h2 id="pr-title">Ask for something to be bought</h2>
+  <form id="pr-form" class="form-grid two-col" novalidate>
+    <div class="form-field two-span"><label for="pr-name">What do you need?</label><input id="pr-name" class="text-input" maxlength="200" placeholder="e.g. Chairs for room 12" /></div>
+    <div class="form-field two-span"><label for="pr-why">Why is it needed?</label><textarea id="pr-why" class="text-input" rows="2" maxlength="2000" placeholder="The administration reads this when deciding."></textarea></div>
+    <div class="form-field"><label for="pr-by">Needed by <small class="field-hint inline">(optional)</small></label><input id="pr-by" class="text-input" type="date" /></div>
+    <div class="form-field"><label>Estimated total</label><div class="pr-total" id="pr-total">Rs. 0</div></div>
+    <div class="form-field two-span"><label>What to buy</label>
+      <div class="table-scroll"><table class="tk-table pr-items"><thead><tr><th>Item</th><th>Quantity</th><th>Price each (Rs.)</th><th>Total</th><th></th></tr></thead><tbody id="pr-items"></tbody></table></div>
+      <button type="button" class="role-btn small-btn secondary-btn" id="pr-add-item">+ Add another item</button></div>
+    <p id="pr-error" class="dash-alert error two-span" hidden></p>
+    <div class="form-actions two-span"><button type="button" class="role-btn" id="pr-save">Send the request</button></div>
+  </form>
+  <button id="pr-close" class="back-link modal-close-btn" type="button">Cancel</button></div></dialog>
+
+<dialog id="pd-modal" class="modal modal-wide" aria-labelledby="pd-title"><div class="modal-body">
+  <div class="ann-detail-badges" id="pd-badges"></div><h2 id="pd-title"></h2><p class="cc-meta" id="pd-meta"></p>
+  <div id="pd-steps"></div><div id="pd-body"></div>
+  <div class="table-scroll"><table class="tk-table"><thead><tr><th>Item</th><th>Qty</th><th>Estimated</th><th>Received</th><th>Actual</th></tr></thead><tbody id="pd-items"></tbody></table></div>
+  <p id="pd-error" class="dash-alert error" hidden></p>
+  <div class="decision-bar" id="pd-actions"></div>
+  <button id="pd-close" class="back-link modal-close-btn" type="button">Close</button></div></dialog>

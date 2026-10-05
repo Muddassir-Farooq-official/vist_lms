@@ -1,0 +1,97 @@
+{% extends "admin/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Welcome back! Here's what's happening at your institute.</div>{% endblock %}
+
+{% block content %}
+<section class="stat-grid" id="stat-grid" aria-label="Student status overview">
+  <div class="stat-card stat-card--blue">
+    <div class="stat-icon-badge">{{ nav_icon("students") }}</div>
+    <span class="stat-label">Total Students</span>
+    <span class="stat-value" id="stat-total">&mdash;</span>
+    <span class="stat-trend" id="stat-total-trend"></span>
+  </div>
+  <div class="stat-card stat-card--green">
+    <div class="stat-icon-badge">{{ nav_icon("check-circle") }}</div>
+    <span class="stat-label">Active</span>
+    <span class="stat-value" id="stat-active">&mdash;</span>
+    <span class="stat-trend" id="stat-active-trend"></span>
+  </div>
+  <div class="stat-card stat-card--purple">
+    <div class="stat-icon-badge">{{ nav_icon("ban") }}</div>
+    <span class="stat-label">Suspended</span>
+    <span class="stat-value" id="stat-suspended">&mdash;</span>
+    <span class="stat-trend" id="stat-suspended-trend"></span>
+  </div>
+  <div class="stat-card stat-card--orange">
+    <div class="stat-icon-badge">{{ nav_icon("graduation-cap") }}</div>
+    <span class="stat-label">Graduated</span>
+    <span class="stat-value" id="stat-graduated">&mdash;</span>
+    <span class="stat-trend" id="stat-graduated-trend"></span>
+  </div>
+  <div class="stat-card stat-card--red">
+    <div class="stat-icon-badge">{{ nav_icon("trash") }}</div>
+    <span class="stat-label">Dropped</span>
+    <span class="stat-value" id="stat-dropped">&mdash;</span>
+    <span class="stat-trend" id="stat-dropped-trend"></span>
+  </div>
+  <div class="stat-card stat-card--teal">
+    <div class="stat-icon-badge">{{ nav_icon("grid") }}</div>
+    <span class="stat-label">Programs</span>
+    <span class="stat-value" id="stat-programs">&mdash;</span>
+    <span class="stat-trend">Total programs</span>
+  </div>
+</section>
+
+<div class="dash-columns">
+  <section class="panel">
+    <div class="panel-header">
+      <div class="panel-header-left">
+        <div class="panel-icon-badge">{{ nav_icon("graduation-cap") }}</div>
+        <h2>Students by Program</h2>
+      </div>
+      <a href="/dashboard/admin/students" class="view-all-link">View all {{ nav_icon("arrow-right") }}</a>
+    </div>
+    <div id="programs-table-wrap">
+      <table class="dash-table" id="programs-table">
+        <thead><tr><th>Program</th><th>Code</th><th class="num">Students</th></tr></thead>
+        <tbody id="programs-tbody"></tbody>
+      </table>
+      <p class="empty-state" id="programs-empty" hidden>No programs yet.</p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <div class="panel-header-left">
+        <div class="panel-icon-badge">{{ nav_icon("cloud-upload") }}</div>
+        <h2>Recent Imports</h2>
+      </div>
+      <a href="/dashboard/admin/imports" class="view-all-link">View all {{ nav_icon("arrow-right") }}</a>
+    </div>
+    <div id="imports-table-wrap">
+      <table class="dash-table" id="imports-table">
+        <thead><tr><th>File</th><th>Status</th><th class="num">Rows</th><th>When</th></tr></thead>
+        <tbody id="imports-tbody"></tbody>
+      </table>
+      <p class="empty-state" id="imports-empty" hidden>No imports yet. <a href="/dashboard/admin/imports">Upload a CSV</a>.</p>
+    </div>
+  </section>
+</div>
+
+<section class="panel">
+  <div class="panel-header">
+    <div class="panel-header-left">
+      <div class="panel-icon-badge">{{ nav_icon("clock") }}</div>
+      <h2>Recent Activity</h2>
+    </div>
+  </div>
+  <ul class="activity-list" id="activity-list"></ul>
+  <p class="empty-state" id="activity-empty" hidden>No activity recorded yet.</p>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/dashboard.js"></script>
+{% endblock %}
