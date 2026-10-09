@@ -29,8 +29,18 @@
   <p id="password-error" class="dash-alert error" hidden></p>
   <p id="password-success" class="success-text" hidden></p>
 </section>
+<section class="panel" id="policy-panel" aria-labelledby="policy-h">
+  <h2 id="policy-h">Institute Policy</h2>
+  <p class="panel-hint">Rules the system applies automatically. Changes take effect straight away (within a minute on every server) and are recorded in the audit log. Leave a box empty to go back to the default.</p>
+  <div id="policy-groups"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
+  <div class="form-actions"><button id="policy-save-btn" class="role-btn" type="button">Save policy</button></div>
+  <p id="policy-error" class="dash-alert error" hidden></p>
+  <p id="policy-success" class="success-text" hidden></p>
+</section>
+
 {% endblock %}
 
 {% block extra_scripts %}
 <script src="/static/js/settings.js"></script>
+<script src="/static/js/policy-settings.js"></script>
 {% endblock %}

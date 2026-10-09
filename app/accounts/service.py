@@ -4,7 +4,7 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.accounts.models import (
@@ -367,7 +367,9 @@ class AccountsService:
     # ------------------------------------------------------------------ the report
     async def summary(self, *, from_date: date | None, to_date: date | None) -> dict:
         cats = {c.id: c.name for c in (await self.session.execute(select(AccountCategory))).scalars()}
-        fee_stmt = select(func.coalesce(func.sum(FeeLedgerEntry.amount), 0)).where(FeeLedgerEntry.entry_type == LedgerEntryType.CREDIT)
+        # Fee income = payments received minus refunds paid back.
+        fee_stmt = select(func.coalesce(func.sum(case((FeeLedgerEntry.entry_type == LedgerEntryType.REFUND, -FeeLedgerEntry.amount), else_=FeeLedgerEntry.amount)), 0)).where(
+            FeeLedgerEntry.entry_type.in_([LedgerEntryType.CREDIT, LedgerEntryType.REFUND]))
         inc_stmt = select(IncomeEntry.category_id, func.sum(IncomeEntry.amount), func.count()).where(IncomeEntry.voided_at.is_(None)).group_by(IncomeEntry.category_id)
         exp_stmt = select(Expense.category_id, func.sum(Expense.amount), func.count()).where(Expense.status == ExpenseStatus.APPROVED).group_by(Expense.category_id)
         pend_stmt = select(func.coalesce(func.sum(Expense.amount), 0), func.count()).where(Expense.status == ExpenseStatus.PENDING_APPROVAL)
@@ -397,7 +399,7 @@ class AccountsService:
         first = date(int(months[0][:4]), int(months[0][5:]), 1)
         month_of = lambda col: func.to_char(col, "YYYY-MM")                                               # noqa: E731
         fm = month_of(FeeLedgerEntry.created_at).label("m")
-        fee_m = {mo: _f(a) for mo, a in (await self.session.execute(select(fm, func.sum(FeeLedgerEntry.amount)).where(FeeLedgerEntry.entry_type == LedgerEntryType.CREDIT, func.date(FeeLedgerEntry.created_at) >= first).group_by(fm))).all()}
+        fee_m = {mo: _f(a) for mo, a in (await self.session.execute(select(fm, func.sum(case((FeeLedgerEntry.entry_type == LedgerEntryType.REFUND, -FeeLedgerEntry.amount), else_=FeeLedgerEntry.amount))).where(FeeLedgerEntry.entry_type.in_([LedgerEntryType.CREDIT, LedgerEntryType.REFUND]), func.date(FeeLedgerEntry.created_at) >= first).group_by(fm))).all()}
         im = month_of(IncomeEntry.income_date).label("m")
         inc_m = {mo: _f(a) for mo, a in (await self.session.execute(select(im, func.sum(IncomeEntry.amount)).where(IncomeEntry.voided_at.is_(None), IncomeEntry.income_date >= first).group_by(im))).all()}
         em = month_of(Expense.expense_date).label("m")

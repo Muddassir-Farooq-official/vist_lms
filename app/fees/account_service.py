@@ -55,7 +55,11 @@ class AccountService:
                 r["challan"] = {"id": c.id, "consumer_number": c.consumer_number, "status": c.status.value, "amount": float(c.amount), "due_date": c.due_date} if c else None
             for e in entries:
                 if e.entry_type == LedgerEntryType.CREDIT:
-                    payments.append({"date": e.created_at, "amount": float(e.amount), "description": e.description or "Payment", "fee": structure.name})
+                    payments.append({"id": e.id, "date": e.paid_on or e.created_at, "amount": float(e.amount), "description": e.description or "Payment", "fee": structure.name,
+                                     "method": e.payment_method, "reference": e.payment_reference, "receipt_number": e.receipt_number})
+                elif FeeStatusCalculator._is_reversal(e):  # a staff reversal cancels an earlier payment: show it as a negative line
+                    payments.append({"id": e.id, "date": e.paid_on or e.created_at, "amount": -float(e.amount), "description": e.description or "Payment reversed", "fee": structure.name,
+                                     "method": e.payment_method, "reference": e.payment_reference, "receipt_number": e.receipt_number})
             conc = [{"name": e.description, "amount": float(e.amount), "installment_number": e.installment_number} for e in entries if e.entry_type == LedgerEntryType.CONCESSION]
             active = a.status == AssignmentStatus.ACTIVE
             charged, concession = sum(r["charged"] for r in rows), sum(r["concession"] for r in rows)
@@ -78,10 +82,11 @@ class AccountService:
             for s in scholarships:
                 s.pop("reason", None)
         nxt = min(upcoming, key=lambda x: x[0]) if upcoming else None
-        payments.sort(key=lambda p: p["date"], reverse=True)
+        payments.sort(key=lambda p: str(p["date"]), reverse=True)
+        net_received = sum(p["amount"] for p in payments)
         return {"payer": payer, "assignments": sorted(out, key=lambda x: (x["is_previous_dues"] is False, x["term_label"] or ""), reverse=False),
                 "summary": {"charged": round(totals["charged"], 2), "concession": round(totals["concession"], 2), "paid": round(totals["paid"], 2), "remaining": round(totals["remaining"], 2),
                             "overdue": round(totals["overdue"], 2), "late_fee_accrued": round(totals["late_fee_accrued"], 2), "next_due": {"date": nxt[0], "amount": round(nxt[1], 2)} if nxt else None,
                             "fines_unpaid": round(fines_unpaid, 2), "fines_count": int(fines_count), "total_to_pay": round(totals["remaining"] + fines_unpaid, 2),
-                            "credit_balance": round(max(0.0, totals["paid"] - (totals["charged"] - totals["concession"])), 2)},
+                            "credit_balance": round(max(0.0, net_received - (totals["charged"] - totals["concession"])), 2)},
                 "payments": payments, "scholarships": scholarships}

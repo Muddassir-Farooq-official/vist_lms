@@ -53,6 +53,9 @@
   const assignmentDetailList = document.getElementById("assignment-detail-list");
   const paymentAmount = document.getElementById("payment-amount");
   const paymentDescription = document.getElementById("payment-description");
+  const paymentMethod = document.getElementById("payment-method");
+  const paymentReference = document.getElementById("payment-reference");
+  const paymentPaidOn = document.getElementById("payment-paid-on");
   const recordPaymentBtn = document.getElementById("record-payment-btn");
   const assignmentStatusSelect = document.getElementById("assignment-status-select");
   const saveAssignmentStatusBtn = document.getElementById("save-assignment-status-btn");
@@ -276,7 +279,8 @@
           const sourceName = btn.getAttribute("data-name");
           const sourceAmount = parseFloat(btn.getAttribute("data-amount"));
 
-          const newTerm = window.prompt('New term label for the clone of "' + sourceName + '":', "");
+          const openTerms = window.VistTerms ? window.VistTerms.open().map(function (t) { return t.label; }) : [];
+          const newTerm = window.prompt('Term for the clone of "' + sourceName + '"' + (openTerms.length ? " (open terms: " + openTerms.join(", ") + ")" : "") + ":", openTerms[0] || "");
           if (!newTerm) return;
 
           const pctInput = window.prompt(
@@ -448,8 +452,9 @@
       tr.innerHTML =
         "<td>" + VA.escapeHtml(entry.entry_type) + "</td>" +
         '<td class="num">' + sign + money(entry.amount) + "</td>" +
-        "<td>" + VA.escapeHtml(entry.due_date || "\u2014") + "</td>" +
-        "<td>" + VA.escapeHtml(entry.description || "\u2014") + "</td>" +
+        "<td>" + VA.escapeHtml(entry.due_date || entry.paid_on || "\u2014") + "</td>" +
+        "<td>" + VA.escapeHtml(entry.description || "\u2014") +
+        (entry.receipt_number ? ' \u00b7 <a href="/api/v1/fees/receipts/' + encodeURIComponent(entry.id) + '/pdf" target="_blank" rel="noopener">Receipt ' + VA.escapeHtml(entry.receipt_number) + "</a>" : "") + "</td>" +
         '<td class="row-actions"></td>';
 
       if (entry.entry_type === "DEBIT") {
@@ -496,6 +501,8 @@
     assignmentModalSuccess.hidden = true;
     paymentAmount.value = "";
     paymentDescription.value = "";
+    paymentReference.value = "";
+    paymentPaidOn.value = "";
     assignmentModal.showModal();
 
     const result = await VA.fetchJson("/api/v1/fees/assignments/" + assignmentId);
@@ -527,6 +534,11 @@
       assignmentModalError.hidden = false;
       return;
     }
+    if (paymentMethod.value !== "CASH" && !paymentReference.value.trim()) {
+      assignmentModalError.textContent = "Enter the deposit slip, transaction or cheque number (needed to match the bank statement).";
+      assignmentModalError.hidden = false;
+      return;
+    }
     recordPaymentBtn.disabled = true;
     assignmentModalError.hidden = true;
     assignmentModalSuccess.hidden = true;
@@ -534,7 +546,10 @@
     const result = await VA.fetchJson("/api/v1/fees/assignments/" + activeAssignmentId + "/payments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount: amount, description: paymentDescription.value.trim() || null }),
+      body: JSON.stringify({
+        amount: amount, description: paymentDescription.value.trim() || null, method: paymentMethod.value,
+        reference: paymentReference.value.trim() || null, paid_on: paymentPaidOn.value || null,
+      }),
     });
 
     recordPaymentBtn.disabled = false;
@@ -545,10 +560,12 @@
       return;
     }
 
-    assignmentModalSuccess.textContent = "Payment recorded.";
+    assignmentModalSuccess.textContent = "Payment recorded. The receipt is in the ledger below.";
     assignmentModalSuccess.hidden = false;
     paymentAmount.value = "";
     paymentDescription.value = "";
+    paymentReference.value = "";
+    paymentPaidOn.value = "";
     await openAssignmentModal(activeAssignmentId);
     loadAssignments();
     loadDashboard();

@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import timedelta
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, UploadFile
 from fastapi.responses import JSONResponse, Response
 
+from app.academics.terms import AcademicTermService, TermStatus, to_dict
+from pydantic import BaseModel, Field
 from app.academics.grading_service import AssessmentTypeService, GradingService
 from app.academics.models import (
     ResultSheetStatus,
@@ -424,6 +426,10 @@ async def create_offering(
     current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_OFFERING_MANAGE)),
     db=Depends(get_db),
 ) -> CourseOfferingOut:
+    term = await AcademicTermService(db).require_usable(payload.term_label)
+    if term is not None:   # dates default to the term's own dates
+        payload.term_start_date = payload.term_start_date or term.start_date
+        payload.term_end_date = payload.term_end_date or term.end_date
     offering = await CourseOfferingService(db).create(
         course_id=payload.course_id, term_label=payload.term_label,
         assigned_teacher_id=payload.assigned_teacher_id,
@@ -763,6 +769,10 @@ async def generate_offerings(
     current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_OFFERING_MANAGE)),
     db=Depends(get_db),
 ) -> GenerateOfferingsResponse:
+    term = await AcademicTermService(db).require_usable(payload.term_label)
+    if term is not None:
+        payload.term_start_date = payload.term_start_date or term.start_date
+        payload.term_end_date = payload.term_end_date or term.end_date
     result = await CourseOfferingService(db).generate_for_program_semester(
         term_label=payload.term_label, program_id=payload.program_id, semester_number=payload.semester_number,
         section_label=payload.section_label, term_start_date=payload.term_start_date,
@@ -926,6 +936,9 @@ async def enroll_self(
     db=Depends(get_db),
 ) -> EnrollmentOut:
     student_id = await _resolve_own_student_id(db, current_user)
+    from app.attendance.holds import ensure_no_attendance_hold
+
+    await ensure_no_attendance_hold(db, student_id, action="Course registration")
     enrollment = await EnrollmentService(db).enroll(
         student_id=student_id, course_offering_id=payload.course_offering_id, actor_id=current_user.id
     )
@@ -1082,6 +1095,33 @@ async def _to_student_mark_detail(db, mark) -> StudentMarkDetail:
         **base, assessment_type_name=assessment_type.name, category=assessment_type.category,
         max_marks=float(assessment_type.max_marks),
     )
+
+
+@router.get("/offerings/{offering_id}/marks.csv", summary="Download the marks sheet: roster x components, with marks already entered")
+async def marks_sheet_download(offering_id: uuid.UUID, current_user: CurrentUser = Depends(require_permission(Permissions.MARKS_ENTER)),
+                               db=Depends(get_db)) -> Response:
+    from app.academics.marks_sheet import MarksSheetService
+
+    offering = await CourseOfferingService(db).get(offering_id)
+    if not await _can_manage_marks_for_offering(db, offering, current_user):
+        raise AuthorizationError("You are not the assigned teacher for this offering.")
+    return Response(content=await MarksSheetService(db).template(offering_id), media_type="text/csv",
+                    headers={"Content-Disposition": f'attachment; filename="marks-{offering_id}.csv"'})
+
+
+@router.post("/offerings/{offering_id}/marks/upload", summary="Upload the filled marks sheet (dry_run=true only checks). Each cell is checked like a hand-entered mark.")
+async def marks_sheet_upload(offering_id: uuid.UUID, file: UploadFile, dry_run: bool = True,
+                             current_user: CurrentUser = Depends(require_permission(Permissions.MARKS_ENTER)), db=Depends(get_db)) -> dict:
+    from app.academics.marks_sheet import MarksSheetService
+
+    offering = await CourseOfferingService(db).get(offering_id)
+    if not await _can_manage_marks_for_offering(db, offering, current_user):
+        raise AuthorizationError("You are not the assigned teacher for this offering.")
+    raw = await file.read(2 * 1024 * 1024 + 1)
+    if len(raw) > 2 * 1024 * 1024:
+        raise BusinessRuleViolationError("The file is larger than 2 MB.")
+    is_admin = Permissions.ENROLLMENT_MANAGE in current_user.permissions or Permissions.RESULT_APPROVE in current_user.permissions
+    return await MarksSheetService(db).upload(offering_id, raw, actor_id=current_user.id, is_admin=is_admin, dry_run=dry_run)
 
 
 @router.post(
@@ -1613,7 +1653,7 @@ async def get_offering_progress(
     summary="Every teacher's course progress across their assigned offerings — admin only",
 )
 async def teacher_progress(
-    current_user: CurrentUser = Depends(require_permission(Permissions.ENROLLMENT_MANAGE)),
+    current_user: CurrentUser = Depends(require_any_permission(Permissions.ENROLLMENT_MANAGE, Permissions.ACADEMIC_OVERSIGHT)),
     db=Depends(get_db),
 ) -> list[TeacherProgressEntry]:
     from sqlalchemy import select
@@ -1734,6 +1774,18 @@ async def delete_class_session_resource(
 # ---------------------------------------------------------------------------
 # End of semester — "reset enrollment for next semester"
 # ---------------------------------------------------------------------------
+@router.get(
+    "/end-semester/preview",
+    summary="What End Semester would do for this term (read-only): offerings, enrollments to complete, ungraded",
+)
+async def end_semester_preview(
+    term_label: str,
+    current_user: CurrentUser = Depends(require_permission(Permissions.ENROLLMENT_MANAGE)),
+    db=Depends(get_db),
+) -> dict:
+    return await EnrollmentService(db).preview_end_semester(term_label)
+
+
 @router.post(
     "/end-semester", response_model=EndSemesterResponse,
     summary="Close a term's offerings to enrollment and finalize its active enrollments to Completed",
@@ -1750,12 +1802,46 @@ async def end_semester(
 # ---------------------------------------------------------------------------
 # Term list (for the admin UI's "load" dropdown) + teacher performance
 # ---------------------------------------------------------------------------
-@router.get("/terms", response_model=list[str], summary="Every term label that has at least one offering")
+@router.get("/terms", response_model=list[str], summary="Every term label in use: registered terms first (newest first), then any older label that only exists on offerings")
 async def list_terms(
     current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_VIEW)),
     db=Depends(get_db),
 ) -> list[str]:
-    return await CourseOfferingRepository(db).list_distinct_terms()
+    registered = [t.label for t in await AcademicTermService(db).all()]
+    return registered + [t for t in await CourseOfferingRepository(db).list_distinct_terms() if t not in registered]
+
+
+class AcademicTermIn(BaseModel):
+    label: str = Field(min_length=1, max_length=50)
+    start_date: date
+    end_date: date
+
+
+class AcademicTermPatch(BaseModel):
+    start_date: date | None = None
+    end_date: date | None = None
+    status: TermStatus | None = None
+
+
+@router.get("/academic-terms", summary="The institute's academic terms with dates and status")
+async def list_academic_terms(current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> list[dict]:
+    # Term names and dates are not sensitive, and several screens need them (fee structures, datesheets, admissions)
+    # for people without course permissions, e.g. the accounts office.
+    return [to_dict(t) for t in await AcademicTermService(db).all()]
+
+
+@router.post("/academic-terms", status_code=201, summary="Add a term (administration)")
+async def create_academic_term(payload: AcademicTermIn, current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_OFFERING_MANAGE)),
+                               db=Depends(get_db)) -> dict:
+    return to_dict(await AcademicTermService(db).create(label=payload.label, start_date=payload.start_date, end_date=payload.end_date,
+                                                        actor_id=current_user.id))
+
+
+@router.patch("/academic-terms/{term_id}", summary="Change a term's dates, or close/reopen it (administration). Labels cannot be renamed.")
+async def update_academic_term(term_id: uuid.UUID, payload: AcademicTermPatch,
+                               current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_OFFERING_MANAGE)), db=Depends(get_db)) -> dict:
+    return to_dict(await AcademicTermService(db).update(term_id, start_date=payload.start_date, end_date=payload.end_date,
+                                                        status=payload.status, actor_id=current_user.id))
 
 
 @router.get(

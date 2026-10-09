@@ -388,6 +388,31 @@ window.VistAdmin = (function () {
     return (roles || []).some(function (r) { return allowed.indexOf(r) !== -1; });
   }
 
+  // Staff holding several roles (e.g. Teacher + Exam Controller) get a "Switch portal" menu in the top bar.
+  const PORTALS = [
+    ["ADMIN", "Administration", "/dashboard/admin"], ["ACCOUNTS_OFFICER", "Accounts", "/dashboard/accounts/fees"],
+    ["LIBRARIAN", "Library", "/dashboard/library"], ["PRINCIPAL", "Principal", "/dashboard/principal"], ["HOD", "Department (HOD)", "/dashboard/hod"], ["TEACHER", "Faculty", "/dashboard/faculty"],
+    ["EXAM_CONTROLLER", "Exam Department", "/dashboard/exam"], ["HOSTEL_WARDEN", "Hostel", "/dashboard/warden"],
+    ["SECURITY_GUARD", "Gate", "/dashboard/gate"], ["STUDENT", "Student", "/dashboard/student"],
+  ];
+  function addPortalSwitcher(me) {
+    const holder = document.querySelector(".content-topbar-right");
+    if (!holder || !me || document.getElementById("portal-switch")) return;
+    const mine = PORTALS.filter(function (p) { return (me.roles || []).indexOf(p[0]) !== -1; });
+    if (mine.length < 2) return;
+    const here = window.location.pathname;
+    const sel = document.createElement("select");
+    sel.id = "portal-switch";
+    sel.className = "select-input small-input";
+    sel.setAttribute("aria-label", "Switch portal");
+    sel.innerHTML = mine.map(function (p) {
+      const base = p[2].split("/").slice(0, 3).join("/");
+      return '<option value="' + p[2] + '"' + (here.indexOf(base) === 0 ? " selected" : "") + ">" + escapeHtml(p[1]) + "</option>";
+    }).join("");
+    sel.addEventListener("change", function () { window.location.href = sel.value; });
+    holder.insertBefore(sel, holder.firstChild);
+  }
+
   async function requireAdminSession() {
     const authGate = document.getElementById("auth-gate");
 
@@ -671,8 +696,8 @@ window.VistAdmin = (function () {
         ident = { name: (r.body.first_name + " " + r.body.last_name).trim(), sub: r.body.roll_number || "Student",
                   photo: r.body.has_photo ? "/api/v1/students/me/photo" : null };
       }
-    } else if (roles.length === 1 && roles[0] === "ADMIN") {
-      return null;       // the administrator account is not an employee record: nothing to ask for, no noisy 404
+    } else if (roles.length === 1 && (roles[0] === "ADMIN" || roles[0] === "PARENT")) {
+      return null;       // the administrator and parents are not employee records: nothing to ask for, no noisy 404
     } else {
       const r = await fetchJson("/api/v1/employees/me", { quiet: true });
       if (r.ok && r.body) {
@@ -748,7 +773,8 @@ window.VistAdmin = (function () {
   // Tasks: how many are waiting for MY answer (and, for the administration, how many flags need a decision).
   function wireTaskBadge(me) {
     const roles = me.roles || [];
-    if (roles.length === 1 && roles[0] === "STUDENT") return;
+    // Students and parents have no tasks: do not ask (it would only be refused).
+    if (roles.every(function (r) { return r === "STUDENT" || r === "PARENT"; })) return;
     const paint = function (n) {
       document.querySelectorAll('a[href$="/tasks"]').forEach(function (link) {
         const old = link.querySelector(".nav-badge");
@@ -849,6 +875,7 @@ window.VistAdmin = (function () {
     if (backToAdmin && (me.roles || []).indexOf("ADMIN") !== -1) backToAdmin.hidden = false;
 
     insertSkeletons(document.querySelector(".content-main") || document);
+    addPortalSwitcher(me);
     document.dispatchEvent(new CustomEvent("vistadmin:ready", { detail: { me: me } }));
     return me;
   }

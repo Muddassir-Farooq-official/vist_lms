@@ -6,6 +6,7 @@
 <div class="portal-tabs" role="tablist" data-auto-tabs>
   <button class="portal-tab active" data-tab="upload" role="tab" aria-selected="true"><span>Upload CSV</span></button>
   <button class="portal-tab" data-tab="history" role="tab" aria-selected="false"><span>Import history</span></button>
+  <button class="portal-tab" data-tab="past-results" role="tab" aria-selected="false"><span>Past results</span></button>
 </div>
 
 <div class="portal-tab-panel" data-tab-panel="upload">
@@ -56,6 +57,30 @@
 </section>
 </div>
 
+<div class="portal-tab-panel" data-tab-panel="past-results" hidden>
+<section class="panel">
+  <h2>Import Past Results</h2>
+  <div class="instruction-banner">
+    <p class="instruction-title">For students who were here before the system:</p>
+    <ul class="instruction-list">
+      <li>One row = one student's final result in one course in one past term. Import the students first.</li>
+      <li><strong>Columns:</strong> roll_number, term_label, term_start_date (YYYY-MM-DD, used to put terms in order), course_code, course_title (only needed for a course not yet in the system), credit_hours, and <strong>percentage or letter_grade</strong> (or both: they must agree with the grading scale).</li>
+      <li>Use the same term name for every course of that term (for example <code>Fall 2025</code>).</li>
+      <li><strong>Check first</strong> shows every problem without importing. <strong>If any row has an error, nothing is imported.</strong> A row imported before is skipped, never doubled.</li>
+      <li>Imported results count in GPA and CGPA (retakes included) and appear on result cards.</li>
+    </ul>
+    <div class="template-download-row"><a href="/api/v1/results/history/template.csv" class="role-btn template-download-btn" download>Download template (.csv)</a></div>
+  </div>
+  <div class="upload-row">
+    <input type="file" id="history-file" accept=".csv" />
+    <button type="button" class="role-btn secondary-btn" id="history-check-btn">Check first</button>
+    <button type="button" class="role-btn" id="history-import-btn">Import</button>
+  </div>
+  <p id="history-error" class="dash-alert error" hidden></p>
+  <div id="history-result" class="panel-hint" hidden></div>
+</section>
+</div>
+
 <dialog id="errors-modal" class="modal">
   <div class="modal-body">
     <h2>Row Errors</h2>
@@ -72,4 +97,5 @@
 
 {% block extra_scripts %}
 <script src="/static/js/imports.js"></script>
+<script src="/static/js/history-import.js"></script>
 {% endblock %}

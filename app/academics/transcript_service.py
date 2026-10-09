@@ -86,7 +86,7 @@ class TranscriptService:
                 courses.append({"enrollment_id": res.enrollment_id, "course_code": course.code, "course_title": course.title, "credit_hours": ch,
                                 "total_obtained": float(res.total_obtained), "total_max": float(res.total_max), "percentage": float(res.percentage),
                                 "letter_grade": res.letter_grade, "grade_points": gp, "quality_points": round(gp * ch, 2), "outcome": res.outcome,
-                                "failed_for_attendance": res.failed_for_attendance, "attempt": attempt[res.enrollment_id],
+                                "failed_for_attendance": res.failed_for_attendance, "supplementary": bool(getattr(res, "supplementary", False)), "attempt": attempt[res.enrollment_id],
                                 "replaced": last_attempt[course.id] != res.enrollment_id})
             out_terms.append({"label": t["label"], "start_date": t["start_date"], "courses": courses,
                               "credits_attempted": sum(c["credit_hours"] for c in courses), "credits_earned": sum(c["credit_hours"] for c in courses if c["outcome"] == "PASSED"),

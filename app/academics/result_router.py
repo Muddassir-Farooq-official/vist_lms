@@ -5,6 +5,10 @@ import uuid
 from fastapi import APIRouter, Depends
 from fastapi.responses import Response
 
+from fastapi import UploadFile
+from app.core.exceptions import BusinessRuleViolationError
+from app.attendance.holds import ensure_no_attendance_hold
+from app.auth.permissions import Roles
 from app.academics.models import ResultSheetStatus
 from app.academics.grade_scale import GradeScaleService
 from app.academics.result_sheet_service import ResultSheetService
@@ -20,6 +24,14 @@ from app.students.repository import StudentRepository
 from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/results", tags=["results"])
+
+
+class PublishIn(BaseModel):
+    """Optional. Needed only to publish before attendance is locked (administrator only)."""
+
+    override_reason: str | None = Field(default=None, max_length=500)
+
+
 approver = require_permission(Permissions.RESULT_APPROVE)
 
 
@@ -89,9 +101,10 @@ async def return_sheet(offering_id: uuid.UUID, payload: ReturnIn, current_user: 
 
 
 @router.post("/sheets/{offering_id}/publish", summary="Publish an approved sheet: students see their marks and pass/fail is decided (approver)")
-async def publish(offering_id: uuid.UUID, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
+async def publish(offering_id: uuid.UUID, payload: PublishIn | None = None, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
     service = ResultSheetService(db)
-    await service.publish(offering_id, actor_id=current_user.id)
+    await service.publish(offering_id, actor_id=current_user.id, override_reason=payload.override_reason if payload else None,
+                          actor_is_admin=Roles.ADMIN in current_user.roles)
     return await service.detail(offering_id)
 
 
@@ -128,12 +141,16 @@ def _pdf(data: dict) -> Response:
 
 @router.get("/me/transcript", summary="My result card: every published result, term by term, with GPA and CGPA")
 async def my_transcript(current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
-    return await TranscriptService(db).build(await _own_student_id(db, current_user))
+    sid = await _own_student_id(db, current_user)
+    await ensure_no_attendance_hold(db, sid, action="Your result card")
+    return await TranscriptService(db).build(sid)
 
 
 @router.get("/me/transcript.pdf", summary="My result card as a PDF")
 async def my_transcript_pdf(current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> Response:
-    return _pdf(await TranscriptService(db).build(await _own_student_id(db, current_user)))
+    sid = await _own_student_id(db, current_user)
+    await ensure_no_attendance_hold(db, sid, action="Your result card")
+    return _pdf(await TranscriptService(db).build(sid))
 
 
 @router.get("/students/{student_id}/transcript", summary="Any student's result card (approver)")
@@ -144,3 +161,22 @@ async def student_transcript(student_id: uuid.UUID, current_user: CurrentUser = 
 @router.get("/students/{student_id}/transcript.pdf", summary="Any student's result card as a PDF (approver)")
 async def student_transcript_pdf(student_id: uuid.UUID, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> Response:
     return _pdf(await TranscriptService(db).build(student_id))
+
+
+# ============================================================ past results (import)
+@router.get("/history/template.csv", summary="CSV template for importing past results")
+async def history_template(current_user: CurrentUser = Depends(require_permission(Permissions.RESULT_HISTORY_IMPORT))) -> Response:
+    from app.academics.history_import import TEMPLATE
+
+    return Response(content=TEMPLATE, media_type="text/csv", headers={"Content-Disposition": 'attachment; filename="past-results-template.csv"'})
+
+
+@router.post("/history/import", summary="Import past results from a CSV (all-or-nothing). dry_run=true only checks the file.")
+async def history_import(file: UploadFile, dry_run: bool = True,
+                         current_user: CurrentUser = Depends(require_permission(Permissions.RESULT_HISTORY_IMPORT)), db=Depends(get_db)) -> dict:
+    from app.academics.history_import import HistoryImportService
+
+    raw = await file.read(10 * 1024 * 1024 + 1)
+    if len(raw) > 10 * 1024 * 1024:
+        raise BusinessRuleViolationError("The file is larger than 10 MB. Split it.")
+    return await HistoryImportService(db).run(raw, actor_id=current_user.id, dry_run=dry_run)

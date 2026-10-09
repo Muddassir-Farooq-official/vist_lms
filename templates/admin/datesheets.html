@@ -1,0 +1,42 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN,EXAM_CONTROLLER{% endblock %}
+{% block title %}Datesheets{% endblock %}
+{% block page_title %}Datesheets &amp; Admit Cards{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Plan each exam's papers, fix clashes, publish, and print admit cards. Students see a datesheet only after it is published.</div>{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Datesheets</h2>
+  <div class="upload-row">
+    <select id="ds-term" class="select-input term-select" aria-label="Term"><option value="">Select a term&hellip;</option></select>
+    <input id="ds-name" class="text-input small-input" maxlength="80" placeholder="Name, e.g. Midterm" aria-label="Datesheet name" />
+    <button id="ds-create" class="role-btn" type="button">Create datesheet</button>
+  </div>
+  <table class="dash-table"><thead><tr><th>Term</th><th>Exam</th><th>Status</th><th></th></tr></thead><tbody id="ds-list"></tbody></table>
+  <p id="ds-error" class="dash-alert error" hidden></p>
+</section>
+
+<section class="panel" id="ds-detail" hidden>
+  <h2 id="ds-title"></h2>
+  <div class="upload-row">
+    <select id="pp-offering" class="select-input" aria-label="Course"></select>
+    <input id="pp-date" type="date" class="text-input small-input" aria-label="Date" />
+    <input id="pp-start" type="time" class="text-input small-input" value="09:00" aria-label="Start" />
+    <input id="pp-end" type="time" class="text-input small-input" value="12:00" aria-label="End" />
+    <input id="pp-room" class="text-input small-input" maxlength="50" placeholder="Room / hall" aria-label="Room" />
+    <button id="pp-add" class="role-btn" type="button">Add paper</button>
+  </div>
+  <div id="ds-clashes"></div>
+  <table class="dash-table"><thead><tr><th>Date</th><th>Time</th><th>Course</th><th>Room</th><th></th></tr></thead><tbody id="pp-list"></tbody></table>
+  <div class="form-actions"><button id="ds-publish" class="role-btn" type="button">Publish datesheet</button></div>
+  <div class="upload-row" id="ac-row" hidden>
+    <input id="ac-roll" class="text-input small-input" placeholder="Roll number" aria-label="Roll number" />
+    <button id="ac-print" class="role-btn secondary-btn" type="button">Print admit card</button>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/academic-terms.js"></script>
+<script src="/static/js/datesheets.js"></script>
+{% endblock %}

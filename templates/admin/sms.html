@@ -1,0 +1,36 @@
+{% extends "admin/_base.html" %}
+{% block title %}SMS{% endblock %}
+{% block page_title %}SMS{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Text messages to students and guardians: attendance fines, datesheets, results and overdue fees. Turn each kind on or off in Settings &rarr; Institute Policy &rarr; SMS.</div>{% endblock %}
+
+{% block content %}
+<p class="dash-alert error" id="sms-not-configured" hidden>No SMS provider is set up yet, so messages are recorded as <strong>Logged</strong> but not sent. Add the provider's details to the server's .env (SMS_PROVIDER_URL, SMS_API_KEY, SMS_SENDER_ID) and restart.</p>
+<section class="stat-grid" aria-label="Last 7 days">
+  <div class="stat-card stat-card--green"><span class="stat-label">Sent (7 days)</span><span class="stat-value" id="sms-sent">&mdash;</span></div>
+  <div class="stat-card"><span class="stat-label">Waiting to send</span><span class="stat-value" id="sms-queued">&mdash;</span></div>
+  <div class="stat-card stat-card--red"><span class="stat-label">Failed (7 days)</span><span class="stat-value" id="sms-failed">&mdash;</span></div>
+  <div class="stat-card"><span class="stat-label">Logged, not sent (7 days)</span><span class="stat-value" id="sms-logged">&mdash;</span></div>
+</section>
+
+<section class="panel">
+  <div class="upload-row">
+    <button id="sms-send" class="role-btn" type="button">Send waiting messages now</button>
+    <button id="sms-retry" class="role-btn secondary-btn" type="button">Retry failed</button>
+    <button id="sms-fees" class="role-btn secondary-btn" type="button">Queue overdue-fee reminders</button>
+  </div>
+  <div class="upload-row">
+    <input id="sms-test-number" class="text-input small-input" placeholder="0300-1234567" aria-label="Test number" />
+    <button id="sms-test" class="role-btn secondary-btn" type="button">Send a test SMS</button>
+    <select id="sms-filter" class="select-input" aria-label="Show">
+      <option value="">All messages</option><option value="QUEUED">Waiting</option><option value="SENT">Sent</option>
+      <option value="FAILED">Failed</option><option value="LOGGED">Logged</option><option value="SKIPPED">Skipped (no valid number)</option>
+    </select>
+  </div>
+  <p id="sms-msg" class="panel-hint" hidden></p>
+  <table class="dash-table"><thead><tr><th>When</th><th>To</th><th>About</th><th>Status</th><th>Message</th></tr></thead><tbody id="sms-tbody"></tbody></table>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/sms-admin.js"></script>
+{% endblock %}

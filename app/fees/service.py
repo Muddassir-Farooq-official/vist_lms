@@ -106,6 +106,9 @@ class FeeStructureService:
         self.audit = AuditService(session)
 
     async def create(self, data: FeeStructureCreateRequest, *, actor_id: uuid.UUID) -> FeeStructure:
+        from app.academics.terms import AcademicTermService
+
+        await AcademicTermService(self.session).require_usable(data.term_label)
         fee_type = await self.fee_type_repo.get_by_id(data.fee_type_id)
         if fee_type is None:
             raise ResourceNotFoundError("Fee type not found.")
@@ -199,6 +202,9 @@ class FeeStructureService:
         forward rather than editing history. The source structure and
         every existing assignment/ledger entry under it are completely
         untouched."""
+        from app.academics.terms import AcademicTermService
+
+        await AcademicTermService(self.session).require_usable(data.new_term_label)
         source = await self.get(structure_id)
 
         new_amount = round(float(source.total_amount) * (1 + data.percentage_change / 100), 2)

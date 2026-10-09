@@ -12,7 +12,7 @@ from sqlalchemy import select
 
 from app.auth.permissions import Permissions, Roles
 from app.core.database import get_db
-from app.core.dependencies import CurrentUser, get_current_user, require_any_role, require_permission
+from app.core.dependencies import CurrentUser, get_current_user, require_any_permission, require_any_role, require_permission
 from app.core.exceptions import AuthorizationError, ResourceNotFoundError
 from app.employees.repository import EmployeeRepository
 from app.fees.account_service import AccountService
@@ -61,15 +61,24 @@ async def student_account(student_id: uuid.UUID, current_user: CurrentUser = Dep
 
 
 # ============================================================ the challan, as a printable PDF
+async def _parent_of(db, current_user: CurrentUser, assignment) -> bool:
+    """A parent may open their own child's challans and receipts."""
+    from app.fees.models import PayerType
+    from app.parents.models import ParentStudentLink
+
+    return (Roles.PARENT in current_user.roles and assignment.payer_type == PayerType.STUDENT
+            and await db.get(ParentStudentLink, (current_user.id, assignment.payer_id)) is not None)
+
+
 @router.get("/challans/{challan_id}/pdf", summary="Download a challan as a PDF (the person it belongs to, or staff)")
-async def challan_pdf(challan_id: uuid.UUID, current_user: CurrentUser = Depends(require_permission(Permissions.FEE_VIEW)), db=Depends(get_db)) -> Response:
+async def challan_pdf(challan_id: uuid.UUID, current_user: CurrentUser = Depends(require_any_permission(Permissions.FEE_VIEW, Permissions.PARENT_VIEW)), db=Depends(get_db)) -> Response:
     challan = await db.get(PaymentChallan, challan_id)
     if challan is None:
         raise ResourceNotFoundError("Challan not found.")
     assignment = await db.get(FeeAssignment, challan.fee_assignment_id)
     if not (Roles.ADMIN in current_user.roles or Roles.ACCOUNTS_OFFICER in current_user.roles):
         own = await _own_payer(db, current_user)
-        if own is None or (assignment.payer_type, assignment.payer_id) != own:
+        if (own is None or (assignment.payer_type, assignment.payer_id) != own) and not await _parent_of(db, current_user, assignment):
             raise ResourceNotFoundError("Challan not found.")             # other people's challans are simply not there
     entry = await db.get(FeeLedgerEntry, challan.fee_ledger_entry_id)
     structure = await db.get(FeeStructure, assignment.fee_structure_id)
@@ -84,6 +93,28 @@ async def challan_pdf(challan_id: uuid.UUID, current_user: CurrentUser = Depends
             "generated_on": challan.generated_at or datetime.now(timezone.utc), "late_fee_per_day": float(structure.late_fee_per_day) if structure.late_fee_per_day else None}
     return Response(content=render_challan_pdf(data), media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="challan-{challan.consumer_number}.pdf"', **_SECURITY_HEADERS})
+
+
+@router.get("/receipts/{entry_id}/pdf", summary="Download the receipt for one recorded payment (the person who paid, or staff)")
+async def receipt_pdf(entry_id: uuid.UUID, current_user: CurrentUser = Depends(require_any_permission(Permissions.FEE_VIEW, Permissions.PARENT_VIEW)), db=Depends(get_db)) -> Response:
+    from app.core.config import settings
+    from app.fees.receipt_pdf import render_receipt_pdf
+
+    entry = await db.get(FeeLedgerEntry, entry_id)
+    if entry is None or entry.entry_type != LedgerEntryType.CREDIT or not entry.receipt_number:
+        raise ResourceNotFoundError("Receipt not found.")
+    assignment = await db.get(FeeAssignment, entry.fee_assignment_id)
+    if not (Roles.ADMIN in current_user.roles or Roles.ACCOUNTS_OFFICER in current_user.roles):
+        own = await _own_payer(db, current_user)
+        if (own is None or (assignment.payer_type, assignment.payer_id) != own) and not await _parent_of(db, current_user, assignment):
+            raise ResourceNotFoundError("Receipt not found.")
+    structure = await db.get(FeeStructure, assignment.fee_structure_id)
+    data = {"institute": settings.app_name, "receipt_number": entry.receipt_number, "paid_on": entry.paid_on, "recorded_on": entry.created_at.date(),
+            "payer": await AccountService(db).payer(assignment.payer_type, assignment.payer_id), "fee_name": structure.name,
+            "term_label": structure.term_label, "amount": float(entry.amount), "method": entry.payment_method,
+            "reference": entry.payment_reference, "description": entry.description}
+    return Response(content=render_receipt_pdf(data), media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="receipt-{entry.receipt_number}.pdf"', **_SECURITY_HEADERS})
 
 
 # ============================================================ scholarships and discounts

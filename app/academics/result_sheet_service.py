@@ -24,6 +24,7 @@ from app.academics.models import (
 from app.audit.service import AuditService
 from app.auth.models import Role, User, UserRole
 from app.auth.permissions import Roles
+from app.core.config import settings
 from app.core.exceptions import AuthorizationError, BusinessRuleViolationError, ResourceNotFoundError
 from app.employees.models import Employee
 from app.notifications.models import NotificationCategory
@@ -157,12 +158,35 @@ class ResultSheetService:
                                       message="They will be published to students by the administration.", link="/dashboard/faculty/grading")
         return sheet
 
-    async def publish(self, offering_id: uuid.UUID, *, actor_id: uuid.UUID) -> ResultSheet:
+    async def publish(self, offering_id: uuid.UUID, *, actor_id: uuid.UUID,
+                      override_reason: str | None = None, actor_is_admin: bool = False) -> ResultSheet:
         offering, course = await self._offering(offering_id)
         sheet = await self._sheet(offering_id, (ResultSheetStatus.APPROVED,), "published")
         self._need_complete(await self.completeness(offering_id), "publish")
+        # Publishing decides pass/fail, including the attendance-eligibility rule,
+        # so attendance must be final first. Override: ADMIN only, with a reason.
+        if settings.require_attendance_lock_before_publish and offering.attendance_locked_at is None:
+            reason = (override_reason or "").strip()
+            if not reason:
+                raise BusinessRuleViolationError(
+                    f"{course.code}: attendance is not locked yet. Lock this course's attendance at the end of term "
+                    "(Attendance page), then publish, so pass/fail uses the final attendance.",
+                    details={"needs": "ATTENDANCE_LOCK", "override_allowed": actor_is_admin},
+                )
+            if not actor_is_admin:
+                raise BusinessRuleViolationError(f"{course.code}: attendance is not locked yet. Only an administrator can publish before that.")
+            if len(reason) < 10:
+                raise BusinessRuleViolationError("Give a reason of at least 10 characters for publishing before attendance is locked.")
+            await self.audit.log(actor_user_id=actor_id, action="result_sheet.published_before_attendance_lock",
+                                 entity_type="result_sheet", entity_id=sheet.id, metadata={"reason": reason})
         sheet.status, sheet.published_by, sheet.published_at = ResultSheetStatus.PUBLISHED, actor_id, _now()
         decided = await self.grading.publish_outcomes(offering_id, actor_id=actor_id)
+        from app.sms.service import SmsService
+
+        sms = SmsService(self.session)
+        for sid in (await self.session.execute(select(Enrollment.student_id).where(Enrollment.course_offering_id == offering_id))).scalars():
+            await sms.queue_for_student(sid, event="RESULTS",
+                                        body=f"{settings.app_name}: result for {course.code} {course.title[:40]} ({offering.term_label}) is published. See My Results.")
         await self.audit.log(actor_user_id=actor_id, action="result_sheet.published", entity_type="result_sheet", entity_id=sheet.id, metadata={"students": decided})
         teacher = await self._teacher_user(offering)
         if teacher:
@@ -185,6 +209,8 @@ class ResultSheetService:
     # ------------------------------------------------------------------ what the approver sees
     async def listing(self, status: ResultSheetStatus | None) -> list[dict]:
         stmt = select(ResultSheet, CourseOffering, Course).join(CourseOffering, CourseOffering.id == ResultSheet.course_offering_id).join(Course, Course.id == CourseOffering.course_id)
+        # Past results imported from before the system (section IMPORTED) are not sheets anyone approves; keep them off this screen.
+        stmt = stmt.where(CourseOffering.section_label != "IMPORTED")
         if status:
             stmt = stmt.where(ResultSheet.status == status)
         rows = (await self.session.execute(stmt.order_by(ResultSheet.submitted_at.asc().nullslast(), Course.code))).all()

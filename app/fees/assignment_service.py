@@ -3,12 +3,13 @@ from __future__ import annotations
 from app.core.clock import institute_today
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import AuditService
+from app.core.config import settings
 from app.core.exceptions import BusinessRuleViolationError, ResourceNotFoundError
 from app.employees.models import Employee
 from app.fees.models import AssignmentStatus, FeeAssignment, FeeLedgerEntry, LedgerEntryType, PayerType
@@ -42,60 +43,116 @@ class FeeStatusCalculator:
     flagged: 'per day 200 rupee charge' didn't specify per-installment vs
     per-assignment stacking, this is the interpretation implemented)."""
 
+    # A staff "mark unpaid" writes a DEBIT that re-opens an installment
+    # (see ChallanService.mark_unpaid). It is not a new charge: it cancels
+    # an earlier payment. Recognised by this description prefix.
+    REVERSAL_PREFIX = "Payment reversed"
+
+    @staticmethod
+    def _is_reversal(e: FeeLedgerEntry) -> bool:
+        """Money taken back off the payments: a staff "mark unpaid" reversal, or a refund paid out."""
+        return e.entry_type == LedgerEntryType.REFUND or (
+            e.entry_type == LedgerEntryType.DEBIT and (e.description or "").startswith(FeeStatusCalculator.REVERSAL_PREFIX))
+
+    @staticmethod
+    def installments(entries: list[FeeLedgerEntry], late_fee_per_day: float | None, *, as_of: date | None = None) -> list[dict]:
+        """One row per installment, worked out from the append-only ledger.
+
+        - charged: the installment's DEBIT amount
+        - concession: CONCESSION entries linked to it (related_entry_id)
+        - paid: payments applied oldest-installment-first (FIFO); a payment
+          reversal cancels the most recent payments first
+        - remaining = charged - concession - paid
+        - status: PAID | OVERDUE | PARTIAL | UPCOMING
+        - late_fee: days late x late_fee_per_day on whatever was unpaid
+          past the due date (to today, or to the day it was settled)
+        """
+        today = as_of or institute_today()
+        debits = sorted(
+            [e for e in entries if e.entry_type == LedgerEntryType.DEBIT and not FeeStatusCalculator._is_reversal(e)],
+            key=lambda e: (e.due_date or date.min, e.installment_number or 0),
+        )
+        reversed_total = sum(float(e.amount) for e in entries if FeeStatusCalculator._is_reversal(e))
+        credits = sorted([e for e in entries if e.entry_type == LedgerEntryType.CREDIT],
+                         key=lambda e: (getattr(e, "paid_on", None) or (e.created_at.date() if e.created_at else date.min), e.created_at or datetime.min.replace(tzinfo=timezone.utc)))
+        # Remove reversed amounts from the newest payments first.
+        # A payment counts from the day it was actually PAID (paid_on), not the
+        # day staff typed it in; older rows without paid_on use created_at.
+        def _paid_day(c):
+            return c.paid_on if getattr(c, "paid_on", None) else (c.created_at.date() if c.created_at else today)
+        pool: list[list] = [[float(c.amount), _paid_day(c)] for c in credits]
+        left = reversed_total
+        for item in reversed(pool):
+            if left <= 1e-9:
+                break
+            take = min(item[0], left)
+            item[0] -= take
+            left -= take
+        pool = [p for p in pool if p[0] > 1e-9]
+
+        concession_by_debit: dict = {}
+        for e in entries:
+            if e.entry_type == LedgerEntryType.CONCESSION and e.related_entry_id is not None:
+                concession_by_debit[e.related_entry_id] = concession_by_debit.get(e.related_entry_id, 0.0) + float(e.amount)
+
+        rows: list[dict] = []
+        idx = 0
+        for d in debits:
+            charged = float(d.amount)
+            concession = min(concession_by_debit.get(d.id, 0.0), charged)
+            owed = charged - concession
+            paid = 0.0
+            settled_at = None
+            while owed - paid > 1e-9 and idx < len(pool):
+                take = min(owed - paid, pool[idx][0])
+                paid += take
+                pool[idx][0] -= take
+                if owed - paid <= 1e-9:
+                    settled_at = pool[idx][1]
+                if pool[idx][0] <= 1e-9:
+                    idx += 1
+            remaining = round(max(owed - paid, 0.0), 2)
+            due = d.due_date or today
+            # An instalment created after its own due date (fee activated late,
+            # previous dues imported) only accrues a late fee from a grace date
+            # after it was created, never retroactively from the old due date.
+            late_from = due
+            created_day = d.created_at.date() if getattr(d, "created_at", None) else None
+            if created_day and created_day > due:
+                late_from = created_day + timedelta(days=settings.fee_backdated_grace_days)
+            late_fee = 0.0
+            if late_fee_per_day:
+                if remaining > 0.005 and late_from < today:
+                    late_fee = (today - late_from).days * late_fee_per_day
+                elif remaining <= 0.005 and owed > 1e-9:
+                    settled_on = settled_at if settled_at else today
+                    if settled_on > late_from:
+                        late_fee = (settled_on - late_from).days * late_fee_per_day
+            if remaining <= 0.005:
+                status = "PAID"
+            elif due < today:
+                status = "OVERDUE"
+            elif paid > 0.005:
+                status = "PARTIAL"
+            else:
+                status = "UPCOMING"
+            rows.append({
+                "ledger_entry_id": d.id, "installment_number": d.installment_number, "due_date": d.due_date,
+                "description": d.description, "charged": round(charged, 2), "concession": round(concession, 2),
+                "paid": round(paid, 2), "remaining": remaining, "status": status, "late_fee": round(late_fee, 2),
+                "late_fee_posted": round(float(d.late_fee_charged_amount or 0), 2),
+            })
+        return rows
+
     @staticmethod
     def compute(entries: list[FeeLedgerEntry], late_fee_per_day: float | None, *, as_of: date | None = None) -> dict:
         today = as_of or institute_today()
-        debits = sorted(
-            [e for e in entries if e.entry_type == LedgerEntryType.DEBIT],
-            key=lambda e: e.due_date or date.min,
-        )
-        credits = sorted(
-            [e for e in entries if e.entry_type == LedgerEntryType.CREDIT],
-            key=lambda e: e.created_at,
-        )
-
-        total_charged = sum(float(d.amount) for d in debits)
-        total_paid = sum(float(c.amount) for c in credits)
-
-        payment_idx = 0
-        remaining_in_current_payment = float(credits[0].amount) if credits else 0.0
-
-        overdue_principal = 0.0
-        accrued_fine = 0.0
-
-        for debit in debits:
-            remaining_owed = float(debit.amount)
-            settled_date: datetime | None = None
-
-            while remaining_owed > 1e-9 and payment_idx < len(credits):
-                if remaining_in_current_payment <= 1e-9:
-                    payment_idx += 1
-                    if payment_idx >= len(credits):
-                        break
-                    remaining_in_current_payment = float(credits[payment_idx].amount)
-
-                take = min(remaining_owed, remaining_in_current_payment)
-                remaining_owed -= take
-                remaining_in_current_payment -= take
-                if remaining_owed <= 1e-9:
-                    settled_date = credits[payment_idx].created_at
-
-            due_date = debit.due_date or today
-            if remaining_owed > 1e-9:
-                if due_date < today:
-                    overdue_principal += remaining_owed
-                    if late_fee_per_day:
-                        days_late = (today - due_date).days
-                        accrued_fine += days_late * late_fee_per_day
-            else:
-                settled_on = settled_date.date() if settled_date else today
-                if settled_on > due_date and late_fee_per_day:
-                    days_late = (settled_on - due_date).days
-                    accrued_fine += days_late * late_fee_per_day
-
-        overdue_principal = round(overdue_principal, 2)
-        accrued_fine = round(accrued_fine, 2)
-
+        rows = FeeStatusCalculator.installments(entries, late_fee_per_day, as_of=today)
+        total_charged = sum(r["charged"] for r in rows)
+        reversed_total = sum(float(e.amount) for e in entries if FeeStatusCalculator._is_reversal(e))
+        total_paid = sum(float(e.amount) for e in entries if e.entry_type == LedgerEntryType.CREDIT) - reversed_total
+        overdue_principal = round(sum(r["remaining"] for r in rows if r["status"] == "OVERDUE"), 2)
+        accrued_fine = round(sum(r["late_fee"] for r in rows), 2)
         return {
             "total_charged": round(total_charged, 2),
             "total_paid": round(total_paid, 2),
@@ -106,60 +163,32 @@ class FeeStatusCalculator:
 
     @staticmethod
     def compute_fine_for_debit(entries: list[FeeLedgerEntry], debit_id: uuid.UUID, late_fee_per_day: float | None, *, as_of: date | None = None) -> float:
-        """The currently-calculated fine for ONE specific installment
-        (debit), not the whole assignment's total — this is what
-        FeeAssignmentService.post_late_fee needs to know how much of
-        THIS installment's fine to post. Re-runs the exact same FIFO
-        settlement as compute() above (has to — whether a debit is
-        settled, and when, depends on payment order across the WHOLE
-        assignment, not just this one debit) but returns this debit's
-        own accrued_fine instead of the assignment-wide sum."""
-        today = as_of or institute_today()
-        debits = sorted(
-            [e for e in entries if e.entry_type == LedgerEntryType.DEBIT],
-            key=lambda e: e.due_date or date.min,
-        )
-        credits = sorted(
-            [e for e in entries if e.entry_type == LedgerEntryType.CREDIT],
-            key=lambda e: e.created_at,
-        )
-
-        payment_idx = 0
-        remaining_in_current_payment = float(credits[0].amount) if credits else 0.0
-
-        for debit in debits:
-            remaining_owed = float(debit.amount)
-            settled_date: datetime | None = None
-
-            while remaining_owed > 1e-9 and payment_idx < len(credits):
-                if remaining_in_current_payment <= 1e-9:
-                    payment_idx += 1
-                    if payment_idx >= len(credits):
-                        break
-                    remaining_in_current_payment = float(credits[payment_idx].amount)
-
-                take = min(remaining_owed, remaining_in_current_payment)
-                remaining_owed -= take
-                remaining_in_current_payment -= take
-                if remaining_owed <= 1e-9:
-                    settled_date = credits[payment_idx].created_at
-
-            due_date = debit.due_date or today
-            this_debit_fine = 0.0
-            if remaining_owed > 1e-9:
-                if due_date < today and late_fee_per_day:
-                    days_late = (today - due_date).days
-                    this_debit_fine = days_late * late_fee_per_day
-            else:
-                settled_on = settled_date.date() if settled_date else today
-                if settled_on > due_date and late_fee_per_day:
-                    days_late = (settled_on - due_date).days
-                    this_debit_fine = days_late * late_fee_per_day
-
-            if debit.id == debit_id:
-                return round(this_debit_fine, 2)
-
+        """The currently-calculated late fee for ONE installment (what
+        FeeAssignmentService.post_late_fee posts). Same FIFO settlement as
+        installments(), because whether a debit is settled, and when,
+        depends on payment order across the whole assignment."""
+        for r in FeeStatusCalculator.installments(entries, late_fee_per_day, as_of=as_of):
+            if r["ledger_entry_id"] == debit_id:
+                return r["late_fee"]
         return 0.0
+
+
+async def next_receipt_number(session: AsyncSession, *, year: int | None = None) -> str:
+    """RCPT-<year>-<6 digits>, one institute-wide sequence per calendar year."""
+    from app.core.sequences import next_sequence_value
+
+    year = year or institute_today().year
+    return f"RCPT-{year}-{await next_sequence_value(session, f'fee_receipt:{year}'):06d}"
+
+
+def validate_paid_on(paid_on: date | None) -> date:
+    today = institute_today()
+    day = paid_on or today
+    if day > today:
+        raise BusinessRuleViolationError("The payment date cannot be in the future.")
+    if (today - day).days > settings.fee_payment_max_backdate_days:
+        raise BusinessRuleViolationError(f"The payment date is more than {settings.fee_payment_max_backdate_days} days ago. Check the date, or ask the administrator.")
+    return day
 
 
 class FeeAssignmentService:
@@ -196,6 +225,21 @@ class FeeAssignmentService:
             raise BusinessRuleViolationError(
                 f"Cannot record a payment against a {assignment.status.value.lower()} assignment."
             )
+        paid_on = validate_paid_on(data.paid_on)
+
+        # Never take more than is owed: an overpayment used to be accepted
+        # silently (Rs 500,000 against a Rs 120,000 fee) and then vanished from
+        # every balance. Refunds/advances are handled outside this screen.
+        structure = await self.structure_repo.get_by_id(assignment.fee_structure_id)
+        rows = FeeStatusCalculator.installments(
+            await self.repo.get_ledger(assignment.id), float(structure.late_fee_per_day) if structure and structure.late_fee_per_day else None)
+        outstanding = round(sum(r["remaining"] for r in rows), 2)
+        if outstanding <= 0.005:
+            raise BusinessRuleViolationError("Nothing is owed on this fee; it is already fully paid.")
+        if data.amount > outstanding + 0.005:
+            raise BusinessRuleViolationError(
+                f"Rs. {data.amount:,.2f} is more than what is still owed on this fee (Rs. {outstanding:,.2f}). "
+                "Record at most the outstanding amount.", details={"outstanding": outstanding})
 
         entry = FeeLedgerEntry(
             fee_assignment_id=assignment.id,
@@ -204,6 +248,10 @@ class FeeAssignmentService:
             installment_number=None,
             due_date=None,
             description=data.description or "Payment received",
+            payment_method=data.method.value,
+            payment_reference=data.reference,
+            paid_on=paid_on,
+            receipt_number=await next_receipt_number(self.session),
             created_by=actor_id,
             created_at=datetime.now(timezone.utc),
         )
@@ -214,7 +262,8 @@ class FeeAssignmentService:
             action="fee.payment_recorded",
             entity_type="fee_assignment",
             entity_id=assignment.id,
-            after={"amount": data.amount},
+            after={"amount": data.amount, "method": data.method.value, "reference": data.reference,
+                   "paid_on": str(paid_on), "receipt_number": entry.receipt_number},
         )
 
         payer_user_id = await _resolve_payer_user_id(self.session, assignment.payer_type, assignment.payer_id)
@@ -222,7 +271,7 @@ class FeeAssignmentService:
             await create_notification(
                 self.session, user_id=payer_user_id, category=NotificationCategory.FEE,
                 title="A payment has been recorded on your account",
-                message=f"Rs. {data.amount:.2f} — {entry.description}",
+                message=f"Rs. {data.amount:.2f} — {entry.description} — receipt {entry.receipt_number}",
                 link="/dashboard/student" if assignment.payer_type == PayerType.STUDENT else "/dashboard/faculty",
             )
 
@@ -364,7 +413,8 @@ class ChallanService:
         )
 
     async def mark_paid_by_staff(
-        self, challan_id: uuid.UUID, *, actor_id: uuid.UUID, note: str | None = None
+        self, challan_id: uuid.UUID, *, actor_id: uuid.UUID, note: str | None = None,
+        method: str = "BANK_DEPOSIT", reference: str | None = None, paid_on: date | None = None,
     ) -> PaymentChallan:
         """Accounts-officer/admin manual override — the current PRIMARY
         way a payment gets recorded while the 1LINK gateway is still
@@ -377,16 +427,28 @@ class ChallanService:
         if challan.status != ChallanStatus.PENDING:
             raise BusinessRuleViolationError(f"This challan is already {challan.status.value.lower()}.")
 
-        reference = f"STAFF-{uuid.uuid4().hex[:10].upper()}"
+        day = validate_paid_on(paid_on)
+        # The challan must still be owed: if the instalment was settled another
+        # way (a counter payment), marking the challan paid would double-collect.
+        assignment = await self.assignment_repo.get_by_id(challan.fee_assignment_id)
+        structure = await FeeStructureRepository(self.session).get_by_id(assignment.fee_structure_id)
+        rows = FeeStatusCalculator.installments(
+            await self.assignment_repo.get_ledger(assignment.id), float(structure.late_fee_per_day) if structure.late_fee_per_day else None)
+        outstanding = round(sum(r["remaining"] for r in rows), 2)
+        if float(challan.amount) > outstanding + 0.005:
+            raise BusinessRuleViolationError(
+                f"Only Rs. {outstanding:,.2f} is still owed on this fee, less than this challan (Rs. {float(challan.amount):,.2f}). "
+                "It was probably paid another way; record the actual amount as a payment instead.")
         challan = await self._mark_paid(
-            challan, gateway_reference=reference, paid_at=datetime.now(timezone.utc), actor_id=actor_id
+            challan, gateway_reference=reference or f"CASH-{uuid.uuid4().hex[:8].upper()}",
+            paid_at=datetime.now(timezone.utc), actor_id=actor_id, method=method, paid_on=day,
         )
         await self.audit.log(
             actor_user_id=actor_id,
             action="fee.payment_marked_paid_by_staff",
             entity_type="payment_challan",
             entity_id=challan.id,
-            metadata={"note": note} if note else None,
+            metadata={"note": note, "method": method, "reference": reference, "paid_on": str(day)},
         )
         return challan
 
@@ -426,7 +488,7 @@ class ChallanService:
             installment_number=original_debit.installment_number if original_debit else None,
             due_date=original_debit.due_date if original_debit else now.date(),
             description=(
-                f"Payment reversed \u2014 challan {challan.consumer_number} marked unpaid by staff"
+                f"{FeeStatusCalculator.REVERSAL_PREFIX} \u2014 challan {challan.consumer_number} marked unpaid by staff"
                 + (f" ({reason})" if reason else "")
             ),
             created_by=actor_id,
@@ -467,7 +529,8 @@ class ChallanService:
         return challan
 
     async def _mark_paid(
-        self, challan: PaymentChallan, *, gateway_reference: str, paid_at: datetime, actor_id: uuid.UUID | None
+        self, challan: PaymentChallan, *, gateway_reference: str, paid_at: datetime, actor_id: uuid.UUID | None,
+        method: str = "ONE_BILL", paid_on: date | None = None,
     ) -> PaymentChallan:
         challan.status = ChallanStatus.PAID
         challan.gateway_reference = gateway_reference
@@ -483,7 +546,12 @@ class ChallanService:
             amount=float(challan.amount),
             installment_number=None,
             due_date=None,
-            description=f"1Bill payment \u2014 consumer no. {challan.consumer_number} \u2014 ref {gateway_reference}",
+            description=(f"1Bill payment \u2014 consumer no. {challan.consumer_number} \u2014 ref {gateway_reference}" if method == "ONE_BILL"
+                         else f"Challan {challan.consumer_number} paid \u2014 {method.replace('_', ' ').lower()} \u2014 ref {gateway_reference}"),
+            payment_method=method,
+            payment_reference=gateway_reference,
+            paid_on=paid_on or institute_today(),
+            receipt_number=await next_receipt_number(self.session),
             created_by=actor_id,
             created_at=paid_at,
         )

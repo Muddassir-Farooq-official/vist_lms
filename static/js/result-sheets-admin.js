@@ -102,7 +102,17 @@
   }
   async function act(what, done) {
     showError("");
-    const r = await VA.fetchJson(API + "/sheets/" + current.course_offering_id + "/" + what, { method: "POST" });
+    let r = await VA.fetchJson(API + "/sheets/" + current.course_offering_id + "/" + what, { method: "POST" });
+    const det = r.body && r.body.error && r.body.error.details;
+    if (!r.ok && what === "publish" && det && det.override_allowed) {
+      // Attendance not locked yet: an administrator may still publish, with a reason kept on record.
+      const why = window.prompt(msg(r.body, "Attendance is not locked yet.") + "\n\nPublish anyway? Type the reason (kept in the audit log), or Cancel.");
+      if (why && why.trim()) {
+        r = await VA.fetchJson(API + "/sheets/" + current.course_offering_id + "/publish", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ override_reason: why.trim() }),
+        });
+      }
+    }
     if (!r.ok) return showError(msg(r.body, "That did not work."));
     VA.toast(done); await openSheet(current.course_offering_id); loadLists();
   }
@@ -154,7 +164,7 @@
     const r = await VA.fetchJson(API + "/publish-approved", { method: "POST" });
     if (!r.ok) return VA.toast(msg(r.body, "Could not publish."), "error");
     const f = r.body.failed.length;
-    VA.toast("Published " + r.body.published + " course" + (r.body.published !== 1 ? "s" : "") + "." + (f ? " " + f + " could not be published (see the list: marks are missing)." : ""), f ? "error" : undefined);
+    VA.toast("Published " + r.body.published + " course" + (r.body.published !== 1 ? "s" : "") + "." + (f ? " " + f + " could not be published: " + r.body.failed.map(function (x) { return x.reason; }).join(" | ") : ""), f ? "error" : undefined);
     loadLists();
   });
 

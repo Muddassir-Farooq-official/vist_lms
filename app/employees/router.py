@@ -6,6 +6,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, Form, UploadFile
 from fastapi.responses import Response
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.auth.permissions import Permissions, Roles
@@ -771,3 +772,26 @@ async def get_employee_full_profile(
         teaching=teaching,
         fees=fee_summary, library=library_summary, fines=fine_summary, complaints=complaint_summary,
     )
+
+
+# ============================================================ extra access roles
+class AccessRolesIn(BaseModel):
+    """The EXTRA roles this person should have (the job title's own role is kept automatically)."""
+
+    extra_roles: list[str] = Field(default_factory=list, max_length=10)
+
+
+@router.get("/{employee_id}/access-roles", summary="The roles this staff member's login has: main (from job title) and extra (administrator)")
+async def get_access_roles(employee_id: uuid.UUID, current_user: CurrentUser = Depends(require_permission(Permissions.ROLE_MANAGE)),
+                           db=Depends(get_db)) -> dict:
+    from app.employees.access_roles import AccessRoleService
+
+    return await AccessRoleService(db).get(employee_id)
+
+
+@router.put("/{employee_id}/access-roles", summary="Set the extra roles (e.g. a teacher who is also Exam Controller; a second administrator). Signs the person out.")
+async def set_access_roles(employee_id: uuid.UUID, payload: AccessRolesIn,
+                           current_user: CurrentUser = Depends(require_permission(Permissions.ROLE_MANAGE)), db=Depends(get_db)) -> dict:
+    from app.employees.access_roles import AccessRoleService
+
+    return await AccessRoleService(db).set_extra(employee_id, payload.extra_roles, actor_user_id=current_user.id)

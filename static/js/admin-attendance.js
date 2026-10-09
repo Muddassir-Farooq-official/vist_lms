@@ -192,6 +192,13 @@
       existingResult.body.forEach(function (r) { existingByStudent[r.student_id] = r.status; });
     }
 
+    if (enrolledStudents.length === 0) {
+      // After results are published every enrollment is completed, so there is nobody left to mark.
+      windowNotice.textContent = "No student is currently enrolled in this course, so there is nothing to mark. " +
+        "(Once a course's results are published its attendance can no longer be changed.)";
+      windowNotice.hidden = false;
+      return;
+    }
     AU.renderRoster(rosterTbody, enrolledStudents, Object.keys(existingByStudent).length ? existingByStudent : null);
     rosterTable.hidden = enrolledStudents.length === 0;
     rosterToolsEl.hidden = enrolledStudents.length === 0;
@@ -311,9 +318,10 @@
       (p.unmarked_overdue_sessions ? " (resolve in Needs Attention first)" : "") + "</li>" +
       "<li>Classes still to come: " + p.future_sessions_remaining + (p.future_sessions_remaining ? " (they cannot be marked after locking)" : "") + "</li>" +
       "<li>Below " + p.eligibility_threshold + "% (cannot pass): " + p.below_eligibility + "</li>" +
-      "<li>Would be fined Rs. " + p.fine_amount + " and blocked (\u2264 " + p.fine_threshold + "%): " + p.would_fine + "</li>" +
-      "<li>Would be dropped from the course (\u2264 " + p.drop_threshold + "%): " + p.would_drop + "</li></ul>";
-    lockBtn.disabled = !p.can_lock;
+      "<li>Would be fined Rs. " + p.fine_amount + " (\u2264 " + p.fine_threshold + "%; registration and result card held until paid): " + p.would_fine + "</li>" +
+      "<li>Would be dropped from the course (\u2264 " + p.drop_threshold + "%): " + p.would_drop + "</li></ul>" +
+      (p.early_reason ? "<p><strong>Not yet:</strong> " + VA.escapeHtml(p.early_reason) + ". Lock at the end of term (an administrator can lock early with a reason).</p>" : "");
+    lockBtn.disabled = p.unmarked_overdue_sessions > 0;   // early locks are allowed for admins with a reason (asked on click)
     lockBtn.setAttribute("data-summary", p.would_fine + " fined, " + p.would_drop + " dropped");
   }
 
@@ -322,7 +330,17 @@
     if (!window.confirm("Lock attendance for this course? " + lockBtn.getAttribute("data-summary") + ". This cannot be undone.")) return;
     lockBtn.disabled = true;
     lockError.hidden = true;
-    const result = await VA.fetchJson("/api/v1/attendance/offerings/" + offeringSelect.value + "/lock", { method: "POST" });
+    let result = await VA.fetchJson("/api/v1/attendance/offerings/" + offeringSelect.value + "/lock", { method: "POST" });
+    const det = result.body && result.body.error && result.body.error.details;
+    if (!result.ok && det && det.override_allowed) {
+      // Locking before the term is over: an administrator may still do it, with a reason kept on record.
+      const why = window.prompt("Too early to lock: " + det.early + ".\n\nLock early anyway? Type the reason (kept in the audit log), or Cancel.");
+      if (why && why.trim()) {
+        result = await VA.fetchJson("/api/v1/attendance/offerings/" + offeringSelect.value + "/lock", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ early_reason: why.trim() }),
+        });
+      }
+    }
     if (!result.ok) {
       lockError.textContent = extractErrorMessage(result.body, "Could not lock attendance.");
       lockError.hidden = false;

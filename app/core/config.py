@@ -135,6 +135,50 @@ class Settings(BaseSettings):
     # the course entirely instead of just fining them — this check
     # takes priority over the fine threshold above (worse outcome wins).
     attendance_drop_threshold_percent: float = 40.0
+    # --- Launch guards (Step 2). All default to the SAFE behaviour. ---
+    # Results may only be published once the course's attendance is locked
+    # (i.e. final). An ADMIN can override one sheet with a written reason.
+    require_attendance_lock_before_publish: bool = True
+    # Attendance may only be locked once no classes remain and the term end
+    # date (if set) has passed. An ADMIN can lock early with a written reason.
+    block_early_attendance_lock: bool = True
+    # Old behaviour: an attendance fine disabled the student's whole login.
+    # New default: the login stays open; self-enrollment and the result card
+    # are on hold until the fine is paid or waived.
+    attendance_fine_blocks_login: bool = False
+    # Fees (Step 3). An instalment created AFTER its due date (a fee activated
+    # late, or previous dues imported) only starts accruing a late fee this
+    # many days after it was created, never from the old due date.
+    fee_backdated_grace_days: int = 7
+    # Payments may be dated (paid_on) at most this many days in the past.
+    fee_payment_max_backdate_days: int = 90
+    # Promotion (Step 4): Advance Semester holds a student back when
+    # - more than this many failed courses are still not cleared (passed on retake)
+    promotion_max_courses_to_clear: int = 2
+    # - CGPA (from published results) is below this
+    promotion_min_cgpa: float = 1.5
+    # Terms (Step 7): new offerings and fee structures must use a term from the
+    # Academic Terms list, so the same term can never be typed two ways.
+    require_registered_terms: bool = True
+    # Exams: withhold the admit card while the student has overdue fees (1 = yes, 0 = no).
+    admit_card_requires_fees_cleared: int = 1
+    # SMS (see app/sms/service.py). No SMS_PROVIDER_URL = messages are recorded (LOGGED) but not sent.
+    # Supplementary exams: the most grade points a supplementary pass can earn (0 = no cap; e.g. 2.0 = at most C).
+    supplementary_max_grade_points: float = 0.0
+    sms_provider_url: str = ""
+    sms_provider_method: str = "GET"
+    sms_provider_body: str = ""
+    sms_api_key: str = ""
+    sms_sender_id: str = ""
+    sms_success_marker: str = ""
+    sms_number_format: str = "92"
+    # Which events send an SMS (1 = yes, 0 = no); editable in Settings -> Institute Policy.
+    sms_on_attendance_fine: int = 1
+    sms_on_datesheet: int = 1
+    sms_on_results: int = 1
+    sms_on_fee_overdue: int = 1
+    sms_to_guardian: int = 1
+    sms_on_admission: int = 1
     # The weighted-average cutoff on a course's graded components (see
     # app/academics's AssessmentComponent/StudentMark) that separates
     # an auto-computed PASSED from FAILED.

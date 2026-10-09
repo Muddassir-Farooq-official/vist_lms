@@ -86,7 +86,7 @@ class TestPaymentNotifications:
         assignments = (await app_client.get("/api/v1/fees/assignments")).json()
         assignment_id = next(a["id"] for a in assignments if a["payer_id"] == student_id)
         pay_resp = await app_client.post(
-            f"/api/v1/fees/assignments/{assignment_id}/payments", json={"amount": 2000, "description": "Paid at counter"}
+            f"/api/v1/fees/assignments/{assignment_id}/payments", json={"amount": 2000, "description": "Paid at counter", "method": "CASH"}
         )
         assert pay_resp.status_code == 201, pay_resp.text
 
@@ -126,7 +126,7 @@ class TestPaymentNotifications:
         challan_id = my_challans[0]["id"]
 
         await _login_admin(app_client)
-        await app_client.post(f"/api/v1/fees/challans/{challan_id}/mark-paid", json={"note": "bank confirmed"})
+        await app_client.post(f"/api/v1/fees/challans/{challan_id}/mark-paid", json={"note": "bank confirmed", "method": "BANK_DEPOSIT", "reference": "HBL-0003"})
         reverse_resp = await app_client.post(
             f"/api/v1/fees/challans/{challan_id}/mark-unpaid", json={"reason": "recorded in error"}
         )

@@ -1,0 +1,49 @@
+{% extends "student/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}My Fees{% endblock %}
+{% block page_title %}My Fees{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Every fee charged to you, its instalments and challans, discounts, payments and what is still due.</div>{% endblock %}
+
+{% block content %}
+<section class="stat-grid" aria-label="Fee balance">
+  <div class="stat-card stat-card--red">
+    <div class="stat-icon-badge">{{ nav_icon("fees") }}</div>
+    <span class="stat-label">Total outstanding (fees + fines)</span>
+    <span class="stat-value" id="fee-stat-total">&mdash;</span>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon-badge">{{ nav_icon("clock") }}</div>
+    <span class="stat-label">Overdue</span>
+    <span class="stat-value" id="fee-stat-overdue">&mdash;</span>
+  </div>
+  <div class="stat-card stat-card--green">
+    <div class="stat-icon-badge">{{ nav_icon("check-circle") }}</div>
+    <span class="stat-label">Paid</span>
+    <span class="stat-value" id="fee-stat-paid">&mdash;</span>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon-badge">{{ nav_icon("fees") }}</div>
+    <span class="stat-label">Remaining (all instalments)</span>
+    <span class="stat-value" id="fee-stat-remaining">&mdash;</span>
+  </div>
+</section>
+
+<p class="content-subtitle" id="fee-next-due" hidden></p>
+<p class="content-subtitle" id="fee-fines-note" hidden></p>
+
+<div id="fee-assignments"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
+<p class="empty-state" id="fee-empty" hidden>No fees have been charged to you yet.</p>
+
+<section class="sh-card" aria-labelledby="pay-h">
+  <div class="sh-card-head"><h2 id="pay-h">Payments received</h2></div>
+  <table class="dash-table" id="fee-payments-table">
+    <thead><tr><th>Paid on</th><th>Fee</th><th>Details</th><th class="num">Amount</th><th>Receipt</th></tr></thead>
+    <tbody id="fee-payments-tbody"></tbody>
+  </table>
+  <p class="empty-state" id="fee-payments-empty" hidden>No payments recorded yet.</p>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/student-fees.js"></script>
+{% endblock %}

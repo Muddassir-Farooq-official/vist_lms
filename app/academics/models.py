@@ -470,4 +470,6 @@ class EnrollmentResult(UUIDPKMixin, TimestampMixin, Base):
     outcome: Mapped[str] = mapped_column(String(10), nullable=False)               # PASSED or FAILED
     attendance_percentage: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
     failed_for_attendance: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # True when this pass was earned in a supplementary (reappear) exam; shown as (S) on the result card.
+    supplementary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

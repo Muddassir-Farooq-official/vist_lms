@@ -118,10 +118,15 @@ async def test_accepting_and_completing_a_task(app_client, admin_user, db_sessio
     acc = (await app_client.post(f"{API}/{t['id']}/respond", json={"action": "ACCEPT"})).json()
     assert acc["status"] == "ACCEPTED" and acc["accepted_at"] and acc["responded_at"] and acc["can"]["complete"] is True and acc["can"]["accept"] is False
     done = (await app_client.post(f"{API}/{t['id']}/complete", json={"note": "Done, 60 desks in place."})).json()
-    assert done["status"] == "COMPLETED" and done["timeliness"] == "ON_TIME" and done["late_by_hours"] is None and done["completion_note"].startswith("Done")
+    # Completing sends it to the person who assigned it for confirmation (the current task workflow).
+    assert done["status"] == "AWAITING_CONFIRMATION" and done["timeliness"] == "ON_TIME" and done["late_by_hours"] is None and done["completion_note"].startswith("Done")
     await _as(app_client, raw, "anna")
+    mine = (await app_client.get(f"{API}/{t['id']}")).json()
+    assert mine["can"]["confirm"] is True and mine["can"]["send_back"] is True
+    confirmed = await app_client.post(f"{API}/{t['id']}/confirm")
+    assert confirmed.status_code == 200 and confirmed.json()["status"] == "COMPLETED"
     titles = [n.title for n in (await db_session.execute(select(Notification).where(Notification.category == NotificationCategory.TASK).order_by(Notification.created_at))).scalars()]
-    assert titles == ["New task from TCA X", "Task accepted", "Task completed"]
+    assert titles == ["New task from TCA X", "Task accepted", "Task completed \u2014 please confirm", "Task confirmed"]
 
 
 async def test_a_rejection_needs_a_reason_and_a_real_explanation(app_client, admin_user, db_session):
@@ -315,7 +320,7 @@ async def test_progress_over_30_60_90_days_and_all_time(app_client, admin_user, 
     assert {t["title"] for t in rep["late"]} == {"done_late", "never_answered"}
     assert rep["reasons"] == [{"key": "NO_CAPACITY", "label": "I do not have the time or capacity", "count": 1}] and len(rep["weeks"]) == 12
     anna = (await app_client.get(f"{API}/reports/person/{ids['anna']}", params={"days": 0})).json()["assigning"]
-    assert (anna["assigned"], anna["rejected"], anna["completed"], anna["overdue"]) == (6, 1, 2, 1)             # the same history, from the giver's side
+    assert (anna["assigned"], anna["rejected"], anna["completed"], anna["awaiting_confirmation"], anna["overdue"]) == (6, 1, 0, 2, 1)   # done by the receiver, not yet confirmed by the giver             # the same history, from the giver's side
     # who may look
     await _as(app_client, raw, "bilal")
     assert (await app_client.get(f"{API}/reports/me", params={"days": 30})).json()["receiving"]["received"] == 4

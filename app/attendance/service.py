@@ -185,7 +185,16 @@ class AttendanceService:
         )
         return class_session
 
-    async def lock_attendance(self, course_offering_id: uuid.UUID, *, actor_id: uuid.UUID) -> dict:
+    async def early_lock_reason(self, offering, future_sessions: int) -> str | None:
+        """Why locking now would be EARLY (None = the term is over for this course)."""
+        if future_sessions > 0:
+            return f"{future_sessions} class(es) of this course are still to come"
+        if offering.term_end_date is not None and institute_now().date() < offering.term_end_date:
+            return f"the term only ends on {offering.term_end_date:%d %b %Y}"
+        return None
+
+    async def lock_attendance(self, course_offering_id: uuid.UUID, *, actor_id: uuid.UUID,
+                              early_reason: str | None = None, actor_is_admin: bool = True) -> dict:
         """The deliberate, one-way admin action that finalizes an
         offering's attendance for the term (ATTENDANCE_LOCK, admin
         only). Stops all further marking, then evaluates every
@@ -222,6 +231,26 @@ class AttendanceService:
                 f"{len(unmarked)} class(es) of this offering have no attendance recorded. Mark each one "
                 "(Needs Attention list) or cancel it, then lock again."
             )
+
+        # Locking drops and fines students from their FINAL percentage, so it
+        # must not happen mid-term. An admin may lock early (e.g. term cut short)
+        # only with a written reason, which is kept in the audit log.
+        early = await self.early_lock_reason(offering, await self.repo.count_future_sessions(course_offering_id, institute_now()))
+        if early and settings.block_early_attendance_lock:
+            reason = (early_reason or "").strip()
+            if not reason:
+                raise BusinessRuleViolationError(
+                    f"Too early to lock: {early}. Attendance is locked once the term is over, because locking drops "
+                    "and fines students on their final percentage. Cancel the remaining classes if the term ended early, "
+                    "or (administrator only) lock early with a written reason.",
+                    details={"early": early, "override_allowed": actor_is_admin},
+                )
+            if not actor_is_admin:
+                raise BusinessRuleViolationError(f"Too early to lock: {early}. Only an administrator can lock early.")
+            if len(reason) < 10:
+                raise BusinessRuleViolationError("Give a reason of at least 10 characters for locking early.")
+            await self.audit.log(actor_user_id=actor_id, action="attendance.locked_early", entity_type="course_offering",
+                                 entity_id=offering.id, metadata={"why_early": early, "reason": reason})
 
         offering.attendance_locked_at = datetime.now(timezone.utc)
 
@@ -270,6 +299,26 @@ class AttendanceService:
             source=FineSource.ATTENDANCE,
             actor_id=actor_id,
         )
+        from app.sms.service import SmsService
+
+        stu = await self.session.get(Student, student_id)
+        await SmsService(self.session).queue_for_student(
+            student_id, event="ATTENDANCE_FINE",
+            body=f"{settings.app_name}: attendance {percentage:g}% (minimum {settings.attendance_eligibility_threshold_percent:g}%). "
+                 f"Fine Rs. {settings.attendance_fine_amount:,.0f} issued; registration and result card on hold until paid.",
+            guardian_body=f"{settings.app_name}: {stu.first_name if stu else 'Your child'}'s attendance is {percentage:g}%. "
+                          f"A fine of Rs. {settings.attendance_fine_amount:,.0f} was issued. Please contact the institute.")
+
+        if not settings.attendance_fine_blocks_login:
+            # The login stays open; self-enrollment and the result card are held
+            # instead (app/attendance/holds.py) until the fine is paid or waived.
+            await self._notify_student(
+                student_id, title="Attendance fine issued",
+                message=f"Your attendance ({percentage}%) was at or below {settings.attendance_fine_threshold_percent}%. "
+                        f"A fine of Rs. {settings.attendance_fine_amount:,.0f} was issued. Course registration and your "
+                        "result card are on hold until it is paid.",
+            )
+            return
 
         student = await self.session.get(Student, student_id)
         if student is not None and student.user_id is not None:
@@ -314,11 +363,13 @@ class AttendanceService:
                 would_drop += 1
             elif pct <= settings.attendance_fine_threshold_percent:
                 would_fine += 1
+        early = await self.early_lock_reason(offering, future) if settings.block_early_attendance_lock else None
         return {
+            "early_reason": early, "term_end_date": offering.term_end_date,
             "course_offering_id": course_offering_id, "already_locked": offering.attendance_locked_at is not None,
             "enrolled_count": len(enrolled_ids), "unmarked_overdue_sessions": len(unmarked),
             "future_sessions_remaining": future, "would_drop": would_drop, "would_fine": would_fine,
-            "below_eligibility": below_eligibility, "can_lock": not unmarked and offering.attendance_locked_at is None,
+            "below_eligibility": below_eligibility, "can_lock": not unmarked and offering.attendance_locked_at is None and early is None,
             "eligibility_threshold": settings.attendance_eligibility_threshold_percent,
             "fine_threshold": settings.attendance_fine_threshold_percent,
             "drop_threshold": settings.attendance_drop_threshold_percent, "fine_amount": settings.attendance_fine_amount,

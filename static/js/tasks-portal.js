@@ -170,6 +170,8 @@
     if (t.can.accept) add("Accept", "", function () { respond(t, true); });
     if (t.can.reject) add("Reject\u2026", "danger-btn", function () { reject(t); });
     if (t.can.complete) add("Mark as completed", "", function () { complete(t); });
+    if (t.can.confirm) add("Confirm it is done", "", function () { send(t.id + "/confirm", {}, "Confirmed as done."); });
+    if (t.can.send_back) add("Send back\u2026", "secondary-btn", function () { sendBack(t); });
     if (t.can.edit) add(t.can.edit === "ALL" ? "Edit" : "Change deadline", "secondary-btn", function () { startEdit(t); });
     if (t.can.assign_again) add("Give it to someone else", "", function () { startFollowUp(t); });
     if (t.can.flag) add("\uD83D\uDEA9 Flag for review", "secondary-btn", function () { flag(t); });
@@ -203,6 +205,11 @@
   async function complete(t) {
     const a = await ask({ title: "Mark as completed", intro: "Anything " + t.assigner.name + " should know? (optional)", textLabel: "Note", placeholder: "e.g. Done. Keys are with the front desk.", ok: "Mark completed" });
     if (a) send(t.id + "/complete", { note: a.text || null }, "Marked as completed.");
+  }
+  async function sendBack(t) {
+    const a = await ask({ title: "Send back", intro: (t.assignee ? t.assignee.name : "The person") + " will see your reason and the task opens again.", textLabel: "What still needs doing?",
+      placeholder: "e.g. Only 40 desks are in place; 20 more are needed.", minText: 5, minMessage: "Say what still needs doing.", ok: "Send back" });
+    if (a) send(t.id + "/send-back", { note: a.text }, "Sent back.");
   }
   async function cancel(t) {
     const a = await ask({ title: "Cancel this task", intro: "The person it was assigned to will be told.", textLabel: "Why is it being cancelled?", minText: 3, minMessage: "Give a short reason.", ok: "Cancel task", danger: true });

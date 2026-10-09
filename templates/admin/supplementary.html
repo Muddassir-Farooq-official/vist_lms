@@ -1,0 +1,32 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN,EXAM_CONTROLLER{% endblock %}
+{% block title %}Supplementary Exams{% endblock %}
+{% block page_title %}Supplementary Exams{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Students who failed a course on marks sit one more paper. Its mark replaces the course's final-exam mark; a pass replaces the failed result (shown as (S)). Students failed for low attendance must repeat the course instead.</div>{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <div class="upload-row">
+    <select id="sp-term" class="select-input term-select" aria-label="Term"><option value="">Select a term&hellip;</option></select>
+    <button id="sp-load" class="role-btn" type="button">Show</button>
+  </div>
+  <p id="sp-msg" class="panel-hint" hidden></p>
+</section>
+
+<section class="panel" id="sp-eligible-panel" hidden>
+  <h2>Can sit a supplementary</h2>
+  <table class="dash-table"><thead><tr><th><input type="checkbox" id="sp-all" aria-label="Select all" /></th><th>Roll no.</th><th>Student</th><th>Course</th><th class="num">Result</th></tr></thead><tbody id="sp-eligible"></tbody></table>
+  <div class="form-actions"><button id="sp-register" class="role-btn" type="button">Register selected</button></div>
+</section>
+
+<section class="panel" id="sp-attempts-panel" hidden>
+  <h2>Registered</h2>
+  <table class="dash-table"><thead><tr><th>Roll no.</th><th>Course</th><th>Paper</th><th>Marks</th><th>Absent</th><th>Status / result</th><th></th></tr></thead><tbody id="sp-attempts"></tbody></table>
+  <div class="form-actions"><button id="sp-publish" class="role-btn" type="button">Publish all marked results</button></div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/academic-terms.js"></script>
+<script src="/static/js/supplementary.js"></script>
+{% endblock %}

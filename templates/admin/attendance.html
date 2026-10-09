@@ -1,4 +1,5 @@
 {% extends "admin/_base.html" %}
+{% block allowed_roles %}{{ allowed_roles|default("ADMIN") }}{% endblock %}
 {% block title %}Attendance{% endblock %}
 {% block page_title %}Attendance{% endblock %}
 
@@ -6,9 +7,9 @@
 <div class="portal-tabs" role="tablist" data-auto-tabs>
   <button class="portal-tab active" data-tab="attention" role="tab" aria-selected="true"><span>Needs attention</span></button>
   <button class="portal-tab" data-tab="corrections" role="tab" aria-selected="false"><span>Correction requests</span></button>
-  <button class="portal-tab" data-tab="mark" role="tab" aria-selected="false"><span>Mark attendance</span></button>
-  <button class="portal-tab" data-tab="lock" role="tab" aria-selected="false"><span>Lock the term</span></button>
-  <button class="portal-tab" data-tab="holiday" role="tab" aria-selected="false"><span>Holidays</span></button>
+  {% if not hod_view %}<button class="portal-tab" data-tab="mark" role="tab" aria-selected="false"><span>Mark attendance</span></button>{% endif %}
+  {% if not hod_view %}<button class="portal-tab" data-tab="lock" role="tab" aria-selected="false"><span>Lock the term</span></button>{% endif %}
+  {% if not hod_view %}<button class="portal-tab" data-tab="holiday" role="tab" aria-selected="false"><span>Holidays</span></button>{% endif %}
 </div>
 
 <div class="portal-tab-panel" data-tab-panel="attention">

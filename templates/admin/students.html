@@ -122,6 +122,13 @@
       <button id="reset-password-btn" class="danger-btn" type="button">Reset Password to Default</button>
       <span id="reset-password-confirm" class="success-text" hidden>Password reset to the default.</span>
     </div>
+    <div class="modal-reset-row" id="parent-access-row">
+      <span id="parent-access-text" class="panel-hint">Parent portal: &hellip;</span>
+      <button id="parent-access-btn" class="role-btn" type="button" hidden>Give guardian a login</button>
+      <button id="parent-reset-btn" class="role-btn secondary-btn" type="button" hidden>New guardian password</button>
+      <button id="parent-revoke-btn" class="danger-btn" type="button" hidden>Remove guardian access</button>
+      <p id="parent-access-result" class="success-text" hidden></p>
+    </div>
     <p id="modal-error" class="dash-alert error" hidden></p>
     <button id="close-modal" class="back-link modal-close-btn" type="button">Close</button>
   </div>
@@ -202,7 +209,7 @@
 <dialog id="advance-semester-modal" class="modal">
   <div class="modal-body">
     <h2>Advance Semester</h2>
-    <p class="panel-hint">Bumps current semester by 1 for eligible active students. Use Preview first: it shows exactly who will be held back and why (courses still in progress, overdue fees, already at final semester). Nothing changes until you press Advance.</p>
+    <p class="panel-hint">Bumps current semester by 1 for eligible active students. Use Preview first: it shows exactly who will be held back and why (courses in progress, failed courses, low CGPA, unpaid fines or fees, final semester). Nothing changes until you press Advance.</p>
     <div class="form-field">
       <label for="advance-program-select">Program</label>
       <select id="advance-program-select" class="select-input">
@@ -211,6 +218,9 @@
     </div>
     <div class="form-field"><label><input type="checkbox" id="advance-skip-open" checked /> Hold back students whose courses are still in progress</label></div>
     <div class="form-field"><label><input type="checkbox" id="advance-skip-fees" /> Hold back students with overdue fees</label></div>
+    <div class="form-field"><label><input type="checkbox" id="advance-skip-failed" checked /> Hold back students with too many failed courses still to clear</label></div>
+    <div class="form-field"><label><input type="checkbox" id="advance-skip-cgpa" checked /> Hold back students whose CGPA is below the minimum</label></div>
+    <div class="form-field"><label><input type="checkbox" id="advance-skip-fines" checked /> Hold back students with unpaid fines</label></div>
     <div class="form-actions">
       <button id="preview-advance-semester-btn" class="role-btn" type="button">Preview</button>
       <button id="confirm-advance-semester-btn" class="role-btn" type="button">Advance</button>

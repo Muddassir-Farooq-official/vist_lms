@@ -12,7 +12,11 @@
   let card = { byEnrollment: {}, byTerm: {} };
   async function loadCard() {
     const r = await VA.fetchJson("/api/v1/results/me/transcript");
-    if (!r.ok) return;
+    if (!r.ok) {
+      // e.g. the result card is on hold for an unpaid attendance fine: say so instead of showing nothing.
+      if (r.body && r.body.error && r.body.error.message) VA.showError(r.body.error.message);
+      return;
+    }
     const t = r.body, fmt = function (v) { return v === null || v === undefined ? "\u2014" : Number(v).toFixed(2); };
     t.terms.forEach(function (term) {
       card.byTerm[term.label] = term;
@@ -48,7 +52,7 @@
         (enrollment.is_retake ? ' <span class="status-pill waitlisted">RETAKE</span>' : "") + "</div>";
       const graded = card.byEnrollment[enrollment.id], termInfo = card.byTerm[enrollment.term_label];
       if (graded) {
-        headerHtml += '<div class="grade-line"><span class="grade-badge ' + (graded.outcome === "PASSED" ? "pass" : "fail") + '">' + VA.escapeHtml(graded.letter_grade) + "</span>" +
+        headerHtml += '<div class="grade-line"><span class="grade-badge ' + (graded.outcome === "PASSED" ? "pass" : "fail") + '">' + VA.escapeHtml(graded.letter_grade + (graded.supplementary ? " (S)" : "")) + "</span>" +
           "<span>" + graded.grade_points.toFixed(2) + " grade points \u00b7 " + graded.credit_hours + " credit hour" + (graded.credit_hours > 1 ? "s" : "") + " \u00b7 " + graded.percentage.toFixed(1) + "%" +
           (graded.failed_for_attendance ? " \u00b7 failed: attendance below the limit" : "") + (graded.replaced ? " \u00b7 repeated later" : "") + "</span></div>" +
           (termInfo ? '<div class="panel-hint">Term GPA ' + (termInfo.gpa === null ? "\u2014" : termInfo.gpa.toFixed(2)) + " \u00b7 CGPA after this term " + (termInfo.cgpa_after === null ? "\u2014" : termInfo.cgpa_after.toFixed(2)) + "</div>" : "");

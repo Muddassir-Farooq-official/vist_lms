@@ -39,7 +39,9 @@ from app.students import models as students_models  # noqa: F401
 from app.imports import models as imports_models  # noqa: F401
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
+# ALEMBIC_DATABASE_URL lets CI/tests migrate a scratch database without touching .env
+import os as _os
+config.set_main_option("sqlalchemy.url", _os.environ.get("ALEMBIC_DATABASE_URL", settings.database_url).replace("%", "%%"))
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 

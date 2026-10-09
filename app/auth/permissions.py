@@ -23,6 +23,15 @@ class Roles:
     LIBRARIAN = "LIBRARIAN"
     HOSTEL_WARDEN = "HOSTEL_WARDEN"
     SECURITY_GUARD = "SECURITY_GUARD"      # marks students and staff in and out at the gate
+    # Head of Department / Coordinator: academic oversight below the administration —
+    # decides teachers' attendance correction requests, follows up classes left
+    # unmarked, and watches every teacher's course progress. Usually given to a
+    # senior teacher as EXTRA access (Employees -> Extra access).
+    HOD = "HOD"
+    # Principal / Director: sees how the whole institute is doing (students, attendance, results, fees,
+    # teacher progress) without being able to change anything.
+    PRINCIPAL = "PRINCIPAL"
+    PARENT = "PARENT"   # a student's guardian: read-only view of their own children (attendance, results, fees)
     EXAM_CONTROLLER = "EXAM_CONTROLLER"    # the exam department: approves, publishes and corrects results, and keeps the grading scale
 
     ALL = (ADMIN, TEACHER, STUDENT, ACCOUNTS_OFFICER, LIBRARIAN, HOSTEL_WARDEN, SECURITY_GUARD, EXAM_CONTROLLER)
@@ -190,6 +199,28 @@ class Permissions:
     # Admin / RBAC management
     ROLE_MANAGE = "role.manage"
     AUDIT_VIEW = "audit.view"
+    # Change institute policy values (attendance thresholds, promotion rules, fee grace days) from Settings.
+    POLICY_MANAGE = "policy.manage"
+    # Import past (pre-system) results so existing students' transcripts and CGPA are complete.
+    RESULT_HISTORY_IMPORT = "result.history.import"
+    # Decide teachers' attendance correction requests and see classes left unmarked (admin + HOD).
+    ATTENDANCE_CORRECTION_DECIDE = "attendance.correction.decide"
+    # See every teacher's course progress (admin + HOD).
+    ACADEMIC_OVERSIGHT = "academic.oversight"
+    # Read-only institute-wide overview and dashboards (admin + principal).
+    INSTITUTE_OVERVIEW = "institute.overview"
+    # Build and publish exam datesheets, print any student's admit card (admin + exam controller).
+    EXAM_SCHEDULE_MANAGE = "exam.schedule.manage"
+    # See the SMS log, send queued messages, retry failures, send a test SMS (admin).
+    SMS_MANAGE = "sms.manage"
+    # Approve or reject fee refunds requested by the accounts office (admin; never the requester).
+    FEE_REFUND_APPROVE = "fee.refund.approve"
+    # Run admissions: rounds, applications, verification, merit lists, admitting (admin).
+    ADMISSION_MANAGE = "admission.manage"
+    # Parent portal: see one's OWN linked children only.
+    PARENT_VIEW = "parent.view"
+    # Create/link/unlink a guardian's parent login from a student's record (administration).
+    PARENT_ACCESS_MANAGE = "parent.access.manage"
     # Scoped audit access for ACCOUNTS_OFFICER — financial actions only,
     # not the full system audit trail (student status changes, role
     # changes, etc.). Kept distinct from AUDIT_VIEW rather than widening
@@ -203,6 +234,16 @@ class Permissions:
 # seed script), not editing scattered `if` statements.
 ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
     Roles.ADMIN: (
+        Permissions.POLICY_MANAGE,
+        Permissions.RESULT_HISTORY_IMPORT,
+        Permissions.ATTENDANCE_CORRECTION_DECIDE,
+        Permissions.ACADEMIC_OVERSIGHT,
+        Permissions.INSTITUTE_OVERVIEW,
+        Permissions.EXAM_SCHEDULE_MANAGE,
+        Permissions.SMS_MANAGE,
+        Permissions.FEE_REFUND_APPROVE,
+        Permissions.ADMISSION_MANAGE,
+        Permissions.PARENT_ACCESS_MANAGE,
         Permissions.STUDENT_VIEW,
         Permissions.STUDENT_CREATE,
         Permissions.STUDENT_UPDATE,
@@ -337,7 +378,14 @@ ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
     ),
     # Placeholder role — Hostel module not built yet.
     Roles.HOSTEL_WARDEN: (Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
-    Roles.EXAM_CONTROLLER: (Permissions.RESULT_APPROVE, Permissions.MARKS_ENTER, Permissions.STUDENT_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
+    Roles.EXAM_CONTROLLER: (Permissions.EXAM_SCHEDULE_MANAGE, Permissions.COURSE_VIEW, Permissions.RESULT_APPROVE, Permissions.MARKS_ENTER, Permissions.STUDENT_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
+    Roles.PARENT: (Permissions.PARENT_VIEW,),
+    Roles.PRINCIPAL: (Permissions.INSTITUTE_OVERVIEW, Permissions.ACADEMIC_OVERSIGHT, Permissions.ATTENDANCE_VIEW,
+                      Permissions.COURSE_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.STUDENT_VIEW,
+                      Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
+    Roles.HOD: (Permissions.ATTENDANCE_CORRECTION_DECIDE, Permissions.ACADEMIC_OVERSIGHT, Permissions.ATTENDANCE_VIEW,
+                Permissions.COURSE_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.STUDENT_VIEW,
+                Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
     Roles.SECURITY_GUARD: (Permissions.GATE_OPERATE, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
     # LIBRARIAN owns the full library domain, same reasoning as
     # ACCOUNTS_OFFICER owning fee submission — this is their job.

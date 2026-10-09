@@ -11,6 +11,7 @@ from app.core.exceptions import AuthorizationError
 from app.tasks.models import TaskStatus
 from app.tasks.schemas import (
     CancelIn,
+    SendBackIn,
     CommentIn,
     CompleteIn,
     FlagIn,
@@ -121,6 +122,20 @@ async def respond(task_id: uuid.UUID, payload: RespondIn, current_user: CurrentU
 async def complete(task_id: uuid.UUID, payload: CompleteIn, current_user: CurrentUser = Depends(use), db=Depends(get_db)) -> TaskOut:
     service = TaskService(db)
     await service.complete(task_id, user_id=current_user.id, note=payload.note)
+    return await _one(service, task_id, current_user)
+
+
+@router.post("/{task_id}/confirm", response_model=TaskOut, summary="Confirm a completed task is really done (the person who assigned it, or the administration)")
+async def confirm(task_id: uuid.UUID, current_user: CurrentUser = Depends(use), db=Depends(get_db)) -> TaskOut:
+    service = TaskService(db)
+    await service.confirm(task_id, user_id=current_user.id, manage=_manage(current_user))
+    return await _one(service, task_id, current_user)
+
+
+@router.post("/{task_id}/send-back", response_model=TaskOut, summary="Not done yet: send a completed task back with a reason (and optionally more time)")
+async def send_back(task_id: uuid.UUID, payload: SendBackIn, current_user: CurrentUser = Depends(use), db=Depends(get_db)) -> TaskOut:
+    service = TaskService(db)
+    await service.send_back(task_id, user_id=current_user.id, manage=_manage(current_user), note=payload.note, new_deadline=payload.new_deadline)
     return await _one(service, task_id, current_user)
 
 

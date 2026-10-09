@@ -82,7 +82,7 @@
       <select id="fs-type" class="select-input" required><option value="">Select&hellip;</option></select>
     </div>
     <div class="form-field"><label for="fs-name">Structure Name</label><input type="text" id="fs-name" class="text-input" placeholder="Clinical Fee — Fall 2026 (BSN)" required maxlength="150" /></div>
-    <div class="form-field"><label for="fs-term">Term Label</label><input type="text" id="fs-term" class="text-input" placeholder="Fall 2026" required maxlength="50" /></div>
+    <div class="form-field"><label for="fs-term">Term Label</label><select id="fs-term" class="select-input term-select" required><option value="">Select a term&hellip;</option></select></div>
     <div class="form-field"><label for="fs-amount">Total Amount</label><input type="number" id="fs-amount" class="text-input" min="0.01" step="0.01" required /></div>
     <div class="form-field"><label for="fs-installments">Installments (1 = pay in full)</label><input type="number" id="fs-installments" class="text-input" min="1" max="24" value="1" required /></div>
     <div class="form-field"><label for="fs-interval">Months Between Installments</label><input type="number" id="fs-interval" class="text-input" min="1" max="12" value="1" required /></div>
@@ -143,8 +143,16 @@
     <dl class="detail-list" id="assignment-detail-list"></dl>
 
     <div class="inline-form">
-      <input type="number" id="payment-amount" class="text-input small-input" placeholder="Amount" min="0.01" step="0.01" />
-      <input type="text" id="payment-description" class="text-input" placeholder="Description (optional)" />
+      <input type="number" id="payment-amount" class="text-input small-input" placeholder="Amount" min="0.01" step="0.01" aria-label="Amount" />
+      <select id="payment-method" class="select-input" aria-label="Payment method">
+        <option value="BANK_DEPOSIT">Bank deposit (challan)</option>
+        <option value="CASH">Cash at counter</option>
+        <option value="ONLINE_TRANSFER">Online transfer</option>
+        <option value="CHEQUE">Cheque</option>
+      </select>
+      <input type="text" id="payment-reference" class="text-input small-input" placeholder="Slip / transaction / cheque no." maxlength="100" aria-label="Reference" />
+      <input type="date" id="payment-paid-on" class="text-input small-input" aria-label="Paid on" title="The day the money was paid" />
+      <input type="text" id="payment-description" class="text-input" placeholder="Note (optional)" aria-label="Note" />
       <button id="record-payment-btn" class="role-btn" type="button">Record Payment</button>
     </div>
 
@@ -164,7 +172,7 @@
     <h3 class="modal-subhead">Ledger</h3>
     <p class="panel-hint">If a fee structure has a late fee configured, "Post Late Fee" charges whatever's newly accrued on that installment as a real, payable fine \u2014 safe to click repeatedly, it never double-charges.</p>
     <table class="dash-table" id="ledger-table">
-      <thead><tr><th>Type</th><th class="num">Amount</th><th>Due</th><th>Description</th><th></th></tr></thead>
+      <thead><tr><th>Type</th><th class="num">Amount</th><th>Due / Paid on</th><th>Description</th><th></th></tr></thead>
       <tbody id="ledger-tbody"></tbody>
     </table>
     <p id="late-fee-error" class="dash-alert error" hidden></p>
@@ -177,4 +185,5 @@
 
 {% block extra_scripts %}
 <script src="/static/js/fees.js"></script>
+<script src="/static/js/academic-terms.js"></script>
 {% endblock %}

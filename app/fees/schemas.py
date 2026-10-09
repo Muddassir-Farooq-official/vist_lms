@@ -3,9 +3,9 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.fees.models import AssignmentStatus, FeeStructureStatus, LedgerEntryType, PayerType
+from app.fees.models import AssignmentStatus, FeeStructureStatus, LedgerEntryType, PayerType, PaymentMethod
 
 
 class FeeTypeCreateRequest(BaseModel):
@@ -137,9 +137,31 @@ class LedgerEntryOut(BaseModel):
     due_date: date | None
     description: str | None
     created_at: datetime
+    payment_method: str | None = None
+    payment_reference: str | None = None
+    paid_on: date | None = None
+    receipt_number: str | None = None
 
 
-class RecordPaymentRequest(BaseModel):
+class PaymentDetails(BaseModel):
+    """How a payment was made — required for every staff-recorded payment so
+    collections can be reconciled with the bank statement / cash book."""
+
+    method: PaymentMethod
+    reference: str | None = Field(default=None, max_length=100, description="Deposit slip / transaction / cheque number. Required unless CASH.")
+    paid_on: date | None = Field(default=None, description="The day the money was paid. Defaults to today.")
+
+    @model_validator(mode="after")
+    def _reference_needed(self):
+        if self.method != PaymentMethod.CASH and not (self.reference or "").strip():
+            raise ValueError("A reference (deposit slip, transaction or cheque number) is required unless the payment was cash.")
+        if self.method == PaymentMethod.ONE_BILL:
+            raise ValueError("1Bill payments are recorded by the bank integration, not by hand.")
+        self.reference = (self.reference or "").strip() or None
+        return self
+
+
+class RecordPaymentRequest(PaymentDetails):
     amount: float = Field(gt=0)
     description: str | None = Field(default=None, max_length=255)
 
@@ -152,7 +174,7 @@ class MarkUnpaidRequest(BaseModel):
     reason: str | None = Field(default=None, max_length=255)
 
 
-class MarkPaidRequest(BaseModel):
+class MarkPaidRequest(PaymentDetails):
     note: str | None = Field(default=None, max_length=255)
 
 

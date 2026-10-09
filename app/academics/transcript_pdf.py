@@ -43,8 +43,8 @@ def render_transcript_pdf(data: dict, *, institute_name: str = "Vertex Institute
         story.append(Paragraph(term["label"], term_style))
         rows = [head]
         for c in term["courses"]:
-            title = c["course_title"] + ("  (repeated later)" if c["replaced"] else "") + ("  (attempt %d)" % c["attempt"] if c["attempt"] > 1 and not c["replaced"] else "") + ("  \u2014 failed: attendance" if c["failed_for_attendance"] else "")
-            rows.append([c["course_code"], Paragraph(title, cell), str(c["credit_hours"]), f"{c['total_obtained']:g}/{c['total_max']:g}", f"{c['percentage']:.1f}", c["letter_grade"], _f(c["grade_points"]), _f(c["quality_points"])])
+            title = c["course_title"] + ("  (repeated later)" if c["replaced"] else "") + ("  (attempt %d)" % c["attempt"] if c["attempt"] > 1 and not c["replaced"] else "") + ("  \u2014 failed: attendance" if c["failed_for_attendance"] else "") + ("  (passed in supplementary exam)" if c.get("supplementary") else "")
+            rows.append([c["course_code"], Paragraph(title, cell), str(c["credit_hours"]), f"{c['total_obtained']:g}/{c['total_max']:g}", f"{c['percentage']:.1f}", c["letter_grade"] + (" (S)" if c.get("supplementary") else ""), _f(c["grade_points"]), _f(c["quality_points"])])
         rows.append(["", Paragraph("<b>Term total</b>", cell), str(term["credits_attempted"]), "", "", "GPA", _f(term["gpa"]), ""])
         rows.append(["", Paragraph(f"<b>Cumulative (CGPA)</b>  \u2014  {term['credits_earned_cumulative']} credit hours earned so far", cell), "", "", "", "CGPA", _f(term["cgpa_after"]), ""])
         tbl = Table(rows, colWidths=[20 * mm, 71 * mm, 9 * mm, 20 * mm, 14 * mm, 14 * mm, 14 * mm, 14 * mm], repeatRows=1)

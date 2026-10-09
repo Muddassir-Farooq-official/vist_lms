@@ -661,6 +661,33 @@ class EnrollmentService:
             "ungraded_count": ungraded_count,
         }
 
+    async def _offerings_for_term_or_fail(self, term_label: str) -> list:
+        """The offerings of an EXISTING term. A typo ("Fal 2026") used to
+        succeed silently with zero offerings; now it is refused, and a
+        case/spacing near-match is suggested."""
+        offerings = await self.offering_repo.list_by_term(term_label)
+        if not offerings:
+            known = await self.offering_repo.list_distinct_terms()
+            norm = lambda t: "".join(t.lower().split())
+            close = [t for t in known if norm(t) == norm(term_label)]
+            hint = f' Did you mean "{close[0]}"?' if close else (f" Known terms: {', '.join(known[:6])}." if known else "")
+            raise ResourceNotFoundError(f'No course offerings found for term "{term_label}".{hint}')
+        return offerings
+
+    async def preview_end_semester(self, term_label: str) -> dict:
+        """What end_semester() would do, without changing anything (the
+        admin UI shows this in its confirmation)."""
+        offerings = await self._offerings_for_term_or_fail(term_label)
+        to_complete = ungraded = 0
+        for offering in offerings:
+            for enrollment in await self.enrollment_repo.list_for_offering(offering.id):
+                if enrollment.status == EnrollmentStatus.ENROLLED:
+                    to_complete += 1
+                    if enrollment.outcome is None:
+                        ungraded += 1
+        return {"term_label": term_label, "offerings_affected": len(offerings),
+                "enrollments_to_complete": to_complete, "ungraded_count": ungraded}
+
     async def end_semester(self, term_label: str, *, actor_id: uuid.UUID) -> dict:
         """The 'reset enrollment for next semester' action: for every
         offering in this term, close it to new enrollment and finalize
@@ -674,7 +701,7 @@ class EnrollmentService:
         — see preview_end_semester() above, which the UI calls first so
         the admin can see and decide, rather than the backend silently
         blocking a real action on an incomplete feature."""
-        offerings = await self.offering_repo.list_by_term(term_label)
+        offerings = await self._offerings_for_term_or_fail(term_label)
         completed_count = 0
         ungraded_count = 0
         for offering in offerings:

@@ -59,3 +59,4 @@ plugins = ["pydantic.mypy"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = ["launch_guards: run with the production launch guards on (Step 2)"]

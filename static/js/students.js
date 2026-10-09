@@ -203,8 +203,47 @@
     nextBtn.disabled = currentPage >= currentTotalPages;
   }
 
+  // ---- parent portal access (guardian login), from the student's record
+  async function loadParentAccess(studentId) {
+    const text = document.getElementById("parent-access-text");
+    const give = document.getElementById("parent-access-btn");
+    const reset = document.getElementById("parent-reset-btn");
+    const revoke = document.getElementById("parent-revoke-btn");
+    document.getElementById("parent-access-result").hidden = true;
+    [give, reset, revoke].forEach(function (b) { b.hidden = true; });
+    const r = await VA.fetchJson("/api/v1/parents/students/" + studentId);
+    if (!r.ok) { text.textContent = "Parent portal: " + ((r.body && r.body.error && r.body.error.message) || "not available."); return; }
+    const a = r.body;
+    text.textContent = "Parent portal — " + a.guardian_name + " (" + a.relation + ", CNIC " + a.guardian_cnic + "): " +
+      (a.linked ? "can sign in as " + a.username + "." : a.has_login ? "has a login; this student is not linked yet." : "no login yet.");
+    give.hidden = a.linked;
+    reset.hidden = !a.has_login;
+    revoke.hidden = !a.linked;
+  }
+  async function parentAction(method, query, confirmText) {
+    if (confirmText && !window.confirm(confirmText)) return;
+    const r = await VA.fetchJson("/api/v1/parents/students/" + activeStudentId + (query || ""), { method: method });
+    const out = document.getElementById("parent-access-result");
+    if (!r.ok) { modalError.textContent = (r.body && r.body.error && r.body.error.message) || "That did not work."; modalError.hidden = false; return; }
+    if (r.body && r.body.temporary_password) {
+      out.textContent = "Sign-in for the guardian — username: " + r.body.username + "  one-time password: " + r.body.temporary_password +
+        "  (shown only now; they must change it at first sign-in). Children linked: " + r.body.children_linked + ".";
+    } else {
+      out.textContent = r.body && r.body.message ? r.body.message : "Done.";
+    }
+    out.hidden = false;
+    const keep = out.textContent;
+    await loadParentAccess(activeStudentId);
+    out.textContent = keep;
+    out.hidden = false;
+  }
+  document.getElementById("parent-access-btn").addEventListener("click", function () { parentAction("POST", "", null); });
+  document.getElementById("parent-reset-btn").addEventListener("click", function () { parentAction("POST", "?reset_password=true", "Issue a new one-time password for the guardian? The old one stops working."); });
+  document.getElementById("parent-revoke-btn").addEventListener("click", function () { parentAction("DELETE", "", "Stop the guardian from seeing this student?"); });
+
   async function openStudentModal(studentId) {
     activeStudentId = studentId;
+    loadParentAccess(studentId);
     document.getElementById("print-slip-link").href = "/api/v1/students/" + studentId + "/admission-slip";
     modalError.hidden = true;
     resetPasswordConfirm.hidden = true;
@@ -501,6 +540,9 @@
       dry_run: dryRun,
       skip_open_enrollments: document.getElementById("advance-skip-open").checked,
       skip_overdue_fees: document.getElementById("advance-skip-fees").checked,
+      skip_failed_courses: document.getElementById("advance-skip-failed").checked,
+      skip_low_cgpa: document.getElementById("advance-skip-cgpa").checked,
+      skip_unpaid_fines: document.getElementById("advance-skip-fines").checked,
     });
   }
 
@@ -508,6 +550,8 @@
     let text =
       verbPast + " " + r.advanced_count + " student(s). Held back: " +
       r.skipped_open_enrollments + " with courses in progress, " + r.skipped_overdue_fees + " with overdue fees, " +
+      (r.skipped_failed_courses || 0) + " with more than " + r.max_courses_to_clear + " failed courses to clear, " +
+      (r.skipped_low_cgpa || 0) + " with CGPA below " + r.min_cgpa + ", " + (r.skipped_unpaid_fines || 0) + " with unpaid fines, " +
       r.skipped_already_at_max + " at final semester, " + r.skipped_no_semester_set + " with no semester, " +
       r.skipped_no_program + " with no program.";
     return text;

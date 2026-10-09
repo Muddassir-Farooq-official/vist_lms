@@ -393,7 +393,7 @@ class TestPaymentRecordingVsReversalAuthoritySplit:
         await _create_accounts_officer(app_client, db_session, code="ACC2")
         resp = await app_client.post(
             f"/api/v1/fees/assignments/{assignment_id}/payments",
-            json={"amount": 5000, "description": "Paid at counter"},
+            json={"amount": 5000, "description": "Paid at counter", "method": "CASH"},
         )
         assert resp.status_code == 201, resp.text
         assert resp.json()["total_paid"] == 5000
@@ -412,7 +412,7 @@ class TestPaymentRecordingVsReversalAuthoritySplit:
 
         # Admin marks it paid first (as staff would after a bank confirmation).
         await _login_admin(app_client)
-        paid_resp = await app_client.post(f"/api/v1/fees/challans/{challan_id}/mark-paid", json={"note": "bank confirmed"})
+        paid_resp = await app_client.post(f"/api/v1/fees/challans/{challan_id}/mark-paid", json={"note": "bank confirmed", "method": "BANK_DEPOSIT", "reference": "HBL-0002"})
         assert paid_resp.status_code == 200
         assert paid_resp.json()["status"] == "PAID"
 

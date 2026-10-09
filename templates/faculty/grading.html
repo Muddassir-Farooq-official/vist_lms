@@ -44,9 +44,17 @@
   </table>
   <p class="empty-state" id="marks-empty" hidden>Add at least one result type above before entering marks.</p>
   <p id="marks-error" class="dash-alert error" hidden></p>
+  <div class="upload-row" id="marks-sheet-row">
+    <a id="marks-sheet-download" class="role-btn secondary-btn" href="#" download>Download marks sheet (.csv)</a>
+    <input type="file" id="marks-sheet-file" accept=".csv" aria-label="Filled marks sheet" />
+    <button type="button" class="role-btn secondary-btn" id="marks-sheet-check">Check sheet</button>
+    <button type="button" class="role-btn" id="marks-sheet-upload">Upload marks</button>
+  </div>
+  <p class="panel-hint" id="marks-sheet-msg" hidden></p>
 </section>
 {% endblock %}
 
 {% block extra_scripts %}
 <script src="/static/js/faculty-grading.js"></script>
+<script src="/static/js/marks-sheet.js"></script>
 {% endblock %}

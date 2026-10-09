@@ -1,0 +1,26 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN,PRINCIPAL{% endblock %}
+{% block title %}Institute Overview{% endblock %}
+{% block page_title %}Institute Overview{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">How the institute is doing right now, for the open terms: students, teaching, attendance, results and fees. Read-only.</div>{% endblock %}
+
+{% block content %}
+<p class="content-subtitle" id="ov-terms"></p>
+<section class="stat-grid" aria-label="Key figures">
+  <div class="stat-card"><span class="stat-label">Active students</span><span class="stat-value" id="ov-active">&mdash;</span></div>
+  <div class="stat-card"><span class="stat-label">Average attendance</span><span class="stat-value" id="ov-att">&mdash;</span></div>
+  <div class="stat-card stat-card--red"><span class="stat-label">Student-courses below minimum attendance</span><span class="stat-value" id="ov-below">&mdash;</span></div>
+  <div class="stat-card stat-card--green"><span class="stat-label">Fee collection rate</span><span class="stat-value" id="ov-rate">&mdash;</span></div>
+</section>
+
+<section class="panel"><h2>Teaching</h2><table class="dash-table no-stack"><tbody id="ov-teaching"></tbody></table></section>
+<section class="panel"><h2>Results (this term)</h2><table class="dash-table no-stack"><tbody id="ov-results"></tbody></table></section>
+<section class="panel"><h2>Fees (active)</h2><table class="dash-table no-stack"><tbody id="ov-fees"></tbody></table></section>
+<section class="panel"><h2>Students</h2><table class="dash-table no-stack"><thead><tr><th>Program</th><th class="num">Active students</th></tr></thead><tbody id="ov-programs"></tbody></table>
+  <p class="panel-hint" id="ov-status"></p></section>
+<p id="ov-error" class="dash-alert error" hidden></p>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/principal-overview.js"></script>
+{% endblock %}

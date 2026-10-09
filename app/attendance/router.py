@@ -7,7 +7,9 @@ from fastapi.responses import Response
 
 from app.academics.repository import ClassSessionRepository, CourseOfferingRepository, CourseRepository
 from app.attendance.repository import AttendanceRepository
+from app.auth.permissions import Roles
 from app.attendance.schemas import (
+    LockAttendanceRequest,
     AttendanceConfigOut,
     AttendanceRecordDetail,
     CorrectionDecision,
@@ -27,7 +29,7 @@ from app.core.clock import institute_now
 from app.core.config import settings
 from app.auth.schemas import CurrentUser
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, require_permission
+from app.core.dependencies import get_current_user, require_any_permission, require_permission
 from app.core.exceptions import AuthorizationError, ResourceNotFoundError
 from app.employees.repository import EmployeeRepository
 from app.students.repository import StudentRepository
@@ -99,7 +101,7 @@ async def mark_session(
 async def needs_attention(
     response: Response,
     limit: int = 200,
-    current_user: CurrentUser = Depends(require_permission(Permissions.ATTENDANCE_LOCK)),
+    current_user: CurrentUser = Depends(require_any_permission(Permissions.ATTENDANCE_LOCK, Permissions.ATTENDANCE_CORRECTION_DECIDE)),
     db=Depends(get_db),
 ) -> list[OverdueSessionOut]:
     """Oldest first. Capped (default 200, header X-Total-Count says how many exist in all): nobody can
@@ -207,10 +209,14 @@ async def offering_percentages(
 )
 async def lock_attendance(
     offering_id: uuid.UUID,
+    payload: LockAttendanceRequest | None = None,
     current_user: CurrentUser = Depends(require_permission(Permissions.ATTENDANCE_LOCK)),
     db=Depends(get_db),
 ) -> LockAttendanceResultOut:
-    result = await AttendanceService(db).lock_attendance(offering_id, actor_id=current_user.id)
+    result = await AttendanceService(db).lock_attendance(
+        offering_id, actor_id=current_user.id, early_reason=payload.early_reason if payload else None,
+        actor_is_admin=Roles.ADMIN in current_user.roles,
+    )
     return LockAttendanceResultOut(course_offering_id=offering_id, **result)
 
 
@@ -372,7 +378,7 @@ async def list_correction_requests(
     current_user: CurrentUser = Depends(require_permission(Permissions.ATTENDANCE_MARK)),
     db=Depends(get_db),
 ) -> list[CorrectionRequestOut]:
-    is_admin = Permissions.ATTENDANCE_LOCK in current_user.permissions
+    is_admin = bool({Permissions.ATTENDANCE_LOCK, Permissions.ATTENDANCE_CORRECTION_DECIDE} & set(current_user.permissions))   # admin or HOD sees all
     requests = await AttendanceService(db).list_correction_requests(
         status=status.upper() if status else None, requested_by=None if is_admin else current_user.id
     )
@@ -386,7 +392,7 @@ async def list_correction_requests(
 async def decide_correction_request(
     request_id: uuid.UUID,
     payload: CorrectionDecision,
-    current_user: CurrentUser = Depends(require_permission(Permissions.ATTENDANCE_LOCK)),
+    current_user: CurrentUser = Depends(require_any_permission(Permissions.ATTENDANCE_LOCK, Permissions.ATTENDANCE_CORRECTION_DECIDE)),
     db=Depends(get_db),
 ) -> CorrectionRequestOut:
     req = await AttendanceService(db).decide_correction_request(

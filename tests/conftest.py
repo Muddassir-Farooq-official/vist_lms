@@ -34,6 +34,14 @@ from app.fines import models as _fines_models  # noqa: F401
 from app.imports import models as _imports_models  # noqa: F401
 from app.library import models as _library_models  # noqa: F401
 from app.programs import models as _programs_models  # noqa: F401
+from app.policy import models as _policy_models  # noqa: F401
+from app.academics import terms as _terms_models  # noqa: F401
+from app.exams import models as _exam_models  # noqa: F401
+from app.sms import models as _sms_models  # noqa: F401
+from app.supplementary import models as _supp_models  # noqa: F401
+from app.fees import refund_models as _refund_models  # noqa: F401
+from app.admissions import models as _admission_models  # noqa: F401
+from app.parents import models as _parents_models  # noqa: F401
 from app.students import models as _students_models  # noqa: F401
 
 TEST_DATABASE_URL = settings.database_url.rsplit("/", 1)[0] + "/vist_lms_test"
@@ -54,6 +62,31 @@ async def _flush_redis():
     yield
     await client.aclose()
     get_redis.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def _reset_policy_overrides():
+    """Policy values saved through the API live on the shared settings object; undo them after each test."""
+    yield
+    from app.policy.service import reset_for_tests
+
+    reset_for_tests()
+
+
+@pytest.fixture(autouse=True)
+def _legacy_launch_guards(monkeypatch, request):
+    """The suite predates the Step 2 launch guards and exercises the original
+    mechanics (publishing straight after approval, locking mid-term, login
+    block on attendance fines). Run it with those guards off; tests marked
+    `launch_guards` keep the real (production) defaults."""
+    if request.node.get_closest_marker("launch_guards"):
+        return
+    from app.core.config import settings as _settings
+
+    monkeypatch.setattr(_settings, "require_attendance_lock_before_publish", False)
+    monkeypatch.setattr(_settings, "block_early_attendance_lock", False)
+    monkeypatch.setattr(_settings, "attendance_fine_blocks_login", True)
+    monkeypatch.setattr(_settings, "require_registered_terms", False)
 
 
 @pytest.fixture(autouse=True)

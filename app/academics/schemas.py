@@ -74,8 +74,9 @@ class GenerateOfferingsRequest(BaseModel):
     program_id: uuid.UUID
     semester_number: int = Field(ge=1, le=20)
     section_label: str = Field(default="A", min_length=1, max_length=30)
-    term_start_date: date
-    term_end_date: date
+    # Optional: taken from the registered academic term (Courses -> Academic Terms) when left out.
+    term_start_date: date | None = None
+    term_end_date: date | None = None
     capacity: int | None = Field(default=None, ge=1, le=2000)
     open_for_enrollment: bool = False
 

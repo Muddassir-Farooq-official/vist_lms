@@ -1,4 +1,5 @@
 {% extends "admin/_base.html" %}
+{% block allowed_roles %}{{ allowed_roles|default("ADMIN") }}{% endblock %}
 {% block title %}Progress{% endblock %}
 {% block page_title %}Teacher Progress{% endblock %}
 {% block page_subtitle %}<div class="content-subtitle">How far each teacher actually is through their course versus where they should be by now, based on topics marked complete.</div>{% endblock %}

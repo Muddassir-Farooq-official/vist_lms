@@ -67,8 +67,17 @@ class OverdueSessionOut(BaseModel):
     room: str
 
 
+class LockAttendanceRequest(BaseModel):
+    """Optional body. early_reason is needed only to lock before the term is
+    over (administrator only); it is kept in the audit log."""
+
+    early_reason: str | None = Field(default=None, max_length=500)
+
+
 class LockPreviewOut(BaseModel):
     course_offering_id: uuid.UUID
+    early_reason: str | None = None   # why locking now would be early (None = term is over)
+    term_end_date: date | None = None
     already_locked: bool
     can_lock: bool
     enrolled_count: int

@@ -33,7 +33,7 @@ TABBED = {
     "/dashboard/faculty/attendance": ["take", "requests"],
     "/dashboard/faculty/library": ["borrowed", "requests", "history", "catalogue", "journals", "eresources"],
     "/dashboard/admin/attendance": ["attention", "corrections", "mark", "lock", "holiday"],
-    "/dashboard/admin/imports": ["upload", "history"],
+    "/dashboard/admin/imports": ["upload", "history", "past-results"],
     "/dashboard/admin/programs": ["all", "add"],
     "/dashboard/admin/courses/offering/00000000-0000-0000-0000-000000000000": ["overview", "syllabus", "timetable", "sessions"],
     "/dashboard/library/issue-return": ["issue", "issued"],

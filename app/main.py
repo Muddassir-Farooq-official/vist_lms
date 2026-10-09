@@ -11,6 +11,13 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from app.admissions.router import router as admissions_router
+from app.fees.refund_router import router as refund_router
+from app.supplementary.router import router as supplementary_router
+from app.sms.router import router as sms_router
+from app.exams.router import router as exams_router
+from app.policy.router import router as policy_router
+from app.parents.router import router as parents_router
 from app.academics.router import router as academics_router
 from app.attendance.router import router as attendance_router
 from app.audit.router import router as audit_router
@@ -154,15 +161,20 @@ def _nav(slug, label, icon, href, *, group=None, mobile=False, short=None):
 ADMIN_NAV_ITEMS = [
     _nav("dashboard", "Dashboard", "dashboard", "/dashboard/admin", mobile=True, short="Home"),
     _nav("students", "Students", "students", "/dashboard/admin/students", group="People", mobile=True),
+    _nav("admissions", "Admissions", "imports", "/dashboard/admin/admissions", group="People"),
     _nav("employees", "Employees", "employees", "/dashboard/admin/employees", group="People"),
     _nav("programs", "Programs", "programs", "/dashboard/admin/programs", group="Academics"),
     _nav("courses", "Courses", "graduation-cap", "/dashboard/admin/courses", group="Academics", mobile=True),
     _nav("timetable", "Timetable", "clock", "/dashboard/admin/timetable", group="Academics"),
     _nav("attendance", "Attendance", "attendance", "/dashboard/admin/attendance", group="Academics", mobile=True),
     _nav("progress", "Teacher Progress", "exams", "/dashboard/admin/progress", group="Academics"),
+    _nav("overview", "Institute Overview", "dashboard", "/dashboard/admin/overview", group="Academics"),
     _nav("results", "Result Types", "exams", "/dashboard/admin/results", group="Academics"),
     _nav("result-sheets", "Result Approval", "tasks", "/dashboard/admin/result-sheets", group="Academics"),
+    _nav("datesheets", "Datesheets", "clock", "/dashboard/admin/datesheets", group="Academics"),
+    _nav("supplementary", "Supplementary Exams", "exams", "/dashboard/admin/supplementary", group="Academics"),
     _nav("fees", "Fees", "fees", "/dashboard/admin/fees", group="Finance"),
+    _nav("refunds", "Refunds", "fees", "/dashboard/admin/refunds", group="Finance"),
     _nav("finance", "Accounts", "tasks", "/dashboard/admin/finance", group="Finance"),
     _nav("payroll", "Payroll", "fees", "/dashboard/admin/payroll", group="Finance"),
     _nav("fines", "Fines", "ban", "/dashboard/admin/fines", group="Finance"),
@@ -173,6 +185,7 @@ ADMIN_NAV_ITEMS = [
     _nav("applications", "Applications", "file", "/dashboard/admin/applications", group="Support"),
     _nav("complaints", "Complaints", "ban", "/dashboard/admin/complaints", group="Support"),
     _nav("imports", "CSV Imports", "imports", "/dashboard/admin/imports", group="System"),
+    _nav("sms", "SMS", "megaphone", "/dashboard/admin/sms", group="System"),
     _nav("settings", "Settings", "settings", "/dashboard/admin/settings", group="System"),
 ]
 
@@ -204,9 +217,25 @@ GATE_NAV_ITEMS = [
     _nav("payslips", "My payslips", "file", "/dashboard/gate/payslips"),
 ]
 
+PARENT_NAV_ITEMS = [
+    _nav("children", "My children", "students", "/dashboard/parent", mobile=True),
+]
+
+PRINCIPAL_NAV_ITEMS = [
+    _nav("overview", "Institute overview", "dashboard", "/dashboard/principal", mobile=True, short="Home"),
+    _nav("progress", "Teacher progress", "exams", "/dashboard/principal/progress", mobile=True),
+]
+
+HOD_NAV_ITEMS = [
+    _nav("attendance", "Attendance oversight", "attendance", "/dashboard/hod", mobile=True),
+    _nav("progress", "Teacher progress", "exams", "/dashboard/hod/progress", mobile=True),
+]
+
 EXAM_NAV_ITEMS = [
     _nav("results", "Result approval", "tasks", "/dashboard/exam", mobile=True),
     _nav("result-types", "Result types", "exams", "/dashboard/exam/result-types", mobile=True),
+    _nav("datesheets", "Datesheets & admit cards", "clock", "/dashboard/exam/datesheets"),
+    _nav("supplementary", "Supplementary exams", "exams", "/dashboard/exam/supplementary"),
     _nav("announcements", "Announcements", "megaphone", "/dashboard/exam/announcements", mobile=True),
     _nav("tasks", "Tasks", "tasks", "/dashboard/exam/tasks", mobile=True),
     _nav("applications", "Applications", "file", "/dashboard/exam/applications"),
@@ -226,6 +255,7 @@ ACCOUNTS_NAV_ITEMS = [
     _nav("announcements", "Announcements", "megaphone", "/dashboard/accounts/announcements", mobile=True),
     _nav("fees", "Fees", "fees", "/dashboard/accounts/fees", mobile=True),
     _nav("finance", "Accounts", "tasks", "/dashboard/accounts/finance", mobile=True),
+    _nav("refunds", "Refunds", "fees", "/dashboard/accounts/refunds"),
     _nav("payroll", "Payroll", "fees", "/dashboard/accounts/payroll"),
     _nav("payslips", "My payslips", "file", "/dashboard/accounts/payslips"),
     _nav("fines", "Fines", "ban", "/dashboard/accounts/fines", mobile=True),
@@ -242,6 +272,7 @@ STUDENT_NAV_ITEMS = [
     _nav("courses", "My Courses", "graduation-cap", "/dashboard/student/courses", group="Study", mobile=True, short="Courses"),
     _nav("timetable", "My Timetable", "clock", "/dashboard/student/timetable", group="Study", mobile=True, short="Timetable"),
     _nav("attendance", "My Attendance", "attendance", "/dashboard/student/attendance", group="Study", mobile=True, short="Attendance"),
+    _nav("exams", "My Exams", "clock", "/dashboard/student/exams", group="Study"),
     _nav("results", "My Results", "exams", "/dashboard/student/results", group="Study"),
     _nav("library", "Library", "library", "/dashboard/student/library", group="Services"),
     _nav("applications", "Applications", "file", "/dashboard/student/applications", group="Services"),
@@ -260,6 +291,7 @@ FACULTY_NAV_ITEMS = [
     _nav("attendance", "Attendance", "attendance", "/dashboard/faculty/attendance", group="Teaching", mobile=True),
     _nav("grading", "Grading", "exams", "/dashboard/faculty/grading", group="Teaching", mobile=True),
     _nav("timetable", "My Timetable", "clock", "/dashboard/faculty/timetable", group="Teaching"),
+    _nav("exams", "Exam duties", "exams", "/dashboard/faculty/exams", group="Teaching"),
     _nav("library", "Library", "library", "/dashboard/faculty/library", group="Services"),
     _nav("tasks", "Tasks", "tasks", "/dashboard/faculty/tasks", group="Services"),
     _nav("applications", "Applications", "file", "/dashboard/faculty/applications", group="Services"),
@@ -269,6 +301,16 @@ FACULTY_NAV_ITEMS = [
     _nav("complaints", "Feedback & Complaints", "ban", "/dashboard/faculty/complaints", group="Services"),
     _nav("profile", "My Profile", "user", "/dashboard/faculty/profile", group="Account"),
 ]
+
+
+@app.middleware("http")
+async def policy_refresh(request: Request, call_next):
+    """Keeps this worker's copy of the administrator-editable policy (app/policy) at most a minute old."""
+    if request.url.path.startswith("/api/"):
+        from app.policy.service import refresh_if_stale
+
+        await refresh_if_stale()
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -342,6 +384,13 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 
 app.include_router(auth_router, prefix=settings.api_v1_prefix)
+app.include_router(policy_router, prefix=settings.api_v1_prefix)
+app.include_router(exams_router, prefix=settings.api_v1_prefix)
+app.include_router(sms_router, prefix=settings.api_v1_prefix)
+app.include_router(supplementary_router, prefix=settings.api_v1_prefix)
+app.include_router(refund_router, prefix=settings.api_v1_prefix)
+app.include_router(admissions_router, prefix=settings.api_v1_prefix)
+app.include_router(parents_router, prefix=settings.api_v1_prefix)
 app.include_router(audit_router, prefix=settings.api_v1_prefix)
 app.include_router(academics_router, prefix=settings.api_v1_prefix)
 app.include_router(attendance_router, prefix=settings.api_v1_prefix)
@@ -555,6 +604,21 @@ async def admin_settings_page(request: Request):
     return templates.TemplateResponse(
         request, "admin/settings.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "settings"}
     )
+
+
+@app.get("/dashboard/admin/admissions", include_in_schema=False)
+async def admin_admissions_page(request: Request):
+    return templates.TemplateResponse(request, "admin/admissions.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "admissions"})
+
+
+@app.get("/dashboard/admin/refunds", include_in_schema=False)
+async def admin_refunds_page(request: Request):
+    return templates.TemplateResponse(request, "admin/refunds.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "refunds"})
+
+
+@app.get("/dashboard/accounts/refunds", include_in_schema=False)
+async def accounts_refunds_page(request: Request):
+    return templates.TemplateResponse(request, "admin/refunds.html", {"nav_items": ACCOUNTS_NAV_ITEMS, "active_nav": "refunds"})
 
 
 @app.get("/dashboard/admin/fees", include_in_schema=False)
@@ -854,9 +918,78 @@ async def gate_payslips_page(request: Request):
     return templates.TemplateResponse(request, "gate/payslips.html", {"nav_items": GATE_NAV_ITEMS, "active_nav": "payslips"})
 
 
+@app.get("/dashboard/parent", include_in_schema=False)
+async def parent_home_page(request: Request):
+    return templates.TemplateResponse(request, "parent/home.html", {"nav_items": PARENT_NAV_ITEMS, "active_nav": "children"})
+
+
+@app.get("/dashboard/principal", include_in_schema=False)
+async def principal_overview_page(request: Request):
+    return templates.TemplateResponse(request, "principal/overview.html", {"nav_items": PRINCIPAL_NAV_ITEMS, "active_nav": "overview"})
+
+
+@app.get("/dashboard/principal/progress", include_in_schema=False)
+async def principal_progress_page(request: Request):
+    return templates.TemplateResponse(request, "admin/progress.html", {"nav_items": PRINCIPAL_NAV_ITEMS, "active_nav": "progress",
+                                                                        "allowed_roles": "ADMIN,PRINCIPAL"})
+
+
+@app.get("/dashboard/admin/overview", include_in_schema=False)
+async def admin_overview_page(request: Request):
+    return templates.TemplateResponse(request, "principal/overview.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "overview"})
+
+
+@app.get("/dashboard/hod", include_in_schema=False)
+async def hod_attendance_page(request: Request):
+    # The admin Attendance page without the admin-only tabs (marking, locking, holidays).
+    return templates.TemplateResponse(request, "admin/attendance.html", {"nav_items": HOD_NAV_ITEMS, "active_nav": "attendance",
+                                                                          "allowed_roles": "ADMIN,HOD", "hod_view": True})
+
+
+@app.get("/dashboard/hod/progress", include_in_schema=False)
+async def hod_progress_page(request: Request):
+    return templates.TemplateResponse(request, "admin/progress.html", {"nav_items": HOD_NAV_ITEMS, "active_nav": "progress",
+                                                                        "allowed_roles": "ADMIN,HOD"})
+
+
 @app.get("/dashboard/exam", include_in_schema=False)
 async def exam_home_page(request: Request):
     return templates.TemplateResponse(request, "admin/result_sheets.html", {"nav_items": EXAM_NAV_ITEMS, "active_nav": "results"})
+
+
+@app.get("/dashboard/exam/datesheets", include_in_schema=False)
+async def exam_datesheets_page(request: Request):
+    return templates.TemplateResponse(request, "admin/datesheets.html", {"nav_items": EXAM_NAV_ITEMS, "active_nav": "datesheets"})
+
+
+@app.get("/dashboard/admin/sms", include_in_schema=False)
+async def admin_sms_page(request: Request):
+    return templates.TemplateResponse(request, "admin/sms.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "sms"})
+
+
+@app.get("/dashboard/exam/supplementary", include_in_schema=False)
+async def exam_supplementary_page(request: Request):
+    return templates.TemplateResponse(request, "admin/supplementary.html", {"nav_items": EXAM_NAV_ITEMS, "active_nav": "supplementary"})
+
+
+@app.get("/dashboard/admin/supplementary", include_in_schema=False)
+async def admin_supplementary_page(request: Request):
+    return templates.TemplateResponse(request, "admin/supplementary.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "supplementary"})
+
+
+@app.get("/dashboard/admin/datesheets", include_in_schema=False)
+async def admin_datesheets_page(request: Request):
+    return templates.TemplateResponse(request, "admin/datesheets.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "datesheets"})
+
+
+@app.get("/dashboard/faculty/exams", include_in_schema=False)
+async def faculty_exams_page(request: Request):
+    return templates.TemplateResponse(request, "faculty/exams.html", {"nav_items": FACULTY_NAV_ITEMS, "active_nav": "exams"})
+
+
+@app.get("/dashboard/student/exams", include_in_schema=False)
+async def student_exams_page(request: Request):
+    return templates.TemplateResponse(request, "student/exams.html", {"nav_items": STUDENT_NAV_ITEMS, "active_nav": "exams"})
 
 
 @app.get("/dashboard/exam/result-types", include_in_schema=False)

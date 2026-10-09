@@ -162,7 +162,7 @@
     <form id="generate-offerings-form" class="form-grid">
       <div class="form-field"><label for="go-program">Program</label><select id="go-program" class="select-input" required><option value="">Select&hellip;</option></select></div>
       <div class="form-field"><label for="go-semester">Semester</label><input type="number" id="go-semester" class="text-input" min="1" max="20" required /></div>
-      <div class="form-field"><label for="go-term">Term Label</label><input type="text" id="go-term" class="text-input" required maxlength="50" placeholder="e.g. Fall 2026" /></div>
+      <div class="form-field"><label for="go-term">Term Label</label><select id="go-term" class="select-input term-select" data-start="go-start" data-end="go-end" required><option value="">Select a term&hellip;</option></select></div>
       <div class="form-field"><label for="go-section">Section / Shift</label><input type="text" id="go-section" class="text-input" maxlength="30" value="A" /></div>
       <div class="form-field"><label for="go-start">Term Start</label><input type="date" id="go-start" class="text-input" required /></div>
       <div class="form-field"><label for="go-end">Term End</label><input type="date" id="go-end" class="text-input" required /></div>
@@ -231,7 +231,7 @@
         <label for="ao-course">Course</label>
         <select id="ao-course" class="select-input" required><option value="">Select&hellip;</option></select>
       </div>
-      <div class="form-field"><label for="ao-term">Term Label</label><input type="text" id="ao-term" class="text-input" required maxlength="50" placeholder="e.g. Fall 2026" /></div>
+      <div class="form-field"><label for="ao-term">Term Label</label><select id="ao-term" class="select-input term-select" data-start="ao-term-start" data-end="ao-term-end" required><option value="">Select a term&hellip;</option></select></div>
       <div class="form-field"><label for="ao-section">Section / Shift</label><input type="text" id="ao-section" class="text-input" maxlength="30" value="A" placeholder="A, B, Morning, Evening" /></div>
       <div class="form-field"><label for="ao-capacity">Seats (optional)</label><input type="number" id="ao-capacity" class="text-input" min="1" max="2000" placeholder="unlimited" /></div>
       <div class="form-field"><label for="ao-term-start">Term Start Date</label><input type="date" id="ao-term-start" class="text-input" /></div>
@@ -250,8 +250,22 @@
   </div>
 </dialog>
 
+<section class="panel" id="terms-panel" aria-labelledby="terms-h">
+  <h2 id="terms-h">Academic Terms</h2>
+  <p class="panel-hint">New course offerings and fee structures can only use a term from this list, so a term is never typed two different ways. Close a term once it is over (it stays in records and result cards).</p>
+  <div class="upload-row">
+    <input type="text" id="term-new-label" class="text-input small-input" maxlength="50" placeholder="e.g. Spring 2027" aria-label="Term name" />
+    <input type="date" id="term-new-start" class="text-input small-input" aria-label="Start date" />
+    <input type="date" id="term-new-end" class="text-input small-input" aria-label="End date" />
+    <button type="button" class="role-btn" id="term-add-btn">Add term</button>
+  </div>
+  <p id="terms-error" class="dash-alert error" hidden></p>
+  <table class="dash-table"><thead><tr><th>Term</th><th>Starts</th><th>Ends</th><th>Status</th><th></th></tr></thead><tbody id="terms-tbody"></tbody></table>
+</section>
+
 {% endblock %}
 
 {% block extra_scripts %}
 <script src="/static/js/courses.js"></script>
+<script src="/static/js/academic-terms.js"></script>
 {% endblock %}

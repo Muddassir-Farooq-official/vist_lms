@@ -29,6 +29,9 @@ async def simulate_challan_payment(
 ) -> ChallanOut:
     challan_service = ChallanService(db)
     challan = await challan_service.get(challan_id)
+    if settings.is_production:
+        # A simulated payment marks a fee paid with no money moving. Never on the live system.
+        raise AuthorizationError("Simulated payments are switched off on the live system. Record the real payment instead.")
 
     # Real security fix, not a style change: this used to allow ANY
     # real student to mark their OWN fee "paid" via a gateway that
@@ -65,7 +68,10 @@ async def mark_challan_paid(
     """This is the day-to-day 'accountant confirms a payment' action while
     the real 1LINK gateway/webhook isn't live yet — gated by
     PAYMENT_RECORD, which currently only ADMIN and ACCOUNTS_OFFICER hold."""
-    challan = await ChallanService(db).mark_paid_by_staff(challan_id, actor_id=current_user.id, note=payload.note)
+    challan = await ChallanService(db).mark_paid_by_staff(
+        challan_id, actor_id=current_user.id, note=payload.note,
+        method=payload.method.value, reference=payload.reference, paid_on=payload.paid_on,
+    )
     return ChallanOut.model_validate(challan)
 
 

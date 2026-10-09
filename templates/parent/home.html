@@ -1,0 +1,46 @@
+{% extends "parent/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}My Children{% endblock %}
+{% block page_title %}My Children{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Attendance in current courses, results and fees for each child linked to your account. Questions? Contact the institute office.</div>{% endblock %}
+
+{% block content %}
+<div class="upload-row" id="child-picker-row" hidden>
+  <label for="child-picker">Child</label>
+  <select id="child-picker" class="select-input"></select>
+</div>
+<p class="empty-state" id="no-children" hidden>No student is linked to your account yet. Please contact the institute office.</p>
+
+<section class="stat-grid" id="child-stats" hidden aria-label="Summary">
+  <div class="stat-card"><span class="stat-label">Program / semester</span><span class="stat-value" id="ps-program">&mdash;</span></div>
+  <div class="stat-card"><span class="stat-label">CGPA</span><span class="stat-value" id="ps-cgpa">&mdash;</span></div>
+  <div class="stat-card stat-card--red"><span class="stat-label">Fees outstanding</span><span class="stat-value" id="ps-fees">&mdash;</span></div>
+  <div class="stat-card"><span class="stat-label">Courses below minimum attendance</span><span class="stat-value" id="ps-low">&mdash;</span></div>
+</section>
+
+<section class="sh-card" id="att-card" hidden>
+  <div class="sh-card-head"><h2>Attendance this term</h2></div>
+  <table class="dash-table"><thead><tr><th>Course</th><th class="num">Classes</th><th class="num">Present</th><th class="num">Attendance</th></tr></thead><tbody id="att-tbody"></tbody></table>
+  <p class="content-subtitle" id="att-note"></p>
+</section>
+
+<section class="sh-card" id="exam-card" hidden>
+  <div class="sh-card-head"><h2>Exams</h2></div>
+  <div id="exam-body"></div>
+</section>
+
+<section class="sh-card" id="res-card" hidden>
+  <div class="sh-card-head"><h2>Results</h2></div>
+  <div id="res-body"></div>
+</section>
+
+<section class="sh-card" id="fee-card" hidden>
+  <div class="sh-card-head"><h2>Fees</h2></div>
+  <div id="fee-body"></div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+
+<script src="/static/js/parent-portal.js"></script>
+{% endblock %}

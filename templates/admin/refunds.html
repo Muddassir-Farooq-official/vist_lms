@@ -1,0 +1,48 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN,ACCOUNTS_OFFICER{% endblock %}
+{% block title %}Refunds{% endblock %}
+{% block page_title %}Fee Refunds{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">The accounts office requests a refund, an administrator (not the same person) approves it, then the accounts office pays it out and prints the voucher. Nothing can be refunded beyond what was paid.</div>{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Request a refund</h2>
+  <div class="upload-row">
+    <input id="rf-roll" class="text-input small-input" placeholder="Roll number" aria-label="Roll number" />
+    <button id="rf-find" class="role-btn secondary-btn" type="button">Find fees</button>
+    <select id="rf-fee" class="select-input" aria-label="Fee" hidden></select>
+  </div>
+  <p id="rf-position" class="panel-hint" hidden></p>
+  <div id="rf-form" hidden>
+    <div class="upload-row">
+      <select id="rf-kind" class="select-input" aria-label="Kind">
+        <option value="WITHDRAWAL">Withdrawal: write off unused fee and refund it</option>
+        <option value="OVERPAYMENT">Overpayment: refund the credit balance</option>
+        <option value="OTHER">Other</option>
+      </select>
+      <input id="rf-amount" type="number" min="0.01" step="0.01" class="text-input small-input" placeholder="Refund amount" aria-label="Refund amount" />
+      <input id="rf-writeoff" type="number" min="0" step="0.01" class="text-input small-input" placeholder="Write off (Rs.)" aria-label="Charges to write off" />
+    </div>
+    <div class="upload-row">
+      <input id="rf-reason" class="text-input" maxlength="500" placeholder="Reason, e.g. Withdrew in week 2; 50% tuition refundable as per policy" aria-label="Reason" />
+      <button id="rf-request" class="role-btn" type="button">Send for approval</button>
+    </div>
+  </div>
+  <p id="rf-msg" class="panel-hint" hidden></p>
+</section>
+
+<section class="panel">
+  <div class="upload-row">
+    <h2>Refunds</h2>
+    <select id="rf-filter" class="select-input" aria-label="Show">
+      <option value="">All</option><option value="REQUESTED" selected>Waiting for approval</option><option value="APPROVED">Approved, to pay out</option>
+      <option value="PAID">Paid</option><option value="REJECTED">Rejected</option>
+    </select>
+  </div>
+  <table class="dash-table"><thead><tr><th>Requested</th><th>Payer</th><th>Fee</th><th class="num">Refund</th><th class="num">Write-off</th><th>Reason</th><th>Status</th><th></th></tr></thead><tbody id="rf-tbody"></tbody></table>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/refunds.js"></script>
+{% endblock %}

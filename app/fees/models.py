@@ -50,6 +50,17 @@ class LedgerEntryType(str, enum.Enum):
     DEBIT = "DEBIT"  # a charge — one row per installment
     CREDIT = "CREDIT"  # a payment recorded against the assignment
     CONCESSION = "CONCESSION"  # a scholarship/discount taken off one installment (reduces what is owed, is not a payment)
+    REFUND = "REFUND"  # money paid BACK to the payer (an approved refund); cancels part of earlier payments
+
+
+class PaymentMethod(str, enum.Enum):
+    """How money reached the institute (CREDIT rows). Needed to reconcile against bank statements."""
+
+    CASH = "CASH"                      # paid at the accounts counter
+    BANK_DEPOSIT = "BANK_DEPOSIT"      # challan / deposit slip paid at a bank branch
+    ONLINE_TRANSFER = "ONLINE_TRANSFER"  # IBFT / mobile banking / Raast
+    CHEQUE = "CHEQUE"
+    ONE_BILL = "ONE_BILL"              # 1LINK 1Bill (gateway)
 
 
 class ScholarshipKind(str, enum.Enum):
@@ -264,7 +275,7 @@ class FeeLedgerEntry(UUIDPKMixin, Base):
     # FeeAssignmentService.post_late_fee. Fixes a real gap: before this,
     # the calculated late fee was informational only and could never
     # actually be charged, paid, or waived.
-    late_fee_charged_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, server_default="0")
+    late_fee_charged_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0, server_default="0")
     description: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # CONCESSION rows only — the DEBIT installment this concession reduces, and the scholarship that granted it.
     related_entry_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -273,6 +284,12 @@ class FeeLedgerEntry(UUIDPKMixin, Base):
     scholarship_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("scholarships.id", ondelete="SET NULL"), nullable=True
     )
+    # CREDIT rows only — what the bank statement / cash book shows, so every
+    # payment can be reconciled, and the receipt handed to the payer.
+    payment_method: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    payment_reference: Mapped[str | None] = mapped_column(String(100), nullable=True)   # deposit slip / transaction / cheque no.
+    paid_on: Mapped[date | None] = mapped_column(Date, nullable=True)                   # the day the money was actually paid
+    receipt_number: Mapped[str | None] = mapped_column(String(30), nullable=True, unique=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 

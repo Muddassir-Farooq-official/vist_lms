@@ -5,7 +5,7 @@ from app.core.clock import institute_today
 import uuid
 from datetime import date, datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import AuditService
@@ -529,7 +529,15 @@ class StudentService:
         skipped_no_program = 0
         skipped_open_enrollments = 0
         skipped_overdue_fees = 0
+        skipped_failed_courses = 0
+        skipped_low_cgpa = 0
+        skipped_unpaid_fines = 0
         skipped_students: list[dict] = []
+        from app.academics.transcript_service import TranscriptService
+        from app.core.config import settings
+        from app.fines.models import Fine, FinePayerType, FineStatus
+
+        transcripts = TranscriptService(self.session)
 
         from app.academics.models import EnrollmentStatus
         from app.academics.repository import EnrollmentRepository
@@ -591,6 +599,29 @@ class StudentService:
                     _hold(student, f"Overdue fees of Rs. {overdue_total:,.0f}")
                     continue
 
+            if data.skip_failed_courses or data.skip_low_cgpa:
+                summary = (await transcripts.build(student.id))["summary"]
+                to_clear = int(summary.get("courses_to_clear") or 0)
+                if data.skip_failed_courses and to_clear > settings.promotion_max_courses_to_clear:
+                    skipped_failed_courses += 1
+                    _hold(student, f"{to_clear} failed course(s) not yet cleared (limit {settings.promotion_max_courses_to_clear})")
+                    continue
+                cgpa = summary.get("cgpa")
+                if data.skip_low_cgpa and cgpa is not None and float(cgpa) < settings.promotion_min_cgpa:
+                    skipped_low_cgpa += 1
+                    _hold(student, f"CGPA {float(cgpa):.2f} is below the minimum {settings.promotion_min_cgpa:.2f}")
+                    continue
+
+            if data.skip_unpaid_fines:
+                unpaid = (await self.session.execute(
+                    select(func.count(), func.coalesce(func.sum(Fine.amount), 0)).where(
+                        Fine.payer_type == FinePayerType.STUDENT, Fine.payer_id == student.id, Fine.status == FineStatus.PENDING)
+                )).one()
+                if unpaid[0]:
+                    skipped_unpaid_fines += 1
+                    _hold(student, f"{unpaid[0]} unpaid fine(s) of Rs. {float(unpaid[1]):,.0f}")
+                    continue
+
             advanced_count += 1
             if data.dry_run:
                 continue
@@ -616,6 +647,9 @@ class StudentService:
                 "skipped_no_program": skipped_no_program,
                 "skipped_open_enrollments": skipped_open_enrollments,
                 "skipped_overdue_fees": skipped_overdue_fees,
+                "skipped_failed_courses": skipped_failed_courses,
+                "skipped_low_cgpa": skipped_low_cgpa,
+                "skipped_unpaid_fines": skipped_unpaid_fines,
             },
         )
 
@@ -626,6 +660,11 @@ class StudentService:
             "skipped_no_program": skipped_no_program,
             "skipped_open_enrollments": skipped_open_enrollments,
             "skipped_overdue_fees": skipped_overdue_fees,
+            "skipped_failed_courses": skipped_failed_courses,
+            "skipped_low_cgpa": skipped_low_cgpa,
+            "skipped_unpaid_fines": skipped_unpaid_fines,
+            "min_cgpa": settings.promotion_min_cgpa,
+            "max_courses_to_clear": settings.promotion_max_courses_to_clear,
             "dry_run": data.dry_run,
             "skipped_students": skipped_students,
         }

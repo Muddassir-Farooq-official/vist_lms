@@ -484,6 +484,37 @@
     nextBtn.disabled = currentPage >= currentTotalPages;
   }
 
+  // ---- extra access roles (teacher + exam controller, second administrator, ...)
+  const ROLE_NAMES = { ADMIN: "Administrator", PRINCIPAL: "Principal / Director (view only)", HOD: "Head of Department / Coordinator", TEACHER: "Teacher", EXAM_CONTROLLER: "Exam Controller", ACCOUNTS_OFFICER: "Accounts Officer",
+    LIBRARIAN: "Librarian", SECURITY_GUARD: "Security Guard", HOSTEL_WARDEN: "Hostel Warden" };
+  async function loadAccessRoles(employeeId) {
+    const box = document.getElementById("access-roles-box");
+    const msgEl = document.getElementById("access-roles-msg");
+    box.hidden = true;
+    msgEl.hidden = true;
+    const r = await VA.fetchJson("/api/v1/employees/" + employeeId + "/access-roles");
+    if (!r.ok) return;                        // no login yet, or not allowed to manage roles
+    const list = document.getElementById("access-roles-list");
+    list.innerHTML = r.body.grantable.map(function (code) {
+      return '<label><input type="checkbox" value="' + code + '"' + (r.body.extra_roles.indexOf(code) !== -1 ? " checked" : "") + " /> " +
+        VA.escapeHtml(ROLE_NAMES[code] || code) + "</label>";
+    }).join(" ");
+    box.dataset.employeeId = employeeId;
+    box.hidden = false;
+  }
+  document.getElementById("access-roles-save").addEventListener("click", async function () {
+    const box = document.getElementById("access-roles-box");
+    const msgEl = document.getElementById("access-roles-msg");
+    const extra = Array.prototype.map.call(box.querySelectorAll("#access-roles-list input:checked"), function (i) { return i.value; });
+    if (!window.confirm("Save this access? The person will be signed out and must sign in again.")) return;
+    const r = await VA.fetchJson("/api/v1/employees/" + box.dataset.employeeId + "/access-roles", {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ extra_roles: extra }),
+    });
+    msgEl.textContent = r.ok ? "Access saved." : ((r.body && r.body.error && r.body.error.message) || "Could not save.");
+    msgEl.hidden = false;
+    if (r.ok) loadAccessRoles(box.dataset.employeeId);
+  });
+
   async function openEmployeeModal(employeeId) {
     activeEmployeeId = employeeId;
     modalError.hidden = true;
@@ -548,6 +579,7 @@
       jobRoleChangeSelect.appendChild(opt);
     });
     jobRoleChangeSelect.value = e.job_role_id;
+    loadAccessRoles(employeeId);
 
     await loadSalaryHistory(employeeId);
     await loadBonuses(employeeId);

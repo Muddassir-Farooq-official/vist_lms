@@ -1,0 +1,174 @@
+"""Editable institute policy.
+
+The values live on the global `settings` object (app/core/config.py), which every
+module already reads. Defaults come from .env; an administrator's saved value
+(table policy_settings) overrides it. Each worker re-reads the table at most
+every REFRESH_SECONDS (see refresh_if_stale, called by a middleware), so a change
+reaches every worker within a minute and the one that saved it immediately.
+Only keys this module has itself overridden are ever restored, so nothing else
+that adjusts `settings` is disturbed.
+"""
+from __future__ import annotations
+
+import time
+import uuid
+from dataclasses import dataclass
+from datetime import datetime, timezone
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import settings
+from app.core.exceptions import ValidationAppError
+
+REFRESH_SECONDS = 60
+
+
+@dataclass(frozen=True)
+class Policy:
+    key: str
+    label: str
+    group: str
+    kind: type
+    minimum: float
+    maximum: float
+    help: str
+
+
+POLICY: tuple[Policy, ...] = (
+    Policy("attendance_eligibility_threshold_percent", "Minimum attendance to pass (%)", "Attendance", float, 0, 100,
+           "Below this, a student cannot pass the course even with good marks."),
+    Policy("attendance_fine_threshold_percent", "Fine at or below (%)", "Attendance", float, 0, 100,
+           "At attendance lock, a student at or below this is fined."),
+    Policy("attendance_drop_threshold_percent", "Drop from course at or below (%)", "Attendance", float, 0, 100,
+           "At attendance lock, a student at or below this is withdrawn from the course."),
+    Policy("attendance_fine_amount", "Attendance fine (Rs.)", "Attendance", float, 0, 1_000_000, "Amount of each attendance fine."),
+    Policy("attendance_marking_window_minutes", "Teacher marking window (minutes)", "Attendance", int, 5, 1440,
+           "How long after a class starts the teacher can still mark it; after that it needs a correction request."),
+    Policy("promotion_max_courses_to_clear", "Promotion: max failed courses still to clear", "Promotion", int, 0, 20,
+           "Advance Semester holds back a student with more failed (not yet passed) courses than this."),
+    Policy("promotion_min_cgpa", "Promotion: minimum CGPA", "Promotion", float, 0, 4,
+           "Advance Semester holds back a student whose CGPA is below this."),
+    Policy("admit_card_requires_fees_cleared", "Withhold admit card while fees are overdue (1 = yes, 0 = no)", "Exams", int, 0, 1,
+           "With 1, a student with any overdue fee instalment gets an admit card marked WITHHELD until it is paid."),
+    Policy("supplementary_max_grade_points", "Supplementary: highest grade points a pass can earn (0 = no cap)", "Exams", float, 0, 4,
+           "Many universities cap a supplementary pass, e.g. 2.0 = at most a C. 0 means the normal grade applies."),
+    Policy("sms_on_attendance_fine", "SMS when an attendance fine is issued (1 = yes, 0 = no)", "SMS", int, 0, 1, "Each SMS costs money."),
+    Policy("sms_on_datesheet", "SMS when a datesheet is published (1 = yes, 0 = no)", "SMS", int, 0, 1, "Each SMS costs money."),
+    Policy("sms_on_results", "SMS when results are published (1 = yes, 0 = no)", "SMS", int, 0, 1, "One SMS per student per course published."),
+    Policy("sms_on_fee_overdue", "SMS weekly reminder for overdue fees (1 = yes, 0 = no)", "SMS", int, 0, 1, "At most once a week per student."),
+    Policy("sms_on_admission", "SMS applicants selected in a merit list (1 = yes, 0 = no)", "SMS", int, 0, 1, "One SMS per offered applicant."),
+    Policy("sms_to_guardian", "Also send each SMS to the guardian (1 = yes, 0 = no)", "SMS", int, 0, 1,
+           "Uses the guardian's contact number on the student record."),
+    Policy("fee_backdated_grace_days", "Late fee grace for backdated instalments (days)", "Fees", int, 0, 90,
+           "An instalment created after its due date accrues a late fee only this many days after creation."),
+    Policy("fee_payment_max_backdate_days", "Payments may be dated back at most (days)", "Fees", int, 1, 365,
+           "Staff cannot record a payment dated earlier than this."),
+)
+BY_KEY = {p.key: p for p in POLICY}
+
+_defaults: dict[str, object] = {}
+_applied: set[str] = set()
+_last_refresh = 0.0
+
+
+def _default(key: str):
+    if key not in _defaults:
+        _defaults[key] = getattr(settings, key)
+    return _defaults[key]
+
+
+def current() -> list[dict]:
+    return [{"key": p.key, "label": p.label, "group": p.group, "type": p.kind.__name__, "min": p.minimum, "max": p.maximum,
+             "help": p.help, "value": getattr(settings, p.key), "default": _default(p.key), "overridden": p.key in _applied}
+            for p in POLICY]
+
+
+def _coerce(p: Policy, raw) -> float | int:
+    try:
+        v = p.kind(raw)
+        if p.kind is int and float(raw) != int(float(raw)):
+            raise ValueError
+    except (TypeError, ValueError):
+        raise ValidationAppError(f"{p.label}: must be a {'whole number' if p.kind is int else 'number'}.")
+    if not (p.minimum <= v <= p.maximum):
+        raise ValidationAppError(f"{p.label}: must be between {p.minimum:g} and {p.maximum:g}.")
+    return v
+
+
+def _check_consistency(values: dict) -> None:
+    drop, fine, elig = (values["attendance_drop_threshold_percent"], values["attendance_fine_threshold_percent"],
+                        values["attendance_eligibility_threshold_percent"])
+    if not (drop < fine <= elig):
+        raise ValidationAppError(
+            f"Attendance thresholds must satisfy drop ({drop:g}%) < fine ({fine:g}%) <= minimum to pass ({elig:g}%).")
+
+
+async def apply_from_db(session: AsyncSession) -> None:
+    global _last_refresh
+    from app.policy.models import PolicySetting
+
+    rows = {r.key: r.value for r in (await session.execute(select(PolicySetting))).scalars()}
+    for p in POLICY:
+        _default(p.key)
+        if p.key in rows:
+            setattr(settings, p.key, p.kind(float(rows[p.key])) if p.kind is int else p.kind(rows[p.key]))
+            _applied.add(p.key)
+        elif p.key in _applied:
+            setattr(settings, p.key, _default(p.key))
+            _applied.discard(p.key)
+    _last_refresh = time.monotonic()
+
+
+async def refresh_if_stale() -> None:
+    if time.monotonic() - _last_refresh < REFRESH_SECONDS:
+        return
+    from app.core.database import AsyncSessionLocal
+
+    try:
+        async with AsyncSessionLocal() as session:
+            await apply_from_db(session)
+    except Exception:  # the table may not exist yet (before migrations); keep the current values
+        globals()["_last_refresh"] = time.monotonic()
+
+
+async def update(session: AsyncSession, changes: dict, *, actor_id: uuid.UUID) -> list[dict]:
+    from app.audit.service import AuditService
+    from app.policy.models import PolicySetting
+
+    unknown = [k for k in changes if k not in BY_KEY]
+    if unknown:
+        raise ValidationAppError(f"Unknown setting(s): {', '.join(unknown)}.")
+    await apply_from_db(session)
+    new = {p.key: getattr(settings, p.key) for p in POLICY}
+    reset = [k for k, v in changes.items() if v is None]
+    for k, v in changes.items():
+        new[k] = _default(k) if v is None else _coerce(BY_KEY[k], v)
+    _check_consistency(new)
+
+    before = {k: getattr(settings, k) for k in changes}
+    now = datetime.now(timezone.utc)
+    for k, v in changes.items():
+        row = await session.get(PolicySetting, k)
+        if k in reset:
+            if row is not None:
+                await session.delete(row)
+            continue
+        if row is None:
+            session.add(PolicySetting(key=k, value=str(new[k]), updated_by=actor_id, updated_at=now))
+        else:
+            row.value, row.updated_by, row.updated_at = str(new[k]), actor_id, now
+    await session.flush()
+    await AuditService(session).log(actor_user_id=actor_id, action="policy.updated", entity_type="policy", entity_id=None,
+                                    before={k: before[k] for k in changes}, after={k: new[k] for k in changes})
+    await apply_from_db(session)
+    return current()
+
+
+def reset_for_tests() -> None:
+    """Put back every value this module overrode and force a re-read on the next request."""
+    global _last_refresh
+    for k in list(_applied):
+        setattr(settings, k, _defaults[k])
+    _applied.clear()
+    _last_refresh = 0.0

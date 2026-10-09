@@ -1,0 +1,59 @@
+{% extends "admin/_base.html" %}
+{% block title %}Admissions{% endblock %}
+{% block page_title %}Admissions{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Open a round per program and term, take applications (one by one or CSV), verify documents, publish merit lists, and admit. Admitting creates the student record, roll number and login.</div>{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Admission rounds</h2>
+  <div class="upload-row">
+    <select id="ar-term" class="select-input term-select" aria-label="Term"><option value="">Term&hellip;</option></select>
+    <select id="ar-program" class="select-input" aria-label="Program"></select>
+    <input id="ar-seats" type="number" min="1" class="text-input small-input" placeholder="Seats" aria-label="Seats" />
+    <input id="ar-closes" type="date" class="text-input small-input" aria-label="Applications close on" title="Applications close on" />
+  </div>
+  <div class="upload-row">
+    <label>Merit: matric % <input id="ar-wm" type="number" value="10" min="0" max="100" class="text-input small-input" /></label>
+    <label>intermediate % <input id="ar-wi" type="number" value="40" min="0" max="100" class="text-input small-input" /></label>
+    <label>entry test % <input id="ar-wt" type="number" value="50" min="0" max="100" class="text-input small-input" /></label>
+    <label>minimum intermediate % <input id="ar-min" type="number" value="45" min="0" max="100" class="text-input small-input" /></label>
+    <button id="ar-create" class="role-btn" type="button">Open round</button>
+  </div>
+  <table class="dash-table"><thead><tr><th>Term</th><th>Program</th><th class="num">Seats</th><th class="num">Free</th><th>Applications</th><th>Status</th><th></th></tr></thead><tbody id="ar-list"></tbody></table>
+  <p id="ad-msg" class="panel-hint" hidden></p>
+</section>
+
+<section class="panel" id="ad-round" hidden>
+  <h2 id="ad-title"></h2>
+  <div class="upload-row">
+    <button id="ad-merit" class="role-btn" type="button">Publish next merit list</button>
+    <button id="ad-expire" class="role-btn secondary-btn" type="button">Expire overdue offers</button>
+    <span id="ad-lists"></span>
+    <button id="ad-close" class="role-btn secondary-btn" type="button">Close round</button>
+  </div>
+  <h3>Add applications</h3>
+  <div class="upload-row">
+    <a href="/api/v1/admissions/applications-template.csv" class="role-btn secondary-btn" download>CSV template</a>
+    <input type="file" id="ad-file" accept=".csv" aria-label="Applications CSV" />
+    <button id="ad-check" class="role-btn secondary-btn" type="button">Check CSV</button>
+    <button id="ad-import" class="role-btn" type="button">Import CSV</button>
+    <button id="ad-one" class="role-btn secondary-btn" type="button">Enter one application&hellip;</button>
+  </div>
+  <div id="ad-form" hidden><div id="ad-fields" class="upload-row" style="flex-wrap:wrap"></div>
+    <button id="ad-save" class="role-btn" type="button">Save application</button></div>
+  <div class="upload-row">
+    <h3>Applications</h3>
+    <select id="ad-filter" class="select-input" aria-label="Show">
+      <option value="">All</option><option value="SUBMITTED">To verify</option><option value="VERIFIED">Verified (waiting)</option>
+      <option value="OFFERED">Offered</option><option value="ADMITTED">Admitted</option><option value="REJECTED">Rejected</option>
+      <option value="EXPIRED">Expired</option><option value="WITHDRAWN">Withdrawn</option>
+    </select>
+  </div>
+  <table class="dash-table"><thead><tr><th>Application</th><th>Name</th><th class="num">Matric</th><th class="num">Inter</th><th class="num">Test</th><th class="num">Aggregate</th><th>Status</th><th></th></tr></thead><tbody id="ad-tbody"></tbody></table>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/academic-terms.js"></script>
+<script src="/static/js/admissions.js"></script>
+{% endblock %}

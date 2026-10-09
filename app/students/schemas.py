@@ -436,6 +436,12 @@ class AdvanceSemesterRequest(BaseModel):
     # Hold back students with overdue fee principal (institute policy
     # varies, so this is opt-in).
     skip_overdue_fees: bool = False
+    # Academic standing (Step 4): hold back students with too many failed
+    # courses still to clear, or a CGPA below the minimum (thresholds in
+    # settings), and students with any unpaid fine.
+    skip_failed_courses: bool = True
+    skip_low_cgpa: bool = True
+    skip_unpaid_fines: bool = True
 
 
 class SkippedStudent(BaseModel):
@@ -451,6 +457,11 @@ class AdvanceSemesterResponse(BaseModel):
     skipped_no_program: int
     skipped_open_enrollments: int = 0
     skipped_overdue_fees: int = 0
+    skipped_failed_courses: int = 0
+    skipped_low_cgpa: int = 0
+    skipped_unpaid_fines: int = 0
+    min_cgpa: float | None = None
+    max_courses_to_clear: int | None = None
     dry_run: bool = False
     # First 200 held-back students with the reason, so nobody has to guess.
     skipped_students: list[SkippedStudent] = []

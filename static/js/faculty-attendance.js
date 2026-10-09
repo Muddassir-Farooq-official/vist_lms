@@ -134,6 +134,12 @@
     if (existingResult.ok) {
       existingResult.body.forEach(function (r) { existingByStudent[r.student_id] = r.status; });
     }
+    if (enrolledStudents.length === 0) {
+      windowNotice.textContent = "No student is currently enrolled in this course, so there is nothing to mark. " +
+        "(Once a course's results are published its attendance can no longer be changed.)";
+      windowNotice.hidden = false;
+      return;
+    }
     AU.renderRoster(rosterTbody, enrolledStudents, Object.keys(existingByStudent).length ? existingByStudent : null);
     rosterTable.hidden = enrolledStudents.length === 0;
     rosterTools.hidden = enrolledStudents.length === 0;

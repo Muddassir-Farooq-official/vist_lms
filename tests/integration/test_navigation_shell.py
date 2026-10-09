@@ -6,7 +6,7 @@ import re
 import pytest
 
 from app.auth.redirects import PORTAL_BY_ROLE
-from app.main import ACCOUNTS_NAV_ITEMS, ADMIN_NAV_ITEMS, EXAM_NAV_ITEMS, FACULTY_NAV_ITEMS, GATE_NAV_ITEMS, LIBRARY_NAV_ITEMS, STUDENT_NAV_ITEMS, WARDEN_NAV_ITEMS
+from app.main import ACCOUNTS_NAV_ITEMS, ADMIN_NAV_ITEMS, EXAM_NAV_ITEMS, FACULTY_NAV_ITEMS, GATE_NAV_ITEMS, HOD_NAV_ITEMS, LIBRARY_NAV_ITEMS, PARENT_NAV_ITEMS, PRINCIPAL_NAV_ITEMS, STUDENT_NAV_ITEMS, WARDEN_NAV_ITEMS
 
 pytestmark = pytest.mark.asyncio
 
@@ -36,7 +36,8 @@ async def test_menu_items_are_unique_and_phone_bar_is_small(portal):
 async def test_every_sign_in_destination_is_in_that_portals_menu():
     menus = {"/dashboard/admin": ADMIN_NAV_ITEMS, "/dashboard/accounts/fees": ACCOUNTS_NAV_ITEMS,
              "/dashboard/library": LIBRARY_NAV_ITEMS, "/dashboard/faculty": FACULTY_NAV_ITEMS,
-             "/dashboard/student": STUDENT_NAV_ITEMS, "/dashboard/gate": GATE_NAV_ITEMS, "/dashboard/exam": EXAM_NAV_ITEMS, "/dashboard/warden": WARDEN_NAV_ITEMS}
+             "/dashboard/student": STUDENT_NAV_ITEMS, "/dashboard/gate": GATE_NAV_ITEMS, "/dashboard/exam": EXAM_NAV_ITEMS, "/dashboard/warden": WARDEN_NAV_ITEMS,
+             "/dashboard/hod": HOD_NAV_ITEMS, "/dashboard/principal": PRINCIPAL_NAV_ITEMS, "/dashboard/parent": PARENT_NAV_ITEMS}
     for _role, path in PORTAL_BY_ROLE:
         assert path in {i["href"] for i in menus[path]}, f"{path} is a landing page but not in its own menu"
 

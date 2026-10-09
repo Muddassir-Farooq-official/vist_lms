@@ -56,6 +56,11 @@ class CompleteIn(BaseModel):
     note: str | None = Field(default=None, max_length=2000)
 
 
+class SendBackIn(BaseModel):
+    note: str = Field(min_length=5, max_length=2000)
+    new_deadline: datetime | None = None
+
+
 class CancelIn(BaseModel):
     reason: str = Field(min_length=3, max_length=1000)
 
@@ -119,6 +124,8 @@ class Abilities(BaseModel):
     comment: bool = False
     assign_again: bool = False
     resolve_flag: bool = False
+    confirm: bool = False              # the giver confirms a completed task is really done
+    send_back: bool = False            # ... or sends it back
 
 
 class FollowUp(BaseModel):
@@ -189,6 +196,8 @@ class ReceiverStats(BaseModel):
     accepted: int
     rejected: int
     completed: int
+    awaiting_confirmation: int = 0  # completed by the receiver, not yet confirmed by the giver
+    sent_back: int = 0
     completed_on_time: int
     completed_late: int
     overdue: int                  # open and past the deadline (including tasks never answered)
@@ -206,7 +215,8 @@ class AssignerStats(BaseModel):
 
     assigned: int
     rejected: int
-    completed: int
+    completed: int                # confirmed as done
+    awaiting_confirmation: int = 0  # done by the receiver, waiting for MY confirmation
     overdue: int
     cancelled: int
     flagged: int

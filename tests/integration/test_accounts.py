@@ -224,7 +224,7 @@ async def test_the_report_adds_up_fees_other_income_and_expenses(app_client, adm
     await _login(app_client, student_user, "StudentPass123!")
     challan = (await app_client.get("/api/v1/fees/accounts/me")).json()["assignments"][0]["installments"][0]["challan"]["id"]
     await _login_admin(app_client)
-    assert (await app_client.post(f"/api/v1/fees/challans/{challan}/mark-paid", json={})).status_code == 200                         # Rs. 3,000 of fees collected
+    assert (await app_client.post(f"/api/v1/fees/challans/{challan}/mark-paid", json={"method": "BANK_DEPOSIT", "reference": "HBL-0001"})).status_code == 200                         # Rs. 3,000 of fees collected
     await _as_officer(app_client, officer)
     vendor = (await app_client.post(f"{A}/vendors", json={"name": "Spark Electricals"})).json()
     don, can = await _cat(app_client, "INCOME", "Donations"), await _cat(app_client, "INCOME", "Canteen")
