@@ -632,35 +632,6 @@ class EnrollmentService:
     async def list_for_offering(self, course_offering_id: uuid.UUID) -> list[Enrollment]:
         return await self.enrollment_repo.list_for_offering(course_offering_id)
 
-    async def preview_end_semester(self, term_label: str) -> dict:
-        """Read-only — computes the same numbers end_semester() would
-        produce, without touching anything, so the admin UI can show
-        real numbers in a confirmation prompt before committing to an
-        action that can't be undone from here. Surfaces
-        ungraded_count specifically because end_semester() itself does
-        NOT block on it — grading is still a manual placeholder ahead
-        of a real Exams module, so refusing to end a semester until
-        every enrollment has a recorded outcome would be blocking on a
-        feature that doesn't fully exist yet. This is the safer
-        default: warn loudly, don't hard-block."""
-        offerings = await self.offering_repo.list_by_term(term_label)
-        would_complete = 0
-        ungraded_count = 0
-        for offering in offerings:
-            enrollments = await self.enrollment_repo.list_for_offering(offering.id)
-            for enrollment in enrollments:
-                if enrollment.status == EnrollmentStatus.ENROLLED:
-                    would_complete += 1
-                    if enrollment.outcome is None:
-                        ungraded_count += 1
-
-        return {
-            "term_label": term_label,
-            "offerings_affected": len(offerings),
-            "enrollments_to_complete": would_complete,
-            "ungraded_count": ungraded_count,
-        }
-
     async def _offerings_for_term_or_fail(self, term_label: str) -> list:
         """The offerings of an EXISTING term. A typo ("Fal 2026") used to
         succeed silently with zero offerings; now it is refused, and a

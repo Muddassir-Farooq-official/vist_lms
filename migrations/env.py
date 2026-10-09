@@ -37,6 +37,14 @@ from app.library import models as library_models  # noqa: F401
 from app.programs import models as programs_models  # noqa: F401
 from app.students import models as students_models  # noqa: F401
 from app.imports import models as imports_models  # noqa: F401
+from app.policy import models as policy_models  # noqa: F401
+from app.parents import models as parents_models  # noqa: F401
+from app.exams import models as exams_models  # noqa: F401
+from app.sms import models as sms_models  # noqa: F401
+from app.supplementary import models as supplementary_models  # noqa: F401
+from app.admissions import models as admissions_models  # noqa: F401
+from app.fees import refund_models as fees_refund_models  # noqa: F401
+from app.academics import terms as academics_terms  # noqa: F401
 
 config = context.config
 # ALEMBIC_DATABASE_URL lets CI/tests migrate a scratch database without touching .env
@@ -47,12 +55,21 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
+# uq_programs_name_lower is a functional index, lower(trim(name)), created with raw SQL.
+# Alembic cannot compare functional indexes, so it always reports it as changed. Skip it.
+_SKIP_INDEXES = {"uq_programs_name_lower"}
+
+
+def _include_object(obj, name, type_, reflected, compare_to):  # noqa: ANN001
+    return not (type_ == "index" and name in _SKIP_INDEXES)
+
 
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
         target_metadata=target_metadata,
+        include_object=_include_object,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
@@ -62,7 +79,8 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
+    context.configure(connection=connection, target_metadata=target_metadata,
+        include_object=_include_object, compare_type=True)
     with context.begin_transaction():
         context.run_migrations()
 

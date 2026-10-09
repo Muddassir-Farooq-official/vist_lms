@@ -69,35 +69,31 @@ jobs:
         run: |
           PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -c 'CREATE DATABASE vist_lms_migcheck;'
           alembic upgrade head
-      - name: Models match migrations (report only)
-        # Warns if a model was changed without a migration. Report-only because two
-        # small pre-existing differences exist today; remove continue-on-error once fixed.
-        continue-on-error: true
+      - name: Models match migrations
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/vist_lms_migcheck
           DATABASE_URL_SYNC: postgresql+psycopg://postgres:postgres@localhost:5432/vist_lms_migcheck
         run: alembic check
 
       - name: Run tests
-        run: pytest -v
+        run: pytest -q -p no:cacheprovider
 
   lint:
     name: Lint (ruff)
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-      - run: pip install -e ".[dev]"
+      - run: pip install "ruff>=0.6.0"
+      # Rules in pyproject.toml: syntax errors, undefined names, duplicate definitions.
       - run: ruff check .
 
   typecheck:
-    name: Type check (mypy)
+    name: Type check (mypy, report only)
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -105,7 +101,11 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
       - run: pip install -e ".[dev]"
-      - run: mypy app/
+      # The code base predates strict typing; this reports the count without failing the run.
+      - run: |
+          mypy app/ > mypy.txt 2>&1 || true
+          tail -n 1 mypy.txt
+          echo "::notice::mypy: $(tail -n 1 mypy.txt)"
 
   deploy:
     name: Deploy to VPS

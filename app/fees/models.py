@@ -257,6 +257,7 @@ class FeeLedgerEntry(UUIDPKMixin, Base):
     __tablename__ = "fee_ledger_entries"
     __table_args__ = (
         Index("ix_fee_ledger_entries_assignment_id", "fee_assignment_id"),
+        Index("ix_fee_ledger_entries_related", "related_entry_id"),
         CheckConstraint("amount > 0", name="positive_amount"),
     )
 

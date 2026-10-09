@@ -37,7 +37,7 @@ class ExamPaper(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     schedule_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("exam_schedules.id", ondelete="CASCADE"), nullable=False, index=True)
     course_offering_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("course_offerings.id", ondelete="CASCADE"), nullable=False)
-    exam_date: Mapped[date] = mapped_column(Date, nullable=False)
+    exam_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     start_time: Mapped[time] = mapped_column(Time, nullable=False)
     end_time: Mapped[time] = mapped_column(Time, nullable=False)
     room: Mapped[str] = mapped_column(String(50), nullable=False)

@@ -3,11 +3,12 @@ __pycache__/
 .venv/
 .env
 .env.*
-!.env
-!.env.production
+!.env.example
 .pytest_cache/
 *.egg-info/
 var/storage/
 backups/
 .mypy_cache/
 .ruff_cache/
+# Local data
+dump.rdb

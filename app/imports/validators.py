@@ -483,5 +483,3 @@ def generate_template_xlsx() -> bytes:
     buffer = io.BytesIO()
     wb.save(buffer)
     return buffer.getvalue()
-    writer.writerow({h: example_row.get(h, "") for h in headers})
-    return buffer.getvalue()
