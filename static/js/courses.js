@@ -279,6 +279,9 @@
   const termLabelInput = document.getElementById("term-label-input");
   const offeringsTbody = document.getElementById("offerings-tbody");
   const offeringsEmpty = document.getElementById("offerings-empty");
+  const onlyUnassigned = document.getElementById("only-unassigned");
+  const unassignedCount = document.getElementById("unassigned-count");
+  onlyUnassigned.addEventListener("change", function () { loadOfferings(); });
 
   async function loadOfferings() {
     const term = termLabelInput.value.trim();
@@ -291,24 +294,38 @@
     VA.clearError();
 
     offeringsTbody.innerHTML = "";
-    if (result.body.length === 0) {
+    const unassigned = result.body.filter(function (o) { return !o.assigned_teacher_id; }).length;
+    unassignedCount.textContent = unassigned ? "(" + unassigned + " without a teacher)" : "(every course has a teacher)";
+    const rows = onlyUnassigned.checked ? result.body.filter(function (o) { return !o.assigned_teacher_id; }) : result.body;
+    if (rows.length === 0) {
+      offeringsEmpty.textContent = result.body.length ? "Every course in this term has a teacher." : "Select a term above to see its offerings, or create a new one.";
       offeringsEmpty.hidden = false;
       return;
     }
     offeringsEmpty.hidden = true;
 
-    result.body.forEach(function (o) {
+    rows.forEach(function (o) {
       const tr = document.createElement("tr");
       tr.innerHTML =
         "<td>" + VA.escapeHtml(o.course_code) + " \u2014 " + VA.escapeHtml(o.course_title) + "</td>" +
+        "<td>" + VA.escapeHtml((o.curriculum && o.curriculum.length) ? o.curriculum.join(", ") : "\u2014 not in a curriculum") + "</td>" +
         "<td>" + VA.escapeHtml(o.section_label || "A") + "</td>" +
         '<td class="num">' + o.credit_hours + "</td>" +
-        "<td>" + VA.escapeHtml(o.teacher_name || "\u2014 unassigned") + "</td>" +
+        '<td class="teacher-cell">' + (o.teacher_name ? VA.escapeHtml(o.teacher_name) : '<span class="status-pill dropped">Unassigned</span>') + " </td>" +
         '<td class="num">' + o.enrolled_count + " / " + (o.capacity == null ? "\u221e" : o.capacity) + "</td>" +
         "<td>" + (o.is_open_for_enrollment ? '<span class="status-pill active">Open</span>' : '<span class="status-pill dropped">Closed</span>') + "</td>" +
         '<td class="row-actions"></td>';
 
       const actionsCell = tr.querySelector(".row-actions");
+
+      const teacherBtn = document.createElement("button");
+      teacherBtn.className = "role-btn small-btn" + (o.teacher_name ? " secondary-btn" : "");
+      teacherBtn.type = "button";
+      teacherBtn.textContent = o.teacher_name ? "Change" : "Assign";
+      teacherBtn.addEventListener("click", function () {
+        window.TeacherPicker.open(o, function () { loadOfferings(); });
+      });
+      tr.querySelector(".teacher-cell").appendChild(teacherBtn);
 
       const toggleBtn = document.createElement("button");
       toggleBtn.className = "role-btn small-btn";

@@ -90,7 +90,7 @@
     offeringSummary.innerHTML =
       "<dt>Credit Hours</dt><dd>" + offering.credit_hours + "</dd>" +
       "<dt>Term</dt><dd>" + VA.escapeHtml(offering.term_label) + "</dd>" +
-      "<dt>Teacher</dt><dd>" + VA.escapeHtml(offering.teacher_name || "\u2014 unassigned") + "</dd>" +
+      '<dt>Teacher</dt><dd id="offering-teacher-dd">' + VA.escapeHtml(offering.teacher_name || "\u2014 unassigned") + " </dd>" +
       "<dt>Open for Enrollment</dt><dd>" + (offering.is_open_for_enrollment ? "Yes" : "No") + "</dd>" +
       "<dt>Enrolled</dt><dd>" + offering.enrolled_count + "</dd>";
 
@@ -102,6 +102,15 @@
       offeringSummary.innerHTML += "<dt>Taught In (Class)</dt><dd>" + VA.escapeHtml(classText) + "</dd>";
     } else {
       offeringSummary.innerHTML += "<dt>Taught In (Class)</dt><dd>Not linked to any program's curriculum yet \u2014 add it in the Curriculum tab.</dd>";
+    }
+
+    if (window.TeacherPicker) {
+      const teacherBtn = document.createElement("button");
+      teacherBtn.type = "button";
+      teacherBtn.className = "role-btn small-btn" + (offering.teacher_name ? " secondary-btn" : "");
+      teacherBtn.textContent = offering.teacher_name ? "Change teacher" : "Assign teacher";
+      teacherBtn.addEventListener("click", function () { window.TeacherPicker.open(offering, function () { loadOffering(); }); });
+      document.getElementById("offering-teacher-dd").appendChild(teacherBtn);
     }
 
     offeringLocked = !!offering.content_locked;

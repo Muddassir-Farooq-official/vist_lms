@@ -101,7 +101,7 @@ async def receipt_pdf(entry_id: uuid.UUID, current_user: CurrentUser = Depends(r
     from app.fees.receipt_pdf import render_receipt_pdf
 
     entry = await db.get(FeeLedgerEntry, entry_id)
-    if entry is None or entry.entry_type != LedgerEntryType.CREDIT or not entry.receipt_number:
+    if entry is None or entry.entry_type not in (LedgerEntryType.CREDIT, LedgerEntryType.REFUND) or not entry.receipt_number:
         raise ResourceNotFoundError("Receipt not found.")
     assignment = await db.get(FeeAssignment, entry.fee_assignment_id)
     if not (Roles.ADMIN in current_user.roles or Roles.ACCOUNTS_OFFICER in current_user.roles):
@@ -112,7 +112,8 @@ async def receipt_pdf(entry_id: uuid.UUID, current_user: CurrentUser = Depends(r
     data = {"institute": settings.app_name, "receipt_number": entry.receipt_number, "paid_on": entry.paid_on, "recorded_on": entry.created_at.date(),
             "payer": await AccountService(db).payer(assignment.payer_type, assignment.payer_id), "fee_name": structure.name,
             "term_label": structure.term_label, "amount": float(entry.amount), "method": entry.payment_method,
-            "reference": entry.payment_reference, "description": entry.description}
+            "reference": entry.payment_reference, "description": entry.description,
+            "kind": "refund" if entry.entry_type == LedgerEntryType.REFUND else "receipt"}
     return Response(content=render_receipt_pdf(data), media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="receipt-{entry.receipt_number}.pdf"', **_SECURITY_HEADERS})
 

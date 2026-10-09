@@ -92,8 +92,9 @@
       <button type="button" class="danger-btn" id="end-semester-btn">End Semester</button>
     </div>
     <div id="readiness-panel" class="panel-hint" hidden></div>
+    <label class="check-row"><input type="checkbox" id="only-unassigned" /> Show only courses without a teacher <span id="unassigned-count" style="font-weight:400;color:var(--slate-500, #64748b)"></span></label>
     <table class="dash-table" id="offerings-table">
-      <thead><tr><th>Course</th><th>Section</th><th>Credit Hours</th><th>Teacher</th><th>Enrolled / Seats</th><th>Open?</th><th></th></tr></thead>
+      <thead><tr><th>Course</th><th>Program &middot; Semester</th><th>Section</th><th>Credit Hours</th><th>Teacher</th><th>Enrolled / Seats</th><th>Open?</th><th></th></tr></thead>
       <tbody id="offerings-tbody"></tbody>
     </table>
     <p class="empty-state" id="offerings-empty" hidden>Select a term above to see its offerings, or create a new one.</p>
@@ -266,6 +267,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="/static/js/teacher-picker.js"></script>
 <script src="/static/js/courses.js"></script>
 <script src="/static/js/academic-terms.js"></script>
 {% endblock %}

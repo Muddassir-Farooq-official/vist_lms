@@ -195,6 +195,27 @@ def _to_class_session_out(class_session, resources) -> ClassSessionOut:
     )
 
 
+async def _curriculum_labels(db, course_ids) -> dict:
+    """course_id -> ["BSCS · Semester 3", ...]: the program(s) and semester each course belongs to."""
+    from sqlalchemy import select as _select
+
+    from app.academics.models import CourseProgram as _CourseProgram
+
+    ids = {c for c in course_ids if c is not None}
+    if not ids:
+        return {}
+    rows = (await db.execute(
+        _select(_CourseProgram.course_id, _CourseProgram.semester_number, Program.code)
+        .join(Program, Program.id == _CourseProgram.program_id)
+        .where(_CourseProgram.course_id.in_(ids))
+        .order_by(Program.code, _CourseProgram.semester_number)
+    )).all()
+    out: dict = {}
+    for course_id, semester, code in rows:
+        out.setdefault(course_id, []).append(f"{code} · Semester {semester}")
+    return out
+
+
 async def _to_offering_out(db, offering: CourseOffering) -> CourseOfferingOut:
     # Explicit fetch, not the .course relationship — a freshly created
     # (constructed-then-flushed, never re-queried) offering has no way
@@ -218,6 +239,7 @@ async def _to_offering_out(db, offering: CourseOffering) -> CourseOfferingOut:
         term_start_date=offering.term_start_date, term_end_date=offering.term_end_date,
         section_label=offering.section_label, capacity=offering.capacity,
         content_locked=offering.content_locked_at is not None,
+        curriculum=(await _curriculum_labels(db, [offering.course_id])).get(offering.course_id, []),
     )
 
 
@@ -227,6 +249,7 @@ async def _to_offering_out_many(db, offerings: list) -> list[CourseOfferingOut]:
     courses = await load_by_ids(db, Course, [o.course_id for o in offerings])
     teachers = await load_by_ids(db, Employee, [o.assigned_teacher_id for o in offerings])
     counts = await enrolled_counts(db, [o.id for o in offerings])
+    curriculum = await _curriculum_labels(db, [o.course_id for o in offerings])
     out = []
     for offering in offerings:
         course = courses.get(offering.course_id)
@@ -242,6 +265,7 @@ async def _to_offering_out_many(db, offerings: list) -> list[CourseOfferingOut]:
             term_start_date=offering.term_start_date, term_end_date=offering.term_end_date,
             section_label=offering.section_label, capacity=offering.capacity,
             content_locked=offering.content_locked_at is not None,
+            curriculum=curriculum.get(offering.course_id, []),
         ))
     return out
 

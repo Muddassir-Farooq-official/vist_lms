@@ -127,6 +127,8 @@ class CourseOfferingOut(BaseModel):
     section_label: str = "A"
     capacity: int | None = None
     content_locked: bool = False
+    # Where the course sits in the curriculum, e.g. ["BSCS · Semester 3"] (one per program).
+    curriculum: list[str] = []
 
 
 class EnrollRequest(BaseModel):
