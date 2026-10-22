@@ -12,3 +12,4 @@ backups/
 .ruff_cache/
 # Local data
 dump.rdb
+deploy_key*
