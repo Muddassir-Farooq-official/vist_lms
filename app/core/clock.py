@@ -26,3 +26,9 @@ def institute_now() -> datetime:
 
 def institute_today() -> date:
     return datetime.now(_tz()).date()
+
+def local_date(value: datetime) -> date:
+    """The institute's calendar date for a moment in time (timezone-aware values are converted; naive ones are taken as local)."""
+    if value.tzinfo is not None:
+        return value.astimezone(_tz()).date()
+    return value.date()

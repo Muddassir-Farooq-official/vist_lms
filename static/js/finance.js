@@ -7,11 +7,11 @@
   const $ = function (id) { return document.getElementById(id); };
   const msg = function (body, fallback) { return body && body.error && body.error.message ? body.error.message : fallback; };
   const json = function (method, data) { return { method: method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }; };
-  const money = function (v) { return "Rs. " + Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 2 }); };
+  const money = function (v) { return VA.formatMoney(v); };
   const day = function (iso) { return iso ? new Date(String(iso).slice(0, 10) + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "\u2014"; };
   const ymd = function (d) { const p = function (n) { return String(n).padStart(2, "0"); }; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); };
   const tile = function (a, b, c, tone) { return '<div class="kpi ' + (tone || "") + '"><span class="kpi-label">' + a + '</span><strong class="kpi-value">' + b + '</strong><span class="kpi-sub">' + (c || "") + "</span></div>"; };
-  const METHOD = { CASH: "Cash", BANK_TRANSFER: "Bank transfer", CHEQUE: "Cheque", ONLINE: "Online" };
+  const METHOD = { CASH: "Cash", BANK_TRANSFER: "Bank transfer", CHEQUE: "Cheque", ONLINE: "Online", BANK_DEPOSIT: "Bank deposit", ONLINE_TRANSFER: "Online transfer", ONE_BILL: "1LINK 1Bill" };
   const STATUS = { PENDING_APPROVAL: ["Waiting for approval", "pending"], APPROVED: ["Approved", "active"], REJECTED: ["Rejected", "dropped"], VOIDED: ["Voided", ""] };
   const pill = function (s) { const x = STATUS[s] || [s, ""]; return '<span class="status-pill ' + x[1] + '">' + esc(x[0]) + "</span>"; };
   const timer = {};
@@ -39,14 +39,14 @@
     if (!r.ok) return;
     const s = r.body;
     $("ov-range").textContent = r0[2] + (r0[0] ? ": " + day(r0[0]) + " to " + day(r0[1]) : "");
-    $("ov-tiles").innerHTML = '<div class="kpi-grid kpi-grid-6">' + tile("Fees collected", money(s.fees_collected), "from students", "good") + tile("Other income", money(s.other_income), "donations, canteen, rent...") + tile("Total income", money(s.total_income), "") +
+    $("ov-tiles").innerHTML = '<div class="kpi-grid kpi-grid-6">' + tile("Fees collected", money(s.fees_collected), "from students", "good") + tile("Fines collected", money(s.fines_collected || 0), (s.fines_outstanding ? money(s.fines_outstanding.amount) + " still unpaid (" + s.fines_outstanding.count + ")" : ""), "good") + tile("Other income", money(s.other_income), "donations, canteen, store sales...") + tile("Total income", money(s.total_income), "fees + fines + other") +
       tile("Expenses", money(s.expenses), "approved", "warn") + tile(s.net >= 0 ? "Surplus" : "Deficit", money(Math.abs(s.net)), s.net >= 0 ? "income is more than spending" : "spending is more than income", s.net >= 0 ? "good" : "bad") +
       tile("Waiting for approval", s.pending_expenses.count, money(s.pending_expenses.amount), s.pending_expenses.count ? "warn" : "") + "</div>";
     const P = Charts.palette();
     Charts.lineChart($("ov-trend"), s.monthly.map(function (m) { return { label: new Date(m.month + "-01T00:00:00").toLocaleDateString(undefined, { month: "short" }), income: Math.round(m.income / 100) / 10, expenses: Math.round(m.expenses / 100) / 10 }; }),
       [{ key: "income", label: "Income (Rs. thousand)", color: P.green }, { key: "expenses", label: "Expenses (Rs. thousand)", color: P.red }], { title: "Income and expenses per month, in Rs. thousand", empty: "Nothing recorded yet." });
     Charts.hbars($("ov-exp-cat"), s.expenses_by_category.map(function (c) { return { label: c.category, count: Math.round(c.amount) }; }), { empty: "No expenses in this period." });
-    Charts.hbars($("ov-inc-cat"), [{ label: "Student fees", count: Math.round(s.fees_collected) }].concat(s.income_by_category.map(function (c) { return { label: c.category, count: Math.round(c.amount) }; })).filter(function (x) { return x.count > 0; }), { empty: "No income in this period." });
+    Charts.hbars($("ov-inc-cat"), [{ label: "Student fees", count: Math.round(s.fees_collected) }].concat((s.fines_by_source || []).map(function (f) { return { label: "Fines \u2014 " + f.source.replace(/_/g, " ").toLowerCase(), count: Math.round(f.amount) }; })).concat(s.income_by_category.map(function (c) { return { label: c.category, count: Math.round(c.amount) }; })).filter(function (x) { return x.count > 0; }), { empty: "No income in this period." });
     $("ov-vendors").innerHTML = s.top_vendors.length ? s.top_vendors.map(function (v) { return '<div class="auth-row"><span class="grow"><strong>' + esc(v.vendor) + "</strong><small>" + v.count + " payment" + (v.count !== 1 ? "s" : "") + '</small></span><span class="sched"><b>' + money(v.amount) + "</b></span></div>"; }).join("") : '<p class="cc-meta">No vendor spending in this period.</p>';
   }
   $("ov-period").querySelectorAll("button").forEach(function (b) { b.addEventListener("click", function () { $("ov-period").querySelectorAll("button").forEach(function (x) { x.classList.toggle("active", x === b); }); period = b.getAttribute("data-p"); loadOverview(); }); });
@@ -223,6 +223,7 @@
     if (has("reject")) add("Reject\u2026", "danger-btn", function () { askReason("Reject this request", "The person who asked is told why.", "Reject", true).then(function (t) { if (t) poCall("reject", { reason: t }, "Rejected."); }); });
     if (has("order")) add("Place the order\u2026", "", openOrderDialog);
     if (has("receive")) add("Goods received\u2026", "", openReceiveDialog);
+    if (has("approve_price")) add("Approve the higher price", "", function () { poCall("approve-price", null, "Price approved. It can now be paid."); });
     if (has("pay")) add("Pay the vendor\u2026", "", openPayDialog);
     if (has("reverse")) add("Reverse the payment\u2026", "danger-btn", function () { askReason("Reverse this payment", "The expense in the books is voided and this goes back to \u201cArrived: to pay\u201d.", "Reverse it", true).then(function (t) { if (t) poCall("reverse-payment", { reason: t }, "Payment reversed."); }); });
     if (has("cancel")) add("Cancel\u2026", "danger-btn", function () { askReason("Cancel this request", "The person who asked is told why.", "Cancel it", true).then(function (t) { if (t) poCall("cancel", { reason: t }, "Cancelled."); }); });
@@ -395,6 +396,33 @@
     if (v.ok) fillSelect($("ex-vendor"), v.body, '<option value="">No vendor</option>');
   }
 
+  // ------------------------------------------------------------------ closing the books
+  async function loadClose() {
+    const r = await VA.fetchJson(API + "/period-close", { quiet: true });
+    const box = $("ov-close");
+    if (!box || !r.ok) return;
+    const d = r.body.closed_through;
+    box.innerHTML = (d ? "Books closed up to <strong>" + VA.escapeHtml(d) + "</strong>: nothing dated on or before it can be recorded or changed. " : "The books are open (no period closed yet). ");
+    if (!isApprover) return;
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "role-btn small-btn secondary-btn"; b.textContent = d ? "Change\u2026" : "Close a period\u2026";
+    b.addEventListener("click", async function () {
+      const day = await VA.ask({ title: "Close the books", input: "date", label: "Close everything up to and including", value: d || "", ok: "Close up to this date", required: false,
+        intro: "Do this after a month's figures are checked and reported. Payments, fines, expenses, income and salaries dated on or before this day can no longer be recorded, approved, changed or voided. Leave it empty to reopen everything." });
+      if (day === null) return;
+      let reason = null;
+      if (d && (!day || day < d)) {
+        reason = await VA.ask({ title: "Reopen closed books?", input: "textarea", min: 10, ok: "Reopen", danger: true, intro: "Reopening lets entries in an already-reported period change. Why?" });
+        if (!reason) return;
+      }
+      const res = await VA.fetchJson(API + "/period-close", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ closed_through: day || null, reason: reason }) });
+      if (!res.ok) return VA.toast((res.body && res.body.error && res.body.error.message) || "Could not change it.", "error");
+      VA.toast(res.body.closed_through ? "Books closed up to " + res.body.closed_through + "." : "All periods are open again.");
+      loadClose();
+    });
+    box.appendChild(b);
+  }
+
   document.addEventListener("vistadmin:ready", async function () {
     const c = await VA.fetchJson(API + "/config", { quiet: true });
     if (c.ok) cfg = c.body;
@@ -403,6 +431,7 @@
     document.querySelectorAll(".ct-add").forEach(function (el) { el.hidden = !isApprover; });
     $("ex-limit").textContent = "Expenses above Rs. " + Number(cfg.expense_approval_limit).toLocaleString() + " wait for the administration to approve them" + (isApprover ? " (you can approve them here)." : ".");
     await refreshLists();
+    loadClose();
     loadOverview(); loadBook(); loadExpenses(); loadIncome(); loadVendors(); loadCategories(); loadPurchasing();
     const open = new URLSearchParams(window.location.search).get("open");
     if (open === "purchases") VA.showTab("purchasing");

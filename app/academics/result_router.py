@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from starlette.concurrency import run_in_threadpool
+
 import uuid
 
 from fastapi import APIRouter, Depends
@@ -18,7 +20,7 @@ from app.academics.router import _can_manage_marks_for_offering
 from app.academics.service import CourseOfferingService
 from app.auth.permissions import Permissions
 from app.core.database import get_db
-from app.core.dependencies import CurrentUser, get_current_user, require_permission
+from app.core.dependencies import require_any_permission, CurrentUser, get_current_user, require_permission
 from app.core.exceptions import AuthorizationError, ResourceNotFoundError
 from app.students.repository import StudentRepository
 from pydantic import BaseModel, Field
@@ -33,6 +35,7 @@ class PublishIn(BaseModel):
 
 
 approver = require_permission(Permissions.RESULT_APPROVE)
+transcript_reader = require_any_permission(Permissions.RESULT_APPROVE, Permissions.ACADEMIC_OVERSIGHT)      # exam office, principal, HOD
 
 
 class ReturnIn(BaseModel):
@@ -79,6 +82,11 @@ async def submit(offering_id: uuid.UUID, current_user: CurrentUser = Depends(get
 @router.get("/sheets", summary="Result sheets by status (approver)")
 async def sheets(status: ResultSheetStatus | None = None, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> list[dict]:
     return await ResultSheetService(db).listing(status)
+
+
+@router.get("/sheets-outstanding", summary="Courses whose marks have not been submitted yet (draft, sent back or not started) -- who to chase (approver)")
+async def sheets_outstanding(current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> list[dict]:
+    return await ResultSheetService(db).outstanding()
 
 
 @router.get("/sheets/{offering_id}", summary="One subject's marks for the whole class, with each student's projected result (approver)")
@@ -133,9 +141,9 @@ async def _own_student_id(db, user: CurrentUser):
     return student.id
 
 
-def _pdf(data: dict) -> Response:
+async def _pdf(data: dict) -> Response:
     name = (data["student"]["roll_number"] or "student").replace("/", "-")
-    return Response(content=render_transcript_pdf(data), media_type="application/pdf",
+    return Response(content=await run_in_threadpool(render_transcript_pdf, data), media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="result-card-{name}.pdf"', "X-Content-Type-Options": "nosniff"})
 
 
@@ -150,17 +158,17 @@ async def my_transcript(current_user: CurrentUser = Depends(get_current_user), d
 async def my_transcript_pdf(current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> Response:
     sid = await _own_student_id(db, current_user)
     await ensure_no_attendance_hold(db, sid, action="Your result card")
-    return _pdf(await TranscriptService(db).build(sid))
+    return await _pdf(await TranscriptService(db).build(sid))
 
 
 @router.get("/students/{student_id}/transcript", summary="Any student's result card (approver)")
-async def student_transcript(student_id: uuid.UUID, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
+async def student_transcript(student_id: uuid.UUID, current_user: CurrentUser = Depends(transcript_reader), db=Depends(get_db)) -> dict:
     return await TranscriptService(db).build(student_id)
 
 
 @router.get("/students/{student_id}/transcript.pdf", summary="Any student's result card as a PDF (approver)")
-async def student_transcript_pdf(student_id: uuid.UUID, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> Response:
-    return _pdf(await TranscriptService(db).build(student_id))
+async def student_transcript_pdf(student_id: uuid.UUID, current_user: CurrentUser = Depends(transcript_reader), db=Depends(get_db)) -> Response:
+    return await _pdf(await TranscriptService(db).build(student_id))
 
 
 # ============================================================ past results (import)

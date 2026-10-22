@@ -175,7 +175,7 @@
       const row = document.createElement("div");
       row.className = "auth-row" + (t.is_active ? "" : " off");
       const who = [t.for_students ? "students" : "", t.for_employees ? "employees" : ""].filter(Boolean).join(" & ");
-      const bits = [who, t.requires_dates ? "needs dates" : "", t.requires_attachment ? "needs a document" : "", t.yearly_limit_days ? t.yearly_limit_days + " days a year" : "", t.is_active ? "" : "switched off"].filter(Boolean).join(" \u00b7 ");
+      const bits = [who, t.requires_dates ? "needs dates" : "", t.requires_attachment ? "needs a document" : "", t.excuses_attendance ? "excuses attendance" : "", t.yearly_limit_days ? t.yearly_limit_days + " days a year" : "", t.is_active ? "" : "switched off"].filter(Boolean).join(" \u00b7 ");
       row.innerHTML = '<span class="grow"><strong>' + esc(t.name) + "</strong><small>" + esc(bits) + "</small></span>";
       const edit = document.createElement("button"); edit.type = "button"; edit.className = "role-btn small-btn secondary-btn"; edit.textContent = "Edit";
       edit.addEventListener("click", function () { editType(t, row); });
@@ -192,6 +192,7 @@
     row.innerHTML = '<div class="type-edit"><input class="text-input" value="' + esc(t.name) + '" maxlength="120" aria-label="Name" /><input class="text-input" value="' + esc(t.description || "") + '" maxlength="2000" aria-label="Help text" />' +
       '<div class="type-flags"><label><input type="checkbox" data-k="for_students"' + (t.for_students ? " checked" : "") + " /> Students</label><label><input type=\"checkbox\" data-k=\"for_employees\"" + (t.for_employees ? " checked" : "") + " /> Employees</label>" +
       '<label><input type="checkbox" data-k="requires_dates"' + (t.requires_dates ? " checked" : "") + ' /> Needs dates</label><label><input type="checkbox" data-k="requires_attachment"' + (t.requires_attachment ? " checked" : "") + " /> Needs a document</label>" +
+      '<label><input type="checkbox" data-k="excuses_attendance"' + (t.excuses_attendance ? " checked" : "") + ' /> Approval excuses attendance</label>' +
       '<label>Yearly limit <input class="text-input tiny" type="number" min="1" max="366" value="' + (t.yearly_limit_days || "") + '" placeholder="days" /></label></div></div>';
     const save = document.createElement("button"); save.type = "button"; save.className = "role-btn small-btn"; save.textContent = "Save";
     const cancel = document.createElement("button"); cancel.type = "button"; cancel.className = "role-btn small-btn secondary-btn"; cancel.textContent = "Cancel"; cancel.addEventListener("click", loadTypes);
@@ -213,7 +214,7 @@
     const limit = $("t-limit").value;
     const r = await VA.fetchJson(API + "/types", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
       name: $("t-name").value, description: $("t-desc").value || null, for_students: $("t-students").checked, for_employees: $("t-employees").checked,
-      requires_dates: $("t-dates").checked, requires_attachment: $("t-attach").checked, yearly_limit_days: limit ? parseInt(limit, 10) : null }) });
+      requires_dates: $("t-dates").checked, requires_attachment: $("t-attach").checked, excuses_attendance: $("t-excuse").checked, yearly_limit_days: limit ? parseInt(limit, 10) : null }) });
     if (!r.ok) { err.textContent = msg(r.body, "Could not add it."); err.hidden = false; return; }
     ["t-name", "t-desc", "t-limit"].forEach(function (id) { $(id).value = ""; });
     VA.toast("Added."); loadTypes();

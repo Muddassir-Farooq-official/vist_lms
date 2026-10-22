@@ -23,6 +23,10 @@
       <option value="">All sources</option>
       <option value="LIBRARY">Library</option>
       <option value="DISCIPLINARY">Disciplinary</option>
+      <option value="ATTENDANCE">Attendance</option>
+      <option value="FEE_LATE_PAYMENT">Late fee payment</option>
+      <option value="GATE">Gate (late arrival)</option>
+      <option value="INVENTORY">Store / inventory</option>
       <option value="OTHER">Other</option>
     </select>
     <button id="open-issue-fine" class="role-btn" type="button">+ Issue Fine</button>
@@ -75,6 +79,10 @@
     <h2 id="resolve-fine-title">Resolve Fine</h2>
     <p id="resolve-fine-summary" class="panel-hint"></p>
     <form id="resolve-fine-form" class="form-grid">
+      <div class="form-field" data-paid-only><label for="resolve-fine-method">Paid by</label>
+        <select id="resolve-fine-method" class="select-input"><option value="CASH">Cash</option><option value="BANK_TRANSFER">Bank transfer / deposit</option><option value="CHEQUE">Cheque</option><option value="ONLINE">Online</option></select></div>
+      <div class="form-field" data-paid-only><label for="resolve-fine-paid-on">Paid on</label><input type="date" id="resolve-fine-paid-on" class="text-input" /></div>
+      <div class="form-field two-span" data-paid-only><label for="resolve-fine-reference">Slip / transaction / cheque no. (not needed for cash)</label><input type="text" id="resolve-fine-reference" class="text-input" maxlength="80" /></div>
       <div class="form-field two-span">
         <label for="resolve-fine-note">Note (optional)</label>
         <input type="text" id="resolve-fine-note" class="text-input" maxlength="500" />

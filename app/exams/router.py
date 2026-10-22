@@ -7,6 +7,7 @@ import uuid
 from datetime import date, time
 
 from fastapi import APIRouter, Depends, Response
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
@@ -46,11 +47,11 @@ class PaperPatch(BaseModel):
     invigilator_employee_id: uuid.UUID | None = None
 
 
-def _pdf(card: dict) -> Response:
+async def _pdf(card: dict) -> Response:
     from app.exams.admit_card_pdf import render_admit_card_pdf
 
     name = f"admit-card-{card['student']['roll_number']}-{card['schedule']['name']}".replace(" ", "-")
-    return Response(content=render_admit_card_pdf(card, settings.app_name), media_type="application/pdf",
+    return Response(content=await run_in_threadpool(render_admit_card_pdf, card, settings.app_name), media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="{name}.pdf"', "Cache-Control": "no-store"})
 
 
@@ -99,7 +100,7 @@ async def publish(schedule_id: uuid.UUID, current_user: CurrentUser = Depends(ma
 
 @router.get("/schedules/{schedule_id}/admit-cards/{student_id}/pdf", summary="Print any student's admit card (exam office)")
 async def staff_admit_card(schedule_id: uuid.UUID, student_id: uuid.UUID, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> Response:
-    return _pdf(await ExamScheduleService(db).admit_card(schedule_id, student_id))
+    return await _pdf(await ExamScheduleService(db).admit_card(schedule_id, student_id))
 
 
 # ------------------------------------------------------------------ students, parents, teachers
@@ -132,7 +133,7 @@ async def my_admit_card(schedule_id: uuid.UUID, current_user: CurrentUser = Depe
 
 @router.get("/me/admit-card/{schedule_id}/pdf", summary="Download my admit card (student)")
 async def my_admit_card_pdf(schedule_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> Response:
-    return _pdf(await ExamScheduleService(db).admit_card(schedule_id, await _own_student(db, current_user)))
+    return await _pdf(await ExamScheduleService(db).admit_card(schedule_id, await _own_student(db, current_user)))
 
 
 @router.get("/children/{student_id}/datesheets", summary="A linked child's published datesheets (parent)")
@@ -143,7 +144,7 @@ async def child_datesheets(student_id: uuid.UUID, current_user: CurrentUser = De
 @router.get("/children/{student_id}/admit-card/{schedule_id}/pdf", summary="A linked child's admit card (parent)")
 async def child_admit_card_pdf(student_id: uuid.UUID, schedule_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user),
                                db=Depends(get_db)) -> Response:
-    return _pdf(await ExamScheduleService(db).admit_card(schedule_id, await _child(db, current_user, student_id)))
+    return await _pdf(await ExamScheduleService(db).admit_card(schedule_id, await _child(db, current_user, student_id)))
 
 
 @router.get("/teaching/papers", summary="Published papers of the courses I teach or invigilate (staff)")

@@ -128,6 +128,9 @@
   }
 
   let activeEmployeeName = "";
+  document.getElementById("records-btn").addEventListener("click", function () {
+    if (activeEmployeeId) window.RecordsPanel.open({ type: "employees", id: activeEmployeeId, name: activeEmployeeName });
+  });
 
   function updatePhotoDisplay(employeeId, hasPhoto) {
     photoError.hidden = true;
@@ -233,7 +236,7 @@
       btn.addEventListener("click", async function () {
         const jobRoleId = btn.getAttribute("data-id");
         const code = btn.getAttribute("data-code");
-        if (!window.confirm('Permanently delete job role "' + code + '"? This only works if no employees are assigned to it.')) {
+        if (!(await window.VistAdmin.confirm('Permanently delete job role "' + code + '"? This only works if no employees are assigned to it.'))) {
           return;
         }
         btn.disabled = true;
@@ -506,7 +509,7 @@
     const box = document.getElementById("access-roles-box");
     const msgEl = document.getElementById("access-roles-msg");
     const extra = Array.prototype.map.call(box.querySelectorAll("#access-roles-list input:checked"), function (i) { return i.value; });
-    if (!window.confirm("Save this access? The person will be signed out and must sign in again.")) return;
+    if (!(await window.VistAdmin.confirm("Save this access? The person will be signed out and must sign in again."))) return;
     const r = await VA.fetchJson("/api/v1/employees/" + box.dataset.employeeId + "/access-roles", {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ extra_roles: extra }),
     });
@@ -543,6 +546,7 @@
       "<dt>Contact</dt><dd>" + VA.escapeHtml(e.contact_no) + "</dd>" +
       "<dt>Hire Date</dt><dd>" + VA.escapeHtml(e.hire_date) + "</dd>" +
       "<dt>Department</dt><dd>" + VA.escapeHtml(e.department || "\u2014") + "</dd>" +
+      "<dt>Salary account</dt><dd>" + VA.escapeHtml(e.bank_iban ? (e.bank_name || "") + " " + e.bank_iban : "Not on record (paid by cash or cheque)") + "</dd>" +
       "<dt>Employment Type</dt><dd>" + VA.escapeHtml(e.employment_type || "\u2014") + "</dd>" +
       "<dt>Email</dt><dd>" + VA.escapeHtml(e.email || "\u2014") + "</dd>" +
       "<dt>Blood Group</dt><dd>" + VA.escapeHtml(e.blood_group || "\u2014") + "</dd>" +
@@ -569,6 +573,9 @@
     document.getElementById("ee-marital").value = e.marital_status || "";
     document.getElementById("ee-emergency-name").value = e.emergency_contact_name || "";
     document.getElementById("ee-emergency-no").value = e.emergency_contact_no || "";
+    document.getElementById("ee-bank").value = e.bank_name || "";
+    document.getElementById("ee-bank-title").value = e.bank_account_title || "";
+    document.getElementById("ee-iban").value = e.bank_iban || "";
     editEmployeeSuccess.hidden = true;
     clearanceResult.hidden = true;
     jobRoleChangeSelect.innerHTML = "";
@@ -640,6 +647,9 @@
       marital_status: document.getElementById("ee-marital").value || null,
       emergency_contact_name: document.getElementById("ee-emergency-name").value.trim() || null,
       emergency_contact_no: document.getElementById("ee-emergency-no").value.trim() || null,
+      bank_name: document.getElementById("ee-bank").value.trim(),
+      bank_account_title: document.getElementById("ee-bank-title").value.trim(),
+      bank_iban: document.getElementById("ee-iban").value.trim(),
     };
 
     const result = await VA.fetchJson("/api/v1/employees/" + activeEmployeeId, {
@@ -675,7 +685,7 @@
           "",
           "Continue?",
         ];
-        if (!window.confirm(lines.join("\n"))) return;
+        if (!(await window.VistAdmin.confirm(lines.join("\n")))) return;
       }
     }
     saveStatusBtn.disabled = true;
@@ -705,7 +715,7 @@
 
   document.getElementById("change-job-role-btn").addEventListener("click", async function () {
     if (!activeEmployeeId) return;
-    if (!window.confirm("Change this employee's job role? Their login permissions change too, and they must sign in again.")) return;
+    if (!(await window.VistAdmin.confirm("Change this employee's job role? Their login permissions change too, and they must sign in again."))) return;
     modalError.hidden = true;
     modalSuccess.hidden = true;
     const result = await VA.fetchJson("/api/v1/employees/" + activeEmployeeId + "/job-role", {
@@ -818,7 +828,7 @@
       resetEmployeePasswordConfirm.hidden = true;
       return;
     }
-    if (!window.confirm("Set a new password for this employee? They will be required to change it on next login.")) {
+    if (!(await window.VistAdmin.confirm("Set a new password for this employee? They will be required to change it on next login."))) {
       return;
     }
     resetEmployeePasswordBtn.disabled = true;

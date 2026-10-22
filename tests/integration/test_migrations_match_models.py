@@ -49,7 +49,7 @@ def test_migrated_schema_matches_models():
 
     for m in ("audit", "academics", "auth", "attendance", "employees", "notifications", "profiles", "fees",
               "announcements", "applications", "tasks", "gate", "accounts", "purchasing", "payroll",
-              "assignments", "complaints", "fines", "imports", "library", "programs", "students", "policy", "parents", "exams", "sms", "supplementary", "admissions"):
+              "assignments", "complaints", "fines", "imports", "library", "programs", "students", "policy", "parents", "exams", "sms", "supplementary", "admissions", "inventory"):
         __import__(f"app.{m}.models")
     __import__("app.fees.payment_models")
     __import__("app.fees.refund_models")

@@ -84,7 +84,7 @@ async def test_the_exam_department_cannot_reach_anything_else(app_client, admin_
     exam = await _exam_user(app_client, db_session)
     await _as_exam(app_client, exam)
     for path in ("/api/v1/employees", "/api/v1/fees/assignments", "/api/v1/gate/summary", "/api/v1/payroll/runs", "/api/v1/accounts/summary", "/api/v1/purchases",
-                 "/api/v1/gate/settings", "/api/v1/fees/scholarships"):
+                 "/api/v1/gate/visitors", "/api/v1/fees/scholarships"):
         assert (await app_client.get(path)).status_code == 403, path
     for call in (app_client.post(f"{A}/enrollments/00000000-0000-0000-0000-000000000000/admin-withdraw"), app_client.post("/api/v1/fees/types", json={"code": "X", "name": "X"}),
                  app_client.post("/api/v1/students", json={})):
@@ -118,7 +118,8 @@ async def test_the_hostel_warden_has_a_portal_of_their_own():
     from app.main import WARDEN_NAV_ITEMS
     assert home_for_roles(["HOSTEL_WARDEN"]) == "/dashboard/warden"
     assert home_for_roles(["HOSTEL_WARDEN"], must_change_password=True) == "/change-password"
-    assert [i["slug"] for i in WARDEN_NAV_ITEMS] == ["announcements", "tasks", "applications", "purchases", "payslips"] and WARDEN_NAV_ITEMS[0]["href"] == "/dashboard/warden"
+    assert [i["slug"] for i in WARDEN_NAV_ITEMS] == ["hostel", "announcements", "tasks", "applications", "purchases", "payslips", "calendar"]
+    assert "/dashboard/warden" in {i["href"] for i in WARDEN_NAV_ITEMS}                                            # the sign-in landing page is in the menu
 
 
 async def test_every_hostel_warden_page_opens_and_belongs_to_the_warden(app_client):

@@ -7,7 +7,7 @@
   const $ = function (id) { return document.getElementById(id); };
   const msg = function (body, fallback) { return body && body.error && body.error.message ? body.error.message : fallback; };
   const json = function (method, data) { return { method: method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }; };
-  const money = function (v) { return "Rs. " + Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 2 }); };
+  const money = function (v) { return VA.formatMoney(v); };
   const day = function (iso) { return iso ? new Date(String(iso).slice(0, 10) + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "\u2014"; };
   const tile = function (a, b, c, tone) { return '<div class="kpi ' + (tone || "") + '"><span class="kpi-label">' + a + '</span><strong class="kpi-value">' + b + '</strong><span class="kpi-sub">' + (c || "") + "</span></div>"; };
   const STATUS = { DRAFT: ["Draft", "pending"], APPROVED: ["Approved: ready to pay", "enrolled"], PAID: ["Paid", "active"], CANCELLED: ["Cancelled", ""] };
@@ -55,7 +55,8 @@
   $("pr-prepare").addEventListener("click", async function () {
     $("pr-prep-error").hidden = true;
     if (!$("pr-month").value) return fail("pr-prep-error", "Choose the month to pay for.");
-    const r = await VA.fetchJson(API + "/runs", json("POST", { month: $("pr-month").value + "-01" }));
+    const wd = parseInt($("pr-wd").value || "0", 10);
+    const r = await VA.fetchJson(API + "/runs", json("POST", { month: $("pr-month").value + "-01", working_days: wd > 0 ? wd : null }));
     if (!r.ok) return fail("pr-prep-error", msg(r.body, "Could not prepare it."));
     VA.toast("Prepared payroll for " + r.body.month_label + ": " + r.body.employees_count + " employees." + (r.body.skipped.length ? " Left out: " + r.body.skipped.join("; ") + "." : ""), r.body.skipped.length ? "error" : undefined);
     loadRuns(); openRun(r.body.id);
@@ -74,11 +75,22 @@
     d.payslips.forEach(function (s) {
       const tr = document.createElement("tr");
       if (s.held) tr.className = "replaced";
-      const notes = [s.days_payable < s.days_in_month ? s.days_payable + "/" + s.days_in_month + " days" : "", s.unpaid_days ? s.unpaid_days + " unpaid day" + (s.unpaid_days !== 1 ? "s" : "") : "", s.adjustment ? (s.adjustment > 0 ? "+" : "\u2212") + money(Math.abs(s.adjustment)) + (s.adjustment_note ? " " + s.adjustment_note : "") : "", s.held ? "HELD: " + (s.held_reason || "") : ""].filter(Boolean);
-      tr.innerHTML = "<td><strong>" + esc(s.employee_name) + "</strong><small>" + esc(s.employee_code) + " \u00b7 " + esc(s.job_title || "") + '</small></td><td class="num">' + money(s.base_salary) + '</td><td class="num">' + money(s.gross) + '</td><td class="num">' + money(s.deductions) + '</td><td class="num ' + (s.net < 0 ? "bad" : "") + '"><b>' + money(s.net) + "</b></td><td><small>" + esc(notes.join(" \u00b7 ")) + "</small></td><td></td>";
+      const notes = [s.attendance_note || "", s.days_payable < s.days_in_month ? "joined: " + s.days_payable + "/" + s.days_in_month + " days" : "", s.unpaid_days ? s.unpaid_days + " unpaid day" + (s.unpaid_days !== 1 ? "s" : "") : "", s.adjustment ? (s.adjustment > 0 ? "+" : "\u2212") + money(Math.abs(s.adjustment)) + (s.adjustment_note ? " " + s.adjustment_note : "") : "", s.held ? "HELD: " + (s.held_reason || "") : ""].filter(Boolean);
+      tr.innerHTML = "<td><strong>" + esc(s.employee_name) + "</strong><small>" + esc(s.employee_code) + " \u00b7 " + esc(s.job_title || "") + '</small></td><td class="num">' + money(s.base_salary) + '</td><td class="num">' + s.working_days + '</td><td class="num">' + s.absent_days + (s.casual_leaves ? "<small>" + s.casual_leaves + " casual</small>" : "") +
+        '</td><td class="num">' + s.late_marks + (s.late_days ? "<small>= " + s.late_days + " day" + (s.late_days > 1 ? "s" : "") + "</small>" : "") + (s.attendance_override ? "<small>set by hand</small>" : "") + '</td><td class="num">' + money(s.gross) + '</td><td class="num">' + money(s.deductions) + '</td><td class="num ' + (s.net < 0 ? "bad" : "") + '"><b>' + money(s.net) + "</b></td><td><small>" + esc(notes.join(" \u00b7 ")) + "</small></td><td></td>";
       const cell = tr.lastElementChild;
       const pdf = document.createElement("a"); pdf.className = "role-btn small-btn secondary-btn"; pdf.href = API + "/payslips/" + s.id + "/pdf"; pdf.setAttribute("data-download", "payslip-" + s.employee_code + ".pdf"); pdf.setAttribute("data-label", "file"); pdf.textContent = "PDF"; cell.appendChild(pdf);
       if (d.status === "DRAFT") { const b = document.createElement("button"); b.type = "button"; b.className = "role-btn small-btn"; b.textContent = "Adjust"; b.addEventListener("click", function () { openSlip(s); }); cell.appendChild(b); }
+      if (s.held && (d.status === "APPROVED" || d.status === "PAID")) {
+        const b = document.createElement("button"); b.type = "button"; b.className = "role-btn small-btn"; b.textContent = d.status === "PAID" ? "Pay now\u2026" : "Release";
+        b.addEventListener("click", function () {
+          if (d.status === "PAID") return openPay(s);
+          VA.fetchJson(API + "/runs/" + run.id + "/payslips/" + s.id + "/release", json("POST", { payment_method: "CASH", paid_date: today, reference_no: null }))
+            .then(function (r) { if (!r.ok) return fail("rd-error", msg(r.body, "Could not release it.")); VA.toast("Released: it will be paid with the rest of the month."); openRun(run.id); loadRuns(); });
+        });
+        cell.appendChild(b);
+      }
+      if (s.released_on) { const sm = document.createElement("small"); sm.textContent = "Paid separately " + day(s.released_on); cell.appendChild(sm); }
       body.appendChild(tr);
     });
     const bar = $("rd-actions"); bar.innerHTML = ""; $("rd-error").hidden = true;
@@ -100,6 +112,8 @@
   async function openSlip(s) {
     slipEdit = s;
     $("sl-title").textContent = s.employee_name; $("sl-sub").textContent = s.employee_code + " \u00b7 basic " + money(s.base_salary) + " \u00b7 " + s.days_in_month + " days in the month";
+    $("sl-wd").value = s.working_days; $("sl-absent").value = s.absent_days; $("sl-late").value = s.late_marks; $("sl-reset").checked = false;
+    $("sl-att").textContent = (s.attendance_note || "") + " Day's pay: " + money(s.day_rate) + ". Casual leave forgiven: " + s.casual_leaves + ". Every " + s.late_marks_per_day + " late / early marks = 1 day." + (s.attendance_override ? " (Figures set by hand.)" : "");
     $("sl-unpaid").value = s.unpaid_days || 0; $("sl-adj").value = s.adjustment || ""; $("sl-note").value = s.adjustment_note || ""; $("sl-hold").checked = s.held; $("sl-hold-reason").value = s.held_reason || ""; $("sl-hold-wrap").hidden = !s.held; $("sl-error").hidden = true;
     const d = await VA.fetchJson(API + "/payslips/" + s.id, { quiet: true });
     $("sl-lines").innerHTML = d.ok ? "<b>Now:</b> " + d.body.earnings.concat(d.body.deduction_lines.map(function (x) { return { label: x.label, amount: -x.amount }; })).map(function (x) { return esc(x.label) + " " + (x.amount < 0 ? "\u2212" : "") + money(Math.abs(x.amount)); }).join(" \u00b7 ") : "";
@@ -108,19 +122,44 @@
   $("sl-hold").addEventListener("change", function () { $("sl-hold-wrap").hidden = !$("sl-hold").checked; });
   $("sl-close").addEventListener("click", function () { $("sl-modal").close(); });
   $("sl-save").addEventListener("click", async function () {
-    const body = { unpaid_days: parseFloat($("sl-unpaid").value || "0"), adjustment: parseFloat($("sl-adj").value || "0"), adjustment_note: $("sl-note").value.trim(), held: $("sl-hold").checked, held_reason: $("sl-hold").checked ? $("sl-hold-reason").value.trim() : null };
+    const body = { working_days: parseInt($("sl-wd").value || "0", 10) || null, unpaid_days: parseFloat($("sl-unpaid").value || "0"), adjustment: parseFloat($("sl-adj").value || "0"), adjustment_note: $("sl-note").value.trim(), held: $("sl-hold").checked, held_reason: $("sl-hold").checked ? $("sl-hold-reason").value.trim() : null };
+    if ($("sl-reset").checked) body.reset_attendance = true;
+    else {
+      if (parseFloat($("sl-absent").value) !== slipEdit.absent_days) body.absent_days = parseFloat($("sl-absent").value || "0");
+      if (parseInt($("sl-late").value, 10) !== slipEdit.late_marks) body.late_marks = parseInt($("sl-late").value || "0", 10);
+    }
     const r = await VA.fetchJson(API + "/runs/" + run.id + "/payslips/" + slipEdit.id, json("PATCH", body));
     if (!r.ok) return fail("sl-error", msg(r.body, "Could not save it."));
     $("sl-modal").close(); VA.toast("Saved. The payslip has been worked out again."); await openRun(run.id); loadRuns();
   });
 
   // ------------------------------------------------------------------ paying
-  function openPay() { $("pp-for").textContent = run.month_label + " \u00b7 " + run.employees_count + " employees \u00b7 " + money(run.total_net); $("pp-ref").value = ""; $("pp-date").value = today; $("pp-error").hidden = true; $("pp-modal").showModal(); }
+  let paySlip = null;   // a held payslip paid on its own, or null for the whole month
+  let paySecurity = null;   // a security deposit being paid back
+  function openPaySecurity(p) {
+    paySlip = null; paySecurity = p;
+    $("pp-for").textContent = "Security deposit of " + p.name + ": " + money(p.held) + " to pay back";
+    $("pp-ref").value = ""; $("pp-date").value = today; $("pp-error").hidden = true; $("pp-modal").showModal();
+  }
+  function openPay(slip) {
+    paySecurity = null;
+    paySlip = slip && slip.id ? slip : null;
+    $("pp-for").textContent = paySlip ? paySlip.employee_name + " \u00b7 held payslip for " + run.month_label + " \u00b7 " + money(paySlip.net)
+      : run.month_label + " \u00b7 " + run.employees_count + " employees \u00b7 " + money(run.total_net); $("pp-ref").value = ""; $("pp-date").value = today; $("pp-error").hidden = true; $("pp-modal").showModal(); }
   $("pp-cancel").addEventListener("click", function () { $("pp-modal").close(); });
   $("pp-ok").addEventListener("click", async function () {
-    const r = await VA.fetchJson(API + "/runs/" + run.id + "/pay", json("POST", { payment_method: $("pp-method").value, paid_date: $("pp-date").value, reference_no: $("pp-ref").value.trim() || null }));
+    const body = { payment_method: $("pp-method").value, paid_date: $("pp-date").value, reference_no: $("pp-ref").value.trim() || null };
+    if (paySecurity) {
+      const s = await VA.fetchJson(API + "/security/" + paySecurity.employee_id + "/release", json("POST", body));
+      if (!s.ok) return fail("pp-error", msg(s.body, "Could not record the payment."));
+      $("pp-modal").close(); VA.toast("Paid back " + money(s.body.paid_back) + ". Booked as " + s.body.expense_reference + "."); paySecurity = null; loadSecurity(); return;
+    }
+    const path = paySlip ? "/payslips/" + paySlip.id + "/release" : "/pay";
+    const r = await VA.fetchJson(API + "/runs/" + run.id + path, json("POST", body));
     if (!r.ok) return fail("pp-error", msg(r.body, "Could not record the payment."));
-    $("pp-modal").close(); VA.toast("Paid. Everyone has been sent their payslip. Booked as " + r.body.expense_reference + "."); await openRun(run.id); loadRuns();
+    $("pp-modal").close();
+    VA.toast(paySlip ? "Paid " + paySlip.employee_name + "'s held salary. It is booked as its own expense." : "Paid. Everyone has been sent their payslip. Booked as " + r.body.expense_reference + ".");
+    paySlip = null; await openRun(run.id); loadRuns();
   });
 
   let asking = null;
@@ -171,6 +210,56 @@
     if (!r.ok) return fail("ad-error", msg(r.body, "Could not record it."));
     VA.toast("Advance paid. It will be taken back from the next payslips."); ["ad-emp", "ad-amount", "ad-rec", "ad-ref", "ad-reason"].forEach(function (id) { $(id).value = ""; }); advEmployee = null; loadAdvances();
   });
+
+  // ------------------------------------------------------------------ security deposits
+  async function loadWithholdings() {
+    const y = $("wh-year");
+    if (!y.value) y.value = new Date().getFullYear();
+    const r = await VA.fetchJson(API + "/withholdings?year=" + encodeURIComponent(y.value));
+    const tb = $("wh-table").tBodies[0];
+    if (!r.ok) { tb.innerHTML = '<tr><td colspan="3">' + esc(msg(r.body, "Could not load this.")) + "</td></tr>"; return; }
+    tb.innerHTML = r.body.months.length ? r.body.months.map(function (m) {
+      const parts = Object.keys(m.by_head).map(function (k) { return esc(k) + " " + money(m.by_head[k]); }).join(" \u00b7 ");
+      return "<tr><td>" + esc(new Date(String(m.month).slice(0, 10) + "T00:00:00").toLocaleDateString("en-GB", { month: "long", year: "numeric" })) + "</td><td>" + parts + '</td><td class="num"><b>' + money(m.total) + "</b></td></tr>";
+    }).join("") : '<tr><td colspan="3">Nothing held from paid payrolls in ' + esc(String(r.body.year)) + ".</td></tr>";
+    $("wh-total").textContent = "Year total: " + money(r.body.total) + (r.body.heads.length ? " (" + r.body.heads.map(function (h) { return h.name + " " + money(h.total); }).join(", ") + ")" : "") +
+      ". Security deposits held right now: " + money(r.body.security_held_now) + ".";
+  }
+  $("wh-year").addEventListener("change", loadWithholdings);
+
+  async function loadSecurity() {
+    loadWithholdings();
+    const r = await VA.fetchJson(API + "/security");
+    if (!r.ok) return;
+    $("sc-intro").textContent = "Each month " + (r.body.institute_percent ? r.body.institute_percent + "% of basic salary is held" : "nothing is held (the institute percentage in Settings \u2192 Payroll is 0)") +
+      " until the total held equals one basic salary. A different percentage (0 = none) can be set for one person. Total held now: " + money(r.body.total_held) + ".";
+    const tb = $("sc-body"); tb.innerHTML = "";
+    r.body.people.forEach(function (p) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = "<td><strong>" + esc(p.name) + "</strong>" + (p.left ? ' <span class="status-pill dropped">left</span>' : "") + "<small>" + esc(p.employee_code + " \u00b7 " + (p.job_title || "")) + (p.released ? " \u00b7 " + money(p.released) + " paid back" : "") + '</small></td><td class="num">' + money(p.base_salary) + '</td><td class="num"><b>' + money(p.held) + "</b>" +
+        (p.opening ? "<small>" + money(p.opening) + " before</small>" : "") + '</td><td class="num">' + money(p.remaining) + "</td><td>" + (p.own_percent == null ? '<span class="cc-meta">institute</span>' : p.own_percent + "%") + (p.note ? "<small>" + esc(p.note) + "</small>" : "") + "</td><td></td>";
+      if (isApprover) {
+        const b = document.createElement("button"); b.type = "button"; b.className = "role-btn small-btn secondary-btn"; b.textContent = "Change";
+        b.addEventListener("click", async function () {
+          const pct = (await window.VistAdmin.promptText("Security % of basic for " + p.name + " (empty = the institute's %, 0 = none):", p.own_percent == null ? "" : String(p.own_percent)));
+          if (pct === null) return;
+          const opening = (await window.VistAdmin.promptText("Deposit already held before this system (Rs.):", String(p.opening || 0)));
+          if (opening === null) return;
+          const x = await VA.fetchJson(API + "/settings/" + p.employee_id, json("PUT", { security_percent: pct.trim() === "" ? null : Number(pct), security_opening: Number(opening || 0), note: p.note }));
+          if (!x.ok) return VA.toast(msg(x.body, "Could not save it."), "error");
+          VA.toast("Saved. It applies when a draft payroll is recalculated."); loadSecurity();
+        });
+        tr.lastElementChild.appendChild(b);
+      }
+      if (p.held > 0) {
+        const pb = document.createElement("button"); pb.type = "button"; pb.className = "role-btn small-btn" + (p.left ? "" : " secondary-btn"); pb.textContent = "Pay back\u2026";
+        pb.addEventListener("click", function () { openPaySecurity(p); });
+        tr.lastElementChild.appendChild(pb);
+      }
+      tb.appendChild(tr);
+    });
+  }
+  document.querySelectorAll('.portal-tab[data-tab="security"]').forEach(function (t) { t.addEventListener("click", loadSecurity); });
 
   document.addEventListener("vistadmin:ready", async function () {
     const me = await VA.fetchJson("/api/v1/auth/me", { quiet: true });

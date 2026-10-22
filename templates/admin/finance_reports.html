@@ -1,0 +1,95 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN,ACCOUNTS_OFFICER{% endblock %}
+{% block title %}Finance reports{% endblock %}
+{% block page_title %}Finance reports{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Who owes what and for how long, what was collected each day and by whom, what is owed to vendors, bank statement matching, and exports for the accountant.</div>{% endblock %}
+
+{% block content %}
+<section class="sh-card">
+  <h2 class="panel-title">Fee defaulters</h2>
+  <div class="toolbar">
+    <select id="df-program" class="text-input" aria-label="Program"><option value="">All programs</option></select>
+    <input id="df-sem" class="text-input" type="number" min="1" max="12" placeholder="Semester" aria-label="Semester" />
+    <input id="df-min" class="text-input" type="number" min="0" step="1" placeholder="At least Rs." aria-label="Minimum overdue amount" />
+    <button type="button" class="role-btn" id="df-load">Show</button>
+    <a class="role-btn secondary-btn" id="df-csv" href="#" data-download="defaulters.csv">Download CSV</a>
+  </div>
+  <div class="stat-grid" id="df-kpis"></div>
+  <div class="table-scroll">
+    <table class="dash-table" id="df-table">
+      <thead><tr><th>Student</th><th>Program</th><th>1-30 days</th><th>31-60 days</th><th>61-90 days</th><th>Over 90</th><th>Total overdue</th><th>Late fee</th><th>Fines</th><th>Phone</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <p class="empty-state" id="df-empty" hidden>No student has overdue fees.</p>
+</section>
+
+<section class="sh-card">
+  <h2 class="panel-title">Daily collection</h2>
+  <div class="toolbar">
+    <input id="co-from" class="text-input" type="date" aria-label="From" />
+    <input id="co-to" class="text-input" type="date" aria-label="To" />
+    <button type="button" class="role-btn" id="co-load">Show</button>
+    <a class="role-btn secondary-btn" id="co-csv" href="#">Download CSV</a>
+  </div>
+  <div class="stat-grid" id="co-kpis"></div>
+  <div class="table-scroll">
+    <table class="dash-table" id="co-table">
+      <thead><tr><th>Day</th><th>Cashier</th><th>Payments</th><th>By method</th><th>Cash to hand in</th><th>Total</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <p class="empty-state" id="co-empty" hidden>No payments were recorded in this period.</p>
+</section>
+
+<section class="sh-card">
+  <h2 class="panel-title">Owed to vendors</h2>
+  <div class="stat-grid" id="pa-kpis"></div>
+  <div class="table-scroll">
+    <table class="dash-table" id="pa-table">
+      <thead><tr><th>Vendor</th><th>Purchases not yet paid</th><th>Oldest (days)</th><th>Owed</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <p class="empty-state" id="pa-empty" hidden>Nothing is owed to any vendor.</p>
+</section>
+
+<section class="sh-card">
+  <h2 class="panel-title">Bank statement matching</h2>
+  <p class="cc-meta">Upload the bank statement as a CSV (a Date column and an Amount, or Credit / Debit, column). Each line is matched against the non-cash payments and expenses in the books.</p>
+  <form id="bk-form" class="toolbar" novalidate>
+    <input id="bk-file" type="file" accept=".csv,text/csv" aria-label="Bank statement CSV" />
+    <button type="submit" class="role-btn">Match</button>
+  </form>
+  <p class="form-error" id="bk-error" role="alert" hidden></p>
+  <div class="stat-grid" id="bk-kpis"></div>
+  <h3>In the bank but not in the books</h3>
+  <div class="table-scroll"><table class="dash-table" id="bk-bank"><thead><tr><th>Date</th><th>Reference</th><th>Amount</th></tr></thead><tbody></tbody></table></div>
+  <h3>In the books but not in the bank</h3>
+  <div class="table-scroll"><table class="dash-table" id="bk-books"><thead><tr><th>Date</th><th>Entry</th><th>Method</th><th>Reference</th><th>Amount</th></tr></thead><tbody></tbody></table></div>
+  <h3>Matched</h3>
+  <div class="table-scroll"><table class="dash-table" id="bk-matched"><thead><tr><th>Date</th><th>Bank reference</th><th>Our record</th><th>Matched on</th><th>Amount</th></tr></thead><tbody></tbody></table></div>
+</section>
+
+<section class="sh-card">
+  <h2 class="panel-title">Exports for the accountant</h2>
+  <div class="toolbar">
+    <label>Day book from <input id="ex-from" class="text-input" type="date" /></label>
+    <label>to <input id="ex-to" class="text-input" type="date" /></label>
+    <a class="role-btn secondary-btn" id="ex-book" href="#" data-download="day-book.csv">Day book CSV</a>
+  </div>
+  <div class="toolbar">
+    <label>Salary deductions for year <input id="ex-year" class="text-input" type="number" min="2000" max="2100" /></label>
+    <a class="role-btn secondary-btn" id="ex-ded" href="#" data-download="salary-deductions.csv">Deductions CSV</a>
+  </div>
+  <div class="toolbar">
+    <label>Bank transfer sheet for payroll <select id="ex-run" class="text-input"></select></label>
+    <a class="role-btn secondary-btn" id="ex-bank" href="#" data-download="salary-bank-sheet.csv" hidden>Bank sheet CSV</a>
+  </div>
+  <p class="cc-meta" id="ex-bank-note"></p>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/finance-report.js"></script>
+{% endblock %}

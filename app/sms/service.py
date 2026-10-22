@@ -23,6 +23,7 @@ so the system can go live before the SMS contract is signed.
 """
 from __future__ import annotations
 
+import time
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -119,6 +120,71 @@ class SmsService:
         await self.session.flush()
         return 1 if norm else 0
 
+    async def bulk(self, *, audience: str, message: str, program_id=None, semester: int | None = None, section: str | None = None,
+                   defaulters_only: bool = False, job_role_id=None, dry_run: bool = True, actor_id=None) -> dict:
+        """One message to many: all students (narrowed by program / semester / section / fee defaulters) or all staff (optionally one job role).
+        `dry_run` only counts who would receive it. A phone number that appears twice (e.g. two siblings, one guardian) is sent to once."""
+        from app.core.exceptions import ValidationAppError
+
+        message = (message or "").strip()
+        if not 5 <= len(message) <= 300:
+            raise ValidationAppError("The message must be between 5 and 300 characters.")
+        if audience not in ("STUDENTS", "STAFF"):
+            raise ValidationAppError("Choose who the message is for: students or staff.")
+        numbers: list[tuple[str, str]] = []                                  # (raw number, who)
+        if audience == "STAFF":
+            from app.employees.models import Employee, EmployeeStatus
+
+            stmt = select(Employee.contact_no).where(Employee.status.in_((EmployeeStatus.ACTIVE, EmployeeStatus.ON_LEAVE)))
+            if job_role_id:
+                stmt = stmt.where(Employee.job_role_id == job_role_id)
+            numbers = [(n, "STAFF") for n in (await self.session.execute(stmt)).scalars()]
+        else:
+            from app.academics.models import CourseOffering, Enrollment, EnrollmentStatus
+            from app.students.models import Student, StudentGuardian, StudentStatus
+
+            stmt = select(Student.id, Student.contact_no).where(Student.status == StudentStatus.ACTIVE)
+            if program_id:
+                stmt = stmt.where(Student.program_id == program_id)
+            if semester:
+                stmt = stmt.where(Student.current_semester == semester)
+            if section:
+                stmt = stmt.where(Student.id.in_(select(Enrollment.student_id).join(CourseOffering, CourseOffering.id == Enrollment.course_offering_id).where(
+                    func.lower(CourseOffering.section_label) == section.strip().lower(), Enrollment.status == EnrollmentStatus.ENROLLED)))
+            rows = (await self.session.execute(stmt)).all()
+            if defaulters_only:
+                from app.reports.finance_service import FinanceReportService
+
+                owing = {p["student_id"] for p in (await FinanceReportService(self.session).defaulters(program_id=program_id, semester=semester))["students"]}
+                rows = [r for r in rows if r[0] in owing]
+            ids = [r[0] for r in rows]
+            numbers = [(r[1], "STUDENT") for r in rows]
+            if ids and int(settings.sms_to_guardian):
+                g = (await self.session.execute(select(StudentGuardian.student_id, StudentGuardian.contact_no).where(
+                    StudentGuardian.student_id.in_(ids), StudentGuardian.is_primary.is_(True)))).all()
+                numbers += [(n, "GUARDIAN") for _, n in g]
+        valid, seen, invalid = [], set(), 0
+        for raw, who in numbers:
+            norm = normalize_pk_mobile(raw)
+            if not norm:
+                invalid += 1
+            elif norm not in seen:
+                seen.add(norm)
+                valid.append((raw, who))
+        result = {"recipients": len(valid), "sample": [r for r, _ in valid[:6]], "without_valid_number": invalid, "queued": 0}
+        if dry_run:
+            return result
+        for raw, who in valid:
+            self.session.add(SmsMessage(to_number=(raw or "")[:20], recipient=who, body=_clip(message), event="BULK", status=SmsStatus.QUEUED))
+        await self.session.flush()
+        from app.audit.service import AuditService
+
+        await AuditService(self.session).log(actor_user_id=actor_id, action="sms.bulk_queued", entity_type="sms", entity_id=None,
+                                             metadata={"audience": audience, "recipients": len(valid), "program_id": str(program_id) if program_id else None,
+                                                       "semester": semester, "section": section, "defaulters_only": defaulters_only})
+        result["queued"] = len(valid)
+        return result
+
     async def queue_test(self, number: str, body: str) -> SmsMessage:
         if normalize_pk_mobile(number) is None:
             raise ValidationAppError("Enter a Pakistani mobile number, e.g. 0300-1234567.")
@@ -161,7 +227,8 @@ class SmsService:
         if msg.attempts >= MAX_ATTEMPTS:
             msg.status = SmsStatus.FAILED
 
-    async def send_pending(self, *, limit: int = 100, client: httpx.AsyncClient | None = None) -> dict:
+    async def send_pending(self, *, limit: int = 100, client: httpx.AsyncClient | None = None, time_budget: float | None = None) -> dict:
+        """Send queued messages. With `time_budget` (seconds), stop starting new deliveries once it is used up; the rest stay queued for the next round."""
         msgs = list((await self.session.execute(select(SmsMessage).where(SmsMessage.status == SmsStatus.QUEUED)
                                                 .order_by(SmsMessage.created_at).limit(limit).with_for_update(skip_locked=True))).scalars())
         if not msgs:
@@ -174,8 +241,14 @@ class SmsService:
         own = client is None
         client = client or httpx.AsyncClient(timeout=15)
         try:
+            started = time.monotonic()
+            done = []
             for m in msgs:
+                if time_budget is not None and done and time.monotonic() - started >= time_budget:
+                    break
                 await self._deliver(client, m)
+                done.append(m)
+            msgs = done
         finally:
             if own:
                 await client.aclose()

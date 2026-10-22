@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -36,6 +36,14 @@ class FineResolveRequest(BaseModel):
     note: str | None = Field(default=None, max_length=500)
 
 
+class FinePaidRequest(FineResolveRequest):
+    """How the fine was paid. Method defaults to cash; anything else needs a reference."""
+
+    method: str | None = Field(default=None, max_length=20)
+    reference: str | None = Field(default=None, max_length=80)
+    paid_on: date | None = None
+
+
 class FineRejectRequest(BaseModel):
     """A rejection must always say why — the requester (librarian/
     accounts officer) is notified with this note and has no other way
@@ -58,6 +66,10 @@ class FineOut(BaseModel):
     approved_at: datetime | None
     resolved_at: datetime | None
     resolution_note: str | None
+    payment_method: str | None = None
+    payment_reference: str | None = None
+    paid_on: date | None = None
+    receipt_number: str | None = None
 
 
 class FineDetail(FineOut):

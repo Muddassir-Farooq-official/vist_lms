@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
+from pydantic import BaseModel, Field
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
@@ -173,3 +174,22 @@ async def book(kind: EntryKind | None = None, from_date: date | None = None, to_
 @router.get("/summary", response_model=SummaryOut, summary="Income versus expenses for a period, with fee collections, categories and a 12-month trend")
 async def summary(from_date: date | None = None, to_date: date | None = None, current_user: CurrentUser = Depends(view), db=Depends(get_db)) -> SummaryOut:
     return SummaryOut(**await AccountsService(db).summary(from_date=from_date, to_date=to_date))
+
+# ---------------------------------------------------------------------------------- closing the books
+class PeriodCloseIn(BaseModel):
+    closed_through: date | None = None          # None = reopen everything
+    reason: str | None = Field(default=None, max_length=300)
+
+
+@router.get("/period-close", summary="Up to which date the books are closed (nothing can be recorded or changed on or before it)")
+async def get_period_close(current_user: CurrentUser = Depends(view), db=Depends(get_db)) -> dict:
+    from app.accounts.period import closed_through
+
+    return {"closed_through": await closed_through(db)}
+
+
+@router.put("/period-close", summary="Close the books up to a date (administration). Moving it back (reopening) needs a reason")
+async def set_period_close(payload: PeriodCloseIn, current_user: CurrentUser = Depends(approve), db=Depends(get_db)) -> dict:
+    from app.accounts.period import set_closed_through
+
+    return {"closed_through": await set_closed_through(db, payload.closed_through, actor_id=current_user.id, reason=payload.reason)}

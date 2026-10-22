@@ -40,6 +40,9 @@ class PurchaseOrder(UUIDPKMixin, TimestampMixin, Base):
     decided_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     decision_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The administration approves the real price when it differs from the estimate; whoever recorded it cannot.
+    price_approved_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    price_approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ordered_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     ordered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     expected_delivery: Mapped[date | None] = mapped_column(Date, nullable=True)

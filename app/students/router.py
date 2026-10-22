@@ -21,6 +21,7 @@ from app.core.storage import (
     MAX_PHOTO_BYTES,
     SAFE_SERVE_HEADERS,
     UnsupportedFileTypeError,
+    archive_file,
     delete_file,
     get_file_path,
     save_uploaded_file,
@@ -37,6 +38,7 @@ from app.students.schemas import (
     FeeSummary,
     FineSummary,
     GuardianInfo,
+    IdentityCorrectionRequest,
     LibrarySummary,
     StudentAdminDetail,
     StudentCreatedResponse,
@@ -77,7 +79,8 @@ def _assert_directory_access(current_user: CurrentUser, *, allow_exam_department
     TEACHER / LIBRARIAN / STUDENT all hold student.view (for their own
     scoped screens) but must NOT be able to list every student: teachers
     use their offering rosters, librarians use /library/borrowers/search."""
-    allowed = {Roles.ADMIN, Roles.ACCOUNTS_OFFICER} | ({Roles.EXAM_CONTROLLER} if allow_exam_department else set())       # (the exam department may search, to open a result card; never export)
+    # The exam department, the principal and heads of department may SEARCH (to open a profile or result card, read-only); only the office exports.
+    allowed = {Roles.ADMIN, Roles.ACCOUNTS_OFFICER} | ({Roles.EXAM_CONTROLLER, Roles.PRINCIPAL, Roles.HOD} if allow_exam_department else set())
     if not (allowed & set(current_user.roles)):
         raise AuthorizationError("You do not have access to the student directory.")
 
@@ -216,16 +219,15 @@ async def admission_slip(
     from fastapi.responses import HTMLResponse
 
     from app.auth.models import User
-    from app.core.constants import DEFAULT_STUDENT_PASSWORD
     from app.programs.repository import ProgramRepository
 
     student = await StudentService(db).get_student(student_id)
     program = await ProgramRepository(db).get_by_id(student.program_id) if student.program_id else None
     user = await db.get(User, student.user_id) if student.user_id else None
-    show_password = bool(user and user.must_change_password)
+    show_password = bool(user and user.must_change_password and user.temp_password)
     e = html.escape
     password_row = (
-        f"<tr><th>Temporary password</th><td><b>{e(DEFAULT_STUDENT_PASSWORD)}</b> (change at first login)</td></tr>"
+        f"<tr><th>Temporary password</th><td><b>{e(user.temp_password or "")}</b> (change at first login)</td></tr>"
         if show_password
         else "<tr><th>Password</th><td>Already changed by the student</td></tr>"
     )
@@ -269,6 +271,18 @@ async def update_student(
     db=Depends(get_db),
 ) -> StudentAdminDetail:
     student = await StudentService(db).update_student(student_id, payload, actor_id=current_user.id)
+    return await _to_admin_detail(db, student)
+
+
+@router.post("/{student_id}/identity", response_model=StudentAdminDetail,
+             summary="Correct a mistyped CNIC or the guardian's details (reason required; a changed guardian CNIC cuts the old parent login)")
+async def correct_identity(
+    student_id: uuid.UUID,
+    payload: IdentityCorrectionRequest,
+    current_user: CurrentUser = Depends(require_permission(Permissions.STUDENT_UPDATE)),
+    db=Depends(get_db),
+) -> StudentAdminDetail:
+    student = await StudentService(db).correct_identity(student_id, payload, actor_id=current_user.id)
     return await _to_admin_detail(db, student)
 
 
@@ -341,7 +355,12 @@ async def _upload_photo(db, student: Student, file: UploadFile, actor_id: uuid.U
     except (UnsupportedFileTypeError, FileTooLargeError) as exc:
         raise ValidationAppError(str(exc)) from exc
 
-    delete_file(student.photo_storage_key)
+    kept = archive_file(student.photo_storage_key)
+    if kept:
+        from app.audit.service import AuditService
+
+        await AuditService(db).log(actor_user_id=actor_id, action="student.photo_replaced", entity_type="student", entity_id=student.id,
+                                   before={"archived_as": kept, "name": student.photo_original_name}, after={"name": safe_name})
     student.photo_storage_key = storage_key
     student.photo_original_name = safe_name
     return await _to_admin_detail(db, student)
@@ -358,7 +377,12 @@ async def _upload_certificate(db, student: Student, file: UploadFile, actor_id: 
     except (UnsupportedFileTypeError, FileTooLargeError) as exc:
         raise ValidationAppError(str(exc)) from exc
 
-    delete_file(student.certificate_storage_key)
+    kept = archive_file(student.certificate_storage_key)
+    if kept:
+        from app.audit.service import AuditService
+
+        await AuditService(db).log(actor_user_id=actor_id, action="student.certificate_replaced", entity_type="student", entity_id=student.id,
+                                   before={"archived_as": kept, "name": student.certificate_original_name}, after={"name": safe_name})
     student.certificate_storage_key = storage_key
     student.certificate_original_name = safe_name
     return await _to_admin_detail(db, student)

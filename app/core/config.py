@@ -19,13 +19,20 @@ class Settings(BaseSettings):
     app_env: str = Field(default="development")
     debug: bool = Field(default=False)
     app_name: str = Field(default="VIST LMS")
+    # Optional: an incoming-webhook URL (Slack, Discord, Google Chat, Teams...) told about unexpected server errors.
+    error_alert_webhook: str = ""
     api_v1_prefix: str = Field(default="/api/v1")
+
+    institute_name: str = Field(default="Vertex Institute of Science & Technology")
+    institute_logo_path: str = Field(default="static/images/vist_logo.png")
 
     # Database
     database_url: str
     database_url_sync: str
-    db_pool_size: int = 10
-    db_max_overflow: int = 20
+    # Per app process. Gunicorn runs 4 processes, plus the import worker and the SMS sender:
+    # 4 x (5 + 5) + a few = about 45 connections, well under PostgreSQL's default limit of 100.
+    db_pool_size: int = 5
+    db_max_overflow: int = 5
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"
@@ -40,6 +47,8 @@ class Settings(BaseSettings):
 
     # CORS
     cors_origins: str = "http://localhost:8000"
+    # The address people type to reach the portal (printed on certificates for verification). Empty = the first CORS origin.
+    public_url: str = ""
 
     # File storage
     storage_backend: str = "local"
@@ -94,6 +103,8 @@ class Settings(BaseSettings):
 
     # Rate limiting
     rate_limit_login_per_minute: int = 5
+    # Reverse proxies whose X-Forwarded-For is believed (comma-separated addresses or networks): loopback and Docker's private ranges.
+    trusted_proxies: str = "127.0.0.1/32,::1/128,172.16.0.0/12,10.0.0.0/8"
     # The above is per (username, ip) pair — deliberately generous enough
     # that a shared office/campus NAT IP with several people logging in
     # doesn't trip it, but that also means it does nothing to slow a
@@ -138,7 +149,16 @@ class Settings(BaseSettings):
     # --- Launch guards (Step 2). All default to the SAFE behaviour. ---
     # Results may only be published once the course's attendance is locked
     # (i.e. final). An ADMIN can override one sheet with a written reason.
+    purchase_over_estimate_percent: float = 10.0    # goods costing more than this % over the approved estimate need the price approved before payment
+    fee_late_fee_cap: float = 0.0                   # most late fee one instalment can build up (Rs.); 0 = no cap
     require_attendance_lock_before_publish: bool = True
+    # End Semester only after every course with students has locked attendance and a published result
+    # (otherwise students are closed out with no result at all). An administrator can still override with a reason.
+    require_results_before_end_semester: bool = True
+    # Withdrawing from a course in the first N days of term leaves no mark; after that it shows as W
+    # on the transcript, and students can no longer withdraw themselves.
+    withdrawal_deadline_days: int = 28
+    supplementary_publish_by_other: bool = True     # whoever enters a supplementary mark does not publish it
     # Attendance may only be locked once no classes remain and the term end
     # date (if set) has passed. An ADMIN can lock early with a written reason.
     block_early_attendance_lock: bool = True
@@ -189,6 +209,22 @@ class Settings(BaseSettings):
     # outside this window (see AttendanceService.mark_session).
     attendance_marking_window_minutes: int = 15
 
+    # Payroll from staff attendance (editable in Settings). A day's pay = basic salary / working days of the run.
+    payroll_default_working_days: int = 0           # 0 = the calendar days of the month (salary / 30 or 31); or fix it, e.g. 26, or 22 for a five-day week
+    payroll_attendance_deductions: int = 1          # 1 = deduct absences and late / early marks from pay
+    payroll_casual_leaves_staff: int = 2            # absences forgiven per month for non-teaching staff
+    payroll_casual_leaves_teacher: int = 0          # teachers: no casual leave
+    payroll_late_marks_per_day: int = 4             # this many late arrivals / early leavings = one day's pay
+    payroll_missing_checkout_counts: int = 1        # 1 = a day with no leaving mark counts as leaving early
+    payroll_security_percent: float = 0.0           # % of basic held back each month as a security deposit, until it equals one basic salary
+    graduation_min_cgpa: float = 2.0                # degree audit: the lowest CGPA that can graduate
+    certificate_signatory: str = "Principal"       # printed under the signature line on certificates
+
+    # How long (seconds) one worker trusts "this user is still active and signed in" before checking again.
+    session_check_seconds: int = 10
+    # The same POST from the same person within this many seconds is refused as a double submission (0 = off).
+    duplicate_post_window_seconds: int = 8
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
@@ -196,6 +232,31 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
+
+    def production_problems(self) -> list[str]:
+        """Settings that are unsafe on a live server. The app refuses to start
+        in production while any of these is true (see app/main.py)."""
+        from urllib.parse import urlsplit
+
+        weak = {"", "changeme", "change_me", "change-me", "secret", "password", "postgres", "pg", "admin", "123456", "test"}
+        out = []
+        secret = (self.jwt_secret or "").strip()
+        if len(secret) < 32 or secret.lower() in weak or "change_me" in secret.lower():
+            out.append("JWT_SECRET is missing, too short or still the example value. "
+                       "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(48))\"")
+        for name in ("database_url", "database_url_sync"):
+            pw = urlsplit(getattr(self, name) or "").password or ""
+            if pw.lower() in weak or "change_me" in pw.lower() or len(pw) < 12:
+                out.append(f"{name.upper()} uses a weak or example database password (use 12+ random characters).")
+        if self.debug:
+            out.append("DEBUG must be false.")
+        if self.enable_student_payment_simulation:
+            out.append("ENABLE_STUDENT_PAYMENT_SIMULATION must be false.")
+        if not self.cookie_secure:
+            out.append("COOKIE_SECURE must be true (the site must run on https).")
+        if "*" in self.cors_origins_list:
+            out.append("CORS_ORIGINS must list your real site address, not *.")
+        return out
 
 
 @lru_cache

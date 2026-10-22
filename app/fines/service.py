@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,6 +26,9 @@ from app.students.models import Student
 # DISCIPLINARY or OTHER fine no matter what a manipulated request body
 # contains. ADMIN doesn't appear here — admin uses the direct issue()
 # path, which accepts any source, not the request/approve workflow.
+# The accounts names and the fee-counter names are both accepted, so a fine can be recorded the same way as a fee.
+FINE_PAYMENT_METHODS = {"CASH", "BANK_TRANSFER", "CHEQUE", "ONLINE", "BANK_DEPOSIT", "ONLINE_TRANSFER"}
+
 ROLE_REQUEST_SOURCE: dict[str, FineSource] = {
     Roles.LIBRARIAN: FineSource.LIBRARY,
     Roles.ACCOUNTS_OFFICER: FineSource.OTHER,
@@ -104,6 +107,7 @@ class FineService:
         actor_id: uuid.UUID,
         related_entity_type: str | None = None,
         related_entity_id: uuid.UUID | None = None,
+        notify_title: str | None = None,
     ) -> Fine:
         if not await payer_exists(self.session, payer_type, payer_id):
             raise ResourceNotFoundError(f"{payer_type.value.title()} not found.")
@@ -145,7 +149,7 @@ class FineService:
                 self.session,
                 user_id=payer_user_id,
                 category=NotificationCategory.FINE,
-                title="A fine has been issued against you",
+                title=notify_title or "A fine has been issued against you",
                 message=f"Rs. {amount:.2f} — {reason.strip()}",
                 link="/dashboard/student/fines" if payer_type == FinePayerType.STUDENT else "/dashboard/faculty/fines",
             )
@@ -318,15 +322,43 @@ class FineService:
 
         return fine
 
-    async def mark_paid(self, fine_id: uuid.UUID, *, actor_id: uuid.UUID, note: str | None = None) -> Fine:
-        fine = await self.get(fine_id)
+    async def mark_paid(self, fine_id: uuid.UUID, *, actor_id: uuid.UUID, note: str | None = None,
+                        method: str | None = None, reference: str | None = None, paid_on: date | None = None) -> Fine:
+        """Collect a fine. How it was paid (method, slip/cheque number, the day) is recorded and a
+        receipt number is issued, so the money shows up in Accounts like any other income."""
+        from app.core.clock import institute_today
+        from app.core.config import settings
+        from app.core.sequences import next_sequence_value
+
+        await self.get(fine_id)
+        fine = await self._locked(fine_id)            # two clicks / two cashiers: the second one sees it is already paid
         if fine.status != FineStatus.PENDING:
             raise BusinessRuleViolationError(f"This fine is already {fine.status.value.lower()}.")
+        method = (method or "CASH").upper()
+        if method not in FINE_PAYMENT_METHODS:
+            raise BusinessRuleViolationError("Choose how the fine was paid: cash, bank transfer, cheque or online.")
+        reference = (reference or "").strip() or None
+        if method != "CASH" and not reference:
+            raise BusinessRuleViolationError("Enter the slip, transaction or cheque number (needed for anything except cash).")
+        today = institute_today()
+        paid_on = paid_on or today
+        if paid_on > today:
+            raise BusinessRuleViolationError("The payment date cannot be in the future.")
+        if (today - paid_on).days > settings.fee_payment_max_backdate_days:
+            raise BusinessRuleViolationError(f"The payment date cannot be more than {settings.fee_payment_max_backdate_days} days ago.")
+        from app.accounts.period import ensure_open
+
+        await ensure_open(self.session, paid_on, "This fine payment")
+        from app.fees.references import refuse_reused_reference
+
+        await refuse_reused_reference(self.session, reference, method)
 
         fine.status = FineStatus.PAID
         fine.resolved_by = actor_id
         fine.resolved_at = datetime.now(UTC)
         fine.resolution_note = note
+        fine.payment_method, fine.payment_reference, fine.paid_on = method, reference, paid_on
+        fine.receipt_number = f"FINE-{paid_on.year}-{await next_sequence_value(self.session, f'fine_receipt:{paid_on.year}'):06d}"
 
         await self.audit.log(
             actor_user_id=actor_id,
@@ -334,7 +366,7 @@ class FineService:
             entity_type="fine",
             entity_id=fine.id,
             before={"status": "PENDING"},
-            after={"status": "PAID"},
+            after={"status": "PAID", "method": method, "reference": reference, "paid_on": str(paid_on), "receipt": fine.receipt_number},
         )
 
         payer_user_id = await _resolve_user_id(self.session, fine.payer_type, fine.payer_id)
@@ -346,8 +378,48 @@ class FineService:
 
         return fine
 
+    async def _locked(self, fine_id: uuid.UUID) -> Fine:
+        from sqlalchemy import select
+
+        return (await self.session.execute(select(Fine).where(Fine.id == fine_id).with_for_update().execution_options(populate_existing=True))).scalar_one()
+
+    async def reverse_payment(self, fine_id: uuid.UUID, *, actor_id: uuid.UUID, reason: str) -> Fine:
+        """Take back a fine payment recorded by mistake. The fine is owed again;
+        the cancelled receipt is kept (FinePaymentReversal) for the books."""
+        from app.core.clock import institute_today
+        from app.fines.models import FinePaymentReversal
+
+        reason = (reason or "").strip()
+        if len(reason) < 4:
+            raise BusinessRuleViolationError("Write why this payment is being reversed.")
+        await self.get(fine_id)
+        fine = await self._locked(fine_id)
+        if fine.status != FineStatus.PAID:
+            raise BusinessRuleViolationError("Only a paid fine can have its payment reversed.")
+        now = datetime.now(UTC)
+        self.session.add(FinePaymentReversal(
+            fine_id=fine.id, receipt_number=fine.receipt_number, amount=fine.amount,
+            paid_on=fine.paid_on or (fine.resolved_at.date() if fine.resolved_at else institute_today()),
+            payment_method=fine.payment_method, payment_reference=fine.payment_reference,
+            reversed_on=institute_today(), reversed_at=now, reversed_by=actor_id, reason=reason[:300]))
+        before = {"status": "PAID", "receipt": fine.receipt_number, "paid_on": str(fine.paid_on), "method": fine.payment_method}
+        fine.status = FineStatus.PENDING
+        fine.resolved_by = fine.resolved_at = fine.resolution_note = None
+        fine.payment_method = fine.payment_reference = fine.paid_on = fine.receipt_number = None
+        await self.session.flush()
+        await self.audit.log(actor_user_id=actor_id, action="fine.payment_reversed", entity_type="fine", entity_id=fine.id,
+                             before=before, after={"status": "PENDING"}, metadata={"reason": reason})
+        payer_user_id = await _resolve_user_id(self.session, fine.payer_type, fine.payer_id)
+        if payer_user_id is not None:
+            await create_notification(self.session, user_id=payer_user_id, category=NotificationCategory.FINE,
+                                      title="A fine payment was reversed", message=f"Rs. {float(fine.amount):,.2f} \u2014 {fine.reason}. It is owed again ({reason}).")
+        return fine
+
     async def waive(self, fine_id: uuid.UUID, *, actor_id: uuid.UUID, note: str | None = None) -> Fine:
-        fine = await self.get(fine_id)
+        if len((note or "").strip()) < 4:
+            raise BusinessRuleViolationError("Write why this fine is being waived. It is kept in the audit log.")
+        await self.get(fine_id)
+        fine = await self._locked(fine_id)
         if fine.status != FineStatus.PENDING:
             raise BusinessRuleViolationError(f"This fine is already {fine.status.value.lower()}.")
 

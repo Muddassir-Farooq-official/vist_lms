@@ -167,7 +167,9 @@ class TestSettledLatePayment:
         result = FeeStatusCalculator.compute(entries, late_fee_per_day=200, as_of=TODAY)
         assert result["overdue_principal"] == 0  # fully paid, not currently overdue
         assert result["accrued_fine"] == 10 * 200  # but was late for 10 days before paying
-        assert result["total_due_now"] == 2000
+        # ...which staff can still post as a fine ("Post Late Fee"); on its own it no longer keeps
+        # the payer out of good standing forever once the instalment itself is paid.
+        assert result["total_due_now"] == 0
 
     def test_installment_paid_exactly_on_due_date_has_no_fine(self):
         due = TODAY - timedelta(days=5)

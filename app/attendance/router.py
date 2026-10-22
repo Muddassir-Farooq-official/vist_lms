@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.core.csvsafe import safe_writer
 import uuid
 
 from fastapi import APIRouter, Depends
@@ -111,8 +112,15 @@ async def needs_attention(
     from app.academics.models import Course, CourseOffering
     from app.employees.models import Employee
 
+    from app.core.scope import hod_department, teacher_ids_in
+
     limit = max(1, min(limit, 1000))
     sessions = await AttendanceService(db).list_overdue_unmarked_sessions()
+    dept = await hod_department(db, current_user)
+    if dept:
+        mine = await teacher_ids_in(db, dept)
+        offs = await load_by_ids(db, CourseOffering, [cs.course_offering_id for cs in sessions])
+        sessions = [cs for cs in sessions if offs.get(cs.course_offering_id) is not None and offs[cs.course_offering_id].assigned_teacher_id in mine]
     response.headers["X-Total-Count"] = str(len(sessions))
     sessions = sessions[:limit]
     offerings = await load_by_ids(db, CourseOffering, [cs.course_offering_id for cs in sessions])
@@ -299,7 +307,7 @@ async def attendance_report_csv(
     student_ids = list(dict.fromkeys(list(enrolled) + list(by_student.keys())))
     students = [s for s in [await StudentRepository(db).get_by_id(sid) for sid in student_ids] if s is not None]
     students.sort(key=lambda s: (s.roll_number or ""))
-    letter = {"PRESENT": "P", "ABSENT": "A"}
+    letter = {"PRESENT": "P", "ABSENT": "A", "LEAVE": "L"}
     service = AttendanceService(db)
 
     def safe(v):
@@ -307,7 +315,7 @@ async def attendance_report_csv(
         return "\'" + t if t[:1] in ("=", "+", "-", "@") else t
 
     out = io.StringIO()
-    w = csv.writer(out)
+    w = safe_writer(out)
     w.writerow(["roll_number", "name"] + [str(cs.session_date) for cs in sessions] + ["attended", "counted", "percentage", "absent"])
     for st in students:
         row = by_student.get(st.id, {})
@@ -382,7 +390,26 @@ async def list_correction_requests(
     requests = await AttendanceService(db).list_correction_requests(
         status=status.upper() if status else None, requested_by=None if is_admin else current_user.id
     )
-    return [await _to_request_out(db, r) for r in requests]
+    out = [await _to_request_out(db, r) for r in requests]
+    if is_admin:
+        from app.core.scope import hod_department, teacher_ids_in
+
+        dept = await hod_department(db, current_user)
+        if dept:
+            mine = await teacher_ids_in(db, dept)
+            teacher_of = {o.id: o.assigned_teacher_id for o in await _offerings_by_ids(db, {r.course_offering_id for r in out})}
+            out = [r for r in out if teacher_of.get(r.course_offering_id) in mine]
+    return out
+
+
+async def _offerings_by_ids(db, ids):
+    from sqlalchemy import select as _select
+
+    from app.academics.models import CourseOffering
+
+    if not ids:
+        return []
+    return (await db.execute(_select(CourseOffering).where(CourseOffering.id.in_(list(ids))))).scalars().all()
 
 
 @router.post(
@@ -395,7 +422,37 @@ async def decide_correction_request(
     current_user: CurrentUser = Depends(require_any_permission(Permissions.ATTENDANCE_LOCK, Permissions.ATTENDANCE_CORRECTION_DECIDE)),
     db=Depends(get_db),
 ) -> CorrectionRequestOut:
+    from app.core.scope import hod_department, teacher_ids_in
+
+    dept = await hod_department(db, current_user)
+    if dept:
+        from app.attendance.models import AttendanceCorrectionRequest as _ACR
+        from app.core.exceptions import AuthorizationError
+
+        pending = await db.get(_ACR, request_id)
+        if pending is not None:
+            cs = await ClassSessionRepository(db).get_by_id(pending.class_session_id)
+            offering = await CourseOfferingRepository(db).get_by_id(cs.course_offering_id)
+            if offering.assigned_teacher_id not in await teacher_ids_in(db, dept):
+                raise AuthorizationError("This class belongs to another department.")
     req = await AttendanceService(db).decide_correction_request(
         request_id, approve=payload.approve, note=payload.note, actor_id=current_user.id
     )
     return await _to_request_out(db, req)
+
+# ------------------------------------------------------------------------------------------------ approved leave
+from datetime import date as _date  # noqa: E402
+
+from pydantic import BaseModel as _BaseModel, Field as _Field  # noqa: E402
+
+
+class LeaveIn(_BaseModel):
+    from_date: _date
+    to_date: _date
+    reason: str = _Field(min_length=4, max_length=300)
+
+
+@router.post("/students/{student_id}/leave", summary="Record approved leave (e.g. medical): those classes are not counted for or against attendance")
+async def grant_leave(student_id: uuid.UUID, payload: LeaveIn,
+                      current_user: CurrentUser = Depends(require_permission(Permissions.ATTENDANCE_LOCK)), db=Depends(get_db)) -> dict:
+    return await AttendanceService(db).grant_leave(student_id, from_date=payload.from_date, to_date=payload.to_date, reason=payload.reason, actor_id=current_user.id)

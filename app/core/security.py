@@ -99,3 +99,13 @@ def generate_activation_or_reset_token() -> tuple[str, str]:
     """Returns (raw_token_to_send_to_user, hash_to_store_in_db)."""
     raw = secrets.token_urlsafe(32)
     return raw, hash_refresh_token(raw)
+
+
+_TEMP_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"   # no 0/O, 1/l/I: read out loud or copied by hand
+
+
+def new_temp_password() -> str:
+    """A random one-time password for a new login (10 characters, no look-alikes). Handed over once; changed at first login."""
+    import secrets
+
+    return "".join(secrets.choice(_TEMP_ALPHABET) for _ in range(10))

@@ -138,6 +138,9 @@
       <div class="form-field"><label for="ee-dob">Date of Birth</label><input type="date" id="ee-dob" class="text-input" /></div>
       <div class="form-field"><label for="ee-gender">Gender</label><select id="ee-gender" class="select-input"><option>Male</option><option>Female</option><option>Other</option></select></div>
       <div class="form-field"><label for="ee-hire-date">Hire Date</label><input type="date" id="ee-hire-date" class="text-input" /></div>
+      <div class="form-field"><label for="ee-bank">Bank (for salary transfer)</label><input type="text" id="ee-bank" class="text-input" maxlength="100" /></div>
+      <div class="form-field"><label for="ee-bank-title">Account title</label><input type="text" id="ee-bank-title" class="text-input" maxlength="150" /></div>
+      <div class="form-field two-span"><label for="ee-iban">IBAN / account number</label><input type="text" id="ee-iban" class="text-input" maxlength="40" /></div>
       <div class="form-field"><label for="ee-employment-type">Employment Type</label><select id="ee-employment-type" class="select-input"><option value="">Not set</option><option value="PERMANENT">Permanent</option><option value="CONTRACT">Contract</option><option value="VISITING">Visiting</option><option value="PART_TIME">Part time</option></select></div>
       <div class="form-field"><label for="ee-email">Email</label><input type="email" id="ee-email" class="text-input" maxlength="255" /></div>
       <div class="form-field"><label for="ee-blood-group">Blood Group</label><select id="ee-blood-group" class="select-input"><option value="">Unknown</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></div>
@@ -206,6 +209,10 @@
       <input type="number" id="bonus-amount" class="text-input small-input" placeholder="Amount" step="0.01" min="0.01" />
       <input type="text" id="bonus-reason" class="text-input" placeholder="Reason" />
       <button id="award-bonus-btn" class="role-btn" type="button">Award</button>
+    </div>
+
+    <div class="modal-reset-row">
+      <button id="records-btn" class="role-btn secondary-btn" type="button">Documents, certificates &amp; clearance&hellip;</button>
     </div>
 
     <p id="modal-error" class="dash-alert error" hidden></p>
@@ -345,5 +352,6 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="/static/js/records-panel.js"></script>
 <script src="/static/js/employees.js"></script>
 {% endblock %}

@@ -49,7 +49,7 @@ async def test_menu_is_grouped_and_shell_has_phone_bar_and_no_api_docs_button(ap
     assert 'class="bottom-nav"' in html
     assert len(re.findall(r'class="bottom-link', html)) == 5          # 4 quick links + More
     assert 'href="/docs"' not in html and "API Docs" not in html
-    assert "Soon" not in html and "Hostel" not in html
+    assert "Soon" not in html and "/dashboard/admin/hostel" in html          # the hostel module is part of the menu
 
 
 async def test_student_and_teacher_home_are_real_pages_and_library_moved(app_client):
@@ -75,10 +75,15 @@ async def test_attendance_screens_have_no_late_or_leave_and_use_a_two_way_switch
 
     for path in ("/dashboard/faculty/attendance", "/dashboard/admin/attendance", "/dashboard/student/attendance"):
         html = (await app_client.get(path)).text
+        # the office's "approved leave" form is not part of marking a register
+        html = re.sub(r'<section class="panel" id="leave-panel">.*?</section>', "", html, flags=re.S)
+        html = re.sub(r"approved leave|on leave|\bLeave\b(?= \(approved\))", "", html, flags=re.I)
         assert not re.search(r"\b(late|leave)\b", re.sub(r"late[-_ ]?(marking|note)|late note", "", html, flags=re.I), re.I), path
     for js in ("attendance-common.js", "student-attendance.js", "admin-attendance.js", "faculty-attendance.js"):
         text = (await app_client.get(f"/static/js/{js}")).text
         text = re.sub(r"late[_ -]?(marking|note)|lateNote|late note", "", text, flags=re.I)
+        # approved (office-recorded) leave may be SHOWN; it is never a choice when marking
+        text = re.sub(r'LEAVE: "Approved leave"|current === "LEAVE"', "", text)
         assert not re.search(r"\b(LATE|LEAVE|late_student_ids|leave_student_ids)\b", text), js
     assert "seg-present" in (await app_client.get("/static/js/attendance-common.js")).text
 

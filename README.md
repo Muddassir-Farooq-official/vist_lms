@@ -8,77 +8,41 @@ circulation, complaints, and CSV-based enrollment.
 
 ## Status
 
-All of the following are implemented, routed, and covered by automated tests — not just
-scaffolded:
+An institute management system, implemented, routed and covered by automated tests. Modules:
 
-- **Auth & RBAC** — users/roles/permissions, Argon2id password hashing (with rehash-on-login
-  for parameter upgrades), JWT access tokens + rotating refresh tokens with reuse detection,
-  HttpOnly cookie auth for browser clients, permission-code-based authorization,
-  resource-scope (IDOR) checks, per-(username, IP) *and* per-username-only login rate
-  limiting.
-- **Students** — records, manual creation, CSV bulk import (checksum-based idempotency,
-  whole-file-reject-on-any-invalid-row policy, automatic account creation with a
-  system-generated roll number as username and a forced first-login password change).
-- **Academics** — programs, courses, course offerings, enrollment (with real eligibility rules:
-  program/semester curriculum matching, credit-hour-per-semester caps, retake handling),
-  lecture resources. **Attendance and marks/grading are NOT implemented** — `ATTENDANCE_VIEW`
-  and `MARKS_PUBLISH` exist as permission codes in the RBAC seed table but have no endpoint,
-  model, or migration behind them at all (dead permissions referencing a future module). The
-  only grading-adjacent thing that exists is `EnrollmentOutcome` — an admin-only placeholder
-  that marks a completed enrollment Pass/Fail, explicitly documented in the code as standing
-  in "ahead of a real Exams/Grading module."
-- **Employees & payroll** — staff records, job roles, salary, bonuses, payroll runs.
-- **Fees** — fee types/structures (program/semester-scoped or course-scoped), automatic
-  per-installment challan generation on activation, manual payment recording, payment
-  reversal (a deliberately higher authority level than recording), a simulated payment
-  gateway standing in for 1LINK 1Bill until VIST's biller credentials arrive.
-- **Fines** — library/disciplinary fines, issue and waive.
-- **Library** — catalogue, copy tracking, issue/return, borrower requests, e-resources.
-- **Complaints**, **profiles** (self-service), **reports/dashboards**, **audit log**.
-- **Notifications** — the data model exists; no delivery channel (email/SMS) is wired to a
-  provider yet, so nothing is actually sent anywhere today.
+- **Students & admissions** — CSV import, merit lists and rounds, roll numbers, guardians, ID cards,
+  identity corrections (reason required), semester advance with a double-run guard.
+- **Academics** — programs, courses, offerings and sections, enrollment rules, timetable, terms,
+  grading scale, marks entry, result sheets (maker/checker), transcripts, supplementary exams,
+  datesheets and admit cards, calendar and holidays.
+- **Attendance** — marking window, corrections decided by the HOD, locking, leave excuses, fines and drop rules.
+- **Fees** — structures, automatic installments and challans, manual payments (closed-books and reused-reference
+  checks), reversal (receipt prints VOID), refunds with cancel, scholarships, late-fee cap, undo of a mistaken activation.
+- **Accounts & finance reports** — day book, expenses (maker/checker), period close, defaulters aging, daily
+  collection, vendor payables, bank-statement matching, exports for the accountant.
+- **Payroll, timekeeping, employees** — pay items, advances, security deposits (hold and release), held payslips,
+  withholdings report, staff attendance, leave, bank transfer sheet.
+- **Records** — numbered, QR-checkable certificates and ID cards (public check page `/verify/<code>`), documents on
+  file, clearance, degree audit.
+- **Purchasing & inventory** (price approval, unique invoices, returns with refunds), **library**, **hostel**,
+  **gate & visitors**, **fines**, **complaints**, **announcements**, **applications**, **tasks**, **SMS** (queue,
+  bulk send, fee reminders), **parent portal**, **principal / HOD / exam controller / warden portals**.
 
-**Known gaps, not hidden:**
-- The hostel module is genuinely not built (the `HOSTEL_WARDEN` role exists with zero
-  permissions assigned — a deliberate placeholder, not an oversight).
-- `ATTENDANCE_VIEW` and `MARKS_PUBLISH` are dead permission codes — granted to roles in the
-  seed table but with no endpoint, model, or migration implementing either feature.
-- Notifications have no delivery provider wired up (see above).
-- CI runs `pytest` as a blocking check; `ruff` and `mypy --strict` currently run
-  report-only (see `.github/workflows/ci.yml`) because they surface real pre-existing
-  findings across the codebase that predate any CI existing at all — tightening that is
-  tracked, not swept under the rug.
-- The Docker build itself has not been verified in this environment (no Docker daemon
-  available) — see the Docker section below.
+**Known gaps:**
+- No course-content layer (lessons, quizzes); assignments are links.
+- No teacher/course evaluation, academic probation rules, or exam seating plans.
+- The payment gateway is simulated until the biller credentials arrive; fees run on challans and manual entry.
+- The SMS sender needs a real provider configured before messages leave the building.
+- `ruff` and `mypy --strict` run report-only in CI.
+- The Docker image build has not been verified here; dependencies are pinned with hashes in `requirements.lock`.
 
 ## What's been verified
 
-Everything above has been run against a real PostgreSQL 16 + Redis 7 instance, not just
-written and assumed correct — including a full live run with `uvicorn`, real HTTP requests,
-and a real attempted attack (a spoofed-content-type file upload) that was confirmed blocked:
+Run against real PostgreSQL 16 and Redis:
 
-- **29 Alembic migrations** apply cleanly against a live schema.
-- The seed script creates real roles/permissions/admin rows.
-- **123 automated tests pass** (`pytest tests/`) — unit, integration, and security suites,
-  covering CSV validation, auth/RBAC/IDOR, the fees module's payment authorization
-  boundaries, upload content-type verification, and the login rate limiter.
-- CI (`.github/workflows/ci.yml`) runs this same suite against a fresh Postgres + Redis on
-  every push/PR.
-
-A recent security-and-correctness pass through this codebase (auth, file uploads, the fees
-module, CI) found and fixed several real, previously-shipped bugs — not just style issues:
-a spoofed-content-type file upload vulnerability, a missing `course_id` field that made
-`POST /fees/structures` crash on every real call, a fee-structure clone that silently
-dropped its course scope, a response schema that silently dropped fields the router had
-already computed, `needs_rehash()` being defined but never called, a login rate limiter
-that could be bypassed by rotating source IPs, and 9 tests that had gone stale against a
-roll-number/employee-ID format change and were failing for the wrong reason. All of these
-have tests locking in the fix, not just a manual note that it was checked once.
-
-**Not verified**: the Docker build itself. No Docker daemon was available in the
-environment this was built and audited in. The Dockerfile and docker-compose.yml are
-written to the same standard as the rest of the codebase, but you should run
-`docker compose build` yourself before trusting it in CI/deployment.
+- **85 Alembic migrations** apply cleanly to an empty database, with a single head, and `alembic check` reports
+  that the models match the schema.
+- **751 automated tests** (`pytest tests/`) — unit, integration and security suites — all pass.
 
 ## Quick start (without Docker)
 

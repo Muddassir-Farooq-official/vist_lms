@@ -79,7 +79,7 @@
   }
 
   function money(n) {
-    return Number(n).toFixed(2);
+    return window.VistAdmin && window.VistAdmin.formatMoney ? window.VistAdmin.formatMoney(n) : "Rs. " + Number(n || 0).toLocaleString("en-PK");
   }
 
   async function loadDashboard() {
@@ -268,6 +268,7 @@
             ? '<button type="button" class="row-action activate-structure-btn" data-id="' + s.id + '">' +
               (s.status === "DRAFT" ? "Activate" : "Re-check") + "</button>"
             : "") +
+          (s.status === "ACTIVE" ? ' &middot; <button type="button" class="row-action undo-activation-btn" data-id="' + s.id + '">Undo activation\u2026</button>' : "") +
           ' &middot; <button type="button" class="row-action clone-structure-btn" data-id="' + s.id +
           '" data-name="' + VA.escapeHtml(s.name) + '" data-amount="' + s.total_amount + '">Clone &amp; Adjust</button>' +
           "</td>";
@@ -280,13 +281,10 @@
           const sourceAmount = parseFloat(btn.getAttribute("data-amount"));
 
           const openTerms = window.VistTerms ? window.VistTerms.open().map(function (t) { return t.label; }) : [];
-          const newTerm = window.prompt('Term for the clone of "' + sourceName + '"' + (openTerms.length ? " (open terms: " + openTerms.join(", ") + ")" : "") + ":", openTerms[0] || "");
+          const newTerm = (await window.VistAdmin.promptText('Term for the clone of "' + sourceName + '"' + (openTerms.length ? " (open terms: " + openTerms.join(", ") + ")" : "") + ":", openTerms[0] || ""));
           if (!newTerm) return;
 
-          const pctInput = window.prompt(
-            "Percentage change (e.g. 10 for a 10% increase, -5 for a 5% decrease, 0 for no change):",
-            "10"
-          );
+          const pctInput = (await window.VistAdmin.promptText("Percentage change (e.g. 10 for a 10% increase, -5 for a 5% decrease, 0 for no change):", "10"));
           if (pctInput === null) return;
           const pct = parseFloat(pctInput);
           if (isNaN(pct)) {
@@ -294,11 +292,11 @@
             return;
           }
 
-          const effectiveFrom = window.prompt("First installment due date for the new term (YYYY-MM-DD):", "");
+          const effectiveFrom = (await window.VistAdmin.promptText("First installment due date for the new term (YYYY-MM-DD):", ""));
           if (!effectiveFrom) return;
 
           const preview = (sourceAmount * (1 + pct / 100)).toFixed(2);
-          if (!window.confirm('This will create a new DRAFT structure "' + newTerm + '" at ' + preview + " (currently " + sourceAmount.toFixed(2) + "). Continue?")) {
+          if (!(await window.VistAdmin.confirm('This will create a new DRAFT structure "' + newTerm + '" at ' + preview + " (currently " + sourceAmount.toFixed(2) + "). Continue?"))) {
             return;
           }
 
@@ -322,8 +320,23 @@
         });
       });
 
+      structuresTbody.querySelectorAll(".undo-activation-btn").forEach(function (btn) {
+        btn.addEventListener("click", async function () {
+          const why = await VA.ask({ title: "Undo this activation?", danger: true, ok: "Undo activation",
+            intro: "Every charge this fee made is removed and it goes back to a draft you can correct. This only works while nobody has paid anything on it." });
+          if (!why) return;
+          const r = await VA.fetchJson("/api/v1/fees/structures/" + btn.getAttribute("data-id") + "/undo-activation", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason: why }) });
+          if (!r.ok) { VA.showError(extractErrorMessage(r.body, "Could not undo it.")); return; }
+          structureSuccess.textContent = "Activation undone: " + r.body.removed_charges + " charge(s) removed. The fee is a draft again.";
+          structureSuccess.hidden = false;
+          loadStructures(); loadAssignments(); loadDashboard();
+        });
+      });
+
       structuresTbody.querySelectorAll(".activate-structure-btn").forEach(function (btn) {
         btn.addEventListener("click", async function () {
+          if (btn.textContent === "Activate" && !(await VA.confirm("Activate this fee? Every matching student (or employee) is charged now and gets bank challans. If something is wrong you can undo it until someone pays.", "Activate"))) return;
           btn.disabled = true;
           const result = await VA.fetchJson("/api/v1/fees/structures/" + btn.getAttribute("data-id") + "/activate", {
             method: "POST",
@@ -443,21 +456,27 @@
   }
 
   async function loadLedger(assignmentId) {
-    const result = await VA.fetchJson("/api/v1/fees/assignments/" + assignmentId + "/ledger");
+    const result = await VA.fetchJson("/api/v1/fees/assignments/" + assignmentId + "/statement");
+    const instTbody = document.getElementById("installments-tbody");
     ledgerTbody.innerHTML = "";
+    instTbody.innerHTML = "";
     if (!result.ok || !result.body) return;
-    result.body.forEach(function (entry) {
-      const sign = entry.entry_type === "DEBIT" ? "\u2212 " : "+ ";
+    const PILL = { PAID: ["active", "Paid"], PARTIAL: ["pending", "Partly paid"], OVERDUE: ["dropped", "Overdue"], UPCOMING: ["", "Not yet due"] };
+
+    result.body.installments.forEach(function (r) {
+      const pill = PILL[r.status] || ["", r.status];
       const tr = document.createElement("tr");
       tr.innerHTML =
-        "<td>" + VA.escapeHtml(entry.entry_type) + "</td>" +
-        '<td class="num">' + sign + money(entry.amount) + "</td>" +
-        "<td>" + VA.escapeHtml(entry.due_date || entry.paid_on || "\u2014") + "</td>" +
-        "<td>" + VA.escapeHtml(entry.description || "\u2014") +
-        (entry.receipt_number ? ' \u00b7 <a href="/api/v1/fees/receipts/' + encodeURIComponent(entry.id) + '/pdf" target="_blank" rel="noopener">Receipt ' + VA.escapeHtml(entry.receipt_number) + "</a>" : "") + "</td>" +
+        "<td>" + VA.escapeHtml(r.label) + "</td>" +
+        "<td>" + VA.escapeHtml(r.due_date || "\u2014") + "</td>" +
+        '<td class="num">' + money(r.charged) + "</td>" +
+        '<td class="num">' + (r.concession ? money(r.concession) : "\u2014") + "</td>" +
+        '<td class="num">' + money(r.paid) + "</td>" +
+        '<td class="num"><strong>' + money(r.remaining) + "</strong></td>" +
+        '<td><span class="status-pill ' + pill[0] + '">' + pill[1] + "</span>" +
+          (r.late_fee > 0.005 ? '<br><small>late fee ' + money(r.late_fee) + (r.late_fee_posted ? " (" + money(r.late_fee_posted) + " posted)" : "") + "</small>" : "") + "</td>" +
         '<td class="row-actions"></td>';
-
-      if (entry.entry_type === "DEBIT") {
+      if (r.late_fee > r.late_fee_posted + 0.005) {
         const postFeeBtn = document.createElement("button");
         postFeeBtn.className = "role-btn small-btn";
         postFeeBtn.type = "button";
@@ -468,29 +487,67 @@
           lateFeeError.hidden = true;
           lateFeeSuccess.hidden = true;
           postFeeBtn.disabled = true;
-
-          const result = await VA.fetchJson(
-            "/api/v1/fees/assignments/" + assignmentId + "/installments/" + entry.id + "/post-late-fee",
+          const res = await VA.fetchJson(
+            "/api/v1/fees/assignments/" + assignmentId + "/installments/" + r.ledger_entry_id + "/post-late-fee",
             { method: "POST" }
           );
           postFeeBtn.disabled = false;
-
-          if (!result.ok) {
-            lateFeeError.textContent = extractErrorMessage(result.body, "Could not post late fee.");
+          if (!res.ok) {
+            lateFeeError.textContent = extractErrorMessage(res.body, "Could not post late fee.");
             lateFeeError.hidden = false;
             return;
           }
-          if (!result.body.posted) {
-            lateFeeSuccess.textContent = result.body.message || "Nothing new to post for this installment.";
-          } else {
-            lateFeeSuccess.textContent =
-              "Posted a " + money(result.body.amount) + " late fee \u2014 visible in the Fines module now.";
-          }
+          lateFeeSuccess.textContent = res.body.posted
+            ? "Posted a " + money(res.body.amount) + " late fee \u2014 it is now a fine the payer must pay."
+            : (res.body.message || "Nothing new to post for this installment.");
           lateFeeSuccess.hidden = false;
+          loadLedger(assignmentId);
         });
         tr.querySelector(".row-actions").appendChild(postFeeBtn);
       }
+      instTbody.appendChild(tr);
+    });
 
+    result.body.lines.forEach(function (l) {
+      const adds = l.type === "DEBIT" || l.type === "REFUND";
+      const when = l.paid_on || (l.created_at || "").slice(0, 10);
+      const details = [];
+      if (l.type === "DEBIT" && l.due_date) details.push("due " + l.due_date);
+      if (l.applied_to && l.applied_to.length) {
+        details.push("settled " + l.applied_to.map(function (a) { return a.installment + " (" + money(a.amount) + ")"; }).join(", "));
+      } else if (l.type === "CREDIT" && l.what === "Payment") {
+        details.push("extra: kept as credit");
+      }
+      if (l.payment_method) details.push(l.payment_method.replace(/_/g, " ").toLowerCase() + (l.payment_reference ? " #" + l.payment_reference : ""));
+      if (l.description && l.type !== "DEBIT") details.push(l.description);
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        "<td>" + VA.escapeHtml(when) + "</td>" +
+        "<td><strong>" + VA.escapeHtml(l.what) + "</strong></td>" +
+        '<td class="num">' + (adds ? money(l.amount) : "") + "</td>" +
+        '<td class="num ok">' + (!adds ? money(l.amount) : "") + "</td>" +
+        '<td class="num">' + money(l.balance) + "</td>" +
+        "<td>" + VA.escapeHtml(details.join(" \u00b7 ")) +
+          (l.receipt_number ? ' \u00b7 <a href="/api/v1/fees/receipts/' + encodeURIComponent(l.id) + '/pdf" target="_blank" rel="noopener">Receipt ' + VA.escapeHtml(l.receipt_number) + "</a>" : "") +
+          (l.reversed ? ' <span class="status-pill dropped">Reversed</span>' : "") + "</td>";
+      if (l.type === "CREDIT" && !l.reversed) {
+        const rev = document.createElement("button");
+        rev.type = "button";
+        rev.className = "role-btn small-btn secondary-btn";
+        rev.textContent = "Reverse\u2026";
+        rev.addEventListener("click", async function () {
+          const reason = await VA.ask({ title: "Reverse this payment?", danger: true, ok: "Reverse payment",
+            intro: money(l.amount) + (l.receipt_number ? ", receipt " + l.receipt_number : "") + ". Use this only for a payment recorded by mistake or a bounced cheque. The receipt will print as VOID and the amount will be owed again." });
+          if (!reason) return;
+          const res = await VA.fetchJson("/api/v1/fees/assignments/payments/" + l.id + "/reverse", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason: reason }) });
+          if (!res.ok) { VA.toast(extractErrorMessage(res.body, "Could not reverse the payment."), "error"); return; }
+          VA.toast("Payment reversed. The receipt now prints as VOID.");
+          loadLedger(assignmentId); loadAssignments(); loadDashboard();
+        });
+        tr.lastElementChild.appendChild(document.createTextNode(" "));
+        tr.lastElementChild.appendChild(rev);
+      }
       ledgerTbody.appendChild(tr);
     });
   }
@@ -573,13 +630,20 @@
 
   saveAssignmentStatusBtn.addEventListener("click", async function () {
     if (!activeAssignmentId) return;
-    saveAssignmentStatusBtn.disabled = true;
     assignmentModalError.hidden = true;
+    const status = assignmentStatusSelect.value;
+    let reason = null;
+    if (status !== "ACTIVE") {
+      reason = await VA.ask({ title: status === "WAIVED" ? "Waive this fee?" : "Cancel this fee?", danger: true, ok: status === "WAIVED" ? "Waive it" : "Cancel it",
+        intro: "Nothing more will be collected on it and its bank challans stop working. Money already paid stays recorded." });
+      if (!reason) return;
+    }
+    saveAssignmentStatusBtn.disabled = true;
 
     const result = await VA.fetchJson("/api/v1/fees/assignments/" + activeAssignmentId + "/status", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: assignmentStatusSelect.value }),
+      body: JSON.stringify({ status: status, reason: reason }),
     });
 
     saveAssignmentStatusBtn.disabled = false;

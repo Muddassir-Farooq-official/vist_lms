@@ -13,6 +13,7 @@ from app.core.database import Base, TimestampMixin, UUIDPKMixin
 class AttendanceStatus(str, enum.Enum):
     PRESENT = "PRESENT"
     ABSENT = "ABSENT"
+    LEAVE = "LEAVE"        # approved leave (e.g. medical): not counted for or against the student
 
 
 class AttendanceRecord(UUIDPKMixin, TimestampMixin, Base):

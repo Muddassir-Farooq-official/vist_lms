@@ -9,6 +9,7 @@ import uuid
 from collections.abc import Iterable
 
 from sqlalchemy import func, select
+from sqlalchemy.orm.util import identity_key
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.academics.models import Enrollment, EnrollmentStatus
@@ -19,8 +20,18 @@ async def load_by_ids(session: AsyncSession, model, ids: Iterable[uuid.UUID | No
     wanted = {i for i in ids if i is not None}
     if not wanted:
         return {}
-    rows = (await session.execute(select(model).where(model.id.in_(wanted)))).scalars().all()
-    return {row.id: row for row in rows}
+    # Rows this request already loaded (e.g. through an eager relationship) cost nothing: only the
+    # rest go to the database. Matters most when the database is far away (every query is a round trip).
+    found = {}
+    for i in wanted:
+        obj = session.identity_map.get(identity_key(model, i))
+        if obj is not None:
+            found[i] = obj
+    missing = wanted - found.keys()
+    if missing:
+        rows = (await session.execute(select(model).where(model.id.in_(missing)))).scalars().all()
+        found.update({row.id: row for row in rows})
+    return found
 
 
 async def enrolled_counts(session: AsyncSession, offering_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, int]:

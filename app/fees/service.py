@@ -355,6 +355,36 @@ class FeeStructureService:
 
         await ScholarshipService(self.session).apply_active_to_assignment(assignment, actor_id=actor_id)
 
+    async def undo_activation(self, structure_id: uuid.UUID, *, reason: str, actor_id: uuid.UUID) -> dict:
+        """Take back a mistaken activation (wrong amount, wrong programs): the generated charges are removed and the fee is a draft
+        again. Only possible while nobody has paid, been given a discount or been refunded on it; after that, correct it with
+        a reversal instead."""
+        from sqlalchemy import delete, func
+
+        from app.fees.models import FeeAssignment, FeeLedgerEntry
+        from app.fees.refund_models import FeeRefund
+
+        structure = await self.get(structure_id)
+        if structure.status != FeeStructureStatus.ACTIVE:
+            raise BusinessRuleViolationError("Only an active fee structure has an activation to undo.")
+        if len((reason or "").strip()) < 5:
+            raise BusinessRuleViolationError("Say why the activation is being undone.")
+        ids = list((await self.session.execute(select(FeeAssignment.id).where(FeeAssignment.fee_structure_id == structure_id))).scalars())
+        if ids:
+            touched = (await self.session.execute(select(func.count(func.distinct(FeeLedgerEntry.fee_assignment_id))).where(
+                FeeLedgerEntry.fee_assignment_id.in_(ids), FeeLedgerEntry.entry_type != LedgerEntryType.DEBIT))).scalar_one()
+            refunds = (await self.session.execute(select(func.count()).select_from(FeeRefund).where(FeeRefund.fee_assignment_id.in_(ids)))).scalar_one()
+            if touched or refunds:
+                raise BusinessRuleViolationError(
+                    f"This activation cannot be undone: payments, discounts or refunds already exist on {max(touched, refunds)} fee(s). Reverse those first, or close this fee instead.")
+            await self.session.execute(delete(FeeAssignment).where(FeeAssignment.id.in_(ids)))
+        structure.status = FeeStructureStatus.DRAFT
+        structure.activated_at = None
+        await self.session.flush()
+        await AuditService(self.session).log(actor_user_id=actor_id, action="fee_structure.activation_undone", entity_type="fee_structure", entity_id=structure.id,
+                                             metadata={"reason": reason.strip(), "removed_charges": len(ids)})
+        return {"removed_charges": len(ids), "status": "DRAFT"}
+
     async def activate(self, structure_id: uuid.UUID, *, actor_id: uuid.UUID) -> dict:
         structure = await self.get(structure_id)
         if structure.status == FeeStructureStatus.CLOSED:

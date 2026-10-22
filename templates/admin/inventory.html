@@ -1,0 +1,132 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN,ACCOUNTS_OFFICER{% endblock %}
+{% block title %}Inventory{% endblock %}
+{% block page_title %}Inventory / Store{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">What the institute keeps in stock, where every item went and who has it. Every change is recorded with who did it, when and why; nothing is ever edited or deleted.</div>{% endblock %}
+
+{% block content %}
+<div id="inv-tiles"></div>
+
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="stock" role="tab" aria-selected="true"><span>Stock</span></button>
+  <button class="portal-tab" data-tab="issue" role="tab" aria-selected="false"><span>Issue items</span></button>
+  <button class="portal-tab" data-tab="receive" role="tab" aria-selected="false"><span>Receive from purchases</span></button>
+  <button class="portal-tab" data-tab="holdings" role="tab" aria-selected="false"><span>With people</span></button>
+  <button class="portal-tab" data-tab="history" role="tab" aria-selected="false"><span>History</span></button>
+</div>
+
+<p id="inv-msg" class="panel-hint" role="status" hidden></p>
+
+<div class="portal-tab-panel" data-tab-panel="stock">
+<section class="panel">
+  <div class="panel-header">
+    <div class="panel-header-left"><h2>Items</h2></div>
+    <button type="button" class="role-btn" id="inv-add-open" data-manage>+ Add item</button>
+  </div>
+  <div class="toolbar">
+    <input id="inv-q" class="text-input" placeholder="Search name or code" aria-label="Search items" />
+    <label class="check-row"><input type="checkbox" id="inv-low" /> Only low stock</label>
+    <label class="check-row"><input type="checkbox" id="inv-inactive" /> Show switched-off items</label>
+  </div>
+  <table class="dash-table" id="inv-items-table">
+    <thead><tr><th>Code</th><th>Item</th><th>Category</th><th class="num">In stock</th><th class="num">Avg. cost</th><th class="num">Stock value</th><th class="num">Sale price</th><th></th></tr></thead>
+    <tbody id="inv-items"></tbody>
+  </table>
+  <p class="empty-state" id="inv-items-empty" hidden>No items yet. Add one, or put a received purchase order into stock.</p>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="issue" hidden>
+<section class="panel">
+  <h2>Issue items</h2>
+  <p class="panel-hint">Free: the college gives it (still costed in the records). Paid now: a receipt is printed and the money goes into Accounts as store sales. Add to dues: it becomes a fine the person pays later, like any other fine.</p>
+  <form id="inv-issue-form" class="form-grid">
+    <div class="form-field"><label for="is-item">Item</label><select id="is-item" class="select-input" required></select></div>
+    <div class="form-field"><label for="is-qty">Quantity</label><input type="number" id="is-qty" class="text-input" min="0.01" step="0.01" value="1" required /></div>
+    <div class="form-field"><label for="is-party-type">Issue to</label>
+      <select id="is-party-type" class="select-input"><option value="STUDENT">Student</option><option value="EMPLOYEE">Staff member</option><option value="DEPARTMENT">Department / office</option></select></div>
+    <div class="form-field" id="is-person-field"><label for="is-person">Find the person (name, roll no. or employee code)</label>
+      <input type="text" id="is-person" class="text-input" autocomplete="off" />
+      <div id="is-person-results" class="search-results-dropdown" hidden></div>
+      <input type="hidden" id="is-person-id" /></div>
+    <div class="form-field" id="is-dept-field" hidden><label for="is-dept">Department</label><input type="text" id="is-dept" class="text-input" maxlength="120" placeholder="e.g. Computer Lab" /></div>
+    <div class="form-field"><label for="is-mode">Charge</label>
+      <select id="is-mode" class="select-input"><option value="FREE">Free (from the college)</option><option value="PAID_NOW">Paid now (receipt)</option><option value="ADD_TO_DUES">Add to their dues (fine)</option></select></div>
+    <div class="form-field" data-charged hidden><label for="is-price">Price per unit (Rs.)</label><input type="number" id="is-price" class="text-input" min="0.01" step="0.01" /></div>
+    <div class="form-field" data-paid-now hidden><label for="is-method">Paid by</label>
+      <select id="is-method" class="select-input"><option value="CASH">Cash</option><option value="BANK_TRANSFER">Bank transfer / deposit</option><option value="CHEQUE">Cheque</option><option value="ONLINE">Online</option></select></div>
+    <div class="form-field" data-paid-now hidden><label for="is-ref">Slip / transaction / cheque no.</label><input type="text" id="is-ref" class="text-input" maxlength="80" /></div>
+    <div class="form-field two-span"><label for="is-reason">Note (optional)</label><input type="text" id="is-reason" class="text-input" maxlength="300" placeholder="e.g. Lab coat for practicals" /></div>
+    <p class="panel-hint two-span" id="is-total"></p>
+    <div class="form-actions two-span"><button type="submit" class="role-btn" id="is-submit">Issue</button></div>
+  </form>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="receive" hidden>
+<section class="panel">
+  <h2>Received purchases waiting to go into stock</h2>
+  <p class="panel-hint">Goods marked received (or paid) on a purchase order appear here. Put each line into an existing item, or create a new item from it. The cost comes from the purchase price.</p>
+  <div id="inv-po-list"></div>
+  <p class="empty-state" id="inv-po-empty" hidden>Nothing waiting. Received purchase orders show up here.</p>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="holdings" hidden>
+<section class="panel">
+  <h2>Returnable items still with someone</h2>
+  <p class="panel-hint">Only items marked "returnable" (laptops, lab coats, keys...). Use Return when they come back.</p>
+  <table class="dash-table" id="inv-hold-table">
+    <thead><tr><th>Issued</th><th>Item</th><th>With</th><th class="num">Still out</th><th>Ref.</th><th></th></tr></thead>
+    <tbody id="inv-hold"></tbody>
+  </table>
+  <p class="empty-state" id="inv-hold-empty" hidden>Nothing returnable is out right now.</p>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="history" hidden>
+<section class="panel">
+  <h2>History (audit trail)</h2>
+  <div class="toolbar">
+    <select id="hi-kind" class="select-input" aria-label="Kind">
+      <option value="">Everything</option><option value="OPENING">Opening stock</option><option value="RECEIVED">Received</option><option value="ISSUED">Issued</option>
+      <option value="RETURNED">Returned</option><option value="ADJUSTED">Corrections</option><option value="REVERSED">Reversals</option></select>
+    <select id="hi-item" class="select-input" aria-label="Item"><option value="">All items</option></select>
+    <input id="hi-q" class="text-input" placeholder="Person or department" aria-label="Person" />
+    <input id="hi-from" type="date" class="text-input" aria-label="From" />
+    <input id="hi-to" type="date" class="text-input" aria-label="To" />
+    <button type="button" class="role-btn" id="hi-load">Show</button>
+  </div>
+  <table class="dash-table" id="inv-hist-table">
+    <thead><tr><th>Ref.</th><th>When</th><th>What</th><th>Item</th><th class="num">Qty</th><th class="num">Value</th><th>Who / charge</th><th>By</th><th></th></tr></thead>
+    <tbody id="inv-hist"></tbody>
+  </table>
+  <p class="empty-state" id="inv-hist-empty" hidden>No movements match.</p>
+</section>
+</div>
+
+<dialog id="inv-item-modal" class="modal">
+  <div class="modal-body">
+    <h2 id="inv-item-title">Add item</h2>
+    <form id="inv-item-form" class="form-grid">
+      <div class="form-field"><label for="it-name">Name</label><input type="text" id="it-name" class="text-input" maxlength="150" required /></div>
+      <div class="form-field"><label for="it-code">Code (empty = automatic)</label><input type="text" id="it-code" class="text-input" maxlength="30" /></div>
+      <div class="form-field"><label for="it-category">Category</label><input type="text" id="it-category" class="text-input" maxlength="60" placeholder="Stationery, Uniform, Lab, IT..." list="inv-categories" /><datalist id="inv-categories"></datalist></div>
+      <div class="form-field"><label for="it-unit">Unit</label><input type="text" id="it-unit" class="text-input" maxlength="20" placeholder="pcs, box, ream, set" /></div>
+      <div class="form-field"><label for="it-price">Sale price (Rs., optional)</label><input type="number" id="it-price" class="text-input" min="0" step="0.01" /></div>
+      <div class="form-field"><label for="it-reorder">Warn when stock falls to</label><input type="number" id="it-reorder" class="text-input" min="0" step="0.01" /></div>
+      <div class="form-field" data-new-only><label for="it-open-qty">Already on the shelf (quantity)</label><input type="number" id="it-open-qty" class="text-input" min="0" step="0.01" /></div>
+      <div class="form-field" data-new-only><label for="it-open-cost">Cost per unit of that stock (Rs.)</label><input type="number" id="it-open-cost" class="text-input" min="0" step="0.01" /></div>
+      <label class="check-row two-span"><input type="checkbox" id="it-returnable" /> Returnable (lent out and expected back)</label>
+      <label class="check-row two-span" data-edit-only hidden><input type="checkbox" id="it-active" /> In use (untick to switch the item off)</label>
+      <div class="form-actions two-span"><button type="submit" class="role-btn" id="it-save">Save</button></div>
+    </form>
+    <p id="it-error" class="dash-alert error" hidden></p>
+    <button id="inv-item-close" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/inventory.js"></script>
+{% endblock %}

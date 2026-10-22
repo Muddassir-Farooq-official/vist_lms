@@ -15,6 +15,8 @@ from app.students.models import Student
 def assert_can_view_student(current_user: CurrentUser, student: Student) -> None:
     if Roles.ADMIN in current_user.roles or Roles.ACCOUNTS_OFFICER in current_user.roles:
         return
+    if Roles.PRINCIPAL in current_user.roles or Roles.HOD in current_user.roles:
+        return                                  # look up, read-only (no edit permission is held)
     if Roles.STUDENT in current_user.roles:
         if student.user_id != current_user.id:
             raise AuthorizationError("You may only view your own student record.")

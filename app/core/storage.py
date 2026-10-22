@@ -137,6 +137,27 @@ def get_file_path(storage_key: str | None) -> Path | None:
     return path if path.exists() else None
 
 
+def archive_file(storage_key: str | None) -> str | None:
+    """Keep a file that is being replaced or removed: it is moved under archive/ (same relative path) instead of being deleted,
+    and the new key is returned. Returns None when there was nothing to keep."""
+    if not storage_key:
+        return None
+    path = Path(settings.storage_local_path) / storage_key
+    if not path.exists():
+        return None
+    from datetime import datetime, timezone
+
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    key = f"archive/{stamp}/{storage_key}"
+    target = Path(settings.storage_local_path) / key
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        path.replace(target)
+    except OSError:
+        return None
+    return key
+
+
 def delete_file(storage_key: str | None) -> None:
     if not storage_key:
         return

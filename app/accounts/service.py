@@ -22,11 +22,13 @@ from app.audit.service import AuditService
 from app.auth.models import Role, User, UserRole
 from app.auth.permissions import Roles
 from app.core.clock import institute_today
+from app.accounts.period import ensure_open
 from app.core.config import settings
 from app.core.exceptions import BusinessRuleViolationError, ResourceNotFoundError
 from app.core.storage import FileTooLargeError, UnsupportedFileTypeError, attachment_is_inline, delete_file, save_attachment, validate_attachment
 from app.employees.models import Employee
 from app.fees.models import FeeLedgerEntry, LedgerEntryType
+from app.fines.models import Fine, FineStatus
 from app.notifications.models import NotificationCategory
 from app.notifications.service import create_notification
 
@@ -190,7 +192,12 @@ class AccountsService:
                 validate_attachment(content=content, original_filename=name, declared_content_type=ctype)
             except (UnsupportedFileTypeError, FileTooLargeError) as exc:
                 raise BusinessRuleViolationError(f"\u201c{name}\u201d: {exc}") from exc
-        needs_approval = not is_approver and amount > Decimal(str(settings.expense_approval_limit))
+        await ensure_open(self.session, data["expense_date"], "This expense")
+        over_limit = amount > Decimal(str(settings.expense_approval_limit))
+        # Maker-checker: above the limit, even an administrator's own expense waits for ANOTHER
+        # administrator (if there is one), so nobody signs off their own large spending.
+        other_admins = [a for a in await self._admin_ids() if a != user_id] if over_limit and is_approver else []
+        needs_approval = over_limit and (not is_approver or bool(other_admins))
         e = Expense(category_id=category.id, vendor_id=data.get("vendor_id"), title=data["title"].strip(), description=(data.get("description") or "").strip() or None, amount=amount,
                     expense_date=data["expense_date"], payment_method=data["payment_method"], reference_no=(data.get("reference_no") or "").strip() or None,
                     status=ExpenseStatus.PENDING_APPROVAL if needs_approval else ExpenseStatus.APPROVED, source=ExpenseSource.MANUAL, recorded_by=user_id)
@@ -225,8 +232,13 @@ class AccountsService:
 
     async def decide_expense(self, expense_id: uuid.UUID, *, admin_id: uuid.UUID, approve: bool, note: str | None) -> Expense:
         e = await self._expense(expense_id)
+        from app.core.controls import refuse_self
+
+        refuse_self(admin_id, e.recorded_by, "You recorded this expense, so another administrator must approve or reject it.")
         if e.status != ExpenseStatus.PENDING_APPROVAL:
             raise BusinessRuleViolationError("This expense is not waiting for approval.")
+        if approve:
+            await ensure_open(self.session, e.expense_date, "This expense")
         if not approve and len((note or "").strip()) < 3:
             raise BusinessRuleViolationError("Say why you are rejecting it.")
         e.status = ExpenseStatus.APPROVED if approve else ExpenseStatus.REJECTED
@@ -243,6 +255,7 @@ class AccountsService:
             raise BusinessRuleViolationError("Only an approved expense can be voided.")
         if e.source != ExpenseSource.MANUAL:
             raise BusinessRuleViolationError("This expense was created by a purchase or a salary run. Reverse it there.")
+        await ensure_open(self.session, e.expense_date, "This expense")
         e.status, e.voided_at, e.void_reason = ExpenseStatus.VOIDED, datetime.now(timezone.utc), reason.strip()
         await self.audit.log(actor_user_id=admin_id, action="accounts.expense_voided", entity_type="expense", entity_id=e.id, metadata={"reason": reason.strip()})
         return e
@@ -293,6 +306,7 @@ class AccountsService:
     async def create_income(self, *, user_id: uuid.UUID, data: dict) -> IncomeEntry:
         amount = Decimal(str(data["amount"])).quantize(Decimal("0.01"))
         self._check_money(amount, data["income_date"], "income")
+        await ensure_open(self.session, data["income_date"], "This income")
         category = await self._category(data["category_id"], EntryKind.INCOME)
         if data["payment_method"] in NEEDS_REFERENCE and not (data.get("reference_no") or "").strip():
             raise BusinessRuleViolationError("Enter the cheque number or the bank transaction reference.")
@@ -310,6 +324,7 @@ class AccountsService:
             raise ResourceNotFoundError("Income entry not found.")
         if i.voided_at is not None:
             raise BusinessRuleViolationError("This entry is already voided.")
+        await ensure_open(self.session, i.income_date, "This income")
         i.voided_at, i.void_reason = datetime.now(timezone.utc), reason.strip()
         await self.audit.log(actor_user_id=admin_id, action="accounts.income_voided", entity_type="income_entry", entity_id=i.id, metadata={"reason": reason.strip()})
         return i
@@ -335,6 +350,10 @@ class AccountsService:
 
     # ------------------------------------------------------------------ the day book
     async def book(self, *, kind: EntryKind | None, from_date: date | None, to_date: date | None, q: str | None, limit: int, offset: int) -> list[dict]:
+        # Each source returns its newest rows first, at most as many as this page can need, so paging
+        # through the day book is exact however many years of entries there are (it used to stop at 5,000).
+        limit = max(1, min(limit, 500))
+        window = max(0, offset) + limit if not (q and q.strip()) else 20000
         rows: list[dict] = []
         cats = {c.id: c.name for c in (await self.session.execute(select(AccountCategory))).scalars()}
         if kind in (None, EntryKind.EXPENSE):
@@ -344,7 +363,7 @@ class AccountsService:
             if to_date:
                 stmt = stmt.where(Expense.expense_date <= to_date)
             vendors = {v.id: v.name for v in (await self.session.execute(select(Vendor))).scalars()}
-            for e in (await self.session.execute(stmt.limit(5000))).scalars():
+            for e in (await self.session.execute(stmt.order_by(Expense.expense_date.desc(), Expense.created_at.desc()).limit(window))).scalars():
                 rows.append({"kind": EntryKind.EXPENSE, "id": e.id, "reference": expense_ref(e), "date": e.expense_date, "title": e.title, "party": vendors.get(e.vendor_id), "category": cats.get(e.category_id, "?"),
                              "amount": _f(e.amount), "payment_method": e.payment_method, "status": e.status.value, "_t": e.created_at})
         if kind in (None, EntryKind.INCOME):
@@ -353,9 +372,91 @@ class AccountsService:
                 stmt = stmt.where(IncomeEntry.income_date >= from_date)
             if to_date:
                 stmt = stmt.where(IncomeEntry.income_date <= to_date)
-            for i in (await self.session.execute(stmt.limit(5000))).scalars():
+            for i in (await self.session.execute(stmt.order_by(IncomeEntry.income_date.desc(), IncomeEntry.created_at.desc()).limit(window))).scalars():
                 rows.append({"kind": EntryKind.INCOME, "id": i.id, "reference": income_ref(i), "date": i.income_date, "title": i.description or i.received_from, "party": i.received_from, "category": cats.get(i.category_id, "?"),
                              "amount": _f(i.amount), "payment_method": i.payment_method, "status": "RECEIVED", "_t": i.created_at})
+        # Student / staff fee payments (money in) and fee refunds paid back (money out) -- the fee ledger.
+        fee_types = []
+        if kind in (None, EntryKind.INCOME):
+            fee_types.append(LedgerEntryType.CREDIT)
+        if kind in (None, EntryKind.EXPENSE):
+            fee_types.append(LedgerEntryType.REFUND)
+        if fee_types:
+            from app.fees.models import FeeAssignment, FeeStructure
+            from app.students.models import Student
+
+            from app.fees import money as fee_money
+
+            fee_day = fee_money.money_day()
+            wanted = FeeLedgerEntry.entry_type.in_(fee_types)
+            if LedgerEntryType.CREDIT in fee_types:
+                wanted = wanted | fee_money.is_reversal()          # a reversed payment is money back out of fee income
+            stmt = (select(FeeLedgerEntry, FeeAssignment.payer_type, FeeAssignment.payer_id, FeeStructure.name)
+                    .join(FeeAssignment, FeeAssignment.id == FeeLedgerEntry.fee_assignment_id)
+                    .join(FeeStructure, FeeStructure.id == FeeAssignment.fee_structure_id)
+                    .where(wanted))
+            if from_date:
+                stmt = stmt.where(fee_day >= from_date)
+            if to_date:
+                stmt = stmt.where(fee_day <= to_date)
+            fee_rows = (await self.session.execute(stmt.order_by(fee_day.desc(), FeeLedgerEntry.created_at.desc()).limit(window))).all()
+            sids = {pid for _e, pt, pid, _n in fee_rows if pt.value == "STUDENT"}
+            eids = {pid for _e, pt, pid, _n in fee_rows if pt.value != "STUDENT"}
+            names = {}
+            if sids:
+                names.update({s.id: f"{s.first_name} {s.last_name} ({s.roll_number or '-'})" for s in (await self.session.execute(select(Student).where(Student.id.in_(sids)))).scalars()})
+            if eids:
+                names.update({e.id: f"{e.first_name} {e.last_name} ({e.employee_code})" for e in (await self.session.execute(select(Employee).where(Employee.id.in_(eids)))).scalars()})
+            from app.core.clock import local_date
+
+            for e, _pt, pid, fee_name in fee_rows:
+                refund = e.entry_type == LedgerEntryType.REFUND
+                reversal = e.entry_type == LedgerEntryType.DEBIT
+                pm = e.payment_method.value if hasattr(e.payment_method, "value") else (e.payment_method or "CASH")
+                if reversal:
+                    rows.append({"kind": EntryKind.INCOME, "id": e.id, "reference": "REVERSAL", "date": local_date(e.created_at),
+                                 "title": "Fee payment reversed: " + fee_name, "party": names.get(pid), "category": "Student / staff fees",
+                                 "amount": -_f(e.amount), "payment_method": pm, "status": "REVERSED", "_t": e.created_at})
+                    continue
+                rows.append({"kind": EntryKind.EXPENSE if refund else EntryKind.INCOME, "id": e.id,
+                             "reference": e.receipt_number or ("REFUND" if refund else "FEE"), "date": e.paid_on or local_date(e.created_at),
+                             "title": ("Fee refund: " if refund else "Fee payment: ") + fee_name, "party": names.get(pid),
+                             "category": "Fee refunds" if refund else "Student / staff fees", "amount": _f(e.amount),
+                             "payment_method": pm, "status": "PAID" if refund else "RECEIVED", "_t": e.created_at})
+        if kind in (None, EntryKind.INCOME):
+            # Collected fines are income too (library, attendance, late fee, gate, store...).
+            paid_day = func.coalesce(Fine.paid_on, func.date(Fine.resolved_at))
+            stmt = select(Fine).where(Fine.status == FineStatus.PAID)
+            if from_date:
+                stmt = stmt.where(paid_day >= from_date)
+            if to_date:
+                stmt = stmt.where(paid_day <= to_date)
+            fines = list((await self.session.execute(stmt.order_by(paid_day.desc(), Fine.created_at.desc()).limit(window))).scalars())
+            if fines:
+                from app.fines.service import resolve_payer
+                for f in fines:
+                    payer = await resolve_payer(self.session, f.payer_type, f.payer_id)
+                    day = f.paid_on or (f.resolved_at.date() if f.resolved_at else None)
+                    rows.append({"kind": EntryKind.INCOME, "id": f.id, "reference": f.receipt_number or f"FINE-{str(f.id)[:8]}", "date": day,
+                                 "title": f"Fine: {f.reason}", "party": payer.name, "category": "Fines \u2014 " + f.source.value.replace("_", " ").title(),
+                                 "amount": _f(f.amount), "payment_method": f.payment_method or "CASH", "status": "RECEIVED", "_t": f.resolved_at or f.created_at})
+        if kind in (None, EntryKind.INCOME):
+            # Fine payments that were later reversed: the money came in on its day and went back out on another.
+            from app.fines.models import FinePaymentReversal
+
+            stmt = select(FinePaymentReversal, Fine).join(Fine, Fine.id == FinePaymentReversal.fine_id)
+            for rv, f in (await self.session.execute(stmt.order_by(FinePaymentReversal.reversed_at.desc()).limit(window))).all():
+                from app.fines.service import resolve_payer
+
+                payer = None
+                for day, amount, title, ref, status in ((rv.paid_on, _f(rv.amount), f"Fine: {f.reason}", rv.receipt_number or "FINE", "REVERSED"),
+                                                        (rv.reversed_on, -_f(rv.amount), f"Fine payment reversed: {rv.reason}", "REVERSAL", "REVERSED")):
+                    if (from_date and day < from_date) or (to_date and day > to_date):
+                        continue
+                    payer = payer or await resolve_payer(self.session, f.payer_type, f.payer_id)
+                    rows.append({"kind": EntryKind.INCOME, "id": rv.id, "reference": ref, "date": day, "title": title, "party": payer.name,
+                                 "category": "Fines \u2014 " + f.source.value.replace("_", " ").title(), "amount": amount,
+                                 "payment_method": rv.payment_method or "CASH", "status": status, "_t": rv.reversed_at})
         if q and q.strip():
             n = q.strip().lower()
             rows = [r for r in rows if n in r["title"].lower() or n in (r["party"] or "").lower() or n in r["reference"].lower() or n in r["category"].lower()]
@@ -368,19 +469,40 @@ class AccountsService:
     async def summary(self, *, from_date: date | None, to_date: date | None) -> dict:
         cats = {c.id: c.name for c in (await self.session.execute(select(AccountCategory))).scalars()}
         # Fee income = payments received minus refunds paid back.
-        fee_stmt = select(func.coalesce(func.sum(case((FeeLedgerEntry.entry_type == LedgerEntryType.REFUND, -FeeLedgerEntry.amount), else_=FeeLedgerEntry.amount)), 0)).where(
-            FeeLedgerEntry.entry_type.in_([LedgerEntryType.CREDIT, LedgerEntryType.REFUND]))
+        from app.fees import money as fee_money
+
+        fee_stmt = select(func.coalesce(func.sum(fee_money.signed_amount()), 0)).where(fee_money.moves_money())
         inc_stmt = select(IncomeEntry.category_id, func.sum(IncomeEntry.amount), func.count()).where(IncomeEntry.voided_at.is_(None)).group_by(IncomeEntry.category_id)
         exp_stmt = select(Expense.category_id, func.sum(Expense.amount), func.count()).where(Expense.status == ExpenseStatus.APPROVED).group_by(Expense.category_id)
         pend_stmt = select(func.coalesce(func.sum(Expense.amount), 0), func.count()).where(Expense.status == ExpenseStatus.PENDING_APPROVAL)
         ven_stmt = select(Vendor.name, func.sum(Expense.amount), func.count()).join(Vendor, Vendor.id == Expense.vendor_id).where(Expense.status == ExpenseStatus.APPROVED).group_by(Vendor.name).order_by(func.sum(Expense.amount).desc()).limit(8)
         if from_date:
-            fee_stmt = fee_stmt.where(func.date(FeeLedgerEntry.created_at) >= from_date)
+            fee_stmt = fee_stmt.where(fee_money.money_day() >= from_date)
             inc_stmt, exp_stmt, ven_stmt = (inc_stmt.where(IncomeEntry.income_date >= from_date), exp_stmt.where(Expense.expense_date >= from_date), ven_stmt.where(Expense.expense_date >= from_date))
         if to_date:
-            fee_stmt = fee_stmt.where(func.date(FeeLedgerEntry.created_at) <= to_date)
+            fee_stmt = fee_stmt.where(fee_money.money_day() <= to_date)
             inc_stmt, exp_stmt, ven_stmt = (inc_stmt.where(IncomeEntry.income_date <= to_date), exp_stmt.where(Expense.expense_date <= to_date), ven_stmt.where(Expense.expense_date <= to_date))
         fees = _f((await self.session.execute(fee_stmt)).scalar_one())
+        paid_day = func.coalesce(Fine.paid_on, func.date(Fine.resolved_at))
+        fine_stmt = select(Fine.source, func.sum(Fine.amount), func.count()).where(Fine.status == FineStatus.PAID).group_by(Fine.source)
+        if from_date:
+            fine_stmt = fine_stmt.where(paid_day >= from_date)
+        if to_date:
+            fine_stmt = fine_stmt.where(paid_day <= to_date)
+        by_src: dict = {src.value: [_f(a), n] for src, a, n in (await self.session.execute(fine_stmt)).all()}
+        from app.fines.models import FinePaymentReversal
+
+        for rv, src in (await self.session.execute(select(FinePaymentReversal, Fine.source).join(Fine, Fine.id == FinePaymentReversal.fine_id))).all():
+            for day, amount, count in ((rv.paid_on, _f(rv.amount), 1), (rv.reversed_on, -_f(rv.amount), -1)):
+                if (from_date and day < from_date) or (to_date and day > to_date):
+                    continue
+                cell = by_src.setdefault(src.value, [0.0, 0])
+                cell[0], cell[1] = round(cell[0] + amount, 2), cell[1] + count
+        fine_rows = [{"source": k, "amount": v[0], "count": v[1]} for k, v in by_src.items() if abs(v[0]) > 0.004 or v[1]]
+        fine_rows.sort(key=lambda r: -r["amount"])
+        fines_collected = round(sum(r["amount"] for r in fine_rows), 2)
+        out_amount, out_count = (await self.session.execute(select(func.coalesce(func.sum(Fine.amount), 0), func.count()).where(Fine.status == FineStatus.PENDING))).one()
+        waived_amount = _f((await self.session.execute(select(func.coalesce(func.sum(Fine.amount), 0)).where(Fine.status == FineStatus.WAIVED))).scalar_one())
         inc_rows = [{"category": cats.get(c, "?"), "amount": _f(a), "count": n} for c, a, n in (await self.session.execute(inc_stmt)).all()]
         exp_rows = [{"category": cats.get(c, "?"), "amount": _f(a), "count": n} for c, a, n in (await self.session.execute(exp_stmt)).all()]
         inc_rows.sort(key=lambda r: -r["amount"]); exp_rows.sort(key=lambda r: -r["amount"])
@@ -398,13 +520,24 @@ class AccountsService:
         months.reverse()
         first = date(int(months[0][:4]), int(months[0][5:]), 1)
         month_of = lambda col: func.to_char(col, "YYYY-MM")                                               # noqa: E731
-        fm = month_of(FeeLedgerEntry.created_at).label("m")
-        fee_m = {mo: _f(a) for mo, a in (await self.session.execute(select(fm, func.sum(case((FeeLedgerEntry.entry_type == LedgerEntryType.REFUND, -FeeLedgerEntry.amount), else_=FeeLedgerEntry.amount))).where(FeeLedgerEntry.entry_type.in_([LedgerEntryType.CREDIT, LedgerEntryType.REFUND]), func.date(FeeLedgerEntry.created_at) >= first).group_by(fm))).all()}
+        fm = month_of(fee_money.money_day()).label("m")
+        fee_m = {mo: _f(a) for mo, a in (await self.session.execute(select(fm, func.sum(fee_money.signed_amount())).where(fee_money.moves_money(), fee_money.money_day() >= first).group_by(fm))).all()}
         im = month_of(IncomeEntry.income_date).label("m")
         inc_m = {mo: _f(a) for mo, a in (await self.session.execute(select(im, func.sum(IncomeEntry.amount)).where(IncomeEntry.voided_at.is_(None), IncomeEntry.income_date >= first).group_by(im))).all()}
         em = month_of(Expense.expense_date).label("m")
+        fnm = func.to_char(paid_day, "YYYY-MM").label("m")
+        fine_m = {mo: _f(a) for mo, a in (await self.session.execute(select(fnm, func.sum(Fine.amount)).where(Fine.status == FineStatus.PAID, paid_day >= first).group_by(fnm))).all()}
+        for rv in (await self.session.execute(select(FinePaymentReversal))).scalars():
+            for day, amount in ((rv.paid_on, _f(rv.amount)), (rv.reversed_on, -_f(rv.amount))):
+                if day and day >= first:
+                    key = f"{day.year:04d}-{day.month:02d}"
+                    fine_m[key] = round(fine_m.get(key, 0.0) + amount, 2)
         exp_m = {mo: _f(a) for mo, a in (await self.session.execute(select(em, func.sum(Expense.amount)).where(Expense.status == ExpenseStatus.APPROVED, Expense.expense_date >= first).group_by(em))).all()}
-        monthly = [{"month": mo, "fees": fee_m.get(mo, 0.0), "other_income": inc_m.get(mo, 0.0), "income": round(fee_m.get(mo, 0.0) + inc_m.get(mo, 0.0), 2), "expenses": exp_m.get(mo, 0.0)} for mo in months]
-        return {"from_date": from_date, "to_date": to_date, "fees_collected": fees, "other_income": other, "total_income": round(fees + other, 2), "expenses": spent, "net": round(fees + other - spent, 2),
+        monthly = [{"month": mo, "fees": fee_m.get(mo, 0.0), "fines": fine_m.get(mo, 0.0), "other_income": inc_m.get(mo, 0.0),
+                    "income": round(fee_m.get(mo, 0.0) + fine_m.get(mo, 0.0) + inc_m.get(mo, 0.0), 2), "expenses": exp_m.get(mo, 0.0)} for mo in months]
+        total_income = round(fees + fines_collected + other, 2)
+        return {"from_date": from_date, "to_date": to_date, "fees_collected": fees, "fines_collected": fines_collected, "fines_by_source": fine_rows,
+                "fines_outstanding": {"count": out_count, "amount": _f(out_amount)}, "fines_waived": waived_amount,
+                "other_income": other, "total_income": total_income, "expenses": spent, "net": round(total_income - spent, 2),
                 "income_by_category": inc_rows, "expenses_by_category": exp_rows, "pending_expenses": {"count": pending_count, "amount": _f(pending_amount)}, "monthly": monthly,
                 "top_vendors": [{"vendor": n, "amount": _f(a), "count": c} for n, a, c in (await self.session.execute(ven_stmt)).all()]}

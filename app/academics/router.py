@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from starlette.concurrency import run_in_threadpool
+
 import logging
 import uuid
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, UploadFile
+from sqlalchemy import select
 from fastapi.responses import JSONResponse, Response
 
 from app.academics.terms import AcademicTermService, TermStatus, to_dict
@@ -270,6 +273,28 @@ async def _to_offering_out_many(db, offerings: list) -> list[CourseOfferingOut]:
     return out
 
 
+async def _to_enrollment_out_many(db, enrollments: list) -> list[EnrollmentOut]:
+    """Same result as _to_enrollment_out for each row, in three queries in total instead of three per row."""
+    students = await load_by_ids(db, Student, [e.student_id for e in enrollments])
+    offerings = await load_by_ids(db, CourseOffering, [e.course_offering_id for e in enrollments])
+    courses = await load_by_ids(db, Course, [o.course_id for o in offerings.values()])
+    out = []
+    for e in enrollments:
+        student = students.get(e.student_id)
+        offering = offerings.get(e.course_offering_id)
+        course = courses.get(offering.course_id) if offering else None
+        out.append(EnrollmentOut(
+            id=e.id, student_id=e.student_id,
+            student_name=f"{student.first_name} {student.last_name}" if student else "Unknown",
+            roll_number=student.roll_number if student else None,
+            course_offering_id=e.course_offering_id, course_code=course.code if course else "Unknown",
+            course_title=course.title if course else "Unknown", credit_hours=course.credit_hours if course else 0,
+            term_label=offering.term_label if offering else "Unknown", status=e.status, outcome=e.outcome,
+            is_retake=e.is_retake, enrolled_at=e.enrolled_at,
+        ))
+    return out
+
+
 async def _to_enrollment_out(db, enrollment) -> EnrollmentOut:
     # Explicit fetches, not .course_offering/.course relationships — see
     # the comment in _to_offering_out for why relationship access is
@@ -444,6 +469,11 @@ async def unlink_course_from_program(
 # ---------------------------------------------------------------------------
 # Course offerings (term instances + teacher assignment)
 # ---------------------------------------------------------------------------
+@router.delete("/offerings/{offering_id}", status_code=204, summary="Delete an offering created by mistake (only while nobody has enrolled)")
+async def delete_offering(offering_id: uuid.UUID, current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_MANAGE)), db=Depends(get_db)) -> None:
+    await CourseOfferingService(db).delete_offering(offering_id, actor_id=current_user.id)
+
+
 @router.post("/offerings", response_model=CourseOfferingOut, status_code=201, summary="Create a course offering for a term")
 async def create_offering(
     payload: CourseOfferingCreateRequest,
@@ -519,17 +549,14 @@ async def list_eligible_offerings_for_me(
     if not course_ids:
         return []
 
-    offering_repo = CourseOfferingRepository(db)
-    out = []
-    for course_id in course_ids:
-        for offering in await offering_repo.list_by_course(course_id):
-            if not offering.is_open_for_enrollment:
-                continue
-            # A student who belongs to a section only sees their own section's offerings.
-            if student.section_label and offering.section_label.strip().lower() != student.section_label.strip().lower():
-                continue
-            out.append(await _to_offering_out(db, offering))
-    return out
+    rows = (await db.execute(
+        select(CourseOffering).where(CourseOffering.course_id.in_(course_ids), CourseOffering.is_open_for_enrollment.is_(True))
+    )).scalars().all()
+    # A student who belongs to a section only sees their own section's offerings.
+    if student.section_label:
+        mine = student.section_label.strip().lower()
+        rows = [o for o in rows if o.section_label.strip().lower() == mine]
+    return await _to_offering_out_many(db, list(rows))
 
 
 @router.get("/offerings/me", response_model=list[CourseOfferingOut], summary="My assigned course offerings (teacher)")
@@ -588,7 +615,7 @@ async def my_teaching_overview(
     attendance = {
         row[0]: row[1:] for row in (await db.execute(
             select(
-                ClassSession.course_offering_id, func.count(AttendanceRecord.id),
+                ClassSession.course_offering_id, func.sum(case((AttendanceRecord.status == AttendanceStatus.LEAVE, 0), else_=1)),             # approved leave is not counted
                 func.sum(case((AttendanceRecord.status == AttendanceStatus.PRESENT, 1), else_=0)),
             ).join(AttendanceRecord, AttendanceRecord.class_session_id == ClassSession.id)
             .where(ClassSession.course_offering_id.in_(ids), live).group_by(ClassSession.course_offering_id)
@@ -671,7 +698,7 @@ async def my_courses_overview(
         oid: (int(held), int(present or 0))
         for oid, held, present in (await db.execute(
             select(
-                ClassSession.course_offering_id, func.count(AttendanceRecord.id),
+                ClassSession.course_offering_id, func.sum(case((AttendanceRecord.status == AttendanceStatus.LEAVE, 0), else_=1)),             # approved leave is not counted
                 func.sum(case((AttendanceRecord.status == AttendanceStatus.PRESENT, 1), else_=0)),
             )
             .join(AttendanceRecord, AttendanceRecord.class_session_id == ClassSession.id)
@@ -947,7 +974,7 @@ async def get_offering_roster(
         if own_teacher_id is None or offering.assigned_teacher_id != own_teacher_id:
             raise AuthorizationError("You are not the assigned teacher for this offering.")
     enrollments = await EnrollmentService(db).list_for_offering(offering_id)
-    return [await _to_enrollment_out(db, e) for e in enrollments]
+    return await _to_enrollment_out_many(db, enrollments)
 
 
 # ---------------------------------------------------------------------------
@@ -976,7 +1003,7 @@ async def my_enrollments(
 ) -> list[EnrollmentOut]:
     student_id = await _resolve_own_student_id(db, current_user)
     enrollments = await EnrollmentService(db).list_for_student(student_id)
-    return [await _to_enrollment_out(db, e) for e in enrollments]
+    return await _to_enrollment_out_many(db, enrollments)
 
 
 @router.post(
@@ -985,10 +1012,34 @@ async def my_enrollments(
 )
 async def withdraw_admin(
     enrollment_id: uuid.UUID,
+    payload: dict | None = None,
     current_user: CurrentUser = Depends(require_permission(Permissions.ENROLLMENT_MANAGE)),
     db=Depends(get_db),
 ) -> EnrollmentOut:
     enrollment = await EnrollmentService(db).withdraw(enrollment_id, student_id=None, actor_id=current_user.id)
+    if payload and str(payload.get("reason") or "").strip():
+        from app.audit.service import AuditService
+
+        await AuditService(db).log(actor_user_id=current_user.id, action="enrollment.withdrawal_reason", entity_type="enrollment", entity_id=enrollment.id,
+                                   metadata={"reason": str(payload["reason"]).strip()[:300]})
+    return await _to_enrollment_out(db, enrollment)
+
+
+@router.get("/enrollments/{enrollment_id}/sections", summary="Other sections of the same course this term, with seats left (admin)")
+async def other_sections(enrollment_id: uuid.UUID, current_user: CurrentUser = Depends(require_permission(Permissions.ENROLLMENT_MANAGE)), db=Depends(get_db)) -> list[dict]:
+    return await EnrollmentService(db).other_sections(enrollment_id)
+
+
+@router.post("/enrollments/{enrollment_id}/move", response_model=EnrollmentOut, summary="Move a student to another section of the same course (admin)")
+async def move_section(enrollment_id: uuid.UUID, payload: dict, current_user: CurrentUser = Depends(require_permission(Permissions.ENROLLMENT_MANAGE)),
+                       db=Depends(get_db)) -> EnrollmentOut:
+    try:
+        target = uuid.UUID(str(payload.get("course_offering_id")))
+    except ValueError:
+        from app.core.exceptions import ValidationAppError
+
+        raise ValidationAppError("Choose the section to move to.")
+    enrollment = await EnrollmentService(db).move_section(enrollment_id, target, actor_id=current_user.id)
     return await _to_enrollment_out(db, enrollment)
 
 
@@ -1377,7 +1428,7 @@ async def weekly_timetable_pdf(
         **scope, **_timetable_filters(term_label, program_id, semester_number, section_label, teacher_id, room)
     )
     try:
-        pdf = render_pdf(data)
+        pdf = await run_in_threadpool(render_pdf, data)
     except ImportError:
         return JSONResponse(status_code=503, content={"error": {
             "code": "PDF_UNAVAILABLE",
@@ -1554,11 +1605,19 @@ async def list_class_sessions(
         raise AuthorizationError("You do not have access to this offering's materials.")
     service = ClassSessionService(db)
     sessions = await service.list_for_offering(offering_id)
-    out = []
-    for class_session in sessions:
-        resources = await service.list_resources(class_session.id)
-        out.append(_to_class_session_out(class_session, resources))
-    return out
+    # Every session's files in ONE query (a full term has 40+ sessions).
+    from app.academics.models import ClassSessionResource
+
+    by_session: dict = {}
+    if sessions:
+        rows = (await db.execute(
+            select(ClassSessionResource)
+            .where(ClassSessionResource.class_session_id.in_([cs.id for cs in sessions]))
+            .order_by(ClassSessionResource.created_at)
+        )).scalars().all()
+        for r in rows:
+            by_session.setdefault(r.class_session_id, []).append(r)
+    return [_to_class_session_out(cs, by_session.get(cs.id, [])) for cs in sessions]
 
 
 @router.patch(
@@ -1689,6 +1748,12 @@ async def teacher_progress(
         select(CourseOffering.assigned_teacher_id).where(CourseOffering.assigned_teacher_id.is_not(None)).distinct()
     )
     teacher_ids = list(teacher_ids_result.scalars())
+    from app.core.scope import hod_department, teacher_ids_in
+
+    dept = await hod_department(db, current_user)
+    if dept:
+        mine = await teacher_ids_in(db, dept)
+        teacher_ids = [t for t in teacher_ids if t in mine]
 
     entries = []
     for teacher_id in teacher_ids:
@@ -1816,10 +1881,11 @@ async def end_semester_preview(
 )
 async def end_semester(
     term_label: str,
+    override_reason: str | None = None,
     current_user: CurrentUser = Depends(require_permission(Permissions.ENROLLMENT_MANAGE)),
     db=Depends(get_db),
 ) -> EndSemesterResponse:
-    result = await EnrollmentService(db).end_semester(term_label, actor_id=current_user.id)
+    result = await EnrollmentService(db).end_semester(term_label, actor_id=current_user.id, override_reason=override_reason)
     return EndSemesterResponse(**result)
 
 

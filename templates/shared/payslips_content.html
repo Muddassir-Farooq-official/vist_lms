@@ -13,3 +13,18 @@
   <div class="ps-net" id="pv-net"></div>
   <div class="form-actions"><a class="role-btn" id="pv-pdf" href="#" data-download="payslip.pdf" data-label="file">Download PDF</a></div>
   <button id="pv-close" class="back-link modal-close-btn" type="button">Close</button></div></dialog>
+
+<section class="sh-card" id="my-att">
+  <h2 class="panel-title">My attendance</h2>
+  <p class="panel-hint">Your arrivals, leavings and late marks. Days covered by approved leave or a holiday show as excused.</p>
+  <div class="toolbar"><label for="ma-month">Month</label><input id="ma-month" class="text-input" type="month" /></div>
+  <div class="kpi-grid" id="ma-summary"></div>
+  <div class="table-scroll">
+    <table class="dash-table" id="ma-table">
+      <thead><tr><th>Day</th><th>In</th><th>Out</th><th>Late (min)</th><th>Early (min)</th><th>Note</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <p class="empty-state" id="ma-empty" hidden>No attendance has been recorded for you this month.</p>
+</section>
+

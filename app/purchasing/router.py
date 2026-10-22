@@ -81,6 +81,13 @@ async def approve_it(order_id: uuid.UUID, current_user: CurrentUser = Depends(ap
     return await _one(service, order_id, current_user)
 
 
+@router.post("/{order_id}/approve-price", response_model=PurchaseOut, summary="Approve a higher price than estimated, so the purchase can be paid (administration)")
+async def approve_price(order_id: uuid.UUID, current_user: CurrentUser = Depends(approve), db=Depends(get_db)) -> PurchaseOut:
+    service = PurchasingService(db)
+    await service.approve_price(order_id, admin_id=current_user.id)
+    return await _one(service, order_id, current_user)
+
+
 @router.post("/{order_id}/reject", response_model=PurchaseOut, summary="Reject a request, with a reason (administration)")
 async def reject_it(order_id: uuid.UUID, payload: ReasonIn, current_user: CurrentUser = Depends(approve), db=Depends(get_db)) -> PurchaseOut:
     service = PurchasingService(db)

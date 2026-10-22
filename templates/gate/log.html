@@ -1,25 +1,12 @@
 {% extends "gate/_base.html" %}
-{% from "_icons.html" import nav_icon %}
-{% block title %}Today's log{% endblock %}
-{% block page_title %}Today's log{% endblock %}
-{% block page_subtitle %}<div class="content-subtitle">Everyone who has been marked in or out. Late arrivals are in red.</div>{% endblock %}
+{% block title %}Visitor log book{% endblock %}
+{% block page_title %}Visitor log book{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Everyone who came in, with their CNIC, purpose and times. You can search the last 7 days.</div>{% endblock %}
 
 {% block content %}
-<section class="sh-card gate-panel">
-  <div class="ann-toolbar">
-    <input id="l-q" class="text-input" type="search" placeholder="Search name, roll number or code&hellip;" aria-label="Search" />
-    <input id="l-day" class="text-input" type="date" aria-label="Day" />
-    <label class="ann-unread-toggle"><input type="checkbox" id="l-late" /> Late only</label>
-  </div>
-  <div class="rv-chips" id="l-kind"><button type="button" class="chip active" data-kind="">Everyone</button><button type="button" class="chip" data-kind="STUDENT">Students</button><button type="button" class="chip" data-kind="EMPLOYEE">Staff</button></div>
-  <p class="cc-meta" id="l-count" aria-live="polite"></p>
-  <div id="l-list" class="gate-list"></div>
-  <p class="empty-state" id="l-empty" hidden>Nobody has been marked in on this day.</p>
-</section>
+{% include "shared/visitor_log.html" %}
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="/static/js/student-ui.js"></script>
-<script src="/static/js/gate-ui.js"></script>
-<script src="/static/js/gate-log.js"></script>
+<script src="/static/js/gate-visitors.js"></script>
 {% endblock %}

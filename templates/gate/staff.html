@@ -1,0 +1,12 @@
+{% extends "gate/_base.html" %}
+{% block title %}Staff in / out{% endblock %}
+{% block page_title %}Staff in / out{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Mark staff in when they arrive and out when they leave. Late arrival and early leaving are worked out from their timing. A wrong mark can be taken back within 10 minutes.</div>{% endblock %}
+
+{% block content %}
+{% include "shared/staff_board.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/staff-attendance.js"></script>
+{% endblock %}

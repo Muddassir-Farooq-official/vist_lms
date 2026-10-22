@@ -1,0 +1,46 @@
+{% extends base_template %}
+{% block allowed_roles %}{{ allowed_roles|default("ADMIN") }}{% endblock %}
+{% block title %}Calendar{% endblock %}
+{% block page_title %}Calendar{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Holidays, exams, events, term dates and deadlines. A holiday cancels that day's classes and excuses staff attendance.</div>{% endblock %}
+
+{% block content %}
+<section class="sh-card">
+  <div class="toolbar">
+    <label for="cal-month">Month</label>
+    <input id="cal-month" class="text-input" type="month" aria-label="Month" />
+  </div>
+  <div class="table-scroll">
+    <table class="dash-table" id="cal-table">
+      <thead><tr><th>When</th><th>What</th><th>Kind</th><th>For</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <p class="empty-state" id="cal-empty" hidden>Nothing is on the calendar for this month.</p>
+</section>
+
+<section class="sh-card" id="cal-manage" hidden>
+  <h2 class="panel-title">Add to the calendar</h2>
+  <form id="cal-form" class="form-grid" novalidate>
+    <label>Title<input id="cal-title" class="text-input" type="text" maxlength="150" required /></label>
+    <label>Kind
+      <select id="cal-kind" class="text-input">
+        <option value="HOLIDAY">Holiday</option><option value="EXAM">Exam</option><option value="EVENT" selected>Event</option>
+        <option value="TERM">Term date</option><option value="DEADLINE">Deadline</option>
+      </select>
+    </label>
+    <label>First day<input id="cal-start" class="text-input" type="date" required /></label>
+    <label>Last day (if more than one)<input id="cal-end" class="text-input" type="date" /></label>
+    <label class="span-all">Details (optional)<textarea id="cal-details" class="text-input" rows="2" maxlength="1000"></textarea></label>
+    <label class="check-row"><input type="checkbox" id="cal-students" checked /> Students</label>
+    <label class="check-row"><input type="checkbox" id="cal-staff" checked /> Staff</label>
+    <p class="form-error" id="cal-error" role="alert" hidden></p>
+    <p class="form-ok" id="cal-done" role="status" hidden></p>
+    <button type="submit" class="role-btn">Add</button>
+  </form>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/calender.js"></script>
+{% endblock %}

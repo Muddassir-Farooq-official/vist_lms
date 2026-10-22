@@ -40,11 +40,16 @@ def item_amount(calc: str, value, base) -> Decimal:
     return q2(Decimal(str(base)) * Decimal(str(value)) / 100) if calc == "PERCENT_OF_BASE" else q2(value)
 
 
-def unpaid_deduction(base, dim: int, unpaid_days) -> Decimal:
-    """A day's pay is the full month's basic salary divided by the days in the month."""
-    return q2(Decimal(str(base)) / dim * Decimal(str(unpaid_days)))
+def unpaid_deduction(base, working_days: int, days) -> Decimal:
+    """A day's pay is the month's basic salary divided by the working days set for the payroll (e.g. 26 or 22)."""
+    return q2(Decimal(str(base)) / working_days * Decimal(str(days)))
 
 
 def advance_recovery(monthly, balance, available) -> Decimal:
     """What to take back this month: the agreed instalment, never more than is owed, and never more than leaves the person with nothing."""
     return max(Decimal(0), min(q2(monthly), q2(balance), q2(available)))
+
+
+def marks_to_days(marks: int, per_day: int) -> int:
+    """Every `per_day` late arrivals / early leavings together count as one day's pay (4 = 1 day, 7 = 1, 8 = 2)."""
+    return marks // per_day if per_day > 0 and marks > 0 else 0

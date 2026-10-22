@@ -11,6 +11,7 @@
   <button class="portal-tab" data-tab="APPROVED" role="tab" aria-selected="false"><span id="rs-tab-APPROVED">Ready to publish</span></button>
   <button class="portal-tab" data-tab="PUBLISHED" role="tab" aria-selected="false"><span id="rs-tab-PUBLISHED">Published</span></button>
   <button class="portal-tab" data-tab="RETURNED" role="tab" aria-selected="false"><span id="rs-tab-RETURNED">Sent back</span></button>
+  <button class="portal-tab" data-tab="OUTSTANDING" role="tab" aria-selected="false"><span id="rs-tab-OUTSTANDING">Not submitted</span></button>
   <button class="portal-tab" data-tab="CARDS" role="tab" aria-selected="false"><span>Result cards</span></button>
   <button class="portal-tab" data-tab="SCALE" role="tab" aria-selected="false"><span>Grading scale</span></button>
 </div>
@@ -22,6 +23,10 @@
 <div class="portal-tab-panel" data-tab-panel="PUBLISHED" hidden><section class="sh-card"><div id="rs-list-PUBLISHED" class="asg-list"></div><p class="empty-state" id="rs-empty-PUBLISHED" hidden>Nothing has been published yet.</p></section></div>
 <div class="portal-tab-panel" data-tab-panel="RETURNED" hidden><section class="sh-card"><div id="rs-list-RETURNED" class="asg-list"></div><p class="empty-state" id="rs-empty-RETURNED" hidden>Nothing has been sent back.</p></section></div>
 
+<div class="portal-tab-panel" data-tab-panel="OUTSTANDING" hidden><section class="sh-card">
+  <p class="panel-hint">Courses whose marks have not been submitted yet: still being entered, sent back, or not started. These are who to chase before result day.</p>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Course</th><th>Teacher</th><th>Students</th><th>Marks missing</th><th>Where it stands</th></tr></thead><tbody id="rs-outstanding"></tbody></table></div>
+  <p class="empty-state" id="rs-empty-OUTSTANDING" hidden>Every course has submitted its marks.</p></section></div>
 <div class="portal-tab-panel" data-tab-panel="CARDS" hidden><section class="sh-card">
   <p class="panel-hint">Find a student to see, or download as a PDF, their result card: every published result term by term, with GPA and CGPA.</p>
   <div class="ann-toolbar"><input id="rc-q" class="text-input" type="search" placeholder="Search by name or roll number&hellip;" aria-label="Search students" autocomplete="off" /></div>

@@ -43,6 +43,16 @@
       $("rs-empty-" + s).hidden = r.body.length > 0;
       $("rs-tab-" + s).textContent = LABEL[s] + (r.body.length && s !== "PUBLISHED" ? " \u00b7 " + r.body.length : "");
     }
+    const o = await VA.fetchJson(API + "/sheets-outstanding", { quiet: true });
+    if (o.ok && $("rs-outstanding")) {
+      $("rs-outstanding").innerHTML = o.body.map(function (x) {
+        return "<tr><td><strong>" + esc(x.course_code) + "</strong><small>" + esc(x.course_title + " \u00b7 Section " + x.section_label + " \u00b7 " + x.term_label) + "</small></td><td>" +
+          esc(x.teacher_name || "no teacher assigned") + "</td><td>" + x.students + "</td><td>" + (x.assessments ? x.missing_students + " student(s)" : "no assessments set up") + "</td><td>" +
+          esc(x.status === "RETURNED" ? "Sent back: " + (x.return_reason || "") : "Teacher still entering marks") + "</td></tr>";
+      }).join("");
+      $("rs-empty-OUTSTANDING").hidden = o.body.length > 0;
+      $("rs-tab-OUTSTANDING").textContent = "Not submitted" + (o.body.length ? " \u00b7 " + o.body.length : "");
+    }
   }
 
   // ------------------------------------------------------------------ one sheet
@@ -106,7 +116,7 @@
     const det = r.body && r.body.error && r.body.error.details;
     if (!r.ok && what === "publish" && det && det.override_allowed) {
       // Attendance not locked yet: an administrator may still publish, with a reason kept on record.
-      const why = window.prompt(msg(r.body, "Attendance is not locked yet.") + "\n\nPublish anyway? Type the reason (kept in the audit log), or Cancel.");
+      const why = (await window.VistAdmin.promptText(msg(r.body, "Attendance is not locked yet.") + "\n\nPublish anyway? Type the reason (kept in the audit log), or Cancel."));
       if (why && why.trim()) {
         r = await VA.fetchJson(API + "/sheets/" + current.course_offering_id + "/publish", {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ override_reason: why.trim() }),
@@ -117,7 +127,7 @@
     VA.toast(done); await openSheet(current.course_offering_id); loadLists();
   }
   async function publish() {
-    if (!window.confirm("Publish the results for " + current.course_code + "? Students will see their marks and pass/fail straight away, and each one is notified.")) return;
+    if (!(await window.VistAdmin.confirm("Publish the results for " + current.course_code + "? Students will see their marks and pass/fail straight away, and each one is notified."))) return;
     act("publish", "Published. " + current.stats.students + " students have been notified.");
   }
 
@@ -160,7 +170,7 @@
   $("rs-close").addEventListener("click", function () { modal.close(); });
 
   $("rs-publish-all").addEventListener("click", async function () {
-    if (!window.confirm("Publish EVERY approved result now? Students will see their marks and pass/fail straight away, and are notified.")) return;
+    if (!(await window.VistAdmin.confirm("Publish EVERY approved result now? Students will see their marks and pass/fail straight away, and are notified."))) return;
     const r = await VA.fetchJson(API + "/publish-approved", { method: "POST" });
     if (!r.ok) return VA.toast(msg(r.body, "Could not publish."), "error");
     const f = r.body.failed.length;
@@ -184,7 +194,7 @@
     if (r.ok) drawScale(r.body.map(function (e) { return [e.letter, e.min_percent, e.grade_points, e.is_passing]; }));
   }
   $("gs-add").addEventListener("click", function () { scaleRow("", "", "", true); });
-  $("gs-reset").addEventListener("click", function () { if (window.confirm("Replace the rows below with the standard scale? Nothing is saved until you press Save.")) drawScale(STANDARD); });
+  $("gs-reset").addEventListener("click", async function () { if ((await window.VistAdmin.confirm("Replace the rows below with the standard scale? Nothing is saved until you press Save."))) drawScale(STANDARD); });
   $("gs-save").addEventListener("click", async function () {
     $("gs-error").hidden = true; $("gs-warning").hidden = true;
     const entries = Array.prototype.map.call($("gs-body").querySelectorAll("tr"), function (tr) {
@@ -228,6 +238,10 @@
     $("rc-terms").innerHTML = t.terms.length ? t.terms.map(function (term) {
       return '<h3 class="modal-subhead">' + esc(term.label) + ' <small class="cc-meta">GPA ' + fmt2(term.gpa) + " \u00b7 CGPA " + fmt2(term.cgpa_after) + "</small></h3>" +
         '<div class="table-scroll"><table class="tk-table rs-table"><thead><tr><th>Course</th><th>Cr</th><th>Marks</th><th>%</th><th>Grade</th><th>GP</th></tr></thead><tbody>' + term.courses.map(function (c) {
+          if (c.withdrawn) {
+            return '<tr class="replaced"><td><strong>' + esc(c.course_code) + "</strong><small>" + esc(c.course_title) + " \u2014 withdrawn: " + esc(c.withdrawn_reason || "") + "</small></td><td>" + c.credit_hours +
+              '</td><td>\u2014</td><td>\u2014</td><td class="bad"><b>W</b></td><td>\u2014</td></tr>';
+          }
           return "<tr" + (c.replaced ? ' class="replaced"' : "") + "><td><strong>" + esc(c.course_code) + "</strong><small>" + esc(c.course_title) + (c.replaced ? " (repeated later)" : c.attempt > 1 ? " (attempt " + c.attempt + ")" : "") + "</small></td><td>" + c.credit_hours + "</td><td>" + c.total_obtained + "/" + c.total_max + "</td><td>" + c.percentage.toFixed(1) +
             '</td><td class="' + (c.outcome === "PASSED" ? "ok" : "bad") + '"><b>' + esc(c.letter_grade) + "</b></td><td>" + fmt2(c.grade_points) + "</td></tr>";
         }).join("") + "</tbody></table></div>";

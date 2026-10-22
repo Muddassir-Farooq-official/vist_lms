@@ -67,6 +67,15 @@ async def decide(refund_id: uuid.UUID, payload: DecisionIn, current_user: Curren
     return _out(await RefundService(db).decide(refund_id, approve=payload.approve, note=payload.note, actor_id=current_user.id))
 
 
+class CancelIn(BaseModel):
+    reason: str = Field(min_length=5, max_length=300)
+
+
+@router.post("/{refund_id}/cancel", summary="Call off a refund that has not been paid (administration); a write-off is put back")
+async def cancel(refund_id: uuid.UUID, payload: CancelIn, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
+    return _out(await RefundService(db).cancel(refund_id, reason=payload.reason, actor_id=current_user.id))
+
+
 @router.post("/{refund_id}/pay", summary="Record that an approved refund was paid out; creates the refund voucher")
 async def pay(refund_id: uuid.UUID, payload: PayIn, current_user: CurrentUser = Depends(staff), db=Depends(get_db)) -> dict:
     if payload.method == PaymentMethod.ONE_BILL:

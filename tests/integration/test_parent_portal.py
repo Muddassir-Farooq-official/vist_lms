@@ -1,5 +1,5 @@
 """Parent portal: the administration creates a guardian login from a student; the guardian sees only their own
-children (brothers and sisters with the same guardian CNIC are linked together), read-only."""
+children (brothers and sisters with the same guardian CNIC are suggested, and linked once the office confirms), read-only."""
 from __future__ import annotations
 
 import pytest
@@ -48,10 +48,13 @@ async def test_guardian_follows_both_children_and_nobody_else(app_client, admin_
 
     before = (await app_client.get(f"{P}/students/{a}")).json()
     assert before["has_login"] is False and before["username"] == GUARDIAN.replace("-", "")
+    assert [s["id"] for s in before["siblings"]] == [b]                                          # suggested, not linked by itself
     made = (await app_client.post(f"{P}/students/{a}")).json()
-    assert made["temporary_password"] and made["children_linked"] == 2
-    again = (await app_client.post(f"{P}/students/{b}")).json()
-    assert again["temporary_password"] is None                                                  # existing login, nothing new to hand out
+    assert made["temporary_password"] and made["children_linked"] == 1
+    # a student of another family can never be added to this login, even by mistake
+    assert (await app_client.post(f"{P}/students/{a}", json={"sibling_ids": [other_id]})).status_code == 422
+    again = (await app_client.post(f"{P}/students/{a}", json={"sibling_ids": [b]})).json()
+    assert again["temporary_password"] is None and again["children_linked"] == 2               # existing login, nothing new to hand out
 
     await _parent_login(app_client, made["username"], made["temporary_password"])
     kids = (await app_client.get(f"{P}/me/children")).json()

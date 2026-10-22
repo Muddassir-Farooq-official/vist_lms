@@ -5,12 +5,12 @@ from app.core.clock import institute_today
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import AuditService
 from app.core.config import settings
-from app.core.exceptions import BusinessRuleViolationError, ResourceNotFoundError
+from app.core.exceptions import BusinessRuleViolationError, ResourceNotFoundError, ValidationAppError
 from app.employees.models import Employee
 from app.fees.models import AssignmentStatus, FeeAssignment, FeeLedgerEntry, LedgerEntryType, PayerType
 from app.fees.payment_gateway import get_payment_gateway
@@ -80,7 +80,7 @@ class FeeStatusCalculator:
         # day staff typed it in; older rows without paid_on use created_at.
         def _paid_day(c):
             return c.paid_on if getattr(c, "paid_on", None) else (c.created_at.date() if c.created_at else today)
-        pool: list[list] = [[float(c.amount), _paid_day(c)] for c in credits]
+        pool: list[list] = [[float(c.amount), _paid_day(c), c.id] for c in credits]
         left = reversed_total
         for item in reversed(pool):
             if left <= 1e-9:
@@ -103,9 +103,12 @@ class FeeStatusCalculator:
             owed = charged - concession
             paid = 0.0
             settled_at = None
+            paid_from: list[dict] = []          # which payments settled this installment, and how much of each
             while owed - paid > 1e-9 and idx < len(pool):
                 take = min(owed - paid, pool[idx][0])
                 paid += take
+                if take > 1e-9:
+                    paid_from.append({"ledger_entry_id": pool[idx][2], "amount": round(take, 2)})
                 pool[idx][0] -= take
                 if owed - paid <= 1e-9:
                     settled_at = pool[idx][1]
@@ -128,6 +131,9 @@ class FeeStatusCalculator:
                     settled_on = settled_at if settled_at else today
                     if settled_on > late_from:
                         late_fee = (settled_on - late_from).days * late_fee_per_day
+            cap = float(settings.fee_late_fee_cap or 0)
+            if cap > 0:
+                late_fee = min(late_fee, cap)          # one instalment can never build up more than the cap
             if remaining <= 0.005:
                 status = "PAID"
             elif due < today:
@@ -141,6 +147,7 @@ class FeeStatusCalculator:
                 "description": d.description, "charged": round(charged, 2), "concession": round(concession, 2),
                 "paid": round(paid, 2), "remaining": remaining, "status": status, "late_fee": round(late_fee, 2),
                 "late_fee_posted": round(float(d.late_fee_charged_amount or 0), 2),
+                "paid_from": paid_from,
             })
         return rows
 
@@ -158,7 +165,8 @@ class FeeStatusCalculator:
             "total_paid": round(total_paid, 2),
             "overdue_principal": overdue_principal,
             "accrued_fine": accrued_fine,
-            "total_due_now": round(overdue_principal + accrued_fine, 2),
+            # A late fee on an instalment that has since been paid can still be posted, but it no longer keeps the payer "owing".
+            "total_due_now": round(overdue_principal + sum(r["late_fee"] for r in rows if r["remaining"] > 0.005), 2),
         }
 
     @staticmethod
@@ -226,6 +234,11 @@ class FeeAssignmentService:
                 f"Cannot record a payment against a {assignment.status.value.lower()} assignment."
             )
         paid_on = validate_paid_on(data.paid_on)
+        from app.accounts.period import ensure_open
+        from app.fees.references import refuse_reused_reference
+
+        await ensure_open(self.session, paid_on, "This payment")
+        await refuse_reused_reference(self.session, data.reference, data.method.value)
 
         # Never take more than is owed: an overpayment used to be accepted
         # silently (Rs 500,000 against a Rs 120,000 fee) and then vanished from
@@ -428,6 +441,11 @@ class ChallanService:
             raise BusinessRuleViolationError(f"This challan is already {challan.status.value.lower()}.")
 
         day = validate_paid_on(paid_on)
+        from app.accounts.period import ensure_open
+        from app.fees.references import refuse_reused_reference
+
+        await ensure_open(self.session, day, "This payment")
+        await refuse_reused_reference(self.session, reference, method)
         # The challan must still be owed: if the instalment was settled another
         # way (a counter payment), marking the challan paid would double-collect.
         assignment = await self.assignment_repo.get_by_id(challan.fee_assignment_id)
@@ -451,6 +469,35 @@ class ChallanService:
             metadata={"note": note, "method": method, "reference": reference, "paid_on": str(day)},
         )
         return challan
+
+    async def payment_is_reversed(self, entry_id: uuid.UUID) -> bool:
+        return (await self.session.execute(select(func.count()).select_from(FeeLedgerEntry).where(
+            FeeLedgerEntry.related_entry_id == entry_id, FeeLedgerEntry.entry_type == LedgerEntryType.DEBIT,
+            FeeLedgerEntry.description.like(FeeStatusCalculator.REVERSAL_PREFIX + "%")))).scalar_one() > 0
+
+    async def reverse_payment(self, entry_id: uuid.UUID, *, reason: str, actor_id: uuid.UUID) -> FeeLedgerEntry:
+        """Take back a recorded payment (entered by mistake, or a cheque that bounced). The ledger is append-only, so the payment
+        stays and a matching charge is added; the receipt then prints as VOID and the amount is owed again."""
+        from app.accounts.period import ensure_open
+        from app.core.clock import local_date
+
+        e = await self.session.get(FeeLedgerEntry, entry_id)
+        if e is None or e.entry_type != LedgerEntryType.CREDIT or not e.receipt_number:
+            raise ResourceNotFoundError("Payment not found.")
+        if len((reason or "").strip()) < 5:
+            raise ValidationAppError("Say why the payment is being reversed.")
+        if await self.payment_is_reversed(e.id):
+            raise BusinessRuleViolationError("This payment was already reversed.")
+        await ensure_open(self.session, e.paid_on or local_date(e.created_at), "This payment")
+        today = institute_today()
+        reversal = FeeLedgerEntry(fee_assignment_id=e.fee_assignment_id, entry_type=LedgerEntryType.DEBIT, amount=float(e.amount), due_date=today,
+                                  related_entry_id=e.id, created_by=actor_id, created_at=datetime.now(timezone.utc),
+                                  description=f"{FeeStatusCalculator.REVERSAL_PREFIX} \u2014 receipt {e.receipt_number} reversed by staff ({reason.strip()})")
+        self.session.add(reversal)
+        await self.session.flush()
+        await self.audit.log(actor_user_id=actor_id, action="fee.payment_reversed", entity_type="fee_ledger_entry", entity_id=e.id,
+                             before={"receipt": e.receipt_number, "amount": float(e.amount)}, after={"reversed": True}, metadata={"reason": reason.strip()})
+        return reversal
 
     async def mark_unpaid(
         self, challan_id: uuid.UUID, *, actor_id: uuid.UUID, reason: str | None = None

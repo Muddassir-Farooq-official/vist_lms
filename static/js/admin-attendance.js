@@ -268,7 +268,7 @@
         btn.className = def[2];
         btn.textContent = def[0];
         btn.addEventListener("click", async function () {
-          const note = def[1] ? null : window.prompt("Reason for rejecting (the teacher will see this):", "");
+          const note = def[1] ? null : (await window.VistAdmin.promptText("Reason for rejecting (the teacher will see this):", ""));
           if (!def[1] && note === null) return;
           btn.disabled = true;
           const res = await VA.fetchJson("/api/v1/attendance/correction-requests/" + r.id + "/decision", {
@@ -327,14 +327,14 @@
 
   lockBtn.addEventListener("click", async function () {
     if (!offeringSelect.value) return;
-    if (!window.confirm("Lock attendance for this course? " + lockBtn.getAttribute("data-summary") + ". This cannot be undone.")) return;
+    if (!(await window.VistAdmin.confirm("Lock attendance for this course? " + lockBtn.getAttribute("data-summary") + ". This cannot be undone."))) return;
     lockBtn.disabled = true;
     lockError.hidden = true;
     let result = await VA.fetchJson("/api/v1/attendance/offerings/" + offeringSelect.value + "/lock", { method: "POST" });
     const det = result.body && result.body.error && result.body.error.details;
     if (!result.ok && det && det.override_allowed) {
       // Locking before the term is over: an administrator may still do it, with a reason kept on record.
-      const why = window.prompt("Too early to lock: " + det.early + ".\n\nLock early anyway? Type the reason (kept in the audit log), or Cancel.");
+      const why = (await window.VistAdmin.promptText("Too early to lock: " + det.early + ".\n\nLock early anyway? Type the reason (kept in the audit log), or Cancel."));
       if (why && why.trim()) {
         result = await VA.fetchJson("/api/v1/attendance/offerings/" + offeringSelect.value + "/lock", {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ early_reason: why.trim() }),
@@ -364,7 +364,7 @@
     const date = document.getElementById("holiday-date").value;
     const reason = document.getElementById("holiday-reason").value.trim();
     if (!date || !reason) { err.textContent = "Choose the date and give a reason."; err.hidden = false; return; }
-    if (!window.confirm("Cancel EVERY scheduled class on " + date + "?")) return;
+    if (!(await window.VistAdmin.confirm("Cancel EVERY scheduled class on " + date + "?"))) return;
     const result = await VA.fetchJson("/api/v1/academics/class-sessions/cancel-day", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -380,5 +380,22 @@
     loadTermsDropdown();
     loadNeedsAttention();
     loadCorrections();
+  });
+  // ---- approved leave for one student
+  const leaveBtn = document.getElementById("leave-btn");
+  if (leaveBtn) leaveBtn.addEventListener("click", async function () {
+    const err = document.getElementById("leave-error"), ok = document.getElementById("leave-success");
+    err.hidden = true; ok.hidden = true;
+    const roll = document.getElementById("leave-roll").value.trim();
+    const from = document.getElementById("leave-from").value, to = document.getElementById("leave-to").value || from;
+    const reason = document.getElementById("leave-reason").value.trim();
+    if (!roll || !from || reason.length < 4) { err.textContent = "Enter the roll number, the first day and the reason."; err.hidden = false; return; }
+    const found = await VA.fetchJson("/api/v1/students?" + new URLSearchParams({ q: roll, page: "1", page_size: "5" }));
+    const st = found.ok && (found.body.items || []).find(function (x) { return (x.roll_number || "").toLowerCase() === roll.toLowerCase(); });
+    if (!st) { err.textContent = "No student with roll number " + roll + "."; err.hidden = false; return; }
+    const r = await VA.fetchJson("/api/v1/attendance/students/" + st.id + "/leave", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ from_date: from, to_date: to, reason: reason }) });
+    if (!r.ok) { err.textContent = (r.body && r.body.error && r.body.error.message) || "Could not record the leave."; err.hidden = false; return; }
+    ok.textContent = st.first_name + " " + st.last_name + ": " + r.body.classes_marked_leave + " class(es) marked as leave."; ok.hidden = false;
   });
 })();

@@ -41,10 +41,33 @@ from app.sms import models as _sms_models  # noqa: F401
 from app.supplementary import models as _supp_models  # noqa: F401
 from app.fees import refund_models as _refund_models  # noqa: F401
 from app.admissions import models as _admission_models  # noqa: F401
+from app.inventory import models as _inventory_models  # noqa: F401
+from app.timekeeping import models as _timekeeping_models  # noqa: F401
 from app.parents import models as _parents_models  # noqa: F401
 from app.students import models as _students_models  # noqa: F401
+from app.hostel import models as _hostel_models  # noqa: F401
+from app.records import models as _records_models  # noqa: F401
+from app.calendar import models as _calendar_models  # noqa: F401
 
 TEST_DATABASE_URL = settings.database_url.rsplit("/", 1)[0] + "/vist_lms_test"
+
+
+def _refuse_unsafe_test_database() -> None:
+    """The tests create and wipe a database called vist_lms_test on the SAME server as DATABASE_URL.
+    Never do that next to the real data: not with APP_ENV=production, and not on a remote server
+    unless ALLOW_REMOTE_TEST_DB=1 is set on purpose."""
+    import os
+    from urllib.parse import urlsplit
+
+    host = (urlsplit(settings.database_url.replace("+asyncpg", "")).hostname or "").lower()
+    if settings.is_production:
+        pytest.exit("Refusing to run the tests: APP_ENV is production. Run them on a development machine.", returncode=2)
+    if host not in ("localhost", "127.0.0.1", "::1", "postgres", "db") and os.environ.get("ALLOW_REMOTE_TEST_DB") != "1":
+        pytest.exit(f"Refusing to run the tests against the database server '{host}': they create and wipe vist_lms_test there. "
+                    "Use a local PostgreSQL for tests (or set ALLOW_REMOTE_TEST_DB=1 if this server holds no real data).", returncode=2)
+
+
+_refuse_unsafe_test_database()
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -87,6 +110,44 @@ def _legacy_launch_guards(monkeypatch, request):
     monkeypatch.setattr(_settings, "block_early_attendance_lock", False)
     monkeypatch.setattr(_settings, "attendance_fine_blocks_login", True)
     monkeypatch.setattr(_settings, "require_registered_terms", False)
+    monkeypatch.setattr(_settings, "require_results_before_end_semester", False)
+    monkeypatch.setattr(_settings, "withdrawal_deadline_days", 100000)
+    monkeypatch.setattr(_settings, "supplementary_publish_by_other", False)
+
+
+@pytest.fixture(autouse=True)
+def _known_student_temp_password(monkeypatch, request):
+    """Older tests sign a new student in with the former shared default. Keep
+    that working by making the one-time password predictable in tests; tests
+    marked `real_temp_passwords` get the real random ones."""
+    if request.node.get_closest_marker("real_temp_passwords"):
+        return
+    import app.imports.service as _imports
+    import app.students.service as _students
+
+    monkeypatch.setattr(_students, "new_temp_password", lambda: "vertex123")
+    monkeypatch.setattr(_imports, "new_temp_password", lambda: "vertex123")
+
+
+@pytest.fixture(autouse=True)
+def _no_duplicate_window(monkeypatch, request):
+    """Many tests send the same request twice on purpose (to check the second is refused by the business rule).
+    Tests marked `duplicate_guard` keep the real double-submission guard."""
+    if request.node.get_closest_marker("duplicate_guard"):
+        return
+    from app.core.config import settings as _settings
+
+    monkeypatch.setattr(_settings, "duplicate_post_window_seconds", 0)
+
+
+@pytest.fixture(autouse=True)
+def _check_sessions_every_time(monkeypatch):
+    """Tests switch users and accounts quickly; never trust a remembered session check."""
+    from app.core import dependencies
+    from app.core.config import settings as _settings
+
+    monkeypatch.setattr(_settings, "session_check_seconds", 0)
+    dependencies._session_ok.clear()
 
 
 @pytest.fixture(autouse=True)
@@ -109,8 +170,11 @@ def _schema_once():
 
     sync_engine = create_engine(TEST_DATABASE_URL_SYNC)
     with sync_engine.begin() as conn:
+        # Always the dedicated vist_lms_test database (see TEST_DATABASE_URL). Starting from an empty schema also
+        # removes tables of modules that no longer exist (e.g. the old gate check-in tables).
+        conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+        conn.execute(text("CREATE SCHEMA public"))
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
-        db_module.Base.metadata.drop_all(conn)
         db_module.Base.metadata.create_all(conn)
     yield sync_engine
     sync_engine.dispose()

@@ -571,3 +571,23 @@ class StudentFullProfileResponse(BaseModel):
     library: LibrarySummary
     fines: FineSummary
     complaints: ComplaintSummary
+
+
+class IdentityCorrectionRequest(BaseModel):
+    """Correct a mistyped CNIC or the guardian's details. A reason is required and kept in the audit log."""
+    student_cnic: str | None = None
+    guardian_name: str | None = Field(default=None, min_length=2, max_length=150)
+    guardian_cnic: str | None = None
+    guardian_relation: str | None = Field(default=None, min_length=2, max_length=50)
+    guardian_contact_no: str | None = None
+    reason: str = Field(min_length=10, max_length=300)
+
+    @field_validator("student_cnic", "guardian_cnic")
+    @classmethod
+    def _cnic(cls, v: str | None) -> str | None:
+        return None if v is None else _normalize_cnic(v)
+
+    @field_validator("guardian_contact_no")
+    @classmethod
+    def _phone(cls, v: str | None) -> str | None:
+        return None if v is None else _normalize_phone(v)

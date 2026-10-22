@@ -10,12 +10,14 @@
   <button class="portal-tab active" data-tab="runs" role="tab" aria-selected="true"><span>Monthly payroll</span></button>
   <button class="portal-tab" data-tab="items" role="tab" aria-selected="false"><span>Allowances &amp; deductions</span></button>
   <button class="portal-tab" data-tab="advances" role="tab" aria-selected="false"><span>Salary advances</span></button>
+  <button class="portal-tab" data-tab="security" role="tab" aria-selected="false"><span>Security deposits</span></button>
 </div>
 
 <div class="portal-tab-panel" data-tab-panel="runs">
   <section class="sh-card">
     <div class="ann-toolbar"><p class="panel-hint" style="margin:0;flex:1">Prepare a month, adjust anything that needs it (unpaid days, extras), then the administration approves it and the accounts office pays it. Everyone gets their payslip when it is paid.</p>
-      <input id="pr-month" class="text-input" type="month" aria-label="Month" /><button type="button" class="role-btn" id="pr-prepare">Prepare payroll</button></div>
+      <input id="pr-month" class="text-input" type="month" aria-label="Month" /><input id="pr-wd" class="text-input small-input" type="number" min="1" max="31" placeholder="Working days" aria-label="Working days in the month" title="A day's pay = basic / working days (e.g. 26 or 22). Empty = the default in Settings." /><button type="button" class="role-btn" id="pr-prepare">Prepare payroll</button></div>
+    <p class="panel-hint">Absences and late arrivals / early leavings come from <a href="/dashboard/admin/staff-attendance">Staff attendance</a>. The rules (casual leaves, how many late marks make a day, security %) are in Settings &rarr; Payroll and can be changed any time; press Recalculate on a draft to apply them.</p>
     <p id="pr-prep-error" class="dash-alert error" hidden></p>
     <div class="table-scroll"><table class="tk-table"><thead><tr><th>Month</th><th>Status</th><th class="num">Employees</th><th class="num">Gross</th><th class="num">Deductions</th><th class="num">Net pay</th></tr></thead><tbody id="rn-body"></tbody></table></div>
     <p class="empty-state" id="rn-empty" hidden>No payroll has been prepared yet.</p>
@@ -64,18 +66,39 @@
   </section>
 </div>
 
+<div class="portal-tab-panel" data-tab-panel="security" hidden>
+  <section class="sh-card">
+    <h2 class="panel-title">Held back from salaries</h2>
+    <p class="panel-hint">What paid payrolls took off pay in the year: security deposits, deductions such as tax or provident fund, advance recoveries and unpaid days. This is money the institute holds or must pass on.</p>
+    <div class="toolbar"><label for="wh-year">Year</label><input id="wh-year" class="text-input small-input" type="number" min="2000" max="2100" /></div>
+    <p class="cc-meta" id="wh-total"></p>
+    <div class="table-scroll"><table class="tk-table" id="wh-table"><thead><tr><th>Month</th><th>Held back</th><th class="num">Total</th></tr></thead><tbody></tbody></table></div>
+  </section>
+  <section class="sh-card">
+    <p class="panel-hint" id="sc-intro">Each month a percentage of basic salary is held from the payslip until the total held equals one basic salary. The institute's percentage is in Settings &rarr; Payroll; a different percentage (or 0 = none) can be set for one person. "Held before" is a deposit already taken before this system.</p>
+    <div class="table-scroll"><table class="tk-table"><thead><tr><th>Employee</th><th class="num">Basic</th><th class="num">Held</th><th class="num">Still to hold</th><th>Their %</th><th></th></tr></thead><tbody id="sc-body"></tbody></table></div>
+  </section>
+</div>
+
 <dialog id="rd-modal" class="modal modal-wide" aria-labelledby="rd-title"><div class="modal-body">
   <div class="ann-detail-badges" id="rd-badges"></div><h2 id="rd-title"></h2><p class="cc-meta" id="rd-meta"></p>
   <div id="rd-tiles"></div><div id="rd-problems"></div>
-  <div class="table-scroll"><table class="tk-table"><thead><tr><th>Employee</th><th class="num">Basic</th><th class="num">Gross</th><th class="num">Deductions</th><th class="num">Net</th><th>Notes</th><th></th></tr></thead><tbody id="rd-body"></tbody></table></div>
+  <div class="table-scroll"><table class="tk-table"><thead><tr><th>Employee</th><th class="num">Basic</th><th class="num">Days</th><th class="num">Absent</th><th class="num">Late / early</th><th class="num">Gross</th><th class="num">Deductions</th><th class="num">Net</th><th>Notes</th><th></th></tr></thead><tbody id="rd-body"></tbody></table></div>
   <p id="rd-error" class="dash-alert error" hidden></p>
   <div class="decision-bar" id="rd-actions"></div>
   <button id="rd-close" class="back-link modal-close-btn" type="button">Close</button></div></dialog>
 
 <dialog id="sl-modal" class="modal" aria-labelledby="sl-title"><div class="modal-body">
   <h2 id="sl-title"></h2><p class="cc-meta" id="sl-sub"></p>
-  <div class="form-field"><label for="sl-unpaid">Unpaid days <small class="field-hint inline">(whole or half days)</small></label><input id="sl-unpaid" class="text-input" type="number" min="0" step="0.5" /></div>
-  <div class="form-field"><label for="sl-adj">Extra pay or deduction (Rs.) <small class="field-hint inline">(+ adds, \u2212 takes away)</small></label><input id="sl-adj" class="text-input" type="number" step="0.01" /></div>
+  <p class="panel-hint" id="sl-att"></p>
+  <div class="form-grid two-col">
+    <div class="form-field"><label for="sl-wd">Working days <small class="field-hint inline">(day's pay = basic / this)</small></label><input id="sl-wd" class="text-input" type="number" min="1" max="31" /></div>
+    <div class="form-field"><label for="sl-absent">Absent days <small class="field-hint inline">(from attendance)</small></label><input id="sl-absent" class="text-input" type="number" min="0" step="0.5" /></div>
+    <div class="form-field"><label for="sl-late">Late arrivals + early leavings</label><input id="sl-late" class="text-input" type="number" min="0" step="1" /></div>
+    <div class="form-field"><label class="check-row"><input type="checkbox" id="sl-reset" /> <span>Use the figures from staff attendance again</span></label></div>
+  </div>
+  <div class="form-field"><label for="sl-unpaid">Other unpaid leave (days) <small class="field-hint inline">(whole or half days)</small></label><input id="sl-unpaid" class="text-input" type="number" min="0" step="0.5" /></div>
+  <div class="form-field"><label for="sl-adj">Compensation (+) or extra deduction (&minus;), Rs.</label><input id="sl-adj" class="text-input" type="number" step="0.01" /></div>
   <div class="form-field"><label for="sl-note">What it is for</label><input id="sl-note" class="text-input" maxlength="200" placeholder="e.g. Overtime, Library fine" /></div>
   <div class="form-field"><label class="check-row"><input type="checkbox" id="sl-hold" /> <span>Hold this payslip back (do not pay it in this run)</span></label></div>
   <div class="form-field" id="sl-hold-wrap" hidden><label for="sl-hold-reason">Why is it held?</label><input id="sl-hold-reason" class="text-input" maxlength="200" /></div>

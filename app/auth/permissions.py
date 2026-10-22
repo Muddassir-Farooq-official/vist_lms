@@ -164,6 +164,19 @@ class Permissions:
     ACCOUNT_APPROVE = "account.approve"
     # Purchasing: any staff member may ask for something to be bought and follow the request.
     PURCHASE_REQUEST = "purchase.request"
+    # Inventory (the store): see stock; receive, issue, return; correct and reverse (administration).
+    INVENTORY_VIEW = "inventory.view"
+    INVENTORY_MANAGE = "inventory.manage"
+    INVENTORY_ADJUST = "inventory.adjust"
+    # Staff timekeeping: mark staff in / out (guard, office); see the records; set timings and correct days (administration).
+    STAFF_ATTENDANCE_MARK = "staff_attendance.mark"
+    STAFF_ATTENDANCE_VIEW = "staff_attendance.view"
+    STAFF_ATTENDANCE_MANAGE = "staff_attendance.manage"
+    CALENDAR_MANAGE = "calendar.manage"
+    RECORDS_ISSUE = "records.issue"
+    RECORDS_DOCUMENTS = "records.documents"
+    HOSTEL_VIEW = "hostel.view"
+    HOSTEL_MANAGE = "hostel.manage"
     # Payroll: the accounts office prepares and pays it; the administration approves it. Employees see only their own payslips (no permission needed).
     PAYROLL_VIEW = "payroll.view"
     PAYROLL_MANAGE = "payroll.manage"
@@ -295,6 +308,17 @@ ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
         Permissions.ACCOUNT_VIEW,
         Permissions.ACCOUNT_RECORD,
         Permissions.ACCOUNT_APPROVE,
+        Permissions.INVENTORY_VIEW,
+        Permissions.INVENTORY_MANAGE,
+        Permissions.INVENTORY_ADJUST,
+        Permissions.STAFF_ATTENDANCE_MARK,
+        Permissions.STAFF_ATTENDANCE_VIEW,
+        Permissions.STAFF_ATTENDANCE_MANAGE,
+        Permissions.CALENDAR_MANAGE,
+        Permissions.RECORDS_ISSUE,
+        Permissions.RECORDS_DOCUMENTS,
+        Permissions.HOSTEL_VIEW,
+        Permissions.HOSTEL_MANAGE,
         Permissions.PURCHASE_REQUEST,
         Permissions.PAYROLL_VIEW,
         Permissions.PAYROLL_MANAGE,
@@ -372,21 +396,25 @@ ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
         Permissions.TASK_USE,
         Permissions.ACCOUNT_VIEW,
         Permissions.ACCOUNT_RECORD,
+        Permissions.INVENTORY_VIEW,
+        Permissions.INVENTORY_MANAGE,
+        Permissions.STAFF_ATTENDANCE_MARK,
+        Permissions.STAFF_ATTENDANCE_VIEW,
         Permissions.PURCHASE_REQUEST,
         Permissions.PAYROLL_VIEW,
         Permissions.PAYROLL_MANAGE,
     ),
     # Placeholder role — Hostel module not built yet.
-    Roles.HOSTEL_WARDEN: (Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
+    Roles.HOSTEL_WARDEN: (Permissions.HOSTEL_VIEW, Permissions.HOSTEL_MANAGE, Permissions.STUDENT_VIEW, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
     Roles.EXAM_CONTROLLER: (Permissions.EXAM_SCHEDULE_MANAGE, Permissions.COURSE_VIEW, Permissions.RESULT_APPROVE, Permissions.MARKS_ENTER, Permissions.STUDENT_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
     Roles.PARENT: (Permissions.PARENT_VIEW,),
-    Roles.PRINCIPAL: (Permissions.INSTITUTE_OVERVIEW, Permissions.ACADEMIC_OVERSIGHT, Permissions.ATTENDANCE_VIEW,
+    Roles.PRINCIPAL: (Permissions.INSTITUTE_OVERVIEW, Permissions.HOSTEL_VIEW, Permissions.INVENTORY_VIEW, Permissions.STAFF_ATTENDANCE_VIEW, Permissions.ACADEMIC_OVERSIGHT, Permissions.ATTENDANCE_VIEW,
                       Permissions.COURSE_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.STUDENT_VIEW,
                       Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
     Roles.HOD: (Permissions.ATTENDANCE_CORRECTION_DECIDE, Permissions.ACADEMIC_OVERSIGHT, Permissions.ATTENDANCE_VIEW,
                 Permissions.COURSE_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.STUDENT_VIEW,
                 Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
-    Roles.SECURITY_GUARD: (Permissions.GATE_OPERATE, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
+    Roles.SECURITY_GUARD: (Permissions.GATE_OPERATE, Permissions.STAFF_ATTENDANCE_MARK, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
     # LIBRARIAN owns the full library domain, same reasoning as
     # ACCOUNTS_OFFICER owning fee submission — this is their job.
     Roles.LIBRARIAN: (

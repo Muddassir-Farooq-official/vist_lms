@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel, Field
 
 from app.auth.permissions import Permissions
 from app.auth.schemas import CurrentUser
@@ -128,6 +129,20 @@ async def get_fee_structure(
 ) -> FeeStructureOut:
     structure = await FeeStructureService(db).get(structure_id)
     return await _to_structure_out(db, structure)
+
+
+class UndoActivationIn(BaseModel):
+    reason: str = Field(min_length=5, max_length=300)
+
+
+@structures_router.post("/{structure_id}/undo-activation", summary="Undo a mistaken activation (only while nobody has paid on it)")
+async def undo_fee_activation(
+    structure_id: uuid.UUID,
+    payload: UndoActivationIn,
+    current_user: CurrentUser = Depends(require_permission(Permissions.FEE_MANAGE)),
+    db=Depends(get_db),
+) -> dict:
+    return await FeeStructureService(db).undo_activation(structure_id, reason=payload.reason, actor_id=current_user.id)
 
 
 @structures_router.post(

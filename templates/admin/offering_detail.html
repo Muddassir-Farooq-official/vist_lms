@@ -132,10 +132,15 @@
   <p class="empty-state" id="class-sessions-empty" hidden>No sessions generated yet &mdash; add a timetable slot above.</p>
 </section>
 </div>
+<section class="panel">
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("graduation-cap") }}</div><h2>Students</h2></div></div>
+  <p class="panel-hint">Everyone enrolled in this course. Withdrawing a student before the deadline leaves no trace on the transcript; after it, the course shows as W. Moving a student to another section keeps their marks.</p>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Student</th><th>Roll no.</th><th>Status</th><th>Result</th><th></th></tr></thead><tbody id="roster-tbody"></tbody></table></div>
+  <p class="empty-state" id="roster-empty" hidden>No students are enrolled in this course yet.</p>
+</section>
 {% endblock %}
 
 {% block extra_scripts %}
-<script>window.OFFERING_ID = {{ offering_id | tojson }};</script>
 <script src="/static/js/teacher-picker.js"></script>
-<script src="/static/js/admin-offering-detail.js"></script>
+<script src="/static/js/admin-offering-detail.js" data-offering-id="{{ offering_id }}"></script>
 {% endblock %}

@@ -29,6 +29,34 @@
   <p id="sms-msg" class="panel-hint" hidden></p>
   <table class="dash-table"><thead><tr><th>When</th><th>To</th><th>About</th><th>Status</th><th>Message</th></tr></thead><tbody id="sms-tbody"></tbody></table>
 </section>
+
+<section class="sh-card">
+  <h2 class="panel-title">Send one message to many</h2>
+  <p class="panel-hint">Choose who gets it, press <strong>Check</strong> to see how many phone numbers that is, then send. A number that appears twice (for example two brothers with one guardian) gets it once. Messages go out within a minute.</p>
+  <form id="bulk-form" class="form-grid" novalidate>
+    <label>For
+      <select id="bk-aud" class="select-input"><option value="STUDENTS">Students (and their guardian)</option><option value="STAFF">Staff</option></select>
+    </label>
+    <label data-staff hidden>Job role (optional)
+      <select id="bk-role" class="select-input"><option value="">All staff</option></select>
+    </label>
+    <label data-students>Program (optional)
+      <select id="bk-prog" class="select-input"><option value="">All programs</option></select>
+    </label>
+    <label data-students>Semester (optional)<input id="bk-sem" class="text-input small-input" type="number" min="1" max="12" /></label>
+    <label data-students>Section (optional)<input id="bk-sec" class="text-input small-input" type="text" maxlength="20" /></label>
+    <label class="check-row" data-students><input id="bk-def" type="checkbox" /> Only students with overdue fees</label>
+    <label class="span-all">Message <small id="bk-count">0 / 300</small>
+      <textarea id="bk-msg" class="text-input" rows="3" maxlength="300"></textarea>
+    </label>
+    <p class="dash-alert error" id="bk-error" role="alert" hidden></p>
+    <p class="panel-hint" id="bk-preview" hidden></p>
+    <div class="toolbar">
+      <button type="button" class="role-btn secondary-btn" id="bk-check">Check who gets it</button>
+      <button type="submit" class="role-btn" id="bk-send" disabled>Send</button>
+    </div>
+  </form>
+</section>
 {% endblock %}
 
 {% block extra_scripts %}

@@ -5,8 +5,8 @@
   const VA = window.VistAdmin;
   const esc = VA.escapeHtml;
   const API = "/api/v1/fees/refunds";
-  const money = function (v) { return "Rs. " + Number(v || 0).toLocaleString("en-PK", { minimumFractionDigits: 0, maximumFractionDigits: 2 }); };
-  const STATUS = { REQUESTED: "Waiting for approval", APPROVED: "Approved — to pay out", PAID: "Paid", REJECTED: "Rejected" };
+  const money = function (v) { return VA.formatMoney(v); };
+  const STATUS = { REQUESTED: "Waiting for approval", APPROVED: "Approved — to pay out", PAID: "Paid", REJECTED: "Rejected", CANCELLED: "Cancelled" };
 
   function say(t) { const el = document.getElementById("rf-msg"); el.textContent = t; el.hidden = !t; }
   function errText(r) { return (r.body && r.body.error && r.body.error.message) || "That did not work."; }
@@ -60,7 +60,7 @@
   });
 
   async function decide(id, approve) {
-    const note = window.prompt(approve ? "Approve this refund? Optional note:" : "Reject this refund: give the reason", "");
+    const note = (await window.VistAdmin.promptText(approve ? "Approve this refund? Optional note:" : "Reject this refund: give the reason", ""));
     if (note === null) return;
     const r = await postJson(API + "/" + id + "/decision", { approve: approve, note: note.trim() || null });
     if (!r.ok) return say(errText(r));
@@ -69,10 +69,10 @@
   }
 
   async function pay(id) {
-    const method = window.prompt("How was it paid back? Type CASH, CHEQUE, BANK_DEPOSIT or ONLINE_TRANSFER", "CHEQUE");
+    const method = (await window.VistAdmin.promptText("How was it paid back? Type CASH, CHEQUE, BANK_DEPOSIT or ONLINE_TRANSFER", "CHEQUE"));
     if (!method) return;
     const m = method.trim().toUpperCase();
-    const ref = m === "CASH" ? "" : window.prompt("Cheque / transfer reference number", "");
+    const ref = m === "CASH" ? "" : (await window.VistAdmin.promptText("Cheque / transfer reference number", ""));
     if (m !== "CASH" && !ref) return;
     const r = await postJson(API + "/" + id + "/pay", { method: m, reference: ref || null });
     if (!r.ok) return say(errText(r));
@@ -89,7 +89,7 @@
       const who = x.payer ? (x.payer.name || "") + (x.payer.identifier ? " (" + x.payer.identifier + ")" : "") : "";
       let act = "";
       if (x.status === "REQUESTED") act = '<button type="button" class="row-action" data-ok="' + x.id + '">Approve</button> <button type="button" class="row-action" data-no="' + x.id + '">Reject</button>';
-      if (x.status === "APPROVED") act = '<button type="button" class="row-action" data-pay="' + x.id + '">Pay out</button>';
+      if (x.status === "APPROVED") act = '<button type="button" class="row-action" data-pay="' + x.id + '">Pay out</button> <button type="button" class="row-action" data-cancel="' + x.id + '">Cancel\u2026</button>';
       if (x.status === "PAID") act = '<a href="/api/v1/fees/receipts/' + x.ledger_entry_id + '/pdf" target="_blank" rel="noopener">' + esc(x.voucher_number) + "</a>";
       return "<tr><td>" + esc(String(x.requested_at).slice(0, 10)) + "</td><td>" + esc(who) + "</td><td>" + esc(x.fee) + '</td><td class="num">' + esc(money(x.amount)) +
         '</td><td class="num">' + esc(money(x.write_off)) + "</td><td>" + esc(x.reason) + (x.decision_note ? "<br><small>" + esc(x.decision_note) + "</small>" : "") +
@@ -98,6 +98,15 @@
     document.querySelectorAll("[data-ok]").forEach(function (b) { b.addEventListener("click", function () { decide(b.dataset.ok, true); }); });
     document.querySelectorAll("[data-no]").forEach(function (b) { b.addEventListener("click", function () { decide(b.dataset.no, false); }); });
     document.querySelectorAll("[data-pay]").forEach(function (b) { b.addEventListener("click", function () { pay(b.dataset.pay); }); });
+    document.querySelectorAll("[data-cancel]").forEach(function (b) {
+      b.addEventListener("click", async function () {
+        const why = await VA.ask({ title: "Cancel this approved refund?", danger: true, ok: "Cancel the refund", intro: "Nothing is paid out. Any charges it wrote off are put back on the fee." });
+        if (!why) return;
+        const r = await postJson(API + "/" + b.dataset.cancel + "/cancel", { reason: why });
+        if (!r.ok) return say(errText(r));
+        VA.toast("Refund cancelled."); load();
+      });
+    });
   }
 
   document.getElementById("rf-filter").addEventListener("change", load);

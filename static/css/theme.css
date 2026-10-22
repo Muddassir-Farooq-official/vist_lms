@@ -24,7 +24,7 @@
   /* Text */
   --text-primary: #0f1f3d;   /* near-black blue — main text */
   --text-secondary: #52627d; /* muted blue-gray — labels, secondary text */
-  --text-muted: #94a3b8;     /* placeholders, faint text */
+  --text-muted: #64748b;     /* placeholders, faint text (4.7:1 on white, readable) */
   --white: #ffffff;
 
   /* Brand blue */
@@ -447,3 +447,7 @@ a:hover { color: var(--blue-700); }
   .auth-card { padding: 34px 32px 28px; }
   .auth-card h1 { font-size: 1.65rem; }
 }
+/* Public certificate check */
+.verify-list { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 14px 0 0; font-size: 0.92rem; }
+.verify-list dt { color: var(--text-secondary); }
+.verify-list dd { margin: 0; overflow-wrap: anywhere; }

@@ -82,7 +82,8 @@
         "<td>" + VA.escapeHtml(f.reason) + "</td>" +
         "<td>" + VA.escapeHtml(f.source) + "</td>" +
         "<td>" + VA.formatDateTime(f.issued_at) + "</td>" +
-        "<td>" + statusPillHtml(f.status) + "</td>" +
+        "<td>" + statusPillHtml(f.status) +
+          (f.receipt_number ? '<br><a href="/api/v1/fines/' + encodeURIComponent(f.id) + '/receipt.pdf" target="_blank" rel="noopener">Receipt ' + VA.escapeHtml(f.receipt_number) + "</a>" : "") + "</td>" +
         '<td class="row-actions"></td>';
 
       if (f.status === "PENDING" && (canManage || canWaive)) {
@@ -121,6 +122,10 @@
     resolveFineSummary.textContent = summary;
     resolveFineNote.value = "";
     resolveFineError.hidden = true;
+    document.querySelectorAll("#resolve-fine-form [data-paid-only]").forEach(function (el) { el.hidden = kind !== "mark-paid"; });
+    document.getElementById("resolve-fine-method").value = "CASH";
+    document.getElementById("resolve-fine-reference").value = "";
+    document.getElementById("resolve-fine-paid-on").value = new Date().toISOString().slice(0, 10);
     resolveFineSubmit.textContent = kind === "mark-paid" ? "Confirm Paid" : "Confirm Waive";
     resolveFineModal.showModal();
   }
@@ -139,7 +144,12 @@
     const result = await VA.fetchJson("/api/v1/fines/" + pendingResolve.fineId + "/" + pendingResolve.kind, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ note: resolveFineNote.value.trim() || null }),
+      body: JSON.stringify(pendingResolve.kind === "mark-paid" ? {
+        note: resolveFineNote.value.trim() || null,
+        method: document.getElementById("resolve-fine-method").value,
+        reference: document.getElementById("resolve-fine-reference").value.trim() || null,
+        paid_on: document.getElementById("resolve-fine-paid-on").value || null,
+      } : { note: resolveFineNote.value.trim() || null }),
     });
 
     resolveFineSubmit.disabled = false;

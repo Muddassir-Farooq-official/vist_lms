@@ -327,6 +327,20 @@
       });
       tr.querySelector(".teacher-cell").appendChild(teacherBtn);
 
+      if (!o.enrolled_count) {
+        const delBtn = document.createElement("button");
+        delBtn.className = "role-btn small-btn danger-btn";
+        delBtn.type = "button";
+        delBtn.textContent = "Delete\u2026";
+        delBtn.addEventListener("click", async function () {
+          if (!(await VA.confirm("Delete " + o.course_code + " section " + (o.section_label || "A") + "? It was created by mistake and nobody has enrolled. Its timetable slots go with it.", "Delete"))) return;
+          const r = await VA.fetchJson("/api/v1/academics/offerings/" + o.id, { method: "DELETE" });
+          if (!r.ok) { VA.showError(extractErrorMessage(r.body, "Could not delete it.")); return; }
+          VA.toast("Offering deleted."); loadOfferings();
+        });
+        actionsCell.appendChild(delBtn);
+      }
+
       const toggleBtn = document.createElement("button");
       toggleBtn.className = "role-btn small-btn";
       toggleBtn.type = "button";
@@ -359,7 +373,7 @@
       seatsBtn.type = "button";
       seatsBtn.textContent = "Seats";
       seatsBtn.addEventListener("click", async function () {
-        const answer = window.prompt("Seats for " + o.course_code + " section " + o.section_label + " (empty = unlimited):", o.capacity == null ? "" : o.capacity);
+        const answer = (await window.VistAdmin.promptText("Seats for " + o.course_code + " section " + o.section_label + " (empty = unlimited):", o.capacity == null ? "" : o.capacity));
         if (answer === null) return;
         const value = answer.trim() === "" ? null : parseInt(answer, 10);
         if (value !== null && (isNaN(value) || value < 1)) { VA.showError("Seats must be a whole number of 1 or more."); return; }
@@ -444,14 +458,25 @@
         "They'll be marked Completed with no grade — you can still set one afterward via each enrollment, but " +
         "this is your last chance to grade them first if you'd rather do that now.";
     }
-    message += "\n\nThis can't be undone from here.";
+    message += " This can't be undone from here.";
 
-    if (!confirm(message)) {
-      return;
+    let overrideReason = null;
+    if (p.override_needed) {
+      overrideReason = await VA.ask({
+        title: "Some courses are not finished", danger: true, ok: "End it anyway", input: "textarea", min: 10, label: "Why end the semester now? (kept on record)",
+        intro: message + " NOT FINISHED: " + p.not_ready.join("; ") + ". Students in these courses will be closed out without a published result. " +
+          "Normally: lock their attendance and publish their results first, then come back.",
+      });
+      if (!overrideReason) return;
+    } else {
+      const ok = await VA.ask({ title: "End the semester?", intro: message, ok: "End semester", input: "none", danger: true });
+      if (!ok) return;
     }
 
     endSemesterBtn.disabled = true;
-    const result = await VA.fetchJson("/api/v1/academics/end-semester?" + new URLSearchParams({ term_label: term }), {
+    const params = { term_label: term };
+    if (overrideReason) params.override_reason = overrideReason;
+    const result = await VA.fetchJson("/api/v1/academics/end-semester?" + new URLSearchParams(params), {
       method: "POST",
     });
     endSemesterBtn.disabled = false;

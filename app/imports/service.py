@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.audit.service import AuditService
 from app.auth.models import Role, User, UserRole
 from app.core.config import settings
-from app.core.constants import DEFAULT_STUDENT_PASSWORD
+from app.core.security import new_temp_password
 from app.core.exceptions import BusinessRuleViolationError, DuplicateResourceError, ValidationAppError
 from app.core.security import hash_password
 from app.core.sequences import generate_roll_number
@@ -318,14 +318,15 @@ class ImportService:
             )
         )
 
-        # Account creation: fixed default password per approved policy
-        # (security tradeoff documented in app/core/constants.py), forced
+        # Account creation: a random one-time password (shown on the admission slip), forced
         # change on first login. Username IS the roll number now — one
         # identifier, not two, already guaranteed unique by the generator.
         username = roll_number
+        temp = new_temp_password()
         user = User(
             username=username,
-            password_hash=hash_password(DEFAULT_STUDENT_PASSWORD),
+            password_hash=hash_password(temp),
+            temp_password=temp,
             is_active=True,
             must_change_password=True,
         )

@@ -94,7 +94,8 @@ async def test_late_and_leave_are_not_accepted_or_stored(app_client, admin_user,
     statuses = {x["student_id"]: x["status"] for x in (await app_client.get(f"/api/v1/attendance/sessions/{sess[0]}")).json()}
     assert statuses == {s1: "PRESENT", s2: "ABSENT"}
     from app.attendance.models import AttendanceStatus
-    assert {m.value for m in AttendanceStatus} == {"PRESENT", "ABSENT"}
+    # The register is two-way. LEAVE exists only for approved (e.g. medical) leave recorded by the office.
+    assert {m.value for m in AttendanceStatus} == {"PRESENT", "ABSENT", "LEAVE"}
 
 
 async def test_register_rejects_students_who_are_not_enrolled(app_client, admin_user, db_session):

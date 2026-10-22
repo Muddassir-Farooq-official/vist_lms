@@ -2255,3 +2255,31 @@ body[data-card-tables] .content-main > .sh-card, body[data-card-tables] .content
 .ps-net { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 14px 0; padding: 14px 18px; border: 1.5px solid var(--success); border-radius: 14px; background: var(--success-bg); } .ps-net span { font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.8rem; color: var(--text-secondary); } .ps-net strong { font-size: 1.7rem; color: var(--success); }
 #rd-body td strong, #rn-body td strong, #ad-body td strong, #it-body td strong { display: block; } #rd-body td small, #rn-body td small, #ad-body td small { display: block; color: var(--text-secondary); font-weight: 500; }
 #rd-body td small:last-child { display: inline; }
+
+/* ---- In-page dialogs (instead of the browser's confirm/prompt) and load problems ---- */
+.ask-dialog .cc-meta, .ask-dialog label { white-space: pre-line; }
+.ask-dialog .text-input { width: 100%; }
+.load-problem { display: block; margin-bottom: 14px; overflow: hidden; }
+.load-problem button { float: right; margin-left: 12px; }
+[aria-busy="true"].role-btn, button[aria-busy="true"] { cursor: progress; }
+
+/* ---- Printing any screen: just the content, no menus or buttons ---- */
+@media print {
+  body { background: #fff !important; }
+  .drawer, .drawer-backdrop, .content-topbar, .bottom-nav, #net-progress, #net-slow, #toast, .load-problem,
+  .portal-tabs, .row-actions, .form-actions, button, .role-btn, .danger-btn, .back-link, .skip-link { display: none !important; }
+  .content, .content-body, main { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+  .panel, .sh-card, .kpi { box-shadow: none !important; border-color: #999 !important; break-inside: avoid; }
+  .table-scroll { overflow: visible !important; border: none !important; }
+  .tk-table, .dash-table { min-width: 0 !important; font-size: 10pt; }
+  .tk-table tr, .dash-table tr { break-inside: avoid; }
+  a { color: inherit; text-decoration: none; }
+}
+
+/* Hostel: residents listed inside a room row */
+.hr-person { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 3px 0; flex-wrap: wrap; }
+.hr-person + .hr-person { border-top: 1px dashed var(--border); }
+.hr-person small { color: var(--text-secondary); }
+#h-rooms td small, #h-hist td small, .records-dialog td small, #md-table td small, #df-table td small, #pa-table td small, #cal-table td small, #sl-table td small { display: block; color: var(--text-secondary); font-weight: 500; }
+dialog.modal.records-dialog { width: min(980px, calc(100vw - 24px)); max-width: none; }
+.records-dialog .form-actions { gap: 8px; flex-wrap: wrap; }

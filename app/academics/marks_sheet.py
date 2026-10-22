@@ -8,6 +8,7 @@ so the rules are exactly those of entering a mark by hand (0..max, locked once s
 """
 from __future__ import annotations
 
+from app.core.csvsafe import safe_writer
 import csv
 import io
 import re
@@ -50,7 +51,7 @@ class MarksSheetService:
         marks = {(m.enrollment_id, m.offering_assessment_id): float(m.obtained_marks) for m in (await self.session.execute(
             select(StudentMark).where(StudentMark.enrollment_id.in_([e.id for e, _ in roster])))).scalars()} if roster else {}
         out = io.StringIO()
-        w = csv.writer(out, lineterminator="\r\n")
+        w = safe_writer(out, lineterminator="\r\n")
         w.writerow(FIXED + [_col(t) for _, t in comps])
         for e, st in roster:
             w.writerow([st.roll_number, f"{st.first_name} {st.last_name}"] + [("" if (e.id, oa.id) not in marks else f"{marks[(e.id, oa.id)]:g}") for oa, _ in comps])

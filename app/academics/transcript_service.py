@@ -54,10 +54,24 @@ class TranscriptService:
             .where(Enrollment.student_id == student_id, ResultSheet.status == ResultSheetStatus.PUBLISHED)
         )).all()
 
+        # Courses the student was withdrawn from for low attendance, or because they left the institute:
+        # they stay on the record as "W" (no grade points, not in the GPA), instead of disappearing.
+        withdrawn = (await self.session.execute(
+            select(Enrollment, CourseOffering, Course)
+            .join(CourseOffering, CourseOffering.id == Enrollment.course_offering_id).join(Course, Course.id == CourseOffering.course_id)
+            .where(Enrollment.student_id == student_id, Enrollment.status == EnrollmentStatus.WITHDRAWN,
+                   Enrollment.withdrawal_reason.in_(["ATTENDANCE", "STUDENT_LEFT", "LATE"]))
+        )).all()
+
         # terms in the order they happened
         terms: dict[str, dict] = {}
+        for enr, off, course in withdrawn:
+            t = terms.setdefault(off.term_label, {"label": off.term_label, "start_date": off.term_start_date, "items": [], "withdrawn": []})
+            t.setdefault("withdrawn", []).append((enr, off, course))
+            if off.term_start_date and (t["start_date"] is None or off.term_start_date < t["start_date"]):
+                t["start_date"] = off.term_start_date
         for res, enr, off, course in rows:
-            t = terms.setdefault(off.term_label, {"label": off.term_label, "start_date": off.term_start_date, "items": []})
+            t = terms.setdefault(off.term_label, {"label": off.term_label, "start_date": off.term_start_date, "items": [], "withdrawn": []})
             if off.term_start_date and (t["start_date"] is None or off.term_start_date < t["start_date"]):
                 t["start_date"] = off.term_start_date
             t["items"].append((res, enr, off, course))
@@ -73,7 +87,10 @@ class TranscriptService:
             items.sort(key=lambda it: (position[it[2].term_label], it[1].enrolled_at))
             for n, it in enumerate(items, start=1):
                 attempt[it[0].enrollment_id] = n
-            last_attempt[course_id] = items[-1][0].enrollment_id
+            # The attempt that counts is the BEST one (a later, worse retake never lowers the CGPA);
+            # between equal grades, the later one.
+            best = max(enumerate(items), key=lambda p: (float(p[1][0].grade_points), p[0]))[1]
+            last_attempt[course_id] = best[0].enrollment_id
 
         latest: dict[uuid.UUID, tuple[float, int, bool]] = {}      # course -> (grade points, credit hours, passed) as it stands after each term
         out_terms = []
@@ -82,14 +99,23 @@ class TranscriptService:
             for res, enr, off, course in sorted(t["items"], key=lambda it: it[3].code):
                 gp, ch = float(res.grade_points), int(res.credit_hours)
                 pairs.append((gp, ch))
-                latest[course.id] = (gp, ch, res.outcome == "PASSED")
+                if course.id not in latest or gp >= latest[course.id][0]:      # a worse retake does not replace a better grade
+                    latest[course.id] = (gp, ch, res.outcome == "PASSED")
                 courses.append({"enrollment_id": res.enrollment_id, "course_code": course.code, "course_title": course.title, "credit_hours": ch,
                                 "total_obtained": float(res.total_obtained), "total_max": float(res.total_max), "percentage": float(res.percentage),
                                 "letter_grade": res.letter_grade, "grade_points": gp, "quality_points": round(gp * ch, 2), "outcome": res.outcome,
                                 "failed_for_attendance": res.failed_for_attendance, "supplementary": bool(getattr(res, "supplementary", False)), "attempt": attempt[res.enrollment_id],
                                 "replaced": last_attempt[course.id] != res.enrollment_id})
+            for enr, off, course in sorted(t.get("withdrawn", []), key=lambda it: it[2].code):
+                attendance = enr.withdrawal_reason == "ATTENDANCE"
+                courses.append({"enrollment_id": enr.id, "course_code": course.code, "course_title": course.title, "credit_hours": int(course.credit_hours),
+                                "total_obtained": 0.0, "total_max": 0.0, "percentage": 0.0, "letter_grade": "W", "grade_points": 0.0, "quality_points": 0.0,
+                                "outcome": "WITHDRAWN", "failed_for_attendance": attendance, "supplementary": False, "attempt": 1, "replaced": False,
+                                "withdrawn": True, "withdrawn_reason": "attendance below the limit" if attendance else
+                                ("withdrew after the deadline" if enr.withdrawal_reason == "LATE" else "left the institute")})
+            graded = [c for c in courses if not c.get("withdrawn")]
             out_terms.append({"label": t["label"], "start_date": t["start_date"], "courses": courses,
-                              "credits_attempted": sum(c["credit_hours"] for c in courses), "credits_earned": sum(c["credit_hours"] for c in courses if c["outcome"] == "PASSED"),
+                              "credits_attempted": sum(c["credit_hours"] for c in graded), "credits_earned": sum(c["credit_hours"] for c in graded if c["outcome"] == "PASSED"),
                               "gpa": gpa(pairs), "cgpa_after": gpa([(g, c) for g, c, _ in latest.values()]),
                               "credits_earned_cumulative": sum(c for _, c, ok in latest.values() if ok)})
         scale = [{"letter": e.letter, "min_percent": float(e.min_percent), "grade_points": float(e.grade_points), "is_passing": e.is_passing} for e in await GradeScaleService(self.session).entries()]

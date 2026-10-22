@@ -12,7 +12,7 @@ import secrets
 import string
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import Role, User, UserRole
@@ -47,10 +47,18 @@ class ParentService:
         linked = False
         if user is not None:
             linked = await self.session.get(ParentStudentLink, (user.id, student_id)) is not None
+        # Brothers and sisters (same guardian CNIC) are SUGGESTED, never linked by themselves: the office picks who the login may see.
+        sib = (await self.session.execute(
+            select(Student).join(StudentGuardian, StudentGuardian.student_id == Student.id)
+            .where(StudentGuardian.cnic == g.cnic, Student.id != student_id).order_by(Student.roll_number, Student.first_name))).scalars().unique().all()
+        siblings = []
+        for s in sib:
+            siblings.append({"id": s.id, "name": f"{s.first_name} {s.last_name}", "roll_number": s.roll_number,
+                             "linked": bool(user and await self.session.get(ParentStudentLink, (user.id, s.id)) is not None)})
         return {"guardian_name": g.name, "guardian_cnic": g.cnic, "relation": g.relation, "username": username,
-                "has_login": user is not None, "linked": linked, "active": bool(user and user.is_active)}
+                "has_login": user is not None, "linked": linked, "active": bool(user and user.is_active), "siblings": siblings}
 
-    async def create_or_link(self, student_id: uuid.UUID, *, actor_id: uuid.UUID, reset_password: bool = False) -> dict:
+    async def create_or_link(self, student_id: uuid.UUID, *, actor_id: uuid.UUID, reset_password: bool = False, sibling_ids: list[uuid.UUID] | None = None) -> dict:
         student = await self.session.get(Student, student_id)
         if student is None:
             raise ResourceNotFoundError("Student not found.")
@@ -77,20 +85,23 @@ class ParentService:
                 user.password_hash = hash_password(temp)
                 user.must_change_password = True
                 user.is_active = True
-        # this student and every brother/sister with the same guardian CNIC
-        sibling_ids = set((await self.session.execute(select(StudentGuardian.student_id).where(StudentGuardian.cnic == g.cnic))).scalars())
-        sibling_ids.add(student_id)
+        # this student, plus only the brothers/sisters the office chose; each must really share the guardian (same CNIC)
+        family = set((await self.session.execute(select(StudentGuardian.student_id).where(StudentGuardian.cnic == g.cnic))).scalars())
+        chosen = {student_id} | set(sibling_ids or [])
+        if not chosen <= family:
+            raise BusinessRuleViolationError("A student of another family cannot be added to this guardian's login.")
         added = []
-        for sid in sibling_ids:
+        for sid in chosen:
             if await self.session.get(ParentStudentLink, (user.id, sid)) is None:
                 self.session.add(ParentStudentLink(user_id=user.id, student_id=sid))
                 added.append(sid)
         await self.session.flush()
+        total = (await self.session.execute(select(func.count()).select_from(ParentStudentLink).where(ParentStudentLink.user_id == user.id))).scalar_one()
         from app.audit.service import AuditService
 
         await AuditService(self.session).log(actor_user_id=actor_id, action="parent.access_granted", entity_type="student", entity_id=student_id,
                                              after={"username": username, "linked_students": [str(s) for s in added], "password_reset": bool(temp)})
-        return {"username": username, "temporary_password": temp, "children_linked": len(sibling_ids),
+        return {"username": username, "temporary_password": temp, "children_linked": total,
                 "message": "Give these sign-in details to the guardian; the password must be changed at first sign-in." if temp
                 else "The guardian's existing login now includes this student."}
 

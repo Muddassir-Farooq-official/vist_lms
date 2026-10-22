@@ -386,6 +386,9 @@ class ApplicationService:
     # ------------------------------------------------------------------ the administration decides
     async def review(self, application_id: uuid.UUID, *, admin_id: uuid.UUID, action: str, note: str | None) -> Application:
         app = await self.get(application_id)
+        from app.core.controls import refuse_self
+
+        refuse_self(admin_id, app.applicant_user_id, "This is your own application, so another administrator must review it.")
         if app.status == ApplicationStatus.WITHDRAWN:
             raise BusinessRuleViolationError("The applicant withdrew this application.")
         note = (note or "").strip() or None
@@ -408,12 +411,30 @@ class ApplicationService:
             app.status = ApplicationStatus.APPROVED if approved else ApplicationStatus.REJECTED
             app.reviewed_at = app.reviewed_at or _now()
             app.decided_at, app.decided_by, app.decision_note = _now(), admin_id, note
+            if approved:
+                await self._excuse_attendance(app, admin_id)
             await self._notify_applicant(app, "Application approved" if approved else "Application rejected",
                                          f"{ref}: \u201c{app.subject}\u201d" + (f" \u2014 {note}" if note else ""))
         else:
             raise BusinessRuleViolationError("Unknown action.")
         await self.audit.log(actor_user_id=admin_id, action=f"application.{action.lower()}", entity_type="application", entity_id=app.id)
         return app
+
+    async def _excuse_attendance(self, app: Application, admin_id: uuid.UUID) -> None:
+        """Approved leave reaches attendance by itself: no separate correction for the office to forget."""
+        t = await self.get_type(app.type_id)
+        if not t.excuses_attendance or not app.from_date:
+            return
+        to = app.to_date or app.from_date
+        why = f"{t.name} ({reference(app)})"
+        if app.applicant_kind == ApplicantKind.EMPLOYEE:
+            from app.timekeeping.service import TimekeepingService
+
+            await TimekeepingService(self.session).excuse_range(app.applicant_ref_id, app.from_date, to, why, actor_id=admin_id)
+        else:
+            from app.attendance.service import AttendanceService
+
+            await AttendanceService(self.session).grant_leave(app.applicant_ref_id, from_date=app.from_date, to_date=to, reason=why, actor_id=admin_id)
 
     # ------------------------------------------------------------------ the charts
     async def overview(self) -> dict:

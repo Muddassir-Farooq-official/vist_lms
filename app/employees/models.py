@@ -70,6 +70,11 @@ class Employee(UUIDPKMixin, TimestampMixin, Base):
     date_of_birth: Mapped[date] = mapped_column(Date, nullable=False)
     gender: Mapped[str] = mapped_column(String(20), nullable=False)
     hire_date: Mapped[date] = mapped_column(Date, nullable=False)
+    left_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Where the salary goes (the payroll bank-transfer sheet)
+    bank_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    bank_account_title: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    bank_iban: Mapped[str | None] = mapped_column(String(34), nullable=True)      # IBAN (PK + 22) or the plain account number      # last working day, set when employment ends
     department: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Added for real-institute launch (all nullable so existing rows stay valid).

@@ -149,10 +149,19 @@ class ResultSheetService:
     async def approve(self, offering_id: uuid.UUID, *, actor_id: uuid.UUID) -> ResultSheet:
         offering, course = await self._offering(offering_id)
         sheet = await self._sheet(offering_id, (ResultSheetStatus.SUBMITTED,), "approved")
+        # Separation of duties: the person who entered and submitted the marks (or teaches the
+        # course) does not approve them; someone else checks -- unless they are the only approver there is.
+        from app.auth.permissions import Permissions
+        from app.core.controls import four_eyes
+
+        teacher_user = await self._teacher_user(offering)
+        alone = await four_eyes(self.session, actor_id, [sheet.submitted_by, teacher_user], Permissions.RESULT_APPROVE,
+                                "You submitted or teach these marks, so another approver (exam office or administration) must approve them.")
         self._need_complete(await self.completeness(offering_id), "approve")
         sheet.status, sheet.approved_by, sheet.approved_at = ResultSheetStatus.APPROVED, actor_id, _now()
-        await self.audit.log(actor_user_id=actor_id, action="result_sheet.approved", entity_type="result_sheet", entity_id=sheet.id)
-        teacher = await self._teacher_user(offering)
+        await self.audit.log(actor_user_id=actor_id, action="result_sheet.approved", entity_type="result_sheet", entity_id=sheet.id,
+                             metadata={"self_approved_only_approver": True} if alone else None)
+        teacher = teacher_user
         if teacher:
             await create_notification(self.session, user_id=teacher, category=NotificationCategory.RESULT, title=f"Marks approved: {course.code}",
                                       message="They will be published to students by the administration.", link="/dashboard/faculty/grading")
@@ -184,7 +193,8 @@ class ResultSheetService:
         from app.sms.service import SmsService
 
         sms = SmsService(self.session)
-        for sid in (await self.session.execute(select(Enrollment.student_id).where(Enrollment.course_offering_id == offering_id))).scalars():
+        for sid in (await self.session.execute(select(Enrollment.student_id).where(Enrollment.course_offering_id == offering_id,
+                                                                                  Enrollment.status != EnrollmentStatus.WITHDRAWN))).scalars():
             await sms.queue_for_student(sid, event="RESULTS",
                                         body=f"{settings.app_name}: result for {course.code} {course.title[:40]} ({offering.term_label}) is published. See My Results.")
         await self.audit.log(actor_user_id=actor_id, action="result_sheet.published", entity_type="result_sheet", entity_id=sheet.id, metadata={"students": decided})
@@ -222,6 +232,33 @@ class ResultSheetService:
                         "teacher_name": teachers.get(offering.assigned_teacher_id), "status": sheet.status, "students": c["students"], "assessments": c["assessments"],
                         "missing_students": c["missing_students"], "submitted_at": sheet.submitted_at, "approved_at": sheet.approved_at, "published_at": sheet.published_at,
                         "return_reason": sheet.return_reason, "correction_count": sheet.correction_count, "resubmission_count": sheet.resubmission_count})
+        return out
+
+    async def outstanding(self) -> list[dict]:
+        """Courses with students whose marks have NOT been submitted yet (no sheet started, still a draft, or
+        sent back): what the exam office chases teachers for before result day."""
+        from sqlalchemy import func as _func
+
+        counts = dict((await self.session.execute(
+            select(Enrollment.course_offering_id, _func.count()).where(Enrollment.status != EnrollmentStatus.WITHDRAWN)
+            .group_by(Enrollment.course_offering_id))).all())
+        if not counts:
+            return []
+        rows = (await self.session.execute(
+            select(CourseOffering, Course, ResultSheet).join(Course, Course.id == CourseOffering.course_id)
+            .outerjoin(ResultSheet, ResultSheet.course_offering_id == CourseOffering.id)
+            .where(CourseOffering.id.in_(list(counts)), CourseOffering.section_label != "IMPORTED")
+            .order_by(CourseOffering.term_label, Course.code, CourseOffering.section_label))).all()
+        rows = [(o, c, s) for o, c, s in rows if s is None or s.status in (ResultSheetStatus.DRAFT, ResultSheetStatus.RETURNED)]
+        teachers = {e.id: f"{e.first_name} {e.last_name}" for e in (await self.session.execute(
+            select(Employee).where(Employee.id.in_([o.assigned_teacher_id for o, _, _ in rows if o.assigned_teacher_id])))).scalars()} if rows else {}
+        out = []
+        for o, c, s in rows:
+            comp = await self.completeness(o.id)
+            out.append({"course_offering_id": o.id, "course_code": c.code, "course_title": c.title, "section_label": o.section_label, "term_label": o.term_label,
+                        "teacher_name": teachers.get(o.assigned_teacher_id), "status": (s.status if s else ResultSheetStatus.DRAFT), "students": counts.get(o.id, 0),
+                        "missing_students": comp["missing_students"], "assessments": comp["assessments"], "return_reason": s.return_reason if s else None,
+                        "attendance_locked": o.attendance_locked_at is not None})
         return out
 
     async def review(self, offering_id: uuid.UUID) -> dict:

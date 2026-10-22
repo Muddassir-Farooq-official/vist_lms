@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, Query
+from starlette.concurrency import run_in_threadpool
 
 from app.auth.permissions import Permissions
 from app.auth.repository import AuthRepository
@@ -23,6 +24,7 @@ from app.fines.schemas import (
     FineRejectRequest,
     FineRequestCreate,
     FineResolveRequest,
+    FinePaidRequest,
 )
 from app.fines.service import FineService, default_source_for_roles, resolve_payer
 from app.students.repository import StudentRepository
@@ -249,11 +251,12 @@ async def balance_for(
 @router.post("/{fine_id}/mark-paid", response_model=FineDetail, summary="Mark a fine as paid")
 async def mark_fine_paid(
     fine_id: uuid.UUID,
-    payload: FineResolveRequest,
+    payload: FinePaidRequest,
     current_user: CurrentUser = Depends(require_permission(Permissions.FINE_MANAGE)),
     db=Depends(get_db),
 ) -> FineDetail:
-    fine = await FineService(db).mark_paid(fine_id, actor_id=current_user.id, note=payload.note)
+    fine = await FineService(db).mark_paid(fine_id, actor_id=current_user.id, note=payload.note, method=payload.method,
+                                           reference=payload.reference, paid_on=payload.paid_on)
     return await _to_detail(db, fine)
 
 
@@ -269,3 +272,32 @@ async def waive_fine(
     Officer also holds."""
     fine = await FineService(db).waive(fine_id, actor_id=current_user.id, note=payload.note)
     return await _to_detail(db, fine)
+
+@router.get("/{fine_id}/receipt.pdf", summary="Receipt for a paid fine (the accounts office, or the person who paid it)")
+async def fine_receipt_pdf(
+    fine_id: uuid.UUID,
+    current_user: CurrentUser = Depends(require_permission(Permissions.FINE_VIEW)),
+    db=Depends(get_db),
+):
+    from fastapi.responses import Response
+
+    from app.core.config import settings
+    from app.core.exceptions import ResourceNotFoundError
+    from app.fees.receipt_pdf import render_receipt_pdf
+    from app.fines.service import _resolve_user_id
+
+    fine = await FineService(db).get(fine_id)
+    if fine.status != FineStatus.PAID or not fine.receipt_number:
+        raise ResourceNotFoundError("Receipt not found.")
+    if Permissions.FINE_MANAGE not in current_user.permissions:
+        if await _resolve_user_id(db, fine.payer_type, fine.payer_id) != current_user.id:
+            raise ResourceNotFoundError("Receipt not found.")
+    payer = await resolve_payer(db, fine.payer_type, fine.payer_id)
+    data = {"institute": settings.app_name, "receipt_number": fine.receipt_number, "paid_on": fine.paid_on,
+            "recorded_on": fine.resolved_at.date() if fine.resolved_at else fine.paid_on,
+            "payer": {"name": payer.name, "identifier": payer.identifier, "group": fine.payer_type.value.title()},
+            "fee_name": f"Fine — {fine.source.value.replace('_', ' ').title()}", "term_label": None,
+            "amount": float(fine.amount), "method": fine.payment_method, "reference": fine.payment_reference,
+            "description": fine.reason}
+    return Response(content=await run_in_threadpool(render_receipt_pdf, data), media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="receipt-{fine.receipt_number}.pdf"'})

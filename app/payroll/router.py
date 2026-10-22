@@ -5,6 +5,7 @@ from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends
+from starlette.concurrency import run_in_threadpool
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
@@ -54,9 +55,14 @@ class AdvanceIn(BaseModel):
 
 class RunIn(BaseModel):
     month: date
+    working_days: int | None = Field(default=None, ge=1, le=31)     # empty = the institute's default (Settings)
 
 
 class PayslipEdit(BaseModel):
+    working_days: int | None = Field(default=None, ge=1, le=31)
+    absent_days: Decimal | None = Field(default=None, ge=0, le=31)      # setting these overrides staff attendance
+    late_marks: int | None = Field(default=None, ge=0, le=62)
+    reset_attendance: bool = False                                      # go back to the figures from staff attendance
     unpaid_days: Decimal | None = Field(default=None, ge=0, le=31)
     adjustment: Decimal | None = Field(default=None, ge=-10_000_000, le=10_000_000)
     adjustment_note: str | None = Field(default=None, max_length=200)
@@ -117,7 +123,7 @@ async def runs(current_user: CurrentUser = Depends(view), db=Depends(get_db)) ->
 @router.post("/runs", status_code=201, summary="Prepare payroll for a month: one payslip per employee, worked out from salary, pay items, bonuses and advances")
 async def prepare(payload: RunIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
     service = PayrollService(db)
-    run, skipped = await service.prepare(payload.month, actor_id=current_user.id)
+    run, skipped = await service.prepare(payload.month, actor_id=current_user.id, working_days=payload.working_days)
     return {**await service.run_detail(run.id), "skipped": skipped}
 
 
@@ -182,5 +188,38 @@ async def payslip(payslip_id: uuid.UUID, current_user: CurrentUser = Depends(get
 @router.get("/payslips/{payslip_id}/pdf", summary="A payslip as a PDF")
 async def payslip_pdf(payslip_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> Response:
     p = await PayrollService(db).payslip_detail(payslip_id, viewer_user_id=current_user.id, can_view_all=Permissions.PAYROLL_VIEW in current_user.permissions)
-    return Response(content=render_payslip_pdf(p), media_type="application/pdf",
+    return Response(content=await run_in_threadpool(render_payslip_pdf, p), media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="payslip-{p["employee_code"]}-{p["month"]:%Y-%m}.pdf"', **SECURITY})
+
+
+class PaySettingIn(BaseModel):
+    security_percent: Decimal | None = Field(default=None, ge=0, le=100)   # empty = the institute's %, 0 = none for this person
+    security_opening: Decimal = Field(default=Decimal(0), ge=0, le=10_000_000)
+    note: str | None = Field(default=None, max_length=200)
+
+
+@router.get("/security", summary="Security deposits: what is held for each employee, and their own % if different")
+async def security(current_user: CurrentUser = Depends(view), db=Depends(get_db)) -> dict:
+    return await PayrollService(db).security_report()
+
+
+@router.post("/runs/{run_id}/payslips/{payslip_id}/release", summary="Release a held payslip: with the month if not yet paid, or pay it on its own if the month is already paid")
+async def release_payslip(run_id: uuid.UUID, payslip_id: uuid.UUID, payload: PayIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    return await PayrollService(db).release_payslip(run_id, payslip_id, method=payload.payment_method, reference=payload.reference_no, paid_date=payload.paid_date, actor_id=current_user.id)
+
+
+@router.post("/security/{employee_id}/release", summary="Pay a person's security deposit back (once); it becomes an expense in the books")
+async def release_security(employee_id: uuid.UUID, payload: PayIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    return await PayrollService(db).release_security(employee_id, method=payload.payment_method, reference=payload.reference_no, paid_date=payload.paid_date, actor_id=current_user.id)
+
+
+@router.put("/settings/{employee_id}", summary="One employee's own security % and the deposit already held before this system (administration)")
+async def set_pay_setting(employee_id: uuid.UUID, payload: PaySettingIn, current_user: CurrentUser = Depends(approve), db=Depends(get_db)) -> dict:
+    return await PayrollService(db).set_pay_setting(employee_id, payload.model_dump(), actor_id=current_user.id)
+
+
+@router.get("/withholdings", summary="What salaries have held back in a year (security, deductions, advance recoveries), by head and month")
+async def withholdings(year: int | None = None, current_user: CurrentUser = Depends(view), db=Depends(get_db)) -> dict:
+    from app.core.clock import institute_today
+
+    return await PayrollService(db).withholdings(year or institute_today().year)

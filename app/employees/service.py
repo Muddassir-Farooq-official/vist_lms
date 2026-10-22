@@ -125,6 +125,7 @@ class JobRoleService:
 _EDITABLE_EXTRA_FIELDS = (
     "first_name", "last_name", "date_of_birth", "gender", "hire_date", "email", "blood_group",
     "marital_status", "employment_type", "emergency_contact_name", "emergency_contact_no",
+    "bank_name", "bank_account_title", "bank_iban",
 )
 
 
@@ -364,9 +365,18 @@ class EmployeeService:
         if employee.user_id is not None:
             from app.auth.models import User
 
+            if new_status == EmployeeStatus.TERMINATED:
+                from app.core.controls import ensure_another_admin, refuse_self
+
+                refuse_self(actor_id, employee.user_id, "You cannot end your own employment. Another administrator must do it.")
+                await ensure_another_admin(self.session, employee.user_id)
             user = await self.session.get(User, employee.user_id)
             if user is not None:
                 user.is_active = new_status != EmployeeStatus.TERMINATED
+        if new_status == EmployeeStatus.TERMINATED:
+            employee.left_on = institute_today()            # paid up to this day in that month's payroll
+        elif old_status == EmployeeStatus.TERMINATED:
+            employee.left_on = None
 
         await self.audit.log(
             actor_user_id=actor_id,
@@ -533,6 +543,10 @@ class EmployeeService:
             old_role = None
             if old_code:
                 old_role = (await self.session.execute(select(Role).where(Role.code == old_code))).scalar_one_or_none()
+            if old_code == "ADMIN" and new_job_role.default_role_code != "ADMIN":
+                from app.core.controls import ensure_another_admin
+
+                await ensure_another_admin(self.session, employee.user_id)
             if old_role is not None and old_role.id != new_role.id:
                 for link in (
                     await self.session.execute(

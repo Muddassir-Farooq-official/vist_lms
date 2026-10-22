@@ -126,7 +126,7 @@ class BookRow(BaseModel):
     party: str | None
     category: str
     amount: float
-    payment_method: PaymentMethod
+    payment_method: str          # accounts methods, or a fee method (BANK_DEPOSIT, ONE_BILL...)
     status: str
 
 
@@ -139,6 +139,7 @@ class CategoryTotal(BaseModel):
 class MonthPoint(BaseModel):
     month: str                  # 2026-09
     fees: float
+    fines: float = 0.0
     other_income: float
     income: float
     expenses: float
@@ -155,10 +156,20 @@ class PendingTotal(BaseModel):
     amount: float
 
 
+class FineSourceTotal(BaseModel):
+    source: str
+    amount: float
+    count: int
+
+
 class SummaryOut(BaseModel):
     from_date: date | None
     to_date: date | None
     fees_collected: float
+    fines_collected: float = 0.0
+    fines_by_source: list[FineSourceTotal] = []
+    fines_outstanding: PendingTotal = PendingTotal(count=0, amount=0.0)
+    fines_waived: float = 0.0
     other_income: float
     total_income: float
     expenses: float

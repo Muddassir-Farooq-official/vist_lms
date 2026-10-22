@@ -20,7 +20,7 @@
       const tr = document.createElement("tr");
       tr.innerHTML =
         '<td data-label="Student"><strong>' + esc(s.student_name) + "</strong>" +
-        '<span class="roll-sub">' + esc(s.roll_number || "\u2014") + "</span></td>" +
+        '<span class="roll-sub">' + esc(s.roll_number || "\u2014") + (current === "LEAVE" ? " \u00b7 on approved leave (stays so unless you mark Present)" : "") + "</span></td>" +
         '<td data-label="Attendance"><div class="seg" role="radiogroup" aria-label="Attendance for ' + esc(s.student_name) + '">' +
         '<label class="seg-opt seg-present"><input type="radio" class="att-radio" name="' + name + '" value="PRESENT" data-student-id="' + s.student_id + '"' +
         (current === "PRESENT" ? " checked" : "") + ' /><span>Present</span></label>' +

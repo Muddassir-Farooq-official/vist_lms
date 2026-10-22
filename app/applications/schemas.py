@@ -16,6 +16,7 @@ class TypeIn(BaseModel):
     for_employees: bool = True
     requires_dates: bool = False
     requires_attachment: bool = False
+    excuses_attendance: bool = False
     yearly_limit_days: int | None = Field(default=None, ge=1, le=366)
     is_active: bool = True
     sort_order: int = 100
@@ -34,6 +35,7 @@ class TypeUpdate(BaseModel):
     for_employees: bool | None = None
     requires_dates: bool | None = None
     requires_attachment: bool | None = None
+    excuses_attendance: bool | None = None
     yearly_limit_days: int | None = Field(default=None, ge=1, le=366)
     clear_limit: bool = False
     is_active: bool | None = None
@@ -57,6 +59,7 @@ class TypeOut(BaseModel):
     for_employees: bool
     requires_dates: bool
     requires_attachment: bool
+    excuses_attendance: bool = False
     yearly_limit_days: int | None
     is_active: bool
     sort_order: int

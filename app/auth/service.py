@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
+from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,27 +47,44 @@ class AuthService:
         return roles, sorted(perms)
 
     async def _check_rate_limit(self, *, username: str, ip: str | None) -> None:
+        """Only FAILED sign-ins count (counted in _count_failure). Two limits:
+        - per (username, ip): one source hammering one account;
+        - per username across all sources: rotating IPs. This one is NOT applied to an IP the
+          person has signed in from successfully in the last 30 days, so a stranger guessing
+          passwords cannot lock the real user out of their own account (lockout denial of service)."""
         redis = get_redis()
+        per_ip = int(await redis.get(f"ratelimit:login:{username}:{ip or 'unknown'}") or 0)
+        if per_ip >= settings.rate_limit_login_per_minute:
+            raise RateLimitedError("Too many wrong passwords. Please wait a minute and try again.")
+        total = int(await redis.get(f"ratelimit:login:global:{username}") or 0)
+        if total >= settings.rate_limit_login_per_username_per_hour and not await self._known_place(username, ip):
+            raise RateLimitedError("Too many wrong passwords for this account from different places. Try again later, "
+                                   "from a computer you normally use, or ask the office for a new one-time password.")
 
-        # Per (username, ip) — the original limiter. Tight window, low
-        # threshold: catches a single source hammering one account.
-        per_ip_key = f"ratelimit:login:{username}:{ip or 'unknown'}"
-        per_ip_count = await redis.incr(per_ip_key)
-        if per_ip_count == 1:
-            await redis.expire(per_ip_key, 60)
-        if per_ip_count > settings.rate_limit_login_per_minute:
-            raise RateLimitedError("Too many login attempts. Please wait and try again.")
+    async def _known_place(self, username: str, ip: str | None) -> bool:
+        if not ip:
+            return False
+        from datetime import timedelta
 
-        # Per username ONLY, across a longer window — independent of
-        # source IP, so rotating IPs doesn't bypass it. See the
-        # settings field's comment for why the threshold differs from
-        # the per-IP one above.
-        global_key = f"ratelimit:login:global:{username}"
-        global_count = await redis.incr(global_key)
-        if global_count == 1:
-            await redis.expire(global_key, 3600)
-        if global_count > settings.rate_limit_login_per_username_per_hour:
-            raise RateLimitedError("Too many login attempts for this account. Please wait and try again.")
+        from app.auth.models import LoginAttempt
+
+        since = datetime.now(timezone.utc) - timedelta(days=30)
+        row = (await self.session.execute(select(LoginAttempt.id).where(
+            LoginAttempt.username_attempted == username, LoginAttempt.ip_address == ip,
+            LoginAttempt.success.is_(True), LoginAttempt.created_at >= since).limit(1))).first()
+        return row is not None
+
+    async def _count_failure(self, *, username: str, ip: str | None) -> None:
+        redis = get_redis()
+        k1 = f"ratelimit:login:{username}:{ip or 'unknown'}"
+        if await redis.incr(k1) == 1:
+            await redis.expire(k1, 60)
+        k2 = f"ratelimit:login:global:{username}"
+        if await redis.incr(k2) == 1:
+            await redis.expire(k2, 3600)
+
+    async def _clear_failures(self, *, username: str, ip: str | None) -> None:
+        await get_redis().delete(f"ratelimit:login:{username}:{ip or 'unknown'}")
 
     async def _deactivation_reason(self, user: User) -> str:
         """Only ever called after the password has already been
@@ -123,6 +141,7 @@ class AuthService:
         )
 
         if not password_ok or user is None:
+            await self._count_failure(username=username, ip=ip)
             await self.audit.log(
                 actor_user_id=None,
                 action="auth.login_failed",
@@ -157,6 +176,7 @@ class AuthService:
         # upgraded even if the parameters had changed. Placed after the
         # is_active check so a suspended/deactivated account's hash is
         # never touched.
+        await self._clear_failures(username=username, ip=ip)
         if needs_rehash(user.password_hash):
             user.password_hash = hash_password(password)
 
@@ -277,6 +297,7 @@ class AuthService:
             raise BusinessRuleViolationError("That password is too easy to guess. Choose something only you know.")
         user.password_hash = hash_password(new_password)
         user.must_change_password = False
+        user.temp_password = None
         # End every OTHER session (e.g. a stolen one), but keep this one
         # alive — the forced first-login change continues straight into
         # the dashboard on the same session.

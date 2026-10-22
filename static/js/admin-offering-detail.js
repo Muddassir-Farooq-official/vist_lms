@@ -2,7 +2,7 @@
   "use strict";
 
   const VA = window.VistAdmin;
-  const OFFERING_ID = window.OFFERING_ID;
+  const OFFERING_ID = (document.currentScript && document.currentScript.dataset.offeringId) || window.OFFERING_ID;
 
   function extractErrorMessage(body, fallback) {
     if (body && body.error && body.error.message) return body.error.message;
@@ -54,7 +54,7 @@
   }
 
   async function changeLock(body, confirmText) {
-    if (confirmText && !window.confirm(confirmText)) return false;
+    if (confirmText && !(await window.VistAdmin.confirm(confirmText))) return false;
     const err = document.getElementById("lock-error");
     err.hidden = true;
     const r = await VA.fetchJson("/api/v1/academics/offerings/" + OFFERING_ID + "/content-lock", {
@@ -234,7 +234,7 @@
         "<td>" + VA.escapeHtml(slot.room) + "</td>" +
         '<td><button type="button" class="danger-btn small-btn slot-delete" data-id="' + slot.id + '">Delete</button></td>';
       tr.querySelector(".slot-delete").addEventListener("click", async function () {
-        if (!confirm("Delete this recurring slot? Its not-yet-occurred sessions will be cancelled; past sessions are kept.")) return;
+        if (!(await window.VistAdmin.confirm("Delete this recurring slot? Its not-yet-occurred sessions will be cancelled; past sessions are kept."))) return;
         const delResult = await VA.fetchJson("/api/v1/academics/timetable-slots/" + slot.id, { method: "DELETE" });
         if (!delResult.ok) {
           addSlotError.textContent = extractErrorMessage(delResult.body, "Could not delete this slot.");
@@ -456,7 +456,7 @@
         });
 
         block.querySelector(".session-cancel").addEventListener("click", async function () {
-          const reason = prompt("Reason for cancelling this session (e.g. a holiday):");
+          const reason = (await window.VistAdmin.promptText("Reason for cancelling this session (e.g. a holiday):"));
           if (!reason) return;
           const result = await VA.fetchJson("/api/v1/academics/class-sessions/" + session.id + "/cancel", {
             method: "POST",
@@ -549,11 +549,57 @@
     if (await changeLock({ locked: true, scope: "COURSE" }, "Lock the WHOLE course? The teacher will not be able to change the syllabus or any class, including upcoming ones.")) { await loadOffering(); loadClassSessions(); }
   });
   document.getElementById("unlock-all-btn").addEventListener("click", async function () {
-    if (!window.confirm("Unlock the course and every class so the teacher can edit again?")) return;
+    if (!(await window.VistAdmin.confirm("Unlock the course and every class so the teacher can edit again?"))) return;
     const a = await changeLock({ locked: false, scope: "COURSE" });
     const b = a && await changeLock({ locked: false, scope: "ALL_CLASSES" });
     if (b) { await loadOffering(); loadClassSessions(); }
   });
 
   loadOffering();
+  // ---------------------------------------------------------------- students: withdraw / move section
+  async function loadRoster() {
+    const tb = document.getElementById("roster-tbody");
+    if (!tb) return;
+    const r = await VA.fetchJson("/api/v1/academics/offerings/" + OFFERING_ID + "/roster");
+    if (!r.ok) return;
+    tb.innerHTML = "";
+    document.getElementById("roster-empty").hidden = r.body.length > 0;
+    r.body.forEach(function (e) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = "<td>" + VA.escapeHtml(e.student_name) + (e.is_retake ? ' <span class="status-pill waitlisted">retake</span>' : "") + "</td><td>" + VA.escapeHtml(e.roll_number || "") +
+        '</td><td><span class="status-pill ' + (e.status === "ENROLLED" ? "active" : e.status === "WITHDRAWN" ? "dropped" : "") + '">' + VA.escapeHtml(e.status.toLowerCase()) + "</span></td><td>" +
+        VA.escapeHtml(e.outcome ? e.outcome.toLowerCase() : "\u2014") + '</td><td class="row-actions"></td>';
+      const cell = tr.querySelector(".row-actions");
+      if (e.status === "ENROLLED") {
+        const w = document.createElement("button");
+        w.type = "button"; w.className = "role-btn small-btn danger-btn"; w.textContent = "Withdraw\u2026";
+        w.addEventListener("click", async function () {
+          const why = await VA.ask({ title: "Withdraw " + e.student_name + "?", danger: true, ok: "Withdraw",
+            intro: "They leave this course. Before the withdrawal deadline nothing shows on the transcript; after it, the course shows as W." });
+          if (!why) return;
+          const res = await VA.fetchJson("/api/v1/academics/enrollments/" + e.id + "/admin-withdraw", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason: why }) });
+          if (!res.ok) return VA.toast(extractErrorMessage(res.body, "Could not withdraw."), "error");
+          VA.toast("Withdrawn."); loadRoster();
+        });
+        cell.appendChild(w);
+        const m = document.createElement("button");
+        m.type = "button"; m.className = "role-btn small-btn secondary-btn"; m.textContent = "Move section\u2026";
+        m.addEventListener("click", async function () {
+          const res0 = await VA.fetchJson("/api/v1/academics/enrollments/" + e.id + "/sections");
+          if (!res0.ok) return VA.toast(extractErrorMessage(res0.body, "Could not load the other sections."), "error");
+          if (!res0.body.length) return VA.toast("There is no other section of this course this term.", "error");
+          const label = await VA.promptText("Move to which section? (" + res0.body.map(function (o) { return o.section_label + (o.seats_left == null ? "" : ", " + o.seats_left + " seats left"); }).join("; ") + ")", res0.body[0].section_label);
+          if (!label) return;
+          const target = res0.body.find(function (o) { return o.section_label.toLowerCase() === label.trim().toLowerCase(); });
+          if (!target) return VA.toast("No section called " + label + ".", "error");
+          const res = await VA.fetchJson("/api/v1/academics/enrollments/" + e.id + "/move", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ course_offering_id: target.id }) });
+          if (!res.ok) return VA.toast(extractErrorMessage(res.body, "Could not move."), "error");
+          VA.toast("Moved to section " + target.section_label + "."); loadRoster();
+        });
+        cell.appendChild(m);
+      }
+      tb.appendChild(tr);
+    });
+  }
+  document.querySelectorAll('.portal-tab[data-tab="students"]').forEach(function (t) { t.addEventListener("click", loadRoster); });
 })();

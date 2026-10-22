@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import enum
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, Numeric, String
+from sqlalchemy import Date, DateTime, Enum, ForeignKey, Index, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base, TimestampMixin, UUIDPKMixin
@@ -26,6 +26,8 @@ class FineSource(str, enum.Enum):
     FEE_LATE_PAYMENT = "FEE_LATE_PAYMENT"
     ATTENDANCE = "ATTENDANCE"
     GATE = "GATE"                       # late arrival, marked at the gate
+    INVENTORY = "INVENTORY"             # an item from the store, issued now and paid later
+    HOSTEL = "HOSTEL"                   # the monthly hostel charge
     OTHER = "OTHER"
 
 
@@ -93,5 +95,31 @@ class Fine(UUIDPKMixin, TimestampMixin, Base):
     # a book_issues.id for a library late fee — intentionally untyped
     # (no FK) since the source could be any module now or in the future;
     # this is a reporting breadcrumb, not a referential constraint.
+    # How the money came in (set when marked PAID) -- counted as income in Accounts.
+    payment_method: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    payment_reference: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    paid_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    receipt_number: Mapped[str | None] = mapped_column(String(30), nullable=True, unique=True)
+
     related_entity_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     related_entity_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
+
+class FinePaymentReversal(UUIDPKMixin, Base):
+    """A fine payment taken back (recorded against the wrong person, a bounced
+    cheque...). The fine goes back to unpaid; this row keeps the cancelled
+    receipt so the books show the money in on the day it came and out on the
+    day it was reversed."""
+
+    __tablename__ = "fine_payment_reversals"
+    __table_args__ = (Index("ix_fine_payment_reversals_fine_id", "fine_id"),)
+
+    fine_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fines.id", ondelete="CASCADE"), nullable=False)
+    receipt_number: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    paid_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    payment_method: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    payment_reference: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    reversed_on: Mapped[date] = mapped_column(Date, nullable=False)
+    reversed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    reversed_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reason: Mapped[str] = mapped_column(String(300), nullable=False)

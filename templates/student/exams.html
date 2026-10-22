@@ -1,12 +1,12 @@
-{% extends "faculty/_base.html" %}
-{% block title %}Exam duties{% endblock %}
-{% block page_title %}Exam duties{% endblock %}
-{% block page_subtitle %}<div class="content-subtitle">Published exam papers for the courses you teach and the papers you invigilate.</div>{% endblock %}
+{% extends "student/_base.html" %}
+{% block title %}My Exams{% endblock %}
+{% block page_title %}My Exams{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Your published datesheets, whether you may sit each paper, and your admit card to download.</div>{% endblock %}
 
 {% block content %}
-<div id="duty-list"><div class="skeleton-stack"><div class="skeleton-line"></div></div></div>
+<div id="ex-list" aria-live="polite"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="/static/js/faculty-exams.js"></script>
+<script src="/static/js/student-exams.js"></script>
 {% endblock %}

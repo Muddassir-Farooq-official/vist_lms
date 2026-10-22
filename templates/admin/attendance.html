@@ -116,6 +116,19 @@
   <p id="holiday-error" class="dash-alert error" hidden></p>
   <p id="holiday-success" class="success-text" hidden></p>
 </section>
+<section class="panel" id="leave-panel">
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("attendance") }}</div><h2>Approved Leave for One Student</h2></div></div>
+  <p class="panel-hint">Medical or other approved leave: the student's classes on these days are marked Leave and are not counted for or against their attendance. Classes they attended stay Present.</p>
+  <div class="toolbar">
+    <input type="text" id="leave-roll" class="text-input" placeholder="Roll number" aria-label="Roll number" maxlength="30" />
+    <input type="date" id="leave-from" class="text-input" aria-label="First day of leave" />
+    <input type="date" id="leave-to" class="text-input" aria-label="Last day of leave" />
+    <input type="text" id="leave-reason" class="text-input" placeholder="Reason, e.g. medical certificate no." aria-label="Reason" maxlength="300" />
+    <button type="button" class="role-btn" id="leave-btn">Record leave</button>
+  </div>
+  <p id="leave-error" class="dash-alert error" role="alert" hidden></p>
+  <p id="leave-success" class="success-text" role="status" hidden></p>
+</section>
 </div>
 {% endblock %}
 

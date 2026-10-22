@@ -25,7 +25,7 @@ async def test_the_accounts_office_and_administration_have_a_payroll_page(app_cl
 async def test_every_employee_portal_has_a_my_payslips_page(app_client):
     for nav, portal in ((FACULTY_NAV_ITEMS, "faculty"), (LIBRARY_NAV_ITEMS, "library"), (GATE_NAV_ITEMS, "gate"), (ACCOUNTS_NAV_ITEMS, "accounts")):
         entry = next(i for i in nav if i["slug"] == "payslips")
-        assert entry["href"] == f"/dashboard/{portal}/payslips" and entry["label"] == "My payslips"
+        assert entry["href"] == f"/dashboard/{portal}/payslips" and entry["label"] == "My pay & attendance"
         html = (await app_client.get(entry["href"])).text
         for needle in ('id="ps-list"', 'id="pv-modal"', 'id="pv-pdf"', "payslips-staff.js"):
             assert needle in html, f"{portal}: {needle}"

@@ -169,10 +169,17 @@
     <p id="assignment-modal-error" class="dash-alert error" hidden></p>
     <p id="assignment-modal-success" class="success-text" hidden></p>
 
-    <h3 class="modal-subhead">Ledger</h3>
-    <p class="panel-hint">If a fee structure has a late fee configured, "Post Late Fee" charges whatever's newly accrued on that installment as a real, payable fine \u2014 safe to click repeatedly, it never double-charges.</p>
+    <h3 class="modal-subhead">Installments</h3>
+    <p class="panel-hint">Every payment is applied to the oldest unpaid installment first. "Post Late Fee" turns a late fee that has built up into a payable fine (safe to click again: it never charges twice).</p>
+    <table class="dash-table" id="installments-table">
+      <thead><tr><th>Installment</th><th>Due</th><th class="num">Charged</th><th class="num">Discount</th><th class="num">Paid</th><th class="num">Still due</th><th>Status</th><th></th></tr></thead>
+      <tbody id="installments-tbody"></tbody>
+    </table>
+
+    <h3 class="modal-subhead">Statement</h3>
+    <p class="panel-hint">Charges add to the balance, payments and discounts reduce it. Each payment shows the installments it settled.</p>
     <table class="dash-table" id="ledger-table">
-      <thead><tr><th>Type</th><th class="num">Amount</th><th>Due / Paid on</th><th>Description</th><th></th></tr></thead>
+      <thead><tr><th>Date</th><th>Entry</th><th class="num">Charge</th><th class="num">Paid / discount</th><th class="num">Balance</th><th>Details</th></tr></thead>
       <tbody id="ledger-tbody"></tbody>
     </table>
     <p id="late-fee-error" class="dash-alert error" hidden></p>

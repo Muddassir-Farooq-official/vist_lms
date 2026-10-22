@@ -5,7 +5,7 @@
   const SU = window.StudentUI;
   const esc = VA.escapeHtml;
 
-  const STATUS_LABEL = { PRESENT: "Present", ABSENT: "Absent" };
+  const STATUS_LABEL = { PRESENT: "Present", ABSENT: "Absent", LEAVE: "Approved leave" };
 
   function verdict(pct, held, threshold) {
     if (!held) return { tone: "", text: "No classes held yet" };

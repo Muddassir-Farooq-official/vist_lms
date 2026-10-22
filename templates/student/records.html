@@ -1,0 +1,47 @@
+{% extends "student/_base.html" %}
+{% block title %}My Records{% endblock %}
+{% block page_title %}My Records{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">How far you are through your degree, and the documents you have given the office.</div>{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2 class="panel-title">Degree progress</h2>
+  <div class="stat-grid" id="da-kpis"></div>
+  <p class="cc-meta" id="da-note"></p>
+  <div class="table-scroll">
+    <table class="dash-table" id="da-table">
+      <thead><tr><th>Sem</th><th>Course</th><th>Credits</th><th>Status</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <h2 class="panel-title">My documents</h2>
+  <p class="cc-meta">Upload a clear photo or scan (PDF, JPG or PNG). The office checks each one against the original.</p>
+  <form id="md-form" class="form-grid" novalidate>
+    <label>Kind
+      <select id="md-kind" class="text-input">
+        <option value="CNIC">CNIC / B-Form</option><option value="PHOTO">Photograph</option><option value="MATRIC">Matric certificate</option>
+        <option value="INTERMEDIATE">Intermediate certificate</option><option value="DEGREE">Degree / transcript</option>
+        <option value="DOMICILE">Domicile</option><option value="TRANSFER">Transfer / leaving certificate</option><option value="OTHER">Other</option>
+      </select>
+    </label>
+    <label>Title (optional)<input id="md-title" class="text-input" type="text" maxlength="150" /></label>
+    <label>File<input id="md-file" type="file" accept=".pdf,.jpg,.jpeg,.png" required /></label>
+    <p class="form-error" id="md-error" role="alert" hidden></p>
+    <button type="submit" class="role-btn">Upload</button>
+  </form>
+  <div class="table-scroll">
+    <table class="dash-table" id="md-table">
+      <thead><tr><th>Document</th><th>Uploaded</th><th>Status</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <p class="empty-state" id="md-empty" hidden>You have not uploaded any documents yet.</p>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/my-records.js"></script>
+{% endblock %}

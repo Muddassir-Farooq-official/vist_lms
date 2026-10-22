@@ -1,0 +1,31 @@
+<section class="sh-card">
+  <div class="toolbar">
+    <input id="vl-q" class="text-input" type="search" placeholder="Name, CNIC, phone, purpose or vehicle" aria-label="Search" />
+    <input id="vl-from" class="text-input" type="date" aria-label="From" />
+    <input id="vl-to" class="text-input" type="date" aria-label="To" />
+    <label class="check-row"><input type="checkbox" id="vl-inside" /> Inside now only</label>
+    <button type="button" class="role-btn" id="vl-load">Show</button>
+    <a class="role-btn secondary-btn" id="vl-export" href="#" hidden>Download CSV</a>
+  </div>
+  <p class="cc-meta" id="vl-count"></p>
+  <div class="table-scroll"><table class="dash-table" id="vl-table"><thead><tr><th>Ref.</th><th>Date</th><th>In</th><th>Out</th><th>Visitor</th><th>CNIC / phone</th><th>Purpose / meeting</th><th>Vehicle / people</th><th>Entered by</th><th></th></tr></thead><tbody id="vl-body"></tbody></table></div>
+  <p class="empty-state" id="vl-empty" hidden>No visitors match.</p>
+</section>
+
+<dialog id="vl-edit" class="modal"><div class="modal-body">
+  <h2 id="vl-edit-title">Correct the entry</h2>
+  <form id="vl-edit-form" class="form-grid two-col" novalidate>
+    <div class="form-field"><label for="ve-name">Name</label><input id="ve-name" class="text-input" maxlength="150" /></div>
+    <div class="form-field"><label for="ve-cnic">CNIC</label><input id="ve-cnic" class="text-input" maxlength="15" /></div>
+    <div class="form-field"><label for="ve-phone">Phone</label><input id="ve-phone" class="text-input" maxlength="20" /></div>
+    <div class="form-field"><label for="ve-purpose">Purpose</label><input id="ve-purpose" class="text-input" maxlength="200" /></div>
+    <div class="form-field"><label for="ve-meet">Whom to meet</label><input id="ve-meet" class="text-input" maxlength="150" /></div>
+    <div class="form-field"><label for="ve-vehicle">Vehicle no.</label><input id="ve-vehicle" class="text-input" maxlength="30" /></div>
+    <div class="form-field"><label for="ve-in">In at</label><input id="ve-in" class="text-input" type="time" /></div>
+    <div class="form-field"><label for="ve-out">Out at (empty = still inside)</label><input id="ve-out" class="text-input" type="time" /></div>
+    <div class="form-field two-span"><label for="ve-note">Note</label><input id="ve-note" class="text-input" maxlength="300" /></div>
+    <p id="ve-error" class="dash-alert error two-span" hidden></p>
+    <div class="form-actions two-span"><button type="submit" class="role-btn">Save</button></div>
+  </form>
+  <button id="ve-close" class="back-link modal-close-btn" type="button">Cancel</button>
+</div></dialog>

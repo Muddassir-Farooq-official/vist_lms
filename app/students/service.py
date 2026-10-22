@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.audit.service import AuditService
 from app.auth.models import Role, User, UserRole
 from app.auth.repository import AuthRepository
-from app.core.constants import DEFAULT_STUDENT_PASSWORD
+from app.core.security import new_temp_password
 from app.core.exceptions import BusinessRuleViolationError, DuplicateResourceError, ResourceNotFoundError
 from app.core.pagination import PageParams, RawPage
 from app.core.security import hash_password
@@ -161,6 +161,51 @@ class StudentService:
         uniqueness by construction rather than by checking after the fact."""
         if await self.repo.get_by_cnic(cnic):
             raise DuplicateResourceError(f"A student with CNIC '{cnic}' already exists.")
+
+    async def correct_identity(self, student_id: uuid.UUID, data, *, actor_id: uuid.UUID) -> Student:
+        """Fix a mistyped student or guardian CNIC / guardian details. Changing the guardian CNIC means a different person: the old
+        guardian's parent-portal access to this student is cut, and the office gives the right guardian a login."""
+        from sqlalchemy import delete, select
+
+        from app.parents.models import ParentStudentLink
+        from app.students.models import StudentGuardian
+
+        student = await self.get_student(student_id)
+        guardian = (await self.session.execute(select(StudentGuardian).where(StudentGuardian.student_id == student_id)
+                                               .order_by(StudentGuardian.is_primary.desc()))).scalars().first()
+        before = {"cnic": student.cnic, "guardian_name": guardian.name if guardian else None, "guardian_cnic": guardian.cnic if guardian else None,
+                  "guardian_relation": guardian.relation if guardian else None}
+        changed: dict = {}
+        if data.student_cnic and data.student_cnic != student.cnic:
+            if await self.repo.get_by_cnic(data.student_cnic) is not None:
+                raise BusinessRuleViolationError("Another student already has this CNIC.")
+            student.cnic = data.student_cnic
+            changed["cnic"] = data.student_cnic
+        cut_parent = False
+        if guardian is not None:
+            if data.guardian_cnic and data.guardian_cnic != guardian.cnic:
+                guardian.cnic = data.guardian_cnic
+                changed["guardian_cnic"] = data.guardian_cnic
+                cut_parent = True
+            if data.guardian_name and data.guardian_name != guardian.name:
+                guardian.name = data.guardian_name
+                changed["guardian_name"] = data.guardian_name
+            if data.guardian_relation and data.guardian_relation != guardian.relation:
+                guardian.relation = data.guardian_relation
+                changed["guardian_relation"] = data.guardian_relation
+            if data.guardian_contact_no and data.guardian_contact_no != guardian.contact_no:
+                guardian.contact_no = data.guardian_contact_no
+                changed["guardian_contact_no"] = data.guardian_contact_no
+        elif data.guardian_cnic or data.guardian_name:
+            raise BusinessRuleViolationError("This student has no guardian on record to correct.")
+        if not changed:
+            raise BusinessRuleViolationError("Nothing to change: the details you typed are the same as those on record.")
+        if cut_parent:
+            await self.session.execute(delete(ParentStudentLink).where(ParentStudentLink.student_id == student_id))
+        await self.session.flush()
+        await self.audit.log(actor_user_id=actor_id, action="student.identity_corrected", entity_type="student", entity_id=student.id, before=before,
+                             after={**changed, "reason": data.reason.strip(), "parent_access_cut": cut_parent})
+        return student
 
     async def update_student(self, student_id: uuid.UUID, data: StudentUpdateRequest, *, actor_id: uuid.UUID) -> Student:
         """Partial field update — see StudentUpdateRequest for exactly
@@ -402,9 +447,11 @@ class StudentService:
         # The roll number IS the login username now — one identifier,
         # not two, and it's already guaranteed unique by the generator.
         username = roll_number
+        temp = new_temp_password()
         user = User(
             username=username,
-            password_hash=hash_password(DEFAULT_STUDENT_PASSWORD),
+            password_hash=hash_password(temp),
+            temp_password=temp,
             is_active=True,
             must_change_password=True,
         )
@@ -456,7 +503,9 @@ class StudentService:
         if user is None:
             raise ResourceNotFoundError("Linked user account not found.")
 
-        user.password_hash = hash_password(DEFAULT_STUDENT_PASSWORD)
+        temp = new_temp_password()
+        user.password_hash = hash_password(temp)
+        user.temp_password = temp
         user.must_change_password = True
         await AuthRepository(self.session).revoke_all_for_user(user.id)
 

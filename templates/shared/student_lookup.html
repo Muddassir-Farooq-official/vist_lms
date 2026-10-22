@@ -1,0 +1,42 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}{{ allowed_roles|default("ADMIN") }}{% endblock %}
+{% block title %}Students{% endblock %}
+{% block page_title %}Students{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Find a student by name, roll number or CNIC and see their courses, guardians and transcript.</div>{% endblock %}
+
+{% block content %}
+<section class="sh-card">
+  <form id="sl-form" class="toolbar" novalidate>
+    <input id="sl-q" class="text-input" type="search" placeholder="Name, roll number or CNIC" aria-label="Search students" autofocus />
+    <button type="submit" class="role-btn">Search</button>
+  </form>
+  <div class="table-scroll">
+    <table class="dash-table" id="sl-table">
+      <thead><tr><th>Roll no.</th><th>Name</th><th>Semester</th><th>Section</th><th>Status</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <p class="empty-state" id="sl-empty" hidden></p>
+</section>
+
+<dialog id="sl-modal" class="modal" aria-labelledby="sl-title">
+  <h2 id="sl-title"></h2>
+  <p class="cc-meta" id="sl-meta"></p>
+  <div class="stat-grid" id="sl-kpis"></div>
+  <div id="sl-guardian"></div>
+  <div class="table-scroll">
+    <table class="dash-table" id="sl-courses">
+      <thead><tr><th>Term</th><th>Course</th><th>Status</th><th>Result</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div class="toolbar">
+    <a class="role-btn secondary-btn" id="sl-transcript" href="#" data-download="transcript.pdf">Transcript (PDF)</a>
+    <button type="button" class="role-btn" id="sl-close">Close</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/student-lookup.js"></script>
+{% endblock %}

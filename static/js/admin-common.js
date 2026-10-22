@@ -61,7 +61,7 @@ window.VistAdmin = (function () {
     note.hidden = net.dismissed;
   }
 
-  function netStart(url) {
+  function netStart(url, method) {
     ensureNetUi();
     const id = net.nextId++;
     net.inflight.set(id, { url: url, t: Date.now(), warned: false });
@@ -77,13 +77,44 @@ window.VistAdmin = (function () {
       net.watcher = setInterval(watchSlow, 1000);
     }
     // The button that was just pressed gets a spinner (after a beat, so instant replies never flash).
+    // The spinner belongs to THIS request: it stops the moment this request is answered, even if
+    // something else on the page (a slow list, a background refresh) is still loading.
     const lc = net.lastClick;
-    if (lc && Date.now() - lc.t < 800 && net.busyButtons.indexOf(lc.el) === -1) {
+    if (lc && Date.now() - lc.t < 800) {
       net.lastClick = null;
-      net.busyButtons.push(lc.el);
-      setTimeout(function () { if (net.pending > 0) lc.el.classList.add("is-loading"); }, 200);
+      net.inflight.get(id).btn = lc.el;
+      if (net.busyButtons.indexOf(lc.el) === -1) net.busyButtons.push(lc.el);
+      // Saving something: the button is locked AT ONCE (not after the spinner delay), so a
+      // double click or a second tap cannot send it twice.
+      if (method && method !== "GET" && !lc.el.disabled) {
+        lc.el.disabled = true;
+        lc.el.setAttribute("data-net-locked", "1");
+        lc.el.setAttribute("aria-busy", "true");
+      }
+      setTimeout(function () { if (buttonBusy(lc.el)) lc.el.classList.add("is-loading"); }, 200);
     }
     return id;
+  }
+
+  function buttonBusy(el) {
+    let busy = false;
+    net.inflight.forEach(function (r) { if (r.btn === el) busy = true; });
+    return busy;
+  }
+
+  function unlock(el) {
+    if (el.getAttribute("data-net-locked")) {
+      el.disabled = false;
+      el.removeAttribute("data-net-locked");
+      el.removeAttribute("aria-busy");
+    }
+  }
+
+  function releaseButton(el) {
+    if (!el || buttonBusy(el)) return;
+    unlock(el);
+    el.classList.remove("is-loading");
+    net.busyButtons = net.busyButtons.filter(function (b) { return b !== el; });
   }
 
   function netFinish() {
@@ -96,13 +127,15 @@ window.VistAdmin = (function () {
     setTimeout(function () { root.classList.remove("net-done"); }, 500);
     const note = document.getElementById("net-slow");
     if (note) note.hidden = true;
-    net.busyButtons.forEach(function (el) { el.classList.remove("is-loading"); });
+    net.busyButtons.forEach(function (el) { el.classList.remove("is-loading"); unlock(el); });
     net.busyButtons = [];
     clearSkeletons();
   }
 
   function netDone(id) {
+    const entry = net.inflight.get(id);
     net.inflight.delete(id);
+    if (entry && entry.btn) releaseButton(entry.btn);
     net.pending = net.inflight.size;
     if (net.pending === 0) {
       // A short grace period: pages that load in steps start the next request immediately,
@@ -125,7 +158,7 @@ window.VistAdmin = (function () {
 
   // ---- Skeleton rows: a table that is about to fill shows placeholder rows instead of a blank space ----
   function insertSkeletons(scope) {
-    (scope || document).querySelectorAll("table.dash-table").forEach(function (table) {
+    (scope || document).querySelectorAll("table.dash-table, table.tk-table").forEach(function (table) {
       if (table.classList.contains("no-skeleton") || table.closest("[hidden], dialog:not([open])")) return;
       const tbody = table.tBodies[0];
       if (!tbody || tbody.children.length) return;
@@ -180,17 +213,31 @@ window.VistAdmin = (function () {
     if (!opts.signal) opts.signal = controller.signal;
     // Never leave a screen waiting forever if the server stops answering.
     const timer = setTimeout(function () { controller.abort(); }, isUpload ? 300000 : 60000);
-    const reqId = quiet ? 0 : netStart(url);
+    const method = String(opts.method || "GET").toUpperCase();
+    const reqId = quiet ? 0 : netStart(url, method);
     try {
-      const resp = await fetch(url, opts);
+      let resp = await fetch(url, opts);
+      // The sign-in pass lasts 15 minutes and is renewed in the background. If it ran out
+      // while someone was typing, renew it and send the same request again, so nothing is lost.
+      if (resp.status === 401 && String(url).indexOf("/api/v1/auth/") === -1) {
+        if (await renewSession()) {
+          resp = await fetch(url, opts);
+        }
+        if (resp.status === 401) sessionEnded();
+      }
       let body = null;
       try {
         body = await resp.json();
       } catch (e) {
         body = null;
       }
+      if (!resp.ok) {
+        body = normaliseError(resp.status, body);
+        if (method === "GET" && !quiet && resp.status >= 500) loadProblem(url, body);
+      }
       return { ok: resp.ok, status: resp.status, body: body, headers: resp.headers };
     } catch (err) {
+      if (method === "GET" && !quiet) loadProblem(url, null);
       // Status 0 = we never got an answer. Pages already show error.message, so they now say something useful.
       const timedOut = !!(err && err.name === "AbortError");
       return {
@@ -199,14 +246,69 @@ window.VistAdmin = (function () {
         body: { error: {
           code: timedOut ? "TIMEOUT" : "NETWORK",
           message: timedOut
-            ? "The server took too long to respond. Please try again."
-            : "Can't reach the server. Check your internet connection and try again.",
+            ? (method === "GET"
+              ? "The server took too long to respond. Please try again."
+              : "The server did not answer in time. It may still have saved this, so refresh the page and check before trying again.")
+            : (method === "GET"
+              ? "Can't reach the server. Check your internet connection and try again."
+              : "Can't reach the server, so this was probably not saved. Check your internet connection, refresh the page and check before trying again."),
         } },
       };
     } finally {
       clearTimeout(timer);
       if (!quiet) netDone(reqId);
     }
+  }
+
+  // Every error, whatever produced it, comes back as {error: {code, message}}. FastAPI's own
+  // field checks ({detail: [{loc, msg}]}) are turned into one plain sentence here.
+  const FIELD_WORDS = { amount: "Amount", paid_on: "Payment date", reference: "Reference", reason: "Reason", note: "Note", cnic: "CNIC", contact_no: "Phone number" };
+  function plainField(loc) {
+    const name = String((loc || []).filter(function (x) { return x !== "body" && x !== "query" && x !== "path" && typeof x === "string"; }).pop() || "");
+    return FIELD_WORDS[name] || (name ? name.replace(/_/g, " ").replace(/^./, function (c) { return c.toUpperCase(); }) : "A value");
+  }
+  function plainMsg(m) {
+    return String(m || "is not valid").replace(/^Value error, /, "").replace(/^String should have at least (\d+) characters?/, "must be at least $1 characters")
+      .replace(/^Field required$/, "is required").replace(/^Input should be greater than (.*)$/, "must be more than $1")
+      .replace(/^Input should be a valid (.*)$/, "must be a valid $1");
+  }
+  function normaliseError(status, body) {
+    if (body && body.error && body.error.message) return body;
+    if (body && Array.isArray(body.detail)) {
+      const parts = body.detail.slice(0, 3).map(function (d) { return plainField(d.loc) + " " + plainMsg(d.msg); });
+      return { error: { code: "VALIDATION_ERROR", message: parts.join("; ") + ".", details: body.detail }, detail: body.detail };
+    }
+    if (body && typeof body.detail === "string") return { error: { code: "ERROR", message: body.detail }, detail: body.detail };
+    const fallback = status === 403 ? "You do not have permission to do this." : status === 404 ? "That was not found (it may have been removed)." :
+      status === 409 ? "This was just submitted, so it was not saved twice. Refresh to see it." : status >= 500 ? "Something went wrong on the server. Please try again in a moment." :
+      "That did not work (error " + status + ").";
+    return Object.assign({}, body || {}, { error: { code: "HTTP_" + status, message: fallback } });
+  }
+
+  // A page that could not load its information says so, at the top, with a way to try again,
+  // instead of showing empty tables that look like "there is nothing".
+  let problemTimer = null;
+  const problems = new Set();
+  function loadProblem(url, body) {
+    if (!document.body) return;
+    problems.add(shortName(url));
+    clearTimeout(problemTimer);
+    problemTimer = setTimeout(function () {
+      let box = document.getElementById("load-problem");
+      if (!box) {
+        box = document.createElement("div");
+        box.id = "load-problem";
+        box.className = "dash-alert error load-problem";
+        box.setAttribute("role", "alert");
+        const host = document.querySelector(".content-body, main, .content") || document.body;
+        host.insertBefore(box, host.firstChild);
+      }
+      const msg = (body && body.error && body.error.message && body.error.code !== "HTTP_500") ? body.error.message : "the server did not answer properly";
+      box.innerHTML = "<strong>Some of this page could not be loaded</strong> (" + escapeHtml(Array.from(problems).slice(0, 3).join(", ")) + ": " + escapeHtml(msg) +
+        "). What you see may be incomplete. <button type=\"button\" class=\"role-btn small-btn\">Try again</button>";
+      box.querySelector("button").addEventListener("click", function () { window.location.reload(); });
+      box.hidden = false;
+    }, 250);
   }
 
   // =========================================================================
@@ -229,13 +331,14 @@ window.VistAdmin = (function () {
 
   // Downloads through the page (not a bare link) so that if the server cannot make the file, the person
   // reads WHY -- instead of the browser saving the error message as a file that will not open.
-  async function downloadFile(url, fallbackName, label) {
+  async function downloadFile(url, fallbackName, label, init) {
     const reqId = netStart(url);
     try {
-      const resp = await fetch(url, { credentials: "include" });
+      const resp = await fetch(url, Object.assign({ credentials: "include" }, init || {}));
       if (!resp.ok) {
         let message = null;
         try { const j = await resp.json(); message = j && j.error && j.error.message; } catch (e) { /* not JSON */ }
+        downloadFile.lastError = message || "";
         toast(message || "The " + (label || "file") + " could not be downloaded (error " + resp.status + ").", "error");
         return false;
       }
@@ -275,11 +378,14 @@ window.VistAdmin = (function () {
     try {
       const d = new Date(isoString);
       if (isNaN(d.getTime())) return isoString;
-      return d.toLocaleString(undefined, {
+      // The same on every computer: "10 Oct, 09:30", Pakistan time.
+      return d.toLocaleString("en-GB", {
+        timeZone: "Asia/Karachi",
         month: "short",
         day: "numeric",
         hour: "2-digit",
         minute: "2-digit",
+        hour12: false,
       });
     } catch (e) {
       return isoString;
@@ -313,9 +419,13 @@ window.VistAdmin = (function () {
 
   function showError(message) {
     const banner = document.getElementById("error-banner");
-    if (!banner) return;
+    if (!banner) { toast(message, "error"); return; }
+    banner.setAttribute("role", "alert");
     banner.textContent = message;
     banner.hidden = false;
+    // An error below the fold used to go unseen: bring it into view.
+    const r = banner.getBoundingClientRect();
+    if (r.top < 0 || r.bottom > window.innerHeight) banner.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   function clearError() {
@@ -325,8 +435,42 @@ window.VistAdmin = (function () {
   }
 
   async function tryRefreshSession() {
-    const result = await fetchJson("/api/v1/auth/refresh", { method: "POST" });
-    return result.ok;
+    return renewSession();
+  }
+
+  // One renewal at a time, shared by every request that found the pass expired.
+  let renewing = null;
+  function renewSession() {
+    if (!renewing) {
+      renewing = fetch("/api/v1/auth/refresh", { method: "POST", credentials: "include" })
+        .then(function (r) { return r.ok; })
+        .catch(function () { return false; })
+        .finally(function () { setTimeout(function () { renewing = null; }, 2000); });
+    }
+    return renewing;
+  }
+
+  // The session really ended (signed out elsewhere, password reset, account closed).
+  // Do NOT navigate away: whatever is typed on this page stays. Sign in in another
+  // tab, come back, and press Save again.
+  let endedShown = false;
+  function sessionEnded() {
+    if (endedShown || !document.body) return;
+    endedShown = true;
+    const d = document.createElement("dialog");
+    d.className = "modal";
+    d.setAttribute("aria-labelledby", "sess-end-title");
+    d.innerHTML = '<div class="modal-body"><h2 id="sess-end-title">You are signed out</h2>' +
+      '<p class="cc-meta">Your session ended, so the last action was not saved. What you typed on this page is still here.</p>' +
+      "<ol class=\"cc-meta\"><li>Sign in again in a new tab.</li><li>Come back to this tab and press Save again.</li></ol>" +
+      '<div class="form-actions"><a class="role-btn" target="_blank" rel="noopener" href="/?reauth=1&next=close">Sign in (new tab)</a>' +
+      '<button type="button" class="role-btn secondary-btn" data-done>I have signed in</button></div>' +
+      '<button type="button" class="back-link modal-close-btn" data-leave>Go to the sign-in page instead</button></div>';
+    document.body.appendChild(d);
+    d.querySelector("[data-done]").addEventListener("click", function () { endedShown = false; d.close(); d.remove(); });
+    d.querySelector("[data-leave]").addEventListener("click", function () { window.location.replace(loginRedirectPath()); });
+    d.addEventListener("cancel", function (e) { e.preventDefault(); });
+    d.showModal();
   }
 
   function allowedRoles() {
@@ -345,7 +489,7 @@ window.VistAdmin = (function () {
     // There is one sign-in page for everyone. ?reauth=1 tells it not to
     // forward a "still signed in" visitor straight back to the page that
     // just rejected them.
-    return "/?reauth=1";
+    return "/?reauth=1&next=" + encodeURIComponent(window.location.pathname + window.location.search);
   }
 
   // The sign-in page stores who just signed in. Using it lets every page
@@ -680,10 +824,11 @@ window.VistAdmin = (function () {
   const ROLE_LABEL = { ADMIN: "Administrator", TEACHER: "Teacher", LIBRARIAN: "Librarian", ACCOUNTS_OFFICER: "Accounts Officer", STUDENT: "Student" };
   const IDENT_KEY = "vist_ident";
 
-  function readCachedIdentity() {
+  function readCachedIdentity(me) {
     try {
       const raw = JSON.parse(sessionStorage.getItem(IDENT_KEY) || "null");
-      return raw && Date.now() - raw.ts < 30 * 60 * 1000 ? raw.ident : null;
+      // only this same person's name: on a shared computer the next person must never see the previous one's
+      return raw && raw.uid === (me && me.id) && Date.now() - raw.ts < 30 * 60 * 1000 ? raw.ident : null;
     } catch (e) { return null; }
   }
 
@@ -706,7 +851,7 @@ window.VistAdmin = (function () {
       }
     }
     if (ident) {
-      try { sessionStorage.setItem(IDENT_KEY, JSON.stringify({ ts: Date.now(), ident: ident })); } catch (e) { /* ignore */ }
+      try { sessionStorage.setItem(IDENT_KEY, JSON.stringify({ ts: Date.now(), uid: me.id, ident: ident })); } catch (e) { /* ignore */ }
     }
     return ident;
   }
@@ -800,14 +945,31 @@ window.VistAdmin = (function () {
     const moreBtn = document.getElementById("bottom-more");
     if (!drawer || !backdrop || !openBtn || !closeBtn) return;
 
-    function openDrawer() {
+    let opener = null;
+    function openDrawer(e) {
+      opener = (e && e.currentTarget) || openBtn;
       drawer.classList.add("drawer-open");
       backdrop.hidden = false;
+      openBtn.setAttribute("aria-expanded", "true");
+      const first = drawer.querySelector("a.drawer-link, button");
+      if (first) first.focus();
     }
     function closeDrawer() {
+      if (!drawer.classList.contains("drawer-open")) return;
       drawer.classList.remove("drawer-open");
       backdrop.hidden = true;
+      openBtn.setAttribute("aria-expanded", "false");
+      if (opener && window.innerWidth < 900) opener.focus();
     }
+    // Keep the keyboard inside the open menu on small screens.
+    drawer.addEventListener("keydown", function (e) {
+      if (e.key !== "Tab" || !drawer.classList.contains("drawer-open") || window.innerWidth >= 900) return;
+      const items = Array.prototype.filter.call(drawer.querySelectorAll("a[href], button:not([disabled])"), function (x) { return x.offsetParent !== null; });
+      if (!items.length) return;
+      const firstEl = items[0], lastEl = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === firstEl) { e.preventDefault(); lastEl.focus(); }
+      else if (!e.shiftKey && document.activeElement === lastEl) { e.preventDefault(); firstEl.focus(); }
+    });
 
     openBtn.addEventListener("click", openDrawer);
     if (moreBtn) moreBtn.addEventListener("click", openDrawer);
@@ -856,7 +1018,7 @@ window.VistAdmin = (function () {
     if (authGate) authGate.hidden = true;
     if (shell) shell.hidden = false;
 
-    paintWhoami(me, readCachedIdentity());
+    paintWhoami(me, readCachedIdentity(me));
     loadIdentity(me).then(function (ident) { if (ident) paintWhoami(me, ident); });
 
     wireDrawer();
@@ -888,7 +1050,89 @@ window.VistAdmin = (function () {
     );
   }
 
+  // =========================================================================
+  // ask(): an in-page dialog instead of the browser's prompt()/confirm().
+  //   ask({title, intro, label, ok, danger, input: "text"|"number"|"none", value, min, required})
+  //   -> Promise of the typed text (or true when input is "none"), or null if cancelled.
+  // =========================================================================
+  function ask(o) {
+    o = o || {};
+    return new Promise(function (resolve) {
+      const d = document.createElement("dialog");
+      d.className = "modal ask-dialog";
+      d.setAttribute("aria-labelledby", "ask-title");
+      const kind = o.input || "text";
+      const field = kind === "none" ? "" :
+        '<div class="form-field"><label for="ask-input">' + escapeHtml(o.label || "Reason (kept on record)") + "</label>" +
+        (kind === "textarea" ? '<textarea id="ask-input" class="text-input" rows="3" maxlength="300"></textarea>'
+          : '<input id="ask-input" class="text-input" type="' + (kind === "number" ? "number" : kind === "date" ? "date" : "text") + '"' + (kind === "number" ? ' step="0.01" inputmode="decimal"' : kind === "date" ? "" : ' maxlength="200"') + ">") + "</div>";
+      d.innerHTML = '<div class="modal-body"><h2 id="ask-title">' + escapeHtml(o.title || "Are you sure?") + "</h2>" +
+        (o.intro ? '<p class="cc-meta">' + escapeHtml(o.intro) + "</p>" : "") + field +
+        '<p class="dash-alert error" role="alert" hidden></p>' +
+        '<div class="form-actions"><button type="button" class="role-btn' + (o.danger ? " danger-btn" : "") + '" data-ask="yes">' + escapeHtml(o.ok || "OK") + "</button></div>" +
+        '<button type="button" class="back-link modal-close-btn" data-ask="no">Cancel</button></div>';
+      document.body.appendChild(d);
+      const input = d.querySelector("#ask-input");
+      const err = d.querySelector(".dash-alert");
+      if (input && o.value != null) input.value = o.value;
+      let done = false;
+      function finish(v) { if (done) return; done = true; if (d.open) d.close(); d.remove(); resolve(v); }
+      d.querySelector('[data-ask="no"]').addEventListener("click", function () { finish(null); });
+      d.addEventListener("cancel", function (e) { e.preventDefault(); finish(null); });
+      function accept() {
+        if (!input) return finish(true);
+        const v = input.value.trim();
+        const min = o.min == null ? (o.required === false ? 0 : 4) : o.min;
+        if (kind === "number" ? (v === "" || isNaN(parseFloat(v))) : kind === "date" ? (o.required !== false && !v) : v.length < min) {
+          err.textContent = kind === "number" ? "Enter an amount." : kind === "date" ? "Choose a date." : (min > 1 ? "Write a few words (at least " + min + " letters)." : "This is needed.");
+          err.hidden = false; input.focus(); return;
+        }
+        finish(v);
+      }
+      d.querySelector('[data-ask="yes"]').addEventListener("click", accept);
+      if (input) input.addEventListener("keydown", function (e) { if (e.key === "Enter" && input.tagName !== "TEXTAREA") { e.preventDefault(); accept(); } });
+      d.showModal();
+      (input || d.querySelector('[data-ask="yes"]')).focus();
+    });
+  }
+
+  // Drop-in replacements for window.confirm / window.prompt (await them).
+  function confirmDialog(message, okLabel) {
+    return ask({ title: "Please confirm", intro: String(message || ""), ok: okLabel || "Yes, continue", input: "none" }).then(function (v) { return !!v; });
+  }
+  function promptText(message, value) {
+    return ask({ title: "Please enter", label: String(message || ""), value: value == null ? "" : value, input: "text", required: false, min: 0 })
+      .then(function (v) { return v === true ? "" : v; });
+  }
+
+  // Money shown the same way everywhere: Rs. 12,500 (paisa only when there are any).
+  function formatMoney(v) {
+    const n = Number(v || 0);
+    const whole = Math.abs(n - Math.round(n)) < 0.005;
+    return (n < 0 ? "\u2212" : "") + "Rs. " + Math.abs(n).toLocaleString("en-PK", { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 });
+  }
+
+  // Inputs that only have grey hint text get a real (spoken) label from it.
+  function labelInputs(scope) {
+    (scope || document).querySelectorAll("input:not([type=hidden]):not([type=checkbox]):not([type=radio]), select, textarea").forEach(function (el) {
+      if (el.getAttribute("aria-label") || el.getAttribute("aria-labelledby") || el.closest("label")) return;
+      if (el.id && document.querySelector('label[for="' + (window.CSS && CSS.escape ? CSS.escape(el.id) : el.id) + '"]')) return;
+      let text = el.getAttribute("placeholder") || el.getAttribute("title") || "";
+      if (!text && el.tagName === "SELECT" && el.options.length) text = (el.options[0].textContent || "").replace(/^[\s\u2014-]+|[\s\u2014-]+$/g, "");
+      if (!text && el.type === "file") text = "Choose a file";
+      if (!text && el.id) text = el.id.replace(/[-_]+/g, " ");
+      if (text) el.setAttribute("aria-label", text.trim());
+    });
+  }
+  document.addEventListener("DOMContentLoaded", function () { labelInputs(document); });
+  document.addEventListener("vistadmin:ready", function () { setTimeout(function () { labelInputs(document); }, 0); });
+
   return {
+    ask: ask,
+    confirm: confirmDialog,
+    promptText: promptText,
+    formatMoney: formatMoney,
+    labelInputs: labelInputs,
     fetchJson: fetchJson,
     insertSkeletons: insertSkeletons,
     downloadFile: downloadFile,

@@ -99,6 +99,13 @@
   }
 
   let activeStudentName = "";
+  let pageStudentIds = [];
+  document.getElementById("print-cards").addEventListener("click", async function () {
+    if (!pageStudentIds.length) return VA.toast("No active students on this page.", "error");
+    if (!(await VA.confirm("Print ID cards for the " + pageStudentIds.length + " active student(s) on this page? Each card is registered with a check code."))) return;
+    VA.downloadFile("/api/v1/records/id-cards", "id-cards.pdf", "ID cards",
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ student_ids: pageStudentIds }) });
+  });
 
   function updatePhotoDisplay(studentId, hasPhoto) {
     photoError.hidden = true;
@@ -183,6 +190,7 @@
       emptyState.hidden = false;
     } else {
       emptyState.hidden = true;
+      pageStudentIds = data.items.filter(function (s) { return s.status === "ACTIVE"; }).map(function (s) { return s.id; });
       data.items.forEach(function (student) {
         const tr = document.createElement("tr");
         tr.className = "clickable-row";
@@ -203,6 +211,45 @@
     nextBtn.disabled = currentPage >= currentTotalPages;
   }
 
+  // ---- correct a mistyped CNIC or the guardian's details (reason required, audited)
+  let lastGuardian = null;
+  let lastStudent = null;
+  const idModal = document.getElementById("identity-modal");
+  document.getElementById("identity-btn").addEventListener("click", function () {
+    document.getElementById("id-cnic").value = (lastStudent && lastStudent.cnic) || "";
+    document.getElementById("id-gname").value = (lastGuardian && lastGuardian.guardian_name) || "";
+    document.getElementById("id-gcnic").value = (lastGuardian && lastGuardian.guardian_cnic) || "";
+    document.getElementById("id-grel").value = (lastGuardian && lastGuardian.relation) || "";
+    document.getElementById("id-gphone").value = "";
+    document.getElementById("id-reason").value = "";
+    document.getElementById("identity-error").hidden = true;
+    idModal.showModal();
+  });
+  document.getElementById("identity-close").addEventListener("click", function () { idModal.close(); });
+  document.getElementById("records-btn").addEventListener("click", function () {
+    if (activeStudentId) window.RecordsPanel.open({ type: "students", id: activeStudentId, name: activeStudentName });
+  });
+  document.getElementById("identity-form").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const err = document.getElementById("identity-error");
+    const body = { reason: document.getElementById("id-reason").value.trim() };
+    function put(key, id, old) { const v = document.getElementById(id).value.trim(); if (v && v !== (old || "")) body[key] = v; }
+    put("student_cnic", "id-cnic", lastStudent && lastStudent.cnic);
+    put("guardian_name", "id-gname", lastGuardian && lastGuardian.guardian_name);
+    put("guardian_cnic", "id-gcnic", lastGuardian && lastGuardian.guardian_cnic);
+    put("guardian_relation", "id-grel", lastGuardian && lastGuardian.relation);
+    put("guardian_contact_no", "id-gphone", "");
+    if (body.reason.length < 10) { err.textContent = "Write the reason (at least 10 letters)."; err.hidden = false; return; }
+    const r = await VA.fetchJson("/api/v1/students/" + activeStudentId + "/identity", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    if (!r.ok) { err.textContent = (r.body && r.body.error && r.body.error.message) || "Could not save the correction."; err.hidden = false; return; }
+    idModal.close();
+    lastStudent = r.body;
+    VA.toast("Correction saved and recorded.");
+    loadParentAccess(activeStudentId);
+  });
+
   // ---- parent portal access (guardian login), from the student's record
   async function loadParentAccess(studentId) {
     const text = document.getElementById("parent-access-text");
@@ -214,15 +261,32 @@
     const r = await VA.fetchJson("/api/v1/parents/students/" + studentId);
     if (!r.ok) { text.textContent = "Parent portal: " + ((r.body && r.body.error && r.body.error.message) || "not available."); return; }
     const a = r.body;
+    lastGuardian = a;
     text.textContent = "Parent portal — " + a.guardian_name + " (" + a.relation + ", CNIC " + a.guardian_cnic + "): " +
       (a.linked ? "can sign in as " + a.username + "." : a.has_login ? "has a login; this student is not linked yet." : "no login yet.");
     give.hidden = a.linked;
     reset.hidden = !a.has_login;
     revoke.hidden = !a.linked;
+    const box = document.getElementById("parent-siblings");
+    const open = (a.siblings || []).filter(function (s) { return !s.linked; });
+    box.hidden = !open.length;
+    box.innerHTML = open.length ? '<p class="panel-hint">Other students with the same guardian CNIC. Tick only real brothers and sisters, then press "Link ticked":</p>' +
+      open.map(function (s) {
+        return '<label class="check-row"><input type="checkbox" value="' + VA.escapeHtml(s.id) + '"> ' + VA.escapeHtml(s.name) + " (" + VA.escapeHtml(s.roll_number || "-") + ")</label>";
+      }).join("") + '<button type="button" class="role-btn secondary-btn" id="parent-siblings-btn">Link ticked</button>' : "";
+    if (open.length) {
+      document.getElementById("parent-siblings-btn").addEventListener("click", function () {
+        const ids = Array.from(box.querySelectorAll("input:checked")).map(function (i) { return i.value; });
+        if (!ids.length) { modalError.textContent = "Tick at least one brother or sister first."; modalError.hidden = false; return; }
+        parentAction("POST", "", null, ids);
+      });
+    }
   }
-  async function parentAction(method, query, confirmText) {
-    if (confirmText && !window.confirm(confirmText)) return;
-    const r = await VA.fetchJson("/api/v1/parents/students/" + activeStudentId + (query || ""), { method: method });
+  async function parentAction(method, query, confirmText, siblingIds) {
+    if (confirmText && !(await window.VistAdmin.confirm(confirmText))) return;
+    const opts = { method: method };
+    if (siblingIds) { opts.body = JSON.stringify({ sibling_ids: siblingIds }); opts.headers = { "Content-Type": "application/json" }; }
+    const r = await VA.fetchJson("/api/v1/parents/students/" + activeStudentId + (query || ""), opts);
     const out = document.getElementById("parent-access-result");
     if (!r.ok) { modalError.textContent = (r.body && r.body.error && r.body.error.message) || "That did not work."; modalError.hidden = false; return; }
     if (r.body && r.body.temporary_password) {
@@ -264,6 +328,7 @@
     }
 
     const s = result.body;
+    lastStudent = s;
     activeStudentName = s.first_name + " " + s.last_name;
     updatePhotoDisplay(studentId, s.has_photo);
     modalName.textContent = s.first_name + " " + s.last_name;
@@ -390,7 +455,7 @@
 
   resetPasswordBtn.addEventListener("click", async function () {
     if (!activeStudentId) return;
-    if (!window.confirm("Reset this student's password to the institution default? They will be required to change it on next login.")) {
+    if (!(await window.VistAdmin.confirm("Reset this student's password to the institution default? They will be required to change it on next login."))) {
       return;
     }
     resetPasswordBtn.disabled = true;
@@ -410,6 +475,8 @@
       return;
     }
 
+    resetPasswordConfirm.textContent = "New one-time password: " + ((result.body && result.body.temporary_password) || "see the admission slip") +
+      ". Give it to the student; it must be changed at first sign-in.";
     resetPasswordConfirm.hidden = false;
   });
 
@@ -596,7 +663,7 @@
       ? advanceProgramSelect.options[advanceProgramSelect.selectedIndex].textContent
       : "all programs";
 
-    if (!window.confirm("Advance current_semester by 1 for every eligible active student in " + programLabel + "? This cannot be undone in bulk.")) {
+    if (!(await window.VistAdmin.confirm("Advance current_semester by 1 for every eligible active student in " + programLabel + "? This cannot be undone in bulk."))) {
       return;
     }
 
@@ -696,7 +763,7 @@
 
     addStudentSuccess.textContent =
       "Student created. Roll number / login username: " + result.body.username +
-      " \u2014 default password: vertex123 (must change on first login).";
+      " \u2014 one-time password: " + (result.body.temporary_password || "see the admission slip") + " (must be changed at first sign-in).";
     addStudentSuccess.hidden = false;
     addStudentForm.reset();
     loadStudents();

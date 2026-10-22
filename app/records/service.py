@@ -1,0 +1,346 @@
+"""Records: degree audit, clearance, certificates and ID cards (numbered, checkable online), documents on file."""
+from __future__ import annotations
+
+import secrets
+import uuid
+from datetime import datetime, timezone
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.audit.service import AuditService
+from app.core.clock import institute_today
+from app.core.config import settings
+from app.core.exceptions import BusinessRuleViolationError, ResourceNotFoundError, ValidationAppError
+from app.records.models import IssuedDocument, PersonDocument
+
+CERTIFICATES = {"BONAFIDE": "Bonafide certificate", "CHARACTER": "Character certificate", "COMPLETION": "Completion certificate",
+                "EXPERIENCE": "Experience certificate", "CARD": "ID card"}
+PREFIX = {"BONAFIDE": "BF", "CHARACTER": "CH", "COMPLETION": "CM", "EXPERIENCE": "EX", "CARD": "ID"}
+DOCUMENTS = {"CNIC": "CNIC / B-Form", "PHOTO": "Photograph", "MATRIC": "Matric certificate", "INTERMEDIATE": "Intermediate certificate",
+             "DEGREE": "Degree / transcript", "DOMICILE": "Domicile", "TRANSFER": "Transfer / leaving certificate", "CONTRACT": "Contract / appointment letter",
+             "EXPERIENCE": "Experience letter", "OTHER": "Other"}
+CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+OWNER = {"students": "STUDENT", "employees": "EMPLOYEE"}
+
+
+def reference_of(d: IssuedDocument) -> str:
+    return f"{PREFIX.get(d.kind, 'DOC')}-{(d.created_at or datetime.now(timezone.utc)).year}-{d.serial_no:05d}"
+
+
+def verify_url(code: str) -> str:
+    return f"{(settings.public_url or '').rstrip('/')}/verify/{code}"
+
+
+class RecordsService:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+        self.audit = AuditService(session)
+
+    # ------------------------------------------------------------------ people
+    async def _student(self, student_id: uuid.UUID):
+        from app.students.models import Student
+
+        s = await self.session.get(Student, student_id)
+        if s is None:
+            raise ResourceNotFoundError("Student not found.")
+        return s
+
+    async def _employee(self, employee_id: uuid.UUID):
+        from app.employees.models import Employee
+
+        e = await self.session.get(Employee, employee_id)
+        if e is None:
+            raise ResourceNotFoundError("Employee not found.")
+        return e
+
+    async def student_of_user(self, user_id: uuid.UUID):
+        from app.students.models import Student
+
+        s = (await self.session.execute(select(Student).where(Student.user_id == user_id))).scalar_one_or_none()
+        if s is None:
+            raise ResourceNotFoundError("There is no student record for your account.")
+        return s
+
+    async def _owner_name(self, owner_type: str, owner_id: uuid.UUID) -> str:
+        p = await (self._student(owner_id) if owner_type == "STUDENT" else self._employee(owner_id))
+        return f"{p.first_name} {p.last_name}"
+
+    # ------------------------------------------------------------------ degree audit
+    async def degree_audit(self, student_id: uuid.UUID) -> dict:
+        from app.academics.models import Course, CourseOffering, CourseProgram, Enrollment, EnrollmentStatus
+        from app.academics.transcript_service import TranscriptService
+
+        student = await self._student(student_id)
+        curriculum = []
+        if student.program_id:
+            curriculum = (await self.session.execute(
+                select(Course, CourseProgram.semester_number).join(CourseProgram, CourseProgram.course_id == Course.id)
+                .where(CourseProgram.program_id == student.program_id).order_by(CourseProgram.semester_number, Course.code))).all()
+        t = await TranscriptService(self.session).build(student_id)
+        passed, failed = set(), set()
+        for term in t["terms"]:
+            for c in term["courses"]:
+                if c.get("withdrawn"):
+                    continue
+                (passed if c["outcome"] == "PASSED" else failed).add(c["course_code"])
+        failed -= passed                                           # a later pass clears an earlier failure
+        studying = set((await self.session.execute(
+            select(Course.code).join(CourseOffering, CourseOffering.course_id == Course.id).join(Enrollment, Enrollment.course_offering_id == CourseOffering.id)
+            .where(Enrollment.student_id == student_id, Enrollment.status == EnrollmentStatus.ENROLLED))).scalars().all())
+        courses, missing = [], []
+        for course, semester in curriculum:
+            status = "PASSED" if course.code in passed else "IN_PROGRESS" if course.code in studying else "FAILED" if course.code in failed else "NOT_TAKEN"
+            courses.append({"semester": semester, "code": course.code, "title": course.title, "credit_hours": course.credit_hours, "status": status})
+            if status != "PASSED":
+                missing.append(course.code)
+        required = sum(c["credit_hours"] for c in courses)
+        earned = sum(c["credit_hours"] for c in courses if c["status"] == "PASSED")
+        cgpa, min_cgpa = float(t["summary"]["cgpa"] or 0), float(settings.graduation_min_cgpa)
+        problems = []
+        if not courses:
+            problems.append("The program has no course list to check against.")
+        if missing:
+            problems.append(f"{len(missing)} course(s) still to pass.")
+        if courses and cgpa + 1e-9 < min_cgpa:
+            problems.append(f"CGPA {cgpa:.2f} is below the {min_cgpa:.2f} needed.")
+        return {"student_id": student_id, "credits_passed": earned, "credits_required": required, "cgpa": cgpa, "min_cgpa": min_cgpa,
+                "missing": missing, "courses": courses, "problems": problems, "clear": not problems}
+
+    # ------------------------------------------------------------------ clearance
+    async def clearance(self, owner_type: str, owner_id: uuid.UUID) -> dict:
+        from app.fines.models import Fine, FinePayerType, FineStatus
+        from app.inventory.models import MovementKind, StockItem, StockMovement
+        from app.library.models import BookIssue, BorrowerType, IssueStatus
+
+        await self._owner_name(owner_type, owner_id)
+        problems, to_settle, store = [], [], []
+        pending = (await self.session.execute(select(func.coalesce(func.sum(Fine.amount), 0), func.count()).where(
+            Fine.payer_type == FinePayerType(owner_type), Fine.payer_id == owner_id, Fine.status == FineStatus.PENDING))).one()
+        if pending[1]:
+            problems.append(f"{pending[1]} unpaid fine(s), Rs. {float(pending[0]):,.0f} in all.")
+        books = (await self.session.execute(select(func.count()).select_from(BookIssue).where(
+            BookIssue.borrower_type == BorrowerType(owner_type), BookIssue.borrower_id == owner_id, BookIssue.status == IssueStatus.ISSUED))).scalar_one()
+        if books:
+            problems.append(f"{books} library book(s) not returned.")
+        issued = (await self.session.execute(
+            select(StockMovement, StockItem.name).join(StockItem, StockItem.id == StockMovement.item_id).where(
+                StockMovement.kind == MovementKind.ISSUED, StockMovement.party_type == owner_type, StockMovement.party_id == owner_id, StockItem.is_returnable.is_(True)))).all()
+        for mv, name in issued:
+            back = (await self.session.execute(select(func.coalesce(func.sum(StockMovement.quantity), 0)).where(
+                StockMovement.issue_id == mv.id, StockMovement.kind == MovementKind.RETURNED))).scalar_one()
+            reversed_ = (await self.session.execute(select(func.count()).select_from(StockMovement).where(StockMovement.reverses_id == mv.id))).scalar_one()
+            left = abs(float(mv.quantity)) - float(back)
+            if left > 1e-9 and not reversed_:
+                store.append({"quantity": left, "item": name, "reference": f"MOV-{mv.serial_no:06d}"})
+        if store:
+            problems.append("Store item(s) not returned: " + ", ".join(f"{s['quantity']:g} x {s['item']}" for s in store) + ".")
+        if owner_type == "STUDENT":
+            problems += await self._student_fee_problems(owner_id)
+            from app.hostel.models import HostelStay
+
+            stay = (await self.session.execute(select(func.count()).select_from(HostelStay).where(HostelStay.student_id == owner_id, HostelStay.end_date.is_(None)))).scalar_one()
+            if stay:
+                problems.append("Still living in the hostel: end the stay first.")
+            to_settle.append("Return the ID card and library card.")
+        else:
+            from app.payroll.models import AdvanceStatus, SalaryAdvance
+
+            owed = (await self.session.execute(select(func.coalesce(func.sum(SalaryAdvance.balance), 0)).where(
+                SalaryAdvance.employee_id == owner_id, SalaryAdvance.status == AdvanceStatus.ACTIVE))).scalar_one()
+            if float(owed) > 0:
+                to_settle.append(f"Salary advance still owed: Rs. {float(owed):,.0f} (recover from the final pay).")
+            try:
+                from app.payroll.service import PayrollService
+
+                held = next((p["held"] for p in (await PayrollService(self.session).security_report())["people"] if p["employee_id"] == owner_id), 0)
+                if held:
+                    to_settle.append(f"Security deposit held: Rs. {held:,.0f} (to be returned).")
+            except Exception:  # noqa: BLE001 - clearance must still answer
+                pass
+            to_settle.append("Return the ID card, keys and equipment.")
+        return {"clear": not problems, "problems": problems, "store_items": store, "to_settle": to_settle}
+
+    async def _student_fee_problems(self, student_id: uuid.UUID) -> list[str]:
+        from app.fees.assignment_service import FeeStatusCalculator
+        from app.fees.models import AssignmentStatus, FeeAssignment, FeeLedgerEntry, FeeStructure, PayerType
+
+        rows = (await self.session.execute(select(FeeAssignment, FeeStructure.late_fee_per_day).join(FeeStructure, FeeStructure.id == FeeAssignment.fee_structure_id).where(
+            FeeAssignment.payer_type == PayerType.STUDENT, FeeAssignment.payer_id == student_id, FeeAssignment.status == AssignmentStatus.ACTIVE))).all()
+        overdue = 0.0
+        for a, late in rows:
+            entries = list((await self.session.execute(select(FeeLedgerEntry).where(FeeLedgerEntry.fee_assignment_id == a.id))).scalars())
+            overdue += FeeStatusCalculator.compute(entries, float(late) if late else None)["overdue_principal"]
+        return [f"Fees overdue: Rs. {overdue:,.0f}."] if overdue > 0.005 else []
+
+    # ------------------------------------------------------------------ certificates
+    async def _register(self, kind: str, owner_type: str, owner_id: uuid.UUID, name: str, details: dict, actor_id) -> IssuedDocument:
+        for _ in range(5):
+            code = "".join(secrets.choice(CODE_ALPHABET) for _ in range(10))
+            if (await self.session.execute(select(func.count()).select_from(IssuedDocument).where(IssuedDocument.verification_code == code))).scalar_one() == 0:
+                break
+        doc = IssuedDocument(kind=kind, owner_type=owner_type, owner_id=owner_id, owner_name=name, verification_code=code, details=details, issued_by=actor_id)
+        self.session.add(doc)
+        await self.session.flush()
+        await self.session.refresh(doc)
+        await self.audit.log(actor_user_id=actor_id, action=f"records.{kind.lower()}_issued", entity_type="issued_document", entity_id=doc.id, metadata={"owner": name, **details})
+        return doc
+
+    async def issue_student_certificate(self, student_id: uuid.UUID, kind: str, *, actor_id, override_reason: str | None = None) -> dict:
+        kind = kind.upper()
+        if kind not in ("BONAFIDE", "CHARACTER", "COMPLETION"):
+            raise ValidationAppError("Unknown certificate. Choose bonafide, character or completion.")
+        from app.programs.models import Program
+
+        s = await self._student(student_id)
+        name = f"{s.first_name} {s.last_name}"
+        program = await self.session.get(Program, s.program_id) if s.program_id else None
+        override = (override_reason or "").strip() or None
+        if kind in ("CHARACTER", "COMPLETION"):
+            clear = await self.clearance("STUDENT", student_id)
+            problems = list(clear["problems"])
+            if kind == "COMPLETION":
+                problems += (await self.degree_audit(student_id))["problems"]
+            if problems and not override:
+                raise BusinessRuleViolationError("Not cleared: " + " ".join(problems) + " To issue it anyway, give a reason.")
+            if problems and len(override) < 10:
+                raise BusinessRuleViolationError("Please give a reason of at least 10 characters.")
+        doc = await self._register(kind, "STUDENT", student_id, name, {"roll_number": s.roll_number, "program": program.name if program else None, "override_reason": override}, actor_id)
+        today = institute_today()
+        prog = program.name if program else "the institute"
+        who = f"{name}, {'son' if (s.gender or '').lower().startswith('m') else 'daughter' if (s.gender or '').lower().startswith('f') else 'child'} of the guardian on record"
+        text = {
+            "BONAFIDE": [f"This is to certify that {who}, holding roll number {s.roll_number}, is a bonafide student of {settings.institute_name}, enrolled in {prog}"
+                         + (f" and currently studying in semester {s.current_semester}" if s.current_semester else "") + ".",
+                         "This certificate is issued on the student's request for whatever purpose it may serve."],
+            "CHARACTER": [f"This is to certify that {name}, roll number {s.roll_number}, was a student of {prog} at {settings.institute_name}.",
+                          "During this time the student's conduct and character were found satisfactory, and nothing is recorded against them in the institute's disciplinary or accounts records."],
+            "COMPLETION": [f"This is to certify that {name}, roll number {s.roll_number}, has completed all the requirements of {prog} at {settings.institute_name}.",
+                           "The degree itself is awarded separately by the competent authority."],
+        }[kind]
+        return {"doc": doc, "paragraphs": text, "institute": settings.institute_name, "issued_on": today}
+
+    async def issue_experience_certificate(self, employee_id: uuid.UUID, *, actor_id, override_reason: str | None = None) -> dict:
+        from app.employees.models import JobRole
+
+        e = await self._employee(employee_id)
+        name = f"{e.first_name} {e.last_name}"
+        clear = await self.clearance("EMPLOYEE", employee_id)
+        override = (override_reason or "").strip() or None
+        if clear["problems"] and not override:
+            raise BusinessRuleViolationError("Not cleared: " + " ".join(clear["problems"]) + " To issue it anyway, give a reason.")
+        if clear["problems"] and len(override) < 10:
+            raise BusinessRuleViolationError("Please give a reason of at least 10 characters.")
+        title = (await self.session.execute(select(JobRole.title).where(JobRole.id == e.job_role_id))).scalar_one_or_none() or "staff member"
+        doc = await self._register("EXPERIENCE", "EMPLOYEE", employee_id, name, {"employee_code": e.employee_code, "title": title, "override_reason": override}, actor_id)
+        end = e.left_on.strftime("%d %B %Y") if e.left_on else "the present day"
+        paragraphs = [f"This is to certify that {name} (employee code {e.employee_code}) has worked at {settings.institute_name} as {title}"
+                      f"{' in the ' + e.department + ' department' if e.department else ''} from {e.hire_date.strftime('%d %B %Y')} to {end}.",
+                      "During this period their work and conduct were found satisfactory. We wish them success in the future."]
+        return {"doc": doc, "paragraphs": paragraphs, "institute": settings.institute_name, "issued_on": institute_today()}
+
+    async def id_cards(self, *, student_ids: list[uuid.UUID], employee_ids: list[uuid.UUID], actor_id) -> dict:
+        from app.employees.models import JobRole
+        from app.programs.models import Program
+
+        if not student_ids and not employee_ids:
+            raise ValidationAppError("Choose at least one person.")
+        if len(student_ids) + len(employee_ids) > 200:
+            raise ValidationAppError("At most 200 ID cards at a time.")
+        today = institute_today()
+        valid_to = today.replace(year=today.year + 1).strftime("%d/%m/%Y")
+        cards = []
+        for sid in student_ids:
+            s = await self._student(sid)
+            program = await self.session.get(Program, s.program_id) if s.program_id else None
+            name = f"{s.first_name} {s.last_name}"
+            doc = await self._register("CARD", "STUDENT", sid, name, {"roll_number": s.roll_number}, actor_id)
+            cards.append({"kind": "STUDENT", "name": name, "photo_key": s.photo_storage_key,
+                          "fields": [("Roll No", s.roll_number), ("Program", program.name if program else None), ("Semester", str(s.current_semester) if s.current_semester else None),
+                                     ("CNIC No", s.cnic), ("Contact", s.contact_no)],
+                          "verify_url": verify_url(doc.verification_code), "reference": reference_of(doc), "valid_to": valid_to})
+        for eid in employee_ids:
+            e = await self._employee(eid)
+            title = (await self.session.execute(select(JobRole.title).where(JobRole.id == e.job_role_id))).scalar_one_or_none() or "Staff"
+            name = f"{e.first_name} {e.last_name}"
+            doc = await self._register("CARD", "EMPLOYEE", eid, name, {"employee_code": e.employee_code}, actor_id)
+            cards.append({"kind": "STAFF", "name": name, "photo_key": e.photo_storage_key, "title": title,
+                          "fields": [("Code", e.employee_code), ("Designation", title), ("Department", e.department), ("CNIC No", e.cnic), ("Contact", e.contact_no)],
+                          "verify_url": verify_url(doc.verification_code), "reference": reference_of(doc), "valid_to": valid_to})
+        return {"institute": settings.institute_name, "cards": cards}
+
+    async def issued_for(self, owner_type: str, owner_id: uuid.UUID) -> list[dict]:
+        rows = (await self.session.execute(select(IssuedDocument).where(IssuedDocument.owner_type == owner_type, IssuedDocument.owner_id == owner_id)
+                                           .order_by(IssuedDocument.created_at.desc()))).scalars().all()
+        return [{"id": d.id, "reference": reference_of(d), "kind": d.kind, "kind_label": CERTIFICATES.get(d.kind, d.kind), "issued_at": d.created_at,
+                 "code": d.verification_code, "revoked": d.revoked_at is not None, "revoke_reason": d.revoke_reason} for d in rows]
+
+    async def revoke(self, issued_id: uuid.UUID, reason: str, *, actor_id) -> dict:
+        d = await self.session.get(IssuedDocument, issued_id)
+        if d is None:
+            raise ResourceNotFoundError("Certificate not found.")
+        if d.revoked_at is not None:
+            raise BusinessRuleViolationError("This one is already cancelled.")
+        d.revoked_at, d.revoke_reason = datetime.now(timezone.utc), reason.strip()
+        await self.audit.log(actor_user_id=actor_id, action="records.revoked", entity_type="issued_document", entity_id=d.id, metadata={"reference": reference_of(d), "reason": d.revoke_reason})
+        return {"id": d.id, "revoked": True}
+
+    async def verify(self, code: str) -> dict | None:
+        """Public check. Returns only what a stranger holding the paper needs: what it is, whose, when, and whether it still stands."""
+        code = (code or "").strip().upper()
+        d = (await self.session.execute(select(IssuedDocument).where(IssuedDocument.verification_code == code))).scalar_one_or_none() if code else None
+        if d is None:
+            return None
+        return {"reference": reference_of(d), "kind": d.kind, "kind_label": CERTIFICATES.get(d.kind, d.kind), "owner_name": d.owner_name,
+                "issued_on": d.created_at.date(), "revoked": d.revoked_at is not None, "revoke_reason": d.revoke_reason}
+
+    # ------------------------------------------------------------------ documents on file
+    @staticmethod
+    def doc_out(d: PersonDocument) -> dict:
+        return {"id": d.id, "kind": d.kind, "kind_label": DOCUMENTS.get(d.kind, d.kind), "title": d.title, "file": d.original_name, "uploaded_at": d.created_at,
+                "verified": d.verified_at is not None, "archived": d.archived_at is not None, "archive_reason": d.archive_reason}
+
+    async def list_documents(self, owner_type: str, owner_id: uuid.UUID, *, include_archived: bool) -> list[dict]:
+        stmt = select(PersonDocument).where(PersonDocument.owner_type == owner_type, PersonDocument.owner_id == owner_id)
+        if not include_archived:
+            stmt = stmt.where(PersonDocument.archived_at.is_(None))
+        return [self.doc_out(d) for d in (await self.session.execute(stmt.order_by(PersonDocument.created_at.desc()))).scalars()]
+
+    async def add_document(self, owner_type: str, owner_id: uuid.UUID, *, kind: str, title: str | None, content: bytes, filename: str, content_type: str | None, actor_id) -> dict:
+        from app.core.storage import FileTooLargeError, UnsupportedFileTypeError, save_attachment
+
+        kind = (kind or "OTHER").upper()
+        if kind not in DOCUMENTS:
+            raise ValidationAppError("Choose a kind of document from the list.")
+        await self._owner_name(owner_type, owner_id)
+        try:
+            key, name, ctype = save_attachment(entity_id=owner_id, content=content, original_filename=filename, declared_content_type=content_type, folder="person-documents")
+        except (UnsupportedFileTypeError, FileTooLargeError) as exc:
+            raise ValidationAppError(str(exc)) from exc
+        d = PersonDocument(owner_type=owner_type, owner_id=owner_id, kind=kind, title=(title or "").strip() or DOCUMENTS[kind], original_name=name, storage_key=key,
+                           content_type=ctype, size_bytes=len(content), uploaded_by=actor_id)
+        self.session.add(d)
+        await self.session.flush()
+        await self.session.refresh(d)
+        await self.audit.log(actor_user_id=actor_id, action="records.document_added", entity_type="person_document", entity_id=d.id, metadata={"kind": kind, "owner_type": owner_type})
+        return self.doc_out(d)
+
+    async def document(self, document_id: uuid.UUID) -> PersonDocument:
+        d = await self.session.get(PersonDocument, document_id)
+        if d is None:
+            raise ResourceNotFoundError("Document not found.")
+        return d
+
+    async def verify_document(self, document_id: uuid.UUID, *, actor_id) -> dict:
+        d = await self.document(document_id)
+        d.verified_by, d.verified_at = actor_id, datetime.now(timezone.utc)
+        await self.audit.log(actor_user_id=actor_id, action="records.document_checked", entity_type="person_document", entity_id=d.id)
+        return self.doc_out(d)
+
+    async def archive_document(self, document_id: uuid.UUID, reason: str, *, actor_id) -> dict:
+        d = await self.document(document_id)
+        if d.archived_at is not None:
+            raise BusinessRuleViolationError("This document is already archived.")
+        d.archived_at, d.archive_reason = datetime.now(timezone.utc), reason.strip()[:300]
+        await self.audit.log(actor_user_id=actor_id, action="records.document_archived", entity_type="person_document", entity_id=d.id, metadata={"reason": d.archive_reason})
+        return self.doc_out(d)

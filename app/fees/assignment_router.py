@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 
+from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends
 
 from app.auth.permissions import Permissions, Roles
@@ -104,6 +105,17 @@ async def get_assignment(
     return await _to_assignment_out(db, assignment)
 
 
+class ReversePaymentIn(BaseModel):
+    reason: str = Field(min_length=5, max_length=255)
+
+
+@router.post("/payments/{entry_id}/reverse", summary="Reverse a recorded payment (mistake or bounced cheque); its receipt then prints as VOID")
+async def reverse_payment(entry_id: uuid.UUID, payload: ReversePaymentIn,
+                          current_user: CurrentUser = Depends(require_permission(Permissions.PAYMENT_REVERSE)), db=Depends(get_db)) -> dict:
+    await ChallanService(db).reverse_payment(entry_id, reason=payload.reason, actor_id=current_user.id)
+    return {"reversed": True}
+
+
 @router.get(
     "/{assignment_id}/ledger",
     response_model=list[LedgerEntryOut],
@@ -116,6 +128,50 @@ async def get_ledger(
 ) -> list[LedgerEntryOut]:
     entries = await FeeAssignmentRepository(db).get_ledger(assignment_id)
     return [LedgerEntryOut.model_validate(e) for e in entries]
+
+
+@router.get("/{assignment_id}/statement", summary="Installments with what was paid against each, payments with the installments they settled, and a running balance (Admin/Accounts Officer)")
+async def get_statement(
+    assignment_id: uuid.UUID,
+    current_user: CurrentUser = Depends(_STAFF_ONLY),
+    db=Depends(get_db),
+) -> dict:
+    from app.fees.assignment_service import FeeStatusCalculator
+    from app.fees.models import FeeAssignment, LedgerEntryType
+
+    assignment = await db.get(FeeAssignment, assignment_id)
+    if assignment is None:
+        raise ResourceNotFoundError("Fee assignment not found.")
+    structure = await db.get(FeeStructure, assignment.fee_structure_id)
+    entries = await FeeAssignmentRepository(db).get_ledger(assignment_id)
+    late = float(structure.late_fee_per_day) if structure and structure.late_fee_per_day else None
+    rows = FeeStatusCalculator.installments(entries, late)
+    label = {r["ledger_entry_id"]: (f"Installment {r['installment_number']}" if r["installment_number"] else (r["description"] or "Charge")) for r in rows}
+    applied: dict = {}
+    for r in rows:
+        for part in r["paid_from"]:
+            applied.setdefault(part["ledger_entry_id"], []).append({"installment": label[r["ledger_entry_id"]], "amount": part["amount"]})
+    # Running balance: charges add, discounts / payments reduce, refunds add back (money returned).
+    reversed_ids = {e.related_entry_id for e in entries if e.related_entry_id and FeeStatusCalculator._is_reversal(e)}
+    sign = {LedgerEntryType.DEBIT: 1, LedgerEntryType.CONCESSION: -1, LedgerEntryType.CREDIT: -1, LedgerEntryType.REFUND: 1}
+    names = {LedgerEntryType.DEBIT: "Charge", LedgerEntryType.CONCESSION: "Discount", LedgerEntryType.CREDIT: "Payment", LedgerEntryType.REFUND: "Refund paid back"}
+    ordered = sorted(entries, key=lambda e: (e.created_at, 0 if e.entry_type == LedgerEntryType.DEBIT else 1))
+    balance, lines = 0.0, []
+    for e in ordered:
+        balance += sign.get(e.entry_type, 0) * float(e.amount)
+        what = names.get(e.entry_type, e.entry_type.value)
+        if FeeStatusCalculator._is_reversal(e):
+            what = "Payment reversed"
+        elif e.entry_type == LedgerEntryType.DEBIT:
+            what = label.get(e.id, "Charge")
+        lines.append({"id": e.id, "type": e.entry_type.value, "what": what, "amount": float(e.amount), "due_date": e.due_date,
+                      "paid_on": e.paid_on, "created_at": e.created_at, "description": e.description,
+                      "payment_method": e.payment_method.value if hasattr(e.payment_method, "value") else e.payment_method,
+                      "payment_reference": e.payment_reference, "receipt_number": e.receipt_number,
+                      "reversed": e.id in reversed_ids, "applied_to": applied.get(e.id, []), "balance": round(balance, 2)})
+    for r in rows:
+        r["label"] = label[r["ledger_entry_id"]]
+    return {"installments": rows, "lines": lines, "balance": round(balance, 2)}
 
 
 @router.get(

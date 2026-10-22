@@ -1,0 +1,101 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}{{ allowed_roles|default("ADMIN,ACCOUNTS_OFFICER") }}{% endblock %}
+{% block title %}Staff attendance{% endblock %}
+{% block page_title %}Staff attendance{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">When each member of staff arrives and leaves, against the timing of their job. Payroll uses this for absences and late / early marks.</div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="daily" role="tab" aria-selected="true"><span>Daily</span></button>
+  <button class="portal-tab" data-tab="month" role="tab" aria-selected="false"><span>Month</span></button>
+  <button class="portal-tab" data-tab="timings" role="tab" aria-selected="false"><span>Timings</span></button>
+  <button class="portal-tab" data-tab="tools" role="tab" aria-selected="false" data-manage-only hidden><span>Holidays &amp; import</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="daily">
+{% include "shared/staff_board.html" %}
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="month" hidden>
+<section class="sh-card">
+  <div class="toolbar"><input id="sm-month" class="text-input" type="month" aria-label="Month" /><button type="button" class="role-btn" id="sm-load">Show</button></div>
+  <p class="panel-hint">Working days are counted up to yesterday (today counts once someone is marked). Excused days count as present. Payroll forgives casual leave and turns late / early marks into days by the rules in Settings &rarr; Payroll.</p>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Staff</th><th class="num">Working days</th><th class="num">Present</th><th class="num">Absent</th><th class="num">Late</th><th class="num">Left early</th><th class="num">No check-out</th><th></th></tr></thead><tbody id="sm-body"></tbody></table></div>
+  <p class="empty-state" id="sm-empty" hidden>No staff.</p>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="timings" hidden>
+<section class="sh-card">
+  <h2>Default timing</h2>
+  <p class="panel-hint">For everyone whose job role (or who personally) has no timing of their own. The relaxation is how many minutes late / early still count as on time.</p>
+  <div id="tm-default"></div>
+</section>
+<section class="sh-card">
+  <h2>By job role</h2>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Job role</th><th>Timing</th><th>Days</th><th>Relaxation in / out</th><th></th></tr></thead><tbody id="tm-roles"></tbody></table></div>
+</section>
+<section class="sh-card">
+  <h2>Employees with their own timing</h2>
+  <div class="toolbar" data-manage-only hidden>
+    <input id="tm-emp-q" class="text-input" type="search" placeholder="Find an employee to give their own timing" autocomplete="off" />
+    <div id="tm-emp-list" class="picker-list"></div>
+  </div>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Employee</th><th>Timing</th><th>Days</th><th>Relaxation in / out</th><th></th></tr></thead><tbody id="tm-emps"></tbody></table></div>
+  <p class="empty-state" id="tm-emps-empty" hidden>Nobody has a personal timing.</p>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="tools" hidden>
+<section class="sh-card">
+  <h2>Holiday / closure</h2>
+  <p class="panel-hint">Excuses the whole day for every member of staff, so nobody is counted absent (arrivals already marked are kept).</p>
+  <div class="toolbar"><input id="hd-day" class="text-input" type="date" aria-label="Day" /><input id="hd-reason" class="text-input" maxlength="200" placeholder="e.g. Eid ul Adha, Kashmir Day" aria-label="Reason" /><button type="button" class="role-btn" id="hd-save">Excuse the day</button></div>
+</section>
+<section class="sh-card">
+  <h2>Import from a biometric machine</h2>
+  <p class="panel-hint">A CSV with the columns <code>employee_code,date,check_in,check_out</code> (date as 2026-10-01, times as 08:55). Check first, then import. Existing times on the same day are replaced.</p>
+  <div class="toolbar"><a class="role-btn secondary-btn" id="im-template" download="staff-attendance-template.csv" href="data:text/csv;charset=utf-8,employee_code%2Cdate%2Ccheck_in%2Ccheck_out%0AEMP-0001%2C2026-10-01%2C08%3A55%2C17%3A05%0A">Download template</a>
+    <input type="file" id="im-file" accept=".csv" /><button type="button" class="role-btn secondary-btn" id="im-check">Check</button><button type="button" class="role-btn" id="im-go">Import</button></div>
+  <p id="im-result" class="panel-hint" hidden></p>
+</section>
+</div>
+
+<dialog id="tm-modal" class="modal"><div class="modal-body">
+  <h2 id="tm-title">Timing</h2>
+  <form id="tm-form" class="form-grid two-col" novalidate>
+    <div class="form-field"><label for="tm-in">Arrive by</label><input id="tm-in" class="text-input" type="time" required /></div>
+    <div class="form-field"><label for="tm-out">Leave at</label><input id="tm-out" class="text-input" type="time" required /></div>
+    <div class="form-field"><label for="tm-gin">Relaxation on arrival (minutes)</label><input id="tm-gin" class="text-input" type="number" min="0" max="180" /></div>
+    <div class="form-field"><label for="tm-gout">Relaxation on leaving (minutes)</label><input id="tm-gout" class="text-input" type="number" min="0" max="180" /></div>
+    <div class="form-field two-span"><label>Working days</label><div id="tm-days" class="dayboxes"></div></div>
+    <p id="tm-error" class="dash-alert error two-span" hidden></p>
+    <div class="form-actions two-span"><button type="submit" class="role-btn">Save</button></div>
+  </form>
+  <button id="tm-close" class="back-link modal-close-btn" type="button">Cancel</button>
+</div></dialog>
+
+<dialog id="dc-modal" class="modal"><div class="modal-body">
+  <h2 id="dc-title">Correct a day</h2><p class="cc-meta" id="dc-sub"></p>
+  <form id="dc-form" class="form-grid two-col" novalidate>
+    <div class="form-field"><label for="dc-in">Arrived at</label><input id="dc-in" class="text-input" type="time" /></div>
+    <div class="form-field"><label for="dc-out">Left at</label><input id="dc-out" class="text-input" type="time" /></div>
+    <label class="check-row two-span"><input type="checkbox" id="dc-excused" /> Excused: official duty, approved leave or holiday (counts as present, never late)</label>
+    <div class="form-field two-span" id="dc-reason-wrap" hidden><label for="dc-reason">Why is it excused?</label><input id="dc-reason" class="text-input" maxlength="200" /></div>
+    <div class="form-field two-span"><label for="dc-note">Note (kept in the history)</label><input id="dc-note" class="text-input" maxlength="300" /></div>
+    <p id="dc-error" class="dash-alert error two-span" hidden></p>
+    <div class="form-actions two-span"><button type="submit" class="role-btn">Save</button><button type="button" class="danger-btn" id="dc-clear">Clear the day</button></div>
+  </form>
+  <button id="dc-close" class="back-link modal-close-btn" type="button">Cancel</button>
+</div></dialog>
+
+<dialog id="em-modal" class="modal modal-wide"><div class="modal-body">
+  <h2 id="em-title"></h2><p class="cc-meta" id="em-sub"></p>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Date</th><th>In</th><th>Out</th><th>Expected</th><th>Status</th><th></th></tr></thead><tbody id="em-body"></tbody></table></div>
+  <button id="em-close" class="back-link modal-close-btn" type="button">Close</button>
+</div></dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/staff-attendance.js"></script>
+{% endblock %}

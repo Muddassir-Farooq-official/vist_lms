@@ -13,6 +13,7 @@ from app.audit.service import AuditService
 from app.auth.models import Role, UserRole
 from app.auth.permissions import Roles
 from app.core.clock import institute_today
+from app.core.config import settings
 from app.core.exceptions import AuthorizationError, BusinessRuleViolationError, ResourceNotFoundError
 from app.core.storage import FileTooLargeError, UnsupportedFileTypeError, delete_file, save_attachment, validate_attachment
 from app.notifications.models import NotificationCategory
@@ -64,6 +65,14 @@ class PurchasingService:
             await create_notification(self.session, user_id=user_id, category=NotificationCategory.FINANCE, title=title, message=message, link=await self._link_for(user_id))
 
     @staticmethod
+    def needs_price_approval(o: PurchaseOrder) -> bool:
+        """Goods that cost well over the approved estimate wait for the administration to approve the higher price before they can be paid."""
+        if o.actual_total is None or o.price_approved_at is not None:
+            return False
+        limit = Decimal(str(o.estimated_total)) * (Decimal(1) + Decimal(str(settings.purchase_over_estimate_percent)) / Decimal(100))
+        return Decimal(str(o.actual_total)) > limit
+
+    @staticmethod
     def _actions(o: PurchaseOrder, *, is_owner: bool, can_approve: bool, can_record: bool) -> list[str]:
         a: list[str] = []
         if o.status == S.REQUESTED:
@@ -76,7 +85,10 @@ class PurchasingService:
         elif o.status == S.ORDERED:
             a += (["receive"] if can_record else []) + (["cancel"] if can_approve else [])
         elif o.status == S.RECEIVED:
-            a += ["pay"] if can_record else []
+            if PurchasingService.needs_price_approval(o):
+                a += ["approve_price"] if can_approve else []
+            else:
+                a += ["pay"] if can_record else []
         elif o.status == S.PAID:
             a += ["reverse"] if can_approve else []
         return a
@@ -187,6 +199,13 @@ class PurchasingService:
             if item.id not in seen:                       # anything not listed did not arrive
                 item.received_quantity, item.actual_unit_price = Decimal(0), _q(item.estimated_unit_price)
         total = _q(total)
+        invoice = (invoice_no or "").strip()
+        if o.vendor_id and invoice:
+            twin = (await self.session.execute(select(PurchaseOrder).where(
+                PurchaseOrder.vendor_id == o.vendor_id, PurchaseOrder.id != o.id, PurchaseOrder.invoice_no.is_not(None),
+                func.lower(func.trim(PurchaseOrder.invoice_no)) == invoice.lower(), PurchaseOrder.status != S.CANCELLED))).scalars().first()
+            if twin is not None:
+                raise BusinessRuleViolationError(f"Invoice number {invoice} from this vendor is already recorded on {po_ref(twin)}. The same bill cannot be paid twice.")
         if total <= 0:
             raise BusinessRuleViolationError("Nothing was received. If the order did not arrive, cancel it instead.")
         if total > MAX_TOTAL:
@@ -196,10 +215,22 @@ class PurchasingService:
         await self._tell(o.requested_by, f"Arrived: {po_ref(o)}", f"{o.title} has been received. Collect it from the accounts office.")
         return o
 
+    async def approve_price(self, order_id: uuid.UUID, *, admin_id: uuid.UUID) -> PurchaseOrder:
+        o = await self._order(order_id)
+        if o.status != S.RECEIVED or not self.needs_price_approval(o):
+            raise BusinessRuleViolationError("This purchase does not need its price approved.")
+        o.price_approved_by, o.price_approved_at = admin_id, datetime.now(timezone.utc)
+        await self.audit.log(actor_user_id=admin_id, action="purchase.price_approved", entity_type="purchase_order", entity_id=o.id,
+                             metadata={"estimated_total": str(o.estimated_total), "actual_total": str(o.actual_total)})
+        return o
+
     async def pay(self, order_id: uuid.UUID, *, actor_id: uuid.UUID, method: PaymentMethod, reference: str | None, paid_date: date, files: list[tuple[str, bytes, str | None]]) -> PurchaseOrder:
         o = await self._order(order_id)
         if o.status != S.RECEIVED:
             raise BusinessRuleViolationError("Only goods that have been received can be paid for.")
+        if self.needs_price_approval(o):
+            raise BusinessRuleViolationError(
+                f"The goods cost Rs. {float(o.actual_total):,.0f} against an approved Rs. {float(o.estimated_total):,.0f}. An administrator must approve the price before it can be paid.")
         if method in NEEDS_REFERENCE and not (reference or "").strip():
             raise BusinessRuleViolationError("Enter the cheque number or the bank transaction reference.")
         today = institute_today()

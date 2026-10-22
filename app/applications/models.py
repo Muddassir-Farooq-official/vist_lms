@@ -42,6 +42,9 @@ class ApplicationType(UUIDPKMixin, TimestampMixin, Base):
     requires_dates: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     requires_attachment: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     yearly_limit_days: Mapped[int | None] = mapped_column(Integer, nullable=True)   # e.g. 10 days of casual leave a year (informational)
+    # Approving this kind of application (with dates) excuses those days: staff attendance is marked
+    # "excused" (no deduction) and a student's classes are marked LEAVE (not counted for or against).
+    excuses_attendance: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=true())
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=100, server_default="100")
 

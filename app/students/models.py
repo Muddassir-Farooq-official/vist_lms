@@ -92,6 +92,7 @@ class Student(UUIDPKMixin, TimestampMixin, Base):
     # backfill it. Used by Fee Structures to scope charges to specific
     # semesters within a program (e.g. "Clinical Fee, BSN, semester 3 only").
     current_semester: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    semester_advanced_on: Mapped[date | None] = mapped_column(Date, nullable=True)      # last "Advance Semester": guards against doing it twice
 
     status: Mapped[StudentStatus] = mapped_column(
         Enum(StudentStatus, name="student_status"), default=StudentStatus.ACTIVE, nullable=False

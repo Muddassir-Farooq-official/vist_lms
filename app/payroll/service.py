@@ -13,6 +13,7 @@ from app.audit.service import AuditService
 from app.auth.models import Role, UserRole
 from app.auth.permissions import Roles
 from app.core.clock import institute_today
+from app.core.config import settings
 from app.core.exceptions import BusinessRuleViolationError, ResourceNotFoundError
 from app.employees.models import Employee, EmployeeBonus, EmployeeSalaryHistory, EmployeeStatus, JobRole
 from app.notifications.models import NotificationCategory
@@ -21,6 +22,7 @@ from app.payroll import rules
 from app.payroll.models import (
     AdvanceStatus,
     EmployeePayItem,
+    EmployeePayrollSetting,
     LineKind,
     PayItemCalc,
     PayItemKind,
@@ -182,10 +184,50 @@ class PayrollService:
         return list((await self.session.execute(select(EmployeeBonus).where(EmployeeBonus.employee_id == employee_id, EmployeeBonus.awarded_at <= rules.month_end(month), EmployeeBonus.id.not_in(taken))
                                                 .order_by(EmployeeBonus.awarded_at))).scalars())
 
-    async def _fill(self, slip: Payslip, emp: Employee, run: PayrollRun, base: Decimal) -> None:
-        """(Re)build every line of one payslip from the salary, pay items, bonuses, unpaid days, adjustment and advances."""
+    async def _attendance(self, month: date, employees: list[Employee]) -> dict:
+        from app.timekeeping.service import TimekeepingService
+
+        return await TimekeepingService(self.session).summary(month, employees)
+
+    async def _teachers(self, employees: list[Employee]) -> set:
+        roles = {r.id: r.default_role_code for r in (await self.session.execute(select(JobRole).where(JobRole.id.in_({e.job_role_id for e in employees} or {uuid.uuid4()})))).scalars()}
+        return {e.id for e in employees if roles.get(e.job_role_id) == Roles.TEACHER}
+
+    async def _security_held(self, employee_id: uuid.UUID, exclude_run: uuid.UUID) -> Decimal:
+        """Security already held: what the person brought in (opening) plus every SECURITY line of paid payrolls."""
+        paid = (await self.session.execute(select(func.coalesce(func.sum(PayslipLine.amount), 0)).join(Payslip, Payslip.id == PayslipLine.payslip_id)
+                                           .join(PayrollRun, PayrollRun.id == Payslip.run_id)
+                                           .where(Payslip.employee_id == employee_id, PayslipLine.source == "SECURITY", PayrollRun.status == S.PAID,
+                                                  PayrollRun.id != exclude_run, Payslip.held.is_(False)))).scalar_one()
+        setting = await self.session.get(EmployeePayrollSetting, employee_id)
+        return rules.q2(paid) + rules.q2(setting.security_opening if setting else 0)
+
+    def _apply_attendance(self, slip: Payslip, att: dict | None, teacher: bool) -> None:
+        """Absences and late / early marks from staff attendance, unless the administration overrode them."""
+        if not slip.attendance_override:
+            if settings.payroll_attendance_deductions and att and att.get("recorded", 0) > 0:
+                missing = att["missing_out"] if settings.payroll_missing_checkout_counts else 0
+                slip.absent_days = Decimal(att["absent"])
+                slip.late_marks = att["late"] + att["early"] + missing
+                slip.attendance_note = (f"Present {att['present']} of {att['scheduled']} working days so far"
+                                        + (f" ({att['excused']} excused)" if att["excused"] else "")
+                                        + f"; late {att['late']}, left early {att['early']}" + (f", no check-out {missing}" if missing else "") + ".")
+            else:
+                slip.absent_days, slip.late_marks = Decimal(0), 0
+                slip.attendance_note = ("No attendance recorded this month, so nothing is deducted for absence." if settings.payroll_attendance_deductions else None)
+        allowed = Decimal(settings.payroll_casual_leaves_teacher if teacher else settings.payroll_casual_leaves_staff)
+        slip.casual_leaves = min(Decimal(str(slip.absent_days)), allowed)
+
+    async def _fill(self, slip: Payslip, emp: Employee, run: PayrollRun, base: Decimal, att: dict | None = None, teacher: bool | None = None) -> None:
+        """(Re)build every line of one payslip: salary, pay items, bonuses, absences, late marks, unpaid days, adjustment, security and advances."""
         await self.session.execute(PayslipLine.__table__.delete().where(PayslipLine.payslip_id == slip.id))
+        if teacher is None:
+            teacher = emp.id in await self._teachers([emp])
+        if att is None and not slip.attendance_override:
+            att = (await self._attendance(run.month, [emp])).get(emp.id)
+        self._apply_attendance(slip, att, teacher)
         month, dim = run.month, rules.days_in(run.month)
+        wd = int(slip.working_days or run.working_days or settings.payroll_default_working_days or rules.days_in(run.month))
         payable = rules.payable_days(emp.hire_date, month)
         slip.base_salary, slip.days_in_month, slip.days_payable = base, dim, payable
         lines: list[tuple[LineKind, str, str, Decimal, uuid.UUID | None]] = []
@@ -205,10 +247,26 @@ class PayrollService:
         adj = rules.q2(slip.adjustment)
         if adj > 0:
             earn.append((LineKind.EARNING, "ADJUSTMENT", slip.adjustment_note or "Adjustment", adj, None))
+        absent, casual = Decimal(str(slip.absent_days)), Decimal(str(slip.casual_leaves))
+        if absent - casual > 0:
+            ded.append((LineKind.DEDUCTION, "ABSENT", f"Absent {float(absent):g} day{'s' if absent != 1 else ''}" + (f", {float(casual):g} casual leave allowed" if casual else "")
+                        + f": {float(absent - casual):g} day{'s' if absent - casual != 1 else ''} at basic / {wd}", rules.unpaid_deduction(base, wd, absent - casual), None))
+        per_day = int(settings.payroll_late_marks_per_day)
+        late_days = rules.marks_to_days(int(slip.late_marks or 0), per_day)
+        if late_days > 0:
+            ded.append((LineKind.DEDUCTION, "LATE", f"{slip.late_marks} late arrivals / early leavings (every {per_day} = 1 day): {late_days} day{'s' if late_days != 1 else ''}",
+                        rules.unpaid_deduction(base, wd, late_days), None))
         if Decimal(str(slip.unpaid_days)) > 0:
-            ded.append((LineKind.DEDUCTION, "UNPAID", f"Unpaid leave ({float(slip.unpaid_days):g} day{'s' if float(slip.unpaid_days) != 1 else ''})", rules.unpaid_deduction(base, dim, slip.unpaid_days), None))
+            ded.append((LineKind.DEDUCTION, "UNPAID", f"Unpaid leave ({float(slip.unpaid_days):g} day{'s' if float(slip.unpaid_days) != 1 else ''})", rules.unpaid_deduction(base, wd, slip.unpaid_days), None))
         if adj < 0:
             ded.append((LineKind.DEDUCTION, "ADJUSTMENT", slip.adjustment_note or "Adjustment", -adj, None))
+        setting = await self.session.get(EmployeePayrollSetting, emp.id)
+        pct = Decimal(str(setting.security_percent)) if setting is not None and setting.security_percent is not None else Decimal(str(settings.payroll_security_percent))
+        if pct > 0:
+            held = await self._security_held(emp.id, run.id)
+            take = min(rules.q2(Decimal(str(base)) * pct / 100), rules.q2(base) - held)
+            if take > 0:
+                ded.append((LineKind.DEDUCTION, "SECURITY", f"Security deposit ({float(pct):g}% of basic): Rs. {float(held + take):,.0f} of Rs. {float(base):,.0f} held after this", take, None))
         gross = sum((l[3] for l in earn), Decimal(0))
         available = gross - sum((l[3] for l in ded), Decimal(0))
         advances = (await self.session.execute(select(SalaryAdvance).where(SalaryAdvance.employee_id == emp.id, SalaryAdvance.status == AdvanceStatus.ACTIVE).order_by(SalaryAdvance.granted_on))).scalars().all()
@@ -235,8 +293,11 @@ class PayrollService:
         return [(e, t) for e, t in rows], await self._salaries([e.id for e, _ in rows], month)
 
     # ------------------------------------------------------------------ the run
-    async def prepare(self, month: date, *, actor_id: uuid.UUID) -> tuple[PayrollRun, list[str]]:
+    async def prepare(self, month: date, *, actor_id: uuid.UUID, working_days: int | None = None) -> tuple[PayrollRun, list[str]]:
         month = rules.month_start(month)
+        working_days = int(working_days or settings.payroll_default_working_days or rules.days_in(month))
+        if not 1 <= working_days <= rules.days_in(month):
+            raise BusinessRuleViolationError(f"Working days must be between 1 and {rules.days_in(month)}.")
         today = institute_today()
         if month > rules.month_start(today).replace(day=1) and (month.year, month.month) > ((today.year, today.month + 1) if today.month < 12 else (today.year + 1, 1)):
             raise BusinessRuleViolationError("You can prepare payroll up to next month, not further ahead.")
@@ -245,21 +306,23 @@ class PayrollService:
         if (await self.session.execute(select(func.count()).select_from(PayrollRun).where(PayrollRun.month == month, PayrollRun.status != S.CANCELLED))).scalar_one():
             raise BusinessRuleViolationError("There is already a payroll run for that month. Open it, or cancel it first.")
         people, salaries = await self._eligible(month)
-        run = PayrollRun(month=month, status=S.DRAFT, created_by=actor_id)
+        run = PayrollRun(month=month, status=S.DRAFT, created_by=actor_id, working_days=working_days)
         self.session.add(run)
         await self.session.flush()
         await self.session.refresh(run)
         skipped = []
+        att = await self._attendance(month, [e for e, _ in people])
+        teachers = await self._teachers([e for e, _ in people])
         for emp, title in people:
             base = salaries.get(emp.id)
             if base is None or base <= 0:
                 skipped.append(f"{emp.first_name} {emp.last_name} (no salary on record)")
                 continue
             slip = Payslip(run_id=run.id, employee_id=emp.id, employee_name=f"{emp.first_name} {emp.last_name}", employee_code=emp.employee_code, job_title=title, department=emp.department,
-                           base_salary=base, days_in_month=rules.days_in(month), days_payable=rules.payable_days(emp.hire_date, month), gross=0, deductions=0, net=0)
+                           base_salary=base, days_in_month=rules.days_in(month), days_payable=rules.payable_days(emp.hire_date, month), working_days=working_days, gross=0, deductions=0, net=0)
             self.session.add(slip)
             await self.session.flush()
-            await self._fill(slip, emp, run, base)
+            await self._fill(slip, emp, run, base, att.get(emp.id), emp.id in teachers)
         await self._totals(run)
         if run.employees_count == 0:
             raise BusinessRuleViolationError("There is nobody to pay for that month. Check that employees have a salary on record.")
@@ -272,6 +335,8 @@ class PayrollService:
             raise BusinessRuleViolationError("Only a draft can be recalculated.")
         people, salaries = await self._eligible(run.month)
         have = {s.employee_id: s for s in await self._payslips(run.id)}
+        att = await self._attendance(run.month, [e for e, _ in people])
+        teachers = await self._teachers([e for e, _ in people])
         for emp, title in people:
             base = salaries.get(emp.id)
             if base is None or base <= 0:
@@ -279,10 +344,11 @@ class PayrollService:
             slip = have.get(emp.id)
             if slip is None:
                 slip = Payslip(run_id=run.id, employee_id=emp.id, employee_name=f"{emp.first_name} {emp.last_name}", employee_code=emp.employee_code, job_title=title, department=emp.department,
-                               base_salary=base, days_in_month=rules.days_in(run.month), days_payable=rules.payable_days(emp.hire_date, run.month), gross=0, deductions=0, net=0)
+                               base_salary=base, days_in_month=rules.days_in(run.month), days_payable=rules.payable_days(emp.hire_date, run.month), working_days=run.working_days,
+                               gross=0, deductions=0, net=0)
                 self.session.add(slip)
                 await self.session.flush()
-            await self._fill(slip, emp, run, base)
+            await self._fill(slip, emp, run, base, att.get(emp.id), emp.id in teachers)
         await self.session.flush()
         await self._totals(run)
         await self.audit.log(actor_user_id=actor_id, action="payroll.recalculated", entity_type="payroll_run", entity_id=run.id)
@@ -295,6 +361,26 @@ class PayrollService:
         slip = await self.session.get(Payslip, payslip_id)
         if slip is None or slip.run_id != run.id:
             raise ResourceNotFoundError("Payslip not found.")
+        if changes.get("working_days") is not None:
+            wd = int(changes["working_days"])
+            if not 1 <= wd <= slip.days_in_month:
+                raise BusinessRuleViolationError(f"Working days must be between 1 and {slip.days_in_month}.")
+            slip.working_days = wd
+        if changes.get("reset_attendance"):
+            slip.attendance_override = False
+        else:
+            if changes.get("absent_days") is not None:
+                a = Decimal(str(changes["absent_days"]))
+                if a < 0 or a > slip.days_in_month or (a * 2) % 1 != 0:
+                    raise BusinessRuleViolationError(f"Absent days must be between 0 and {slip.days_in_month}, in whole or half days.")
+                slip.absent_days, slip.attendance_override = a, True
+            if changes.get("late_marks") is not None:
+                m = int(changes["late_marks"])
+                if not 0 <= m <= 62:
+                    raise BusinessRuleViolationError("Late / early marks must be between 0 and 62.")
+                slip.late_marks, slip.attendance_override = m, True
+            if slip.attendance_override:
+                slip.attendance_note = "Set by the administration."
         if "unpaid_days" in changes and changes["unpaid_days"] is not None:
             d = Decimal(str(changes["unpaid_days"]))
             if d < 0 or d > slip.days_in_month or (d * 2) % 1 != 0:
@@ -405,14 +491,18 @@ class PayrollService:
     # ------------------------------------------------------------------ reading
     @staticmethod
     def _slip_row(s: Payslip) -> dict:
+        per_day = int(settings.payroll_late_marks_per_day)
         return {"id": s.id, "employee_id": s.employee_id, "employee_name": s.employee_name, "employee_code": s.employee_code, "job_title": s.job_title, "base_salary": _f(s.base_salary), "days_payable": s.days_payable,
-                "days_in_month": s.days_in_month, "unpaid_days": _f(s.unpaid_days), "adjustment": _f(s.adjustment), "adjustment_note": s.adjustment_note, "held": s.held, "held_reason": s.held_reason,
+                "working_days": s.working_days, "absent_days": _f(s.absent_days), "casual_leaves": _f(s.casual_leaves), "late_marks": s.late_marks,
+                "late_days": rules.marks_to_days(int(s.late_marks or 0), per_day), "late_marks_per_day": per_day, "attendance_override": s.attendance_override,
+                "attendance_note": s.attendance_note, "day_rate": _f(Decimal(str(s.base_salary)) / (s.working_days or 26)),
+                "days_in_month": s.days_in_month, "unpaid_days": _f(s.unpaid_days), "adjustment": _f(s.adjustment), "adjustment_note": s.adjustment_note, "held": s.held, "held_reason": s.held_reason, "released_on": s.released_on,
                 "gross": _f(s.gross), "deductions": _f(s.deductions), "net": _f(s.net)}
 
     async def _run_row(self, r: PayrollRun) -> dict:
         names = await self.accounts._names({r.created_by, r.approved_by, r.paid_by})
         exp = await self.session.get(Expense, r.expense_id) if r.expense_id else None
-        return {"id": r.id, "reference": run_ref(r), "month": r.month, "month_label": r.month.strftime("%B %Y"), "status": r.status, "employees_count": r.employees_count, "total_gross": _f(r.total_gross),
+        return {"id": r.id, "reference": run_ref(r), "month": r.month, "month_label": r.month.strftime("%B %Y"), "status": r.status, "working_days": r.working_days, "employees_count": r.employees_count, "total_gross": _f(r.total_gross),
                 "total_deductions": _f(r.total_deductions), "total_net": _f(r.total_net), "created_by_name": names.get(r.created_by), "approved_by_name": names.get(r.approved_by), "approved_at": r.approved_at,
                 "paid_by_name": names.get(r.paid_by), "paid_at": r.paid_at, "paid_date": r.paid_date, "payment_method": r.payment_method, "payment_reference": r.payment_reference,
                 "expense_reference": expense_ref(exp) if exp else None, "cancel_reason": r.cancel_reason, "created_at": r.created_at}
@@ -452,3 +542,137 @@ class PayrollService:
         rows = (await self.session.execute(select(Payslip, PayrollRun).join(PayrollRun, PayrollRun.id == Payslip.run_id).where(Payslip.employee_id == emp.id, PayrollRun.status == S.PAID, Payslip.held.is_(False))
                                            .order_by(PayrollRun.month.desc()))).all()
         return [{"id": s.id, "month": r.month, "month_label": r.month.strftime("%B %Y"), "gross": _f(s.gross), "deductions": _f(s.deductions), "net": _f(s.net), "paid_date": r.paid_date} for s, r in rows]
+    # ------------------------------------------------------------------ security deposits
+    async def security_report(self) -> dict:
+        people = (await self.session.execute(select(Employee, JobRole.title).join(JobRole, JobRole.id == Employee.job_role_id).where(Employee.status.in_(ACTIVE))
+                                             .order_by(Employee.first_name, Employee.last_name))).all()
+        salaries = await self._salaries([e.id for e, _ in people], institute_today())
+        settings_rows = {s.employee_id: s for s in (await self.session.execute(select(EmployeePayrollSetting))).scalars()}
+        held_rows = dict((await self.session.execute(select(Payslip.employee_id, func.sum(PayslipLine.amount)).join(PayslipLine, PayslipLine.payslip_id == Payslip.id)
+                                                     .join(PayrollRun, PayrollRun.id == Payslip.run_id)
+                                                     .where(PayslipLine.source == "SECURITY", PayrollRun.status == S.PAID, Payslip.held.is_(False))
+                                                     .group_by(Payslip.employee_id))).all())
+        rows = []
+        for e, title in people:
+            st = settings_rows.get(e.id)
+            base = salaries.get(e.id) or Decimal(0)
+            held = max(Decimal(0), rules.q2(held_rows.get(e.id) or 0) + rules.q2(st.security_opening if st else 0) - rules.q2(st.security_released if st else 0))
+            pct = st.security_percent if st is not None and st.security_percent is not None else None
+            rows.append({"employee_id": e.id, "name": f"{e.first_name} {e.last_name}", "employee_code": e.employee_code, "job_title": title,
+                         "base_salary": _f(base), "held": _f(held), "target": _f(base), "remaining": _f(max(Decimal(0), rules.q2(base) - held)),
+                         "own_percent": _f(pct) if pct is not None else None, "opening": _f(st.security_opening) if st else 0.0, "note": st.note if st else None})
+        return {"institute_percent": float(settings.payroll_security_percent), "total_held": round(sum(r["held"] for r in rows), 2), "people": rows}
+
+    async def release_payslip(self, run_id: uuid.UUID, payslip_id: uuid.UUID, *, method: PaymentMethod, reference: str | None, paid_date: date, actor_id: uuid.UUID) -> dict:
+        """A payslip that was held back. While the month is still being approved, releasing it simply puts it back in the month's payment.
+        Once the month has been paid, it is paid on its own now: one expense in the books, and the slip remembers the day."""
+        from app.accounts.period import ensure_open
+
+        run = await self._run(run_id)
+        slip = next((s for s in await self._payslips(run_id) if s.id == payslip_id), None)
+        if slip is None:
+            raise ResourceNotFoundError("Payslip not found.")
+        if not slip.held:
+            raise BusinessRuleViolationError("This payslip is not held back.")
+        if run.status in (S.DRAFT, S.CANCELLED):
+            raise BusinessRuleViolationError("Release it only once the payroll is approved; until then, untick 'hold back' on the payslip.")
+        if run.status == S.APPROVED:
+            slip.held, slip.held_reason = False, None
+            await self.session.flush()
+            return {"released": True, "paid_separately": False}
+        if paid_date > institute_today():
+            raise BusinessRuleViolationError("The payment date cannot be in the future.")
+        if method in NEEDS_REFERENCE and not (reference or "").strip():
+            raise BusinessRuleViolationError("Enter the cheque number or the bank transaction reference.")
+        await ensure_open(self.session, paid_date, "This payment")
+        net = rules.q2(slip.net)
+        if net <= 0:
+            raise BusinessRuleViolationError("There is nothing to pay on this payslip.")
+        category = await self._salary_category()
+        expense = Expense(category_id=category.id, title=f"Salary (held, paid now): {slip.employee_name}", description=f"Payslip of {run_ref(run)} that had been held back.",
+                          amount=net, expense_date=paid_date, payment_method=method, reference_no=(reference or "").strip() or None, status=ExpenseStatus.APPROVED,
+                          source=ExpenseSource.PAYROLL, recorded_by=actor_id, decided_by=actor_id, decided_at=datetime.now(timezone.utc))
+        self.session.add(expense)
+        slip.held, slip.held_reason, slip.released_on = False, None, paid_date
+        await self.session.flush()
+        await self.audit.log(actor_user_id=actor_id, action="payroll.held_payslip_paid", entity_type="payslip", entity_id=slip.id, metadata={"amount": str(net), "expense": str(expense.id)})
+        return {"released": True, "paid_separately": True, "expense_reference": expense_ref(expense)}
+
+    async def release_security(self, employee_id: uuid.UUID, *, method: PaymentMethod, reference: str | None, paid_date: date, actor_id: uuid.UUID) -> dict:
+        """Pay a person's security deposit back (normally when they leave). It is one expense in the books, and can be done only once:
+        what has been paid back is no longer 'held'."""
+        from app.accounts.period import ensure_open
+
+        e = await self._employee(employee_id)
+        if paid_date > institute_today():
+            raise BusinessRuleViolationError("The date cannot be in the future.")
+        if method in NEEDS_REFERENCE and not (reference or "").strip():
+            raise BusinessRuleViolationError("Enter the cheque number or the bank transaction reference.")
+        await ensure_open(self.session, paid_date, "This payment")
+        st = await self.session.get(EmployeePayrollSetting, e.id)
+        deducted = (await self.session.execute(
+            select(func.coalesce(func.sum(PayslipLine.amount), 0)).join(Payslip, Payslip.id == PayslipLine.payslip_id).join(PayrollRun, PayrollRun.id == Payslip.run_id)
+            .where(Payslip.employee_id == e.id, PayslipLine.source == "SECURITY", PayrollRun.status == S.PAID, Payslip.held.is_(False)))).scalar_one()
+        held = rules.q2(deducted) + rules.q2(st.security_opening if st else 0) - rules.q2(st.security_released if st else 0)
+        if held <= 0:
+            raise BusinessRuleViolationError("Nothing is held for this person.")
+        category = await self._salary_category()
+        expense = Expense(category_id=category.id, title=f"Security deposit paid back: {e.first_name} {e.last_name}", description="Security deposit held from salary, returned to the employee.",
+                          amount=held, expense_date=paid_date, payment_method=method, reference_no=(reference or "").strip() or None, status=ExpenseStatus.APPROVED,
+                          source=ExpenseSource.PAYROLL, recorded_by=actor_id, decided_by=actor_id, decided_at=datetime.now(timezone.utc))
+        self.session.add(expense)
+        if st is None:
+            st = EmployeePayrollSetting(employee_id=e.id, security_opening=0, security_released=0)
+            self.session.add(st)
+        st.security_released = rules.q2(st.security_released or 0) + held
+        st.security_released_on = paid_date
+        await self.session.flush()
+        await self.audit.log(actor_user_id=actor_id, action="payroll.security_released", entity_type="employee", entity_id=e.id, metadata={"amount": str(held), "expense": str(expense.id)})
+        return {"employee_id": e.id, "paid_back": _f(held), "expense_reference": expense_ref(expense)}
+
+    async def set_pay_setting(self, employee_id: uuid.UUID, data: dict, *, actor_id: uuid.UUID) -> dict:
+        e = await self._employee(employee_id)
+        st = await self.session.get(EmployeePayrollSetting, e.id)
+        before = {"security_percent": str(st.security_percent), "security_opening": str(st.security_opening)} if st else None
+        if st is None:
+            st = EmployeePayrollSetting(employee_id=e.id, security_opening=0)
+            self.session.add(st)
+        st.security_percent = data.get("security_percent")
+        st.security_opening = rules.q2(data.get("security_opening") or 0)
+        st.note = (data.get("note") or "").strip() or None
+        await self.session.flush()
+        await self.audit.log(actor_user_id=actor_id, action="payroll.employee_setting", entity_type="employee", entity_id=e.id, before=before,
+                             after={"security_percent": str(st.security_percent), "security_opening": str(st.security_opening), "note": st.note})
+        return next(r for r in (await self.security_report())["people"] if r["employee_id"] == e.id)
+
+    # ------------------------------------------------------------------ what the payroll owes onward
+    async def withholdings(self, year: int) -> dict:
+        """Money taken off salaries in a year's PAID payrolls, by head and by month: what the institute holds or must pass
+        on (security deposits, deductions such as tax or provident fund, advance recoveries, unpaid days)."""
+        def head_of(source: str, label: str) -> str:
+            if source == "SECURITY":
+                return "Security deposit"
+            if source == "ADVANCE":
+                return "Advance recovery"
+            if source == "UNPAID":
+                return "Unpaid days"
+            return label.split(":")[0].strip()[:60] or "Deduction"
+
+        rows = (await self.session.execute(
+            select(PayrollRun.month, PayslipLine.source, PayslipLine.label, func.sum(PayslipLine.amount))
+            .join(Payslip, Payslip.id == PayslipLine.payslip_id).join(PayrollRun, PayrollRun.id == Payslip.run_id)
+            .where(PayrollRun.status == S.PAID, Payslip.held.is_(False), PayslipLine.kind == LineKind.DEDUCTION,
+                   PayrollRun.month >= date(year, 1, 1), PayrollRun.month <= date(year, 12, 31))
+            .group_by(PayrollRun.month, PayslipLine.source, PayslipLine.label))).all()
+        heads: dict[str, float] = {}
+        months: dict[str, dict[str, float]] = {}
+        for month, source, label, amount in rows:
+            name = head_of(source, label or "")
+            amt = _f(amount)
+            heads[name] = round(heads.get(name, 0.0) + amt, 2)
+            m = months.setdefault(f"{month.year:04d}-{month.month:02d}", {})
+            m[name] = round(m.get(name, 0.0) + amt, 2)
+        security_now = (await self.security_report())["total_held"]
+        return {"year": year, "heads": [{"name": k, "total": v} for k, v in sorted(heads.items())],
+                "months": [{"month": k, "by_head": v, "total": round(sum(v.values()), 2)} for k, v in sorted(months.items())],
+                "total": round(sum(heads.values()), 2), "security_held_now": security_now}

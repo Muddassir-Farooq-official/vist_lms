@@ -6,6 +6,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, UploadFile
+from starlette.concurrency import run_in_threadpool
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -17,6 +18,7 @@ from app.core.exceptions import AuthorizationError, ResourceNotFoundError
 from app.employees.repository import EmployeeRepository
 from app.fees.account_service import AccountService
 from app.fees.challan_pdf import render_challan_pdf
+from app.fees.assignment_service import ChallanService, FeeAssignmentService
 from app.fees.models import (
     FeeAssignment,
     FeeLedgerEntry,
@@ -91,7 +93,7 @@ async def challan_pdf(challan_id: uuid.UUID, current_user: CurrentUser = Depends
             "payer": await AccountService(db).payer(assignment.payer_type, assignment.payer_id), "payable": float(challan.amount),
             "charged": float(entry.amount), "concession": concession, "status": challan.status.value, "paid_on": challan.paid_at,
             "generated_on": challan.generated_at or datetime.now(timezone.utc), "late_fee_per_day": float(structure.late_fee_per_day) if structure.late_fee_per_day else None}
-    return Response(content=render_challan_pdf(data), media_type="application/pdf",
+    return Response(content=await run_in_threadpool(render_challan_pdf, data), media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="challan-{challan.consumer_number}.pdf"', **_SECURITY_HEADERS})
 
 
@@ -113,8 +115,9 @@ async def receipt_pdf(entry_id: uuid.UUID, current_user: CurrentUser = Depends(r
             "payer": await AccountService(db).payer(assignment.payer_type, assignment.payer_id), "fee_name": structure.name,
             "term_label": structure.term_label, "amount": float(entry.amount), "method": entry.payment_method,
             "reference": entry.payment_reference, "description": entry.description,
-            "kind": "refund" if entry.entry_type == LedgerEntryType.REFUND else "receipt"}
-    return Response(content=render_receipt_pdf(data), media_type="application/pdf",
+            "kind": "refund" if entry.entry_type == LedgerEntryType.REFUND else "receipt",
+            "void": entry.entry_type == LedgerEntryType.CREDIT and await ChallanService(db).payment_is_reversed(entry.id)}
+    return Response(content=await run_in_threadpool(render_receipt_pdf, data), media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="receipt-{entry.receipt_number}.pdf"', **_SECURITY_HEADERS})
 
 

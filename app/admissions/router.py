@@ -1,6 +1,9 @@
 """Admissions office: rounds, applications, verification, merit lists, admitting."""
 from __future__ import annotations
 
+from starlette.concurrency import run_in_threadpool
+
+from app.core.csvsafe import safe_writer
 import uuid
 from datetime import date
 
@@ -101,7 +104,7 @@ async def merit_pdf(round_id: uuid.UUID, list_no: int, current_user: CurrentUser
     from app.admissions.merit_pdf import render_merit_list_pdf
 
     m = await AdmissionService(db).merit_list(round_id, list_no)
-    return Response(content=render_merit_list_pdf(m, settings.app_name), media_type="application/pdf",
+    return Response(content=await run_in_threadpool(render_merit_list_pdf, m, settings.app_name), media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="merit-list-{list_no}-{m["program"]}.pdf"'})
 
 
@@ -121,7 +124,7 @@ async def template(current_user: CurrentUser = Depends(manage)) -> Response:
     import io
 
     buf = io.StringIO()
-    w = csv.writer(buf, lineterminator="\r\n")       # quotes values that contain commas, e.g. addresses
+    w = safe_writer(buf, lineterminator="\r\n")       # quotes values that contain commas, e.g. addresses
     w.writerow(CSV_COLUMNS)
     w.writerow(sample)
     return Response(content=buf.getvalue(), media_type="text/csv",

@@ -4,6 +4,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel, Field
 
 from app.auth.permissions import Permissions
 from app.core.database import get_db
@@ -12,6 +13,10 @@ from app.parents import models as _models  # noqa: F401  (registers the table)
 from app.parents.service import ParentService
 
 router = APIRouter(prefix="/parents", tags=["parents"])
+
+
+class GrantIn(BaseModel):
+    sibling_ids: list[uuid.UUID] = Field(default_factory=list, max_length=12)     # brothers / sisters (same guardian) to give the same login
 
 
 @router.get("/me/children", summary="The students this parent may follow")
@@ -32,9 +37,10 @@ async def parent_access(student_id: uuid.UUID, current_user: CurrentUser = Depen
 
 
 @router.post("/students/{student_id}", summary="Create the guardian's login (or add this student to it); reset_password=true issues a new one-time password")
-async def grant_parent_access(student_id: uuid.UUID, reset_password: bool = False,
+async def grant_parent_access(student_id: uuid.UUID, payload: GrantIn | None = None, reset_password: bool = False,
                               current_user: CurrentUser = Depends(require_permission(Permissions.PARENT_ACCESS_MANAGE)), db=Depends(get_db)) -> dict:
-    return await ParentService(db).create_or_link(student_id, actor_id=current_user.id, reset_password=reset_password)
+    return await ParentService(db).create_or_link(student_id, actor_id=current_user.id, reset_password=reset_password,
+                                                  sibling_ids=payload.sibling_ids if payload else None)
 
 
 @router.delete("/students/{student_id}", status_code=204, summary="Stop every parent login from seeing this student")

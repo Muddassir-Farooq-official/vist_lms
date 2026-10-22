@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.core.net import client_ip
+from pydantic import BaseModel, Field
 from fastapi import APIRouter, Cookie, Depends, Request, Response
 
 from app.auth.redirects import home_for_roles
@@ -53,7 +55,7 @@ async def login(
     user, tokens = await service.login(
         username=payload.username,
         password=payload.password,
-        ip=request.client.host if request.client else None,
+        ip=client_ip(request),
         user_agent=request.headers.get("user-agent"),
     )
     _set_auth_cookies(response, access_token=tokens.access_token, refresh_token=tokens.refresh_token)
@@ -82,7 +84,7 @@ async def refresh(
     service = AuthService(db)
     _, tokens = await service.refresh(
         raw_refresh_token=refresh_token,
-        ip=request.client.host if request.client else None,
+        ip=client_ip(request),
         user_agent=request.headers.get("user-agent"),
     )
     _set_auth_cookies(response, access_token=tokens.access_token, refresh_token=tokens.refresh_token)
@@ -100,6 +102,30 @@ async def logout(
         await service.logout(raw_refresh_token=refresh_token)
     response.delete_cookie(ACCESS_COOKIE, path="/")
     response.delete_cookie(REFRESH_COOKIE, path="/")
+
+
+class _ForgotIn(BaseModel):
+    username: str = Field(min_length=1, max_length=60)
+
+
+class _ResetIn(BaseModel):
+    username: str = Field(min_length=1, max_length=60)
+    code: str = Field(min_length=4, max_length=10)
+    new_password: str = Field(min_length=10, max_length=256)
+
+
+@router.post("/forgot-password", summary="Send a 6-digit reset code by SMS to the mobile on the person's record (same answer whoever asks)")
+async def forgot_password(payload: _ForgotIn, request: Request, db=Depends(get_db)) -> dict:
+    from app.auth.reset import PasswordResetService
+
+    return await PasswordResetService(db).request(payload.username, ip=client_ip(request))
+
+
+@router.post("/reset-password", status_code=204, summary="Set a new password with the SMS code; signs the account out everywhere")
+async def reset_password(payload: _ResetIn, request: Request, db=Depends(get_db)) -> None:
+    from app.auth.reset import PasswordResetService
+
+    await PasswordResetService(db).perform(payload.username, payload.code, payload.new_password, ip=client_ip(request))
 
 
 @router.get("/me", response_model=CurrentUser, summary="Get the current authenticated user")

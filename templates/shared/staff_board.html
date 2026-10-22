@@ -1,0 +1,12 @@
+<section class="sh-card">
+  <div class="toolbar">
+    <input id="sb-q" class="text-input" type="search" placeholder="Name or employee code" aria-label="Search staff" />
+    <input id="sb-day" class="text-input" type="date" aria-label="Day" data-manage-only hidden />
+    <select id="sb-state" class="select-input" aria-label="Show">
+      <option value="">Everyone</option><option value="NOT_IN">Not in yet</option><option value="IN">In</option><option value="OUT">Left</option><option value="EXCUSED">Excused</option>
+    </select>
+  </div>
+  <p class="cc-meta" id="sb-count"></p>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Staff</th><th>Timing</th><th>In</th><th>Out</th><th>Status</th><th></th></tr></thead><tbody id="sb-body"></tbody></table></div>
+  <p class="empty-state" id="sb-empty" hidden>Nobody matches.</p>
+</section>

@@ -7,6 +7,8 @@ import uuid
 from datetime import date, datetime, time, timedelta, timezone
 
 from sqlalchemy import func, select
+
+from app.core.config import settings
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.academics.models import (
@@ -274,6 +276,28 @@ class CourseOfferingService:
         )
         return {"term_label": term_label, "section_label": section_label, "created": created, "skipped": skipped}
 
+    async def delete_offering(self, offering_id: uuid.UUID, *, actor_id: uuid.UUID) -> None:
+        """Remove an offering created by mistake. Only while it is empty: no student has ever enrolled,
+        no attendance was taken and no exam paper refers to it. Anything with history stays (close it instead)."""
+        from app.academics.models import Enrollment as _E
+        from app.attendance.models import AttendanceRecord
+        from app.exams.models import ExamPaper
+
+        offering = await self.repo.get_by_id(offering_id)
+        if offering is None:
+            raise ResourceNotFoundError("Course offering not found.")
+        if (await self.session.execute(select(_E.id).where(_E.course_offering_id == offering_id).limit(1))).first():
+            raise BusinessRuleViolationError("Students have enrolled in this offering, so it cannot be deleted. Close it to enrollment instead.")
+        if (await self.session.execute(select(AttendanceRecord.id).join(ClassSession, ClassSession.id == AttendanceRecord.class_session_id)
+                                       .where(ClassSession.course_offering_id == offering_id).limit(1))).first():
+            raise BusinessRuleViolationError("Attendance was taken for this offering, so it cannot be deleted.")
+        if (await self.session.execute(select(ExamPaper.id).where(ExamPaper.course_offering_id == offering_id).limit(1))).first():
+            raise BusinessRuleViolationError("An exam paper is scheduled for this offering. Remove it from the datesheet first.")
+        await self.session.delete(offering)
+        await self.session.flush()
+        await self.audit.log(actor_user_id=actor_id, action="course_offering.deleted", entity_type="course_offering", entity_id=offering_id,
+                             before={"term_label": offering.term_label, "section": offering.section_label, "course_id": str(offering.course_id)})
+
     async def update(
         self, offering_id: uuid.UUID, *, assigned_teacher_id: uuid.UUID | None = ..., is_open_for_enrollment: bool | None = None,
         term_start_date: date | None = ..., term_end_date: date | None = ..., actor_id: uuid.UUID,
@@ -375,6 +399,16 @@ class EnrollmentService:
         self.program_link_repo = CourseProgramRepository(session)
         self.audit = AuditService(session)
 
+    async def _refuse_finished_offering(self, offering) -> None:
+        """No one joins a course whose attendance is final or whose result is already decided."""
+        from app.academics.models import ResultSheet, ResultSheetStatus
+
+        if getattr(offering, "attendance_locked_at", None) is not None:
+            raise BusinessRuleViolationError("This course's attendance is already locked (final), so nobody can join it now.")
+        decided = (await self.session.execute(select(ResultSheet.status).where(ResultSheet.course_offering_id == offering.id))).scalar_one_or_none()
+        if decided in (ResultSheetStatus.APPROVED, ResultSheetStatus.PUBLISHED):
+            raise BusinessRuleViolationError("This course's result is already approved or published, so nobody can join it now.")
+
     async def enroll(
         self, *, student_id: uuid.UUID, course_offering_id: uuid.UUID, actor_id: uuid.UUID, by_admin: bool = False
     ) -> Enrollment:
@@ -386,6 +420,7 @@ class EnrollmentService:
             raise ResourceNotFoundError("Course offering not found.")
         if not by_admin and not offering.is_open_for_enrollment:
             raise BusinessRuleViolationError("This course is not currently open for enrollment.")
+        await self._refuse_finished_offering(offering)
 
         student = await self.session.get(Student, student_id)
         if student is None:
@@ -427,6 +462,8 @@ class EnrollmentService:
         # taken in any semester; a first-time attempt must match the
         # student's own program's curriculum slot for this course.
         prior_attempts = await self.enrollment_repo.list_prior_for_course(student_id, offering.course_id)
+        # Re-joining the very section one withdrew from is the same attempt, not a retake.
+        prior_attempts = [p for p in prior_attempts if existing is None or p.id != existing.id]
         is_retake = len(prior_attempts) > 0
 
         if not is_retake:
@@ -454,8 +491,12 @@ class EnrollmentService:
                 f"('{student.section_label}'). Enroll in section '{student.section_label}' instead."
             )
 
-        # Capacity
+        # Capacity -- the offering row is locked first, so two students taking the last seat at
+        # the same moment cannot both get it.
         if offering.capacity is not None:
+            from app.academics.models import CourseOffering as _CO
+
+            await self.session.execute(select(_CO.id).where(_CO.id == offering.id).with_for_update())
             already = await self.offering_repo.enrolled_count(offering.id)
             if already >= offering.capacity:
                 raise BusinessRuleViolationError(
@@ -593,7 +634,7 @@ class EnrollmentService:
         except (BusinessRuleViolationError, ResourceNotFoundError) as exc:
             return {"can_enroll": False, "reason": exc.message, "is_retake": is_retake, "already_enrolled": already}
 
-    async def withdraw(self, enrollment_id: uuid.UUID, *, student_id: uuid.UUID | None, actor_id: uuid.UUID) -> Enrollment:
+    async def withdraw(self, enrollment_id: uuid.UUID, *, student_id: uuid.UUID | None, actor_id: uuid.UUID, reason: str = "REQUEST") -> Enrollment:
         """student_id is provided for self-service withdrawal (ownership
         check); None for an admin-initiated withdrawal (no ownership
         restriction)."""
@@ -603,9 +644,23 @@ class EnrollmentService:
         if enrollment.status != EnrollmentStatus.ENROLLED:
             raise BusinessRuleViolationError(f"This enrollment is already {enrollment.status.value.lower()}.")
 
+        if reason == "REQUEST":
+            from app.core.clock import institute_today
+
+            offering = await self.offering_repo.get_by_id(enrollment.course_offering_id)
+            start = offering.term_start_date if offering else None
+            if start is not None and (institute_today() - start).days > int(settings.withdrawal_deadline_days):
+                if student_id is not None:
+                    raise BusinessRuleViolationError(
+                        f"The withdrawal deadline ({int(settings.withdrawal_deadline_days)} days after the term started) has passed. Ask the office.")
+                reason = "LATE"                      # the office can still withdraw; it shows as W
+
         enrollment.status = EnrollmentStatus.WITHDRAWN
+        enrollment.withdrawal_reason = reason
+        enrollment.withdrawn_at = datetime.now(timezone.utc)
         await self.audit.log(
             actor_user_id=actor_id, action="enrollment.withdrawn", entity_type="enrollment", entity_id=enrollment.id,
+            metadata={"reason": reason},
         )
         return enrollment
 
@@ -617,6 +672,12 @@ class EnrollmentService:
             raise ResourceNotFoundError("Enrollment not found.")
         if enrollment.status == EnrollmentStatus.WITHDRAWN:
             raise BusinessRuleViolationError("Can't record an outcome for a withdrawn enrollment.")
+        from app.academics.models import EnrollmentResult
+
+        frozen = (await self.session.execute(select(EnrollmentResult.id).where(EnrollmentResult.enrollment_id == enrollment.id))).first()
+        if frozen is not None:
+            raise BusinessRuleViolationError("This result is already published with a grade. Correct the marks instead "
+                                             "(Result sheets \u2192 correction), so the grade and pass/fail stay the same everywhere.")
 
         enrollment.status = EnrollmentStatus.COMPLETED
         enrollment.outcome = outcome
@@ -624,6 +685,56 @@ class EnrollmentService:
             actor_user_id=actor_id, action="enrollment.outcome_set", entity_type="enrollment", entity_id=enrollment.id,
             after={"outcome": outcome.value},
         )
+        return enrollment
+
+    async def other_sections(self, enrollment_id: uuid.UUID) -> list[dict]:
+        enrollment = await self.enrollment_repo.get_by_id(enrollment_id)
+        if enrollment is None:
+            raise ResourceNotFoundError("Enrollment not found.")
+        here = await self.offering_repo.get_by_id(enrollment.course_offering_id)
+        out = []
+        for o in await self.offering_repo.list_by_term(here.term_label):
+            if o.course_id != here.course_id or o.id == here.id or o.attendance_locked_at is not None:
+                continue
+            seats = None if o.capacity is None else max(0, o.capacity - await self.offering_repo.enrolled_count(o.id))
+            out.append({"id": o.id, "section_label": o.section_label, "seats_left": seats})
+        return out
+
+    async def move_section(self, enrollment_id: uuid.UUID, target_offering_id: uuid.UUID, *, actor_id: uuid.UUID) -> Enrollment:
+        """Move a student to another section of the same course in the same term (timetable, numbers).
+        Only before anything is recorded for them in this section: once attendance or marks exist,
+        withdraw and enrol instead so nothing is silently moved or lost."""
+        from app.academics.models import CourseOffering as _CO
+        from app.academics.models import StudentMark
+        from app.attendance.models import AttendanceRecord
+
+        enrollment = await self.enrollment_repo.get_by_id(enrollment_id)
+        if enrollment is None or enrollment.status != EnrollmentStatus.ENROLLED:
+            raise BusinessRuleViolationError("Only a current enrollment can be moved.")
+        here = await self.offering_repo.get_by_id(enrollment.course_offering_id)
+        target = await self.offering_repo.get_by_id(target_offering_id)
+        if target is None or target.course_id != here.course_id or target.term_label != here.term_label or target.id == here.id:
+            raise BusinessRuleViolationError("Choose another section of the same course in the same term.")
+        await self._refuse_finished_offering(target)
+        marks = (await self.session.execute(select(StudentMark.id).where(StudentMark.enrollment_id == enrollment.id))).first()
+        att = (await self.session.execute(select(AttendanceRecord.id).join(ClassSession, ClassSession.id == AttendanceRecord.class_session_id)
+                                          .where(AttendanceRecord.student_id == enrollment.student_id, ClassSession.course_offering_id == here.id))).first()
+        if marks or att:
+            raise BusinessRuleViolationError("Attendance or marks are already recorded for this student in this section, so it cannot simply be moved. "
+                                             "Withdraw them here and enrol them in the other section instead.")
+        if await self.enrollment_repo.get_by_student_and_offering(enrollment.student_id, target.id) is not None:
+            raise BusinessRuleViolationError("The student already has a record in that section.")
+        if target.capacity is not None:
+            await self.session.execute(select(_CO.id).where(_CO.id == target.id).with_for_update())
+            if await self.offering_repo.enrolled_count(target.id) >= target.capacity:
+                raise BusinessRuleViolationError(f"Section {target.section_label} is full.")
+        clash = await TimetableService(self.session).student_clash(enrollment.student_id, target, ignore_enrollment_id=enrollment.id)
+        if clash:
+            raise BusinessRuleViolationError(clash)
+        enrollment.course_offering_id = target.id
+        await self.session.flush()
+        await self.audit.log(actor_user_id=actor_id, action="enrollment.section_moved", entity_type="enrollment", entity_id=enrollment.id,
+                             before={"course_offering_id": str(here.id), "section": here.section_label}, after={"course_offering_id": str(target.id), "section": target.section_label})
         return enrollment
 
     async def list_for_student(self, student_id: uuid.UUID) -> list[Enrollment]:
@@ -645,10 +756,33 @@ class EnrollmentService:
             raise ResourceNotFoundError(f'No course offerings found for term "{term_label}".{hint}')
         return offerings
 
+    async def _end_semester_blockers(self, offerings: list) -> list[str]:
+        """Courses that still have students but no locked attendance or no published result."""
+        from app.academics.models import ResultSheet, ResultSheetStatus
+
+        ids = [o.id for o in offerings]
+        published = set((await self.session.execute(select(ResultSheet.course_offering_id).where(
+            ResultSheet.course_offering_id.in_(ids), ResultSheet.status == ResultSheetStatus.PUBLISHED))).scalars()) if ids else set()
+        out = []
+        for o in offerings:
+            enrolled = [e for e in await self.enrollment_repo.list_for_offering(o.id) if e.status == EnrollmentStatus.ENROLLED]
+            if not enrolled:
+                continue
+            missing = []
+            if getattr(o, "attendance_locked_at", None) is None:
+                missing.append("attendance not locked")
+            if o.id not in published:
+                missing.append("result not published")
+            if missing:
+                course = await self.session.get(Course, o.course_id)
+                out.append(f"{course.code if course else o.id}{' ' + o.section_label if getattr(o, 'section_label', None) else ''}: {', '.join(missing)}")
+        return out
+
     async def preview_end_semester(self, term_label: str) -> dict:
         """What end_semester() would do, without changing anything (the
         admin UI shows this in its confirmation)."""
         offerings = await self._offerings_for_term_or_fail(term_label)
+        blockers = await self._end_semester_blockers(offerings)
         to_complete = ungraded = 0
         for offering in offerings:
             for enrollment in await self.enrollment_repo.list_for_offering(offering.id):
@@ -657,9 +791,10 @@ class EnrollmentService:
                     if enrollment.outcome is None:
                         ungraded += 1
         return {"term_label": term_label, "offerings_affected": len(offerings),
-                "enrollments_to_complete": to_complete, "ungraded_count": ungraded}
+                "enrollments_to_complete": to_complete, "ungraded_count": ungraded,
+                "not_ready": blockers, "override_needed": bool(blockers and settings.require_results_before_end_semester)}
 
-    async def end_semester(self, term_label: str, *, actor_id: uuid.UUID) -> dict:
+    async def end_semester(self, term_label: str, *, actor_id: uuid.UUID, override_reason: str | None = None) -> dict:
         """The 'reset enrollment for next semester' action: for every
         offering in this term, close it to new enrollment and finalize
         every still-ENROLLED row to COMPLETED. Outcome (Pass/Fail) is
@@ -673,6 +808,13 @@ class EnrollmentService:
         the admin can see and decide, rather than the backend silently
         blocking a real action on an incomplete feature."""
         offerings = await self._offerings_for_term_or_fail(term_label)
+        blockers = await self._end_semester_blockers(offerings)
+        override_reason = (override_reason or "").strip() or None
+        if blockers and settings.require_results_before_end_semester and (override_reason is None or len(override_reason) < 10):
+            raise BusinessRuleViolationError(
+                f"{len(blockers)} course(s) are not finished: " + "; ".join(blockers[:8]) + ("; ..." if len(blockers) > 8 else "")
+                + ". Lock their attendance and publish their results first, or give a reason (at least 10 letters) to end the semester anyway.",
+                details={"not_ready": blockers})
         completed_count = 0
         ungraded_count = 0
         for offering in offerings:
@@ -691,6 +833,9 @@ class EnrollmentService:
             "enrollments_completed": completed_count,
             "ungraded_count": ungraded_count,
         }
+        if blockers:
+            result["ended_with_unfinished_courses"] = blockers
+            result["override_reason"] = override_reason
         await self.audit.log(
             actor_user_id=actor_id, action="enrollment.semester_ended", entity_type="course_offering", entity_id=None,
             metadata=result,
@@ -861,7 +1006,7 @@ class TimetableService:
 
         # 1. Room -- a physical resource, whoever owns the booking.
         for slot, _other in neighbours:
-            if slot.room == room:
+            if "".join((slot.room or "").split()).lower() == "".join((room or "").split()).lower():     # "Lab 1" and "lab1" are the same room
                 raise BusinessRuleViolationError(
                     f"Room '{room}' is already booked on {when.format(slot.start_time, slot.end_time)}."
                 )
@@ -1019,15 +1164,20 @@ class TimetableService:
         return None
 
     async def _generate_sessions_for_slot(self, slot: TimetableSlot, offering: CourseOffering) -> int:
+        from app.calendar.service import student_holidays
+
+        holidays = await student_holidays(self.session, offering.term_start_date, offering.term_end_date)   # from the academic calendar
         count = 0
         current = offering.term_start_date
         while current <= offering.term_end_date:
             if DAY_OF_WEEK_BY_PYTHON_WEEKDAY[current.weekday()] == slot.day_of_week:
+                off = holidays.get(current)
                 await self.session_repo.create(
                     ClassSession(
                         course_offering_id=offering.id, timetable_slot_id=slot.id, session_date=current,
                         start_time=slot.start_time, end_time=slot.end_time, room=slot.room,
-                        status=ClassSessionStatus.SCHEDULED,
+                        status=ClassSessionStatus.CANCELLED if off else ClassSessionStatus.SCHEDULED,
+                        cancelled_reason=f"Holiday: {off}" if off else None,
                     )
                 )
                 count += 1

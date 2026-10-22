@@ -269,6 +269,9 @@ class EmployeeDetail(BaseModel):
     has_photo: bool = False
     certificate_original_name: str | None = None
     has_certificate: bool = False
+    bank_name: str | None = None
+    bank_account_title: str | None = None
+    bank_iban: str | None = None
 
 
 class EmployeeUpdateRequest(BaseModel):
@@ -292,6 +295,9 @@ class EmployeeUpdateRequest(BaseModel):
     employment_type: str | None = None
     emergency_contact_name: str | None = Field(default=None, max_length=150)
     emergency_contact_no: str | None = None
+    bank_name: str | None = Field(default=None, max_length=100)
+    bank_account_title: str | None = Field(default=None, max_length=150)
+    bank_iban: str | None = Field(default=None, max_length=40)
     # Data-entry corrections (typos in a name / birth date / hire date could
     # previously never be fixed). CNIC and employee_code stay immutable.
     first_name: str | None = Field(default=None, min_length=1, max_length=100)
@@ -334,6 +340,28 @@ class EmployeeUpdateRequest(BaseModel):
     @classmethod
     def _validate_emergency_contact_no_field(cls, v: str | None) -> str | None:
         return _normalize_phone(v) if v else None
+
+    @field_validator("bank_iban")
+    @classmethod
+    def _validate_bank_iban(cls, v: str | None) -> str | None:
+        """A Pakistani IBAN (PK, 2 check digits, 4-letter bank code, 16 digits) or a plain account number."""
+        if v is None:
+            return None
+        v = "".join(v.split()).upper().replace("-", "")
+        if not v:
+            return ""
+        if v.startswith("PK"):
+            import re as _re
+
+            if not _re.fullmatch(r"PK\d{2}[A-Z]{4}\d{16}", v):
+                raise ValueError("A Pakistani IBAN is PK, 2 digits, the 4-letter bank code and 16 digits (24 characters).")
+            moved = v[4:] + v[:4]
+            if int("".join(str(int(c, 36)) for c in moved)) % 97 != 1:
+                raise ValueError("This IBAN's check digits are wrong. Copy it again from the bank letter or cheque book.")
+            return v
+        if not v.isdigit() or not 6 <= len(v) <= 20:
+            raise ValueError("Give the IBAN (starts with PK) or the account number (digits only).")
+        return v
 
     @field_validator("contact_no")
     @classmethod

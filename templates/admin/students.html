@@ -16,6 +16,7 @@
     <button id="open-add-student" class="role-btn" type="button">+ Add Student</button>
     <button id="open-advance-semester" class="role-btn secondary-btn" type="button">Advance Semester</button>
     <a id="export-students-link" class="role-btn secondary-btn" href="/api/v1/students/export" download>Export CSV</a>
+    <button id="print-cards" class="role-btn secondary-btn" type="button">Print ID cards (this page)</button>
   </div>
 
   <div id="students-table-wrap">
@@ -120,7 +121,7 @@
     </div>
     <div class="modal-reset-row">
       <button id="reset-password-btn" class="danger-btn" type="button">Reset Password to Default</button>
-      <span id="reset-password-confirm" class="success-text" hidden>Password reset to the default.</span>
+      <span id="reset-password-confirm" class="success-text" hidden>Password reset. Print the admission slip to give the student the new one-time password.</span>
     </div>
     <div class="modal-reset-row" id="parent-access-row">
       <span id="parent-access-text" class="panel-hint">Parent portal: &hellip;</span>
@@ -129,9 +130,29 @@
       <button id="parent-revoke-btn" class="danger-btn" type="button" hidden>Remove guardian access</button>
       <p id="parent-access-result" class="success-text" hidden></p>
     </div>
+    <div id="parent-siblings" hidden></div>
+    <div class="modal-reset-row">
+      <button id="identity-btn" class="role-btn secondary-btn" type="button">Correct CNIC / guardian details&hellip;</button>
+      <button id="records-btn" class="role-btn secondary-btn" type="button">Documents, certificates &amp; clearance&hellip;</button>
+    </div>
     <p id="modal-error" class="dash-alert error" hidden></p>
     <button id="close-modal" class="back-link modal-close-btn" type="button">Close</button>
   </div>
+</dialog>
+
+<dialog id="identity-modal" class="modal">
+  <form id="identity-form" class="form-grid" novalidate>
+    <h2>Correct CNIC / guardian details</h2>
+    <p class="panel-hint">Only for mistakes made when the details were typed. Change only what is wrong. A new guardian CNIC means a different person: the old guardian's parent-portal access to this student is removed. Every correction is recorded with its reason.</p>
+    <label>Student CNIC<input id="id-cnic" class="text-input" type="text" inputmode="numeric" placeholder="12345-1234567-1" /></label>
+    <label>Guardian name<input id="id-gname" class="text-input" type="text" maxlength="150" /></label>
+    <label>Guardian CNIC<input id="id-gcnic" class="text-input" type="text" inputmode="numeric" placeholder="12345-1234567-1" /></label>
+    <label>Relation<input id="id-grel" class="text-input" type="text" maxlength="50" /></label>
+    <label>Guardian phone (leave empty to keep)<input id="id-gphone" class="text-input" type="tel" /></label>
+    <label>Why is this being corrected? (at least 10 letters)<input id="id-reason" class="text-input" type="text" maxlength="300" required /></label>
+    <p id="identity-error" class="dash-alert error" role="alert" hidden></p>
+    <div class="toolbar"><button type="submit" class="role-btn">Save correction</button><button id="identity-close" type="button" class="back-link modal-close-btn">Cancel</button></div>
+  </form>
 </dialog>
 
 <dialog id="add-student-modal" class="modal modal-wide">
@@ -300,5 +321,6 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="/static/js/records-panel.js"></script>
 <script src="/static/js/students.js"></script>
 {% endblock %}

@@ -1,6 +1,7 @@
 """SMS log and controls (administration)."""
 from __future__ import annotations
 
+import uuid
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
@@ -26,9 +27,25 @@ async def overview(status: SmsStatus | None = None, current_user: CurrentUser = 
     return await SmsService(db).overview(status=status)
 
 
+class BulkIn(BaseModel):
+    audience: str = Field(pattern="^(STUDENTS|STAFF)$")
+    message: str = Field(min_length=5, max_length=300)
+    program_id: uuid.UUID | None = None
+    semester: int | None = Field(default=None, ge=1, le=12)
+    section: str | None = Field(default=None, max_length=20)
+    defaulters_only: bool = False
+    job_role_id: uuid.UUID | None = None
+    dry_run: bool = True
+
+
+@router.post("/bulk", summary="One message to many students or staff (dry_run=true only counts who would get it)")
+async def bulk(payload: BulkIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    return await SmsService(db).bulk(**payload.model_dump(), actor_id=current_user.id)
+
+
 @router.post("/send-now", summary="Send queued messages now (the sender process also does this every 30 seconds)")
 async def send_now(current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
-    return await SmsService(db).send_pending(limit=200)
+    return await SmsService(db).send_pending(limit=50, time_budget=12)
 
 
 @router.post("/retry", summary="Put failed (and not-sent LOGGED) messages back in the queue")

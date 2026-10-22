@@ -11,9 +11,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-COPY pyproject.toml ./
+COPY pyproject.toml requirements.lock ./
 COPY app ./app
-RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir .
+# Every dependency is pinned to an exact version with hashes (requirements.lock), so a build is the same build tomorrow.
+RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir --require-hashes -r requirements.lock && pip install --no-cache-dir --no-deps .
 
 # --- Runtime stage: slim image, no build toolchain ---
 FROM python:3.12-slim AS runtime

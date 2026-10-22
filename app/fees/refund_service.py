@@ -142,6 +142,39 @@ class RefundService:
 
         await ScholarshipService(self.session)._refresh_challans(a, await self.session.get(FeeStructure, a.fee_structure_id))
 
+    # ---------------------------------------------------------------- 2b. cancel (before it is paid)
+    async def cancel(self, refund_id: uuid.UUID, *, reason: str, actor_id: uuid.UUID) -> FeeRefund:
+        r = await self._get(refund_id)
+        if r.status not in (RefundStatus.REQUESTED, RefundStatus.APPROVED):
+            raise BusinessRuleViolationError("Only a refund that is still waiting or approved, and not yet paid out, can be cancelled.")
+        if len((reason or "").strip()) < 5:
+            raise ValidationAppError("Say why the refund is cancelled.")
+        if r.status == RefundStatus.APPROVED and float(r.write_off) > 0:
+            await self._restore_write_off(r, actor_id)
+        r.status = RefundStatus.CANCELLED
+        r.decision_note = f"Cancelled: {reason.strip()}"[:500]
+        await self.session.flush()
+        await self._audit(actor_id, "fee_refund.cancelled", r, {"reason": reason.strip()})
+        return r
+
+    async def _restore_write_off(self, r: FeeRefund, actor_id: uuid.UUID) -> None:
+        """The ledger is append-only, so a cancelled write-off is put back as a new charge for the same amount and instalment."""
+        tag = f"Withdrawal write-off (refund {str(r.id)[:8]})"
+        entries = await self._ledger(r.fee_assignment_id)
+        by_id = {e.id: e for e in entries}
+        now = datetime.now(timezone.utc)
+        for e in entries:
+            if e.entry_type == LedgerEntryType.CONCESSION and (e.description or "") == tag:
+                original = by_id.get(e.related_entry_id)
+                self.session.add(FeeLedgerEntry(fee_assignment_id=r.fee_assignment_id, entry_type=LedgerEntryType.DEBIT, amount=float(e.amount),
+                                                installment_number=e.installment_number, due_date=original.due_date if original else None,
+                                                description=f"Write-off cancelled (refund {str(r.id)[:8]})", created_by=actor_id, created_at=now))
+        await self.session.flush()
+        a = await self.session.get(FeeAssignment, r.fee_assignment_id)
+        from app.fees.scholarship_service import ScholarshipService
+
+        await ScholarshipService(self.session)._refresh_challans(a, await self.session.get(FeeStructure, a.fee_structure_id))
+
     # ---------------------------------------------------------------- 3. pay
     async def pay(self, refund_id: uuid.UUID, *, method: str, reference: str | None, paid_on: date | None, actor_id: uuid.UUID) -> FeeRefund:
         r = await self._get(refund_id)

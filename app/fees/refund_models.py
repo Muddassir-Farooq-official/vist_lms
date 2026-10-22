@@ -22,6 +22,7 @@ class RefundStatus(str, enum.Enum):
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
     PAID = "PAID"
+    CANCELLED = "CANCELLED"      # called off before it was paid; any write-off was put back
 
 
 class FeeRefund(Base):

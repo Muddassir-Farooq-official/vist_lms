@@ -174,6 +174,9 @@ class Enrollment(UUIDPKMixin, TimestampMixin, Base):
     )
     is_retake: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     enrolled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Why and when a WITHDRAWN row ended: ATTENDANCE (dropped for low attendance), STUDENT_LEFT, LATE (office withdrew after the deadline), or a free reason.
+    withdrawal_reason: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     course_offering: Mapped[CourseOffering] = relationship(lazy="selectin")  # see CourseProgram.course above re: lazy="selectin"
 

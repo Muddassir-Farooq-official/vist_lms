@@ -44,7 +44,7 @@ async def _read(files: list[UploadFile]) -> list[tuple[str, bytes, str | None]]:
 
 def _type_out(t, usage=None) -> TypeOut:
     return TypeOut(id=t.id, name=t.name, description=t.description, for_students=t.for_students, for_employees=t.for_employees, requires_dates=t.requires_dates,
-                   requires_attachment=t.requires_attachment, yearly_limit_days=t.yearly_limit_days, is_active=t.is_active, sort_order=t.sort_order, usage=usage)
+                   requires_attachment=t.requires_attachment, excuses_attendance=t.excuses_attendance, yearly_limit_days=t.yearly_limit_days, is_active=t.is_active, sort_order=t.sort_order, usage=usage)
 
 
 # ============================================================ kinds of application (admin manages, applicants choose)

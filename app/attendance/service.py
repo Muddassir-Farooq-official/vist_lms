@@ -107,10 +107,16 @@ class AttendanceService:
 
         now = datetime.now(timezone.utc)
         records: list[AttendanceRecord] = []
+        changed: list[dict] = []
         for student_id in enrolled_ids:
             status = AttendanceStatus.PRESENT if student_id in present_set else AttendanceStatus.ABSENT
             existing = await self.repo.get_for_session_and_student(class_session_id, student_id)
+            if existing is not None and existing.status == AttendanceStatus.LEAVE and status == AttendanceStatus.ABSENT:
+                records.append(existing)              # approved leave stays leave (only "present" overrides it)
+                continue
             if existing is not None:
+                if existing.status != status:          # an edit: who changed from what to what is kept in the audit log
+                    changed.append({"student_id": str(student_id), "from": existing.status.value, "to": status.value})
                 existing.status = status
                 existing.marked_by = actor_id
                 existing.marked_at = now
@@ -141,6 +147,7 @@ class AttendanceService:
                 "absent_count": len(enrolled_ids) - len(present_set),
                 "marked_late_by_admin": window_closed and actor_is_admin,
                 "late_note": late_note if (window_closed and actor_is_admin) else None,
+                "changed": changed,
             },
         )
         return records
@@ -150,13 +157,49 @@ class AttendanceService:
         Attendance is Present or Absent -- nothing else. Returns 100% (nothing
         to penalize yet) when no class has been taken."""
         records = await self.repo.list_for_student_in_offering(student_id, course_offering_id)
+        leave = sum(1 for r in records if r.status == AttendanceStatus.LEAVE)
         present = sum(1 for r in records if r.status == AttendanceStatus.PRESENT)
-        total = len(records)
+        total = len(records) - leave                   # approved leave is left out of the count
         percentage = 100.0 if total == 0 else round((present / total) * 100, 2)
         return {
             "total_sessions_taken": total, "present_count": present, "percentage": percentage,
-            "absent_count": total - present,
+            "absent_count": total - present, "leave_count": leave,
         }
+
+    async def grant_leave(self, student_id: uuid.UUID, *, from_date, to_date, reason: str, actor_id: uuid.UUID) -> dict:
+        """Approved leave (medical, bereavement, official duty): every class of the student's current
+        courses in those days is recorded as LEAVE, so it neither counts for nor against attendance.
+        Classes already marked PRESENT stay present; locked courses are left alone."""
+        from app.academics.models import ClassSession, CourseOffering, Enrollment, EnrollmentStatus
+
+        if to_date < from_date:
+            raise BusinessRuleViolationError("The last day of leave is before the first.")
+        if (to_date - from_date).days > 120:
+            raise BusinessRuleViolationError("Leave can be recorded for at most 120 days at a time.")
+        if len((reason or "").strip()) < 4:
+            raise BusinessRuleViolationError("Give the reason for the leave (e.g. medical certificate no.).")
+        rows = (await self.session.execute(
+            select(ClassSession, CourseOffering).join(CourseOffering, CourseOffering.id == ClassSession.course_offering_id)
+            .join(Enrollment, Enrollment.course_offering_id == CourseOffering.id)
+            .where(Enrollment.student_id == student_id, Enrollment.status == EnrollmentStatus.ENROLLED,
+                   ClassSession.session_date >= from_date, ClassSession.session_date <= to_date,
+                   ClassSession.status != ClassSessionStatus.CANCELLED, CourseOffering.attendance_locked_at.is_(None))
+        )).all()
+        now = datetime.now(timezone.utc)
+        marked = 0
+        for cs, _off in rows:
+            existing = await self.repo.get_for_session_and_student(cs.id, student_id)
+            if existing is not None:
+                if existing.status == AttendanceStatus.PRESENT:
+                    continue
+                existing.status, existing.marked_by, existing.marked_at = AttendanceStatus.LEAVE, actor_id, now
+            else:
+                await self.repo.create(AttendanceRecord(class_session_id=cs.id, student_id=student_id, status=AttendanceStatus.LEAVE,
+                                                        marked_by=actor_id, marked_at=now))
+            marked += 1
+        await self.audit.log(actor_user_id=actor_id, action="attendance.leave_granted", entity_type="student", entity_id=student_id,
+                             metadata={"from": str(from_date), "to": str(to_date), "reason": reason.strip(), "classes": marked})
+        return {"classes_marked_leave": marked}
 
     async def compute_percentages_for_offering(self, course_offering_id: uuid.UUID) -> dict[uuid.UUID, dict]:
         """Bulk form of compute_percentage — one call for every
@@ -266,7 +309,7 @@ class AttendanceService:
                 if enrollment is not None and enrollment.status == EnrollmentStatus.ENROLLED:
                     from app.academics.service import EnrollmentService
 
-                    await EnrollmentService(self.session).withdraw(enrollment.id, student_id=None, actor_id=actor_id)
+                    await EnrollmentService(self.session).withdraw(enrollment.id, student_id=None, actor_id=actor_id, reason="ATTENDANCE")
                     dropped_count += 1
                     await self._notify_student(
                         student_id,
