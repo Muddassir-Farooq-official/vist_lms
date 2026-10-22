@@ -10,6 +10,7 @@
   <button class="portal-tab" data-tab="syllabus" role="tab" aria-selected="false"><span>Syllabus</span></button>
   <button class="portal-tab" data-tab="timetable" role="tab" aria-selected="false"><span>Timetable</span></button>
   <button class="portal-tab" data-tab="sessions" role="tab" aria-selected="false"><span>Class sessions</span></button>
+  <button class="portal-tab" data-tab="students" role="tab" aria-selected="false"><span>Students</span></button>
 </div>
 
 <div class="portal-tab-panel" data-tab-panel="overview">
@@ -132,12 +133,15 @@
   <p class="empty-state" id="class-sessions-empty" hidden>No sessions generated yet &mdash; add a timetable slot above.</p>
 </section>
 </div>
+
+<div class="portal-tab-panel" data-tab-panel="students" hidden>
 <section class="panel">
   <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("graduation-cap") }}</div><h2>Students</h2></div></div>
   <p class="panel-hint">Everyone enrolled in this course. Withdrawing a student before the deadline leaves no trace on the transcript; after it, the course shows as W. Moving a student to another section keeps their marks.</p>
   <div class="table-scroll"><table class="dash-table"><thead><tr><th>Student</th><th>Roll no.</th><th>Status</th><th>Result</th><th></th></tr></thead><tbody id="roster-tbody"></tbody></table></div>
   <p class="empty-state" id="roster-empty" hidden>No students are enrolled in this course yet.</p>
 </section>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
