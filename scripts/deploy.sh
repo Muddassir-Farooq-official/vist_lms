@@ -25,7 +25,7 @@ if [ "${SKIP_BACKUP:-0}" != "1" ]; then
   log "2/6 Backing up the REAL database (kept in backups/, last 10)"
   PG_URL="$(envval DATABASE_URL_SYNC | sed 's#^postgresql+psycopg://#postgresql://#')"
   STAMP="$(date +%Y%m%d-%H%M%S)"
-  docker run --rm -e PGURL="$PG_URL" -v "$PWD/backups:/backups" postgres:17-alpine \
+  docker run --rm -e PGURL="$PG_URL" -v "$PWD/backups:/backups" postgres:18-alpine \
     sh -c 'pg_dump --format=custom --no-owner "$PGURL" -f /backups/pre-deploy-'"$STAMP"'.dump' \
     || die "Database backup failed. Fix it (or run with SKIP_BACKUP=1 once) - nothing was changed."
   ls -1t backups/pre-deploy-*.dump 2>/dev/null | tail -n +11 | xargs -r rm -f
