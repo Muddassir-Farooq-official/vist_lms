@@ -1387,6 +1387,23 @@ class TimetableService:
             class_session.status = ClassSessionStatus.CANCELLED
             class_session.cancelled_reason = "Timetable slot removed"
 
+        # Sessions that never had any attendance, content, resources or
+        # correction requests are just empty calendar rows: remove them
+        # (past ones included) so no orphan "scheduled" class is left behind.
+        from sqlalchemy import text
+
+        await self.session.execute(
+            text(
+                "DELETE FROM class_sessions cs WHERE cs.timetable_slot_id = :slot "
+                "AND cs.attendance_taken_at IS NULL AND cs.content_locked_at IS NULL "
+                "AND cs.topic_completed = false AND cs.title IS NULL AND cs.description IS NULL "
+                "AND NOT EXISTS (SELECT 1 FROM attendance_records a WHERE a.class_session_id = cs.id) "
+                "AND NOT EXISTS (SELECT 1 FROM attendance_correction_requests r WHERE r.class_session_id = cs.id) "
+                "AND NOT EXISTS (SELECT 1 FROM class_session_resources x WHERE x.class_session_id = cs.id)"
+            ),
+            {"slot": slot_id},
+        )
+
         # Detach ALL of this slot's sessions (past ones keep their
         # attendance/content history, just no longer point at a slot that
         # is about to stop existing). Explicit rather than relying only on
