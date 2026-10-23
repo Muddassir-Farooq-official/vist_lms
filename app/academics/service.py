@@ -1168,10 +1168,38 @@ class TimetableService:
 
         holidays = await student_holidays(self.session, offering.term_start_date, offering.term_end_date)   # from the academic calendar
         count = 0
+        # A removed slot leaves its sessions behind (detached, cancelled), so
+        # re-creating the same day/period must adopt them, not insert twins.
+        from sqlalchemy import select
+
+        existing = {
+            row.session_date: row
+            for row in (await self.session.execute(
+                select(ClassSession).where(
+                    ClassSession.course_offering_id == offering.id,
+                    ClassSession.start_time == slot.start_time,
+                    ClassSession.session_date >= offering.term_start_date,
+                    ClassSession.session_date <= offering.term_end_date,
+                )
+            )).scalars().all()
+        }
         current = offering.term_start_date
         while current <= offering.term_end_date:
             if DAY_OF_WEEK_BY_PYTHON_WEEKDAY[current.weekday()] == slot.day_of_week:
                 off = holidays.get(current)
+                prior = existing.get(current)
+                if prior is not None:
+                    if prior.timetable_slot_id is None:
+                        prior.timetable_slot_id = slot.id
+                        prior.end_time = slot.end_time
+                        prior.room = slot.room
+                        if not off and prior.status == ClassSessionStatus.CANCELLED \
+                                and prior.cancelled_reason == "Timetable slot removed":
+                            prior.status = ClassSessionStatus.SCHEDULED
+                            prior.cancelled_reason = None
+                        count += 1
+                    current += timedelta(days=1)
+                    continue
                 await self.session_repo.create(
                     ClassSession(
                         course_offering_id=offering.id, timetable_slot_id=slot.id, session_date=current,
