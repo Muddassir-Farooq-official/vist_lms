@@ -37,6 +37,9 @@ class TestNoLedgerActivity:
         result = FeeStatusCalculator.compute([], late_fee_per_day=200)
         assert result == {
             "total_charged": 0,
+            "total_concession": 0,
+            "total_payable": 0,
+            "total_remaining": 0,
             "total_paid": 0,
             "overdue_principal": 0,
             "accrued_fine": 0,

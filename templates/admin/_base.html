@@ -3,9 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>{% block title %}Dashboard{% endblock %} — VIST LMS Admin</title>
+  <title>{% block title %}Dashboard{% endblock %} — {{ brand.short_name }} Admin</title>
   <link rel="stylesheet" href="/static/css/theme.css" />
   <link rel="stylesheet" href="/static/css/dashboard.css" />
+  {% from "_brand.html" import brand_head, brand_mark %}{{ brand_head() }}
   {% block extra_head %}{% endblock %}
 </head>
 <body data-allowed-roles="{% block allowed_roles %}ADMIN{% endblock %}" data-login-path="/?reauth=1">
@@ -18,8 +19,8 @@
 
     <aside id="drawer" class="drawer">
       <div class="drawer-brand">
-        <span class="brand-mark">V</span>
-        VIST LMS
+        {%- set _seg = request.url.path.split("/")[2] if request.url.path.startswith("/dashboard/") and request.url.path.count("/") >= 2 else "admin" -%}
+        {{ brand_mark({"principal": "Principal", "hod": "Head of department"}.get(_seg, "Admin")) }}
         <button id="drawer-close" class="drawer-close" type="button" aria-label="Close menu">{{ nav_icon("close") }}</button>
       </div>
 

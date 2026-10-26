@@ -1,0 +1,59 @@
+{% extends "admin/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}View as a person{% endblock %}
+{% block page_title %}View as a person{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">See exactly what a teacher, student, parent or member of staff sees. Read-only, and kept in the activity log.</div>{% endblock %}
+
+{% block content %}
+<div class="dash">
+  <section class="panel dash-panel" aria-labelledby="va-h">
+    <div class="dash-panel-head"><h2 id="va-h">Find the person</h2></div>
+    <div class="toolbar">
+      <input id="va-q" class="text-input" type="search" placeholder="Name, roll number, employee code, CNIC, or a child's name for a parent" aria-label="Search people" autocomplete="off" />
+    </div>
+    <ul class="person-list va-results" id="va-list"></ul>
+    <p class="dash-empty" id="va-hint">Type at least two letters.</p>
+    <p class="dash-alert error" id="va-error" hidden></p>
+  </section>
+
+  <div class="dash-grid dash-grid--2">
+    <section class="panel dash-panel" aria-labelledby="va-how-h">
+      <div class="dash-panel-head"><h2 id="va-how-h">How it works</h2></div>
+      <ul class="fact-list va-rules">
+        <li><span>You see their screens, with their data, for up to 30 minutes.</span></li>
+        <li><span>Nothing can be changed while viewing: saving, marking or submitting is refused.</span></li>
+        <li><span>A bar at the top says whose screens you are viewing, with an Exit button.</span></li>
+        <li><span>Every view is kept in the activity log: who viewed whom, when, and from where.</span></li>
+        <li><span>Administrators' accounts cannot be viewed.</span></li>
+      </ul>
+    </section>
+
+    <section class="panel dash-panel" aria-labelledby="va-panels-h">
+      <div class="dash-panel-head"><h2 id="va-panels-h">Office panels (with your own login)</h2></div>
+      <div class="panel-links">
+        <a href="/dashboard/accounts">{{ nav_icon("fees") }}<span>Accounts office</span></a>
+        <a href="/dashboard/exam/home">{{ nav_icon("exams") }}<span>Exam department</span></a>
+        <a href="/dashboard/principal">{{ nav_icon("dashboard") }}<span>Principal</span></a>
+        <a href="/dashboard/library">{{ nav_icon("library") }}<span>Library</span></a>
+        <a href="/dashboard/gate/home">{{ nav_icon("shield") }}<span>Gate</span></a>
+        <a href="/dashboard/warden/home">{{ nav_icon("hostel") }}<span>Hostel warden</span></a>
+      </div>
+      <p class="panel-hint">These open the office's own screens and menu. Use "Back to admin" in the menu to return.</p>
+    </section>
+  </div>
+
+  <section class="panel dash-panel" aria-labelledby="va-recent-h">
+    <div class="dash-panel-head">
+      <h2 id="va-recent-h">Recent views</h2>
+      <a href="/dashboard/admin/activity?action=view_as" class="view-all-link">All in the activity log {{ nav_icon("arrow-right") }}</a>
+    </div>
+    <ul class="timeline" id="va-recent"></ul>
+    <p class="dash-empty" id="va-recent-empty" hidden>Nobody has used "view as" yet.</p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/dash-common.js"></script>
+<script src="/static/js/view-as.js"></script>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends base_template %}
+{% block allowed_roles %}{{ allowed_roles }}{% endblock %}
+{% block title %}Reports{% endblock %}
+{% block page_title %}Reports{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Fees, accounts, payroll, academics, staff and store reports in one place. Choose a report, set the filters, then print it or download it as a spreadsheet.</div>{% endblock %}
+
+{% block content %}
+<div class="rp-layout">
+  <aside class="rp-list sh-card" aria-label="Reports">
+    <input id="rp-search" class="text-input" type="search" placeholder="Find a report&hellip;" aria-label="Find a report" />
+    <nav id="rp-nav"></nav>
+    <p class="cc-meta">Also: <a href="#" id="rp-finance-link">Finance reports</a> (defaulters with aging, daily collection, vendor payables, bank matching).</p>
+  </aside>
+
+  <section class="rp-main">
+    <div class="sh-card" id="rp-empty">
+      <h2 class="panel-title">Choose a report</h2>
+      <p class="cc-meta">Every report uses the same figures as the screens it comes from, so a total here matches the fee account, the day book or the payroll run it is drawn from.</p>
+    </div>
+
+    <div class="sh-card" id="rp-card" hidden>
+      <div class="rp-head">
+        <div><h2 class="panel-title" id="rp-title"></h2><p class="cc-meta" id="rp-desc"></p></div>
+      </div>
+      <form id="rp-filters" class="rp-filters" novalidate></form>
+      <div class="rp-actions">
+        <button type="button" class="role-btn" id="rp-run">Show</button>
+        <a class="role-btn secondary-btn" id="rp-csv" href="#">Download spreadsheet (CSV)</a>
+        <button type="button" class="role-btn secondary-btn" id="rp-print">Print</button>
+      </div>
+      <p class="dash-alert error" id="rp-error" role="alert" hidden></p>
+    </div>
+
+    <div class="sh-card rp-result" id="rp-result" hidden>
+      <div class="rp-print-head">
+        <div class="rp-brand">
+          {% if brand.has_logo %}<img src="{{ brand.logo_url }}" alt="" class="rp-logo" />{% endif %}
+          <div><strong id="rp-inst">{{ brand.name }}</strong>{% if brand.address %}<small>{{ brand.address }}</small>{% endif %}{% if brand.contact %}<small>{{ brand.contact }}</small>{% endif %}</div>
+        </div>
+        <h2 id="rp-r-title"></h2>
+        <p class="cc-meta" id="rp-r-sub"></p>
+      </div>
+      <div class="table-scroll"><table class="dash-table rp-table" id="rp-table"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
+      <p class="empty-state" id="rp-none" hidden>Nothing to show for these filters.</p>
+      <ul class="rp-notes cc-meta" id="rp-notes"></ul>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/reports.js"></script>
+{% endblock %}

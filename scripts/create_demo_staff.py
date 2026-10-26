@@ -22,7 +22,8 @@ PEOPLE = [
     ("DEMO_ACCOUNTS", "Accounts Officer", "ACCOUNTS_OFFICER", "Demo Accounts", "35202-9910003-3", "Accounts portal: fees, accounts, payroll"),
     ("SECURITY_GUARD", "Security Guard", "SECURITY_GUARD", "Demo Guard", "35202-9910004-4", "Gate: search people, mark in and out"),
     ("EXAM_CONTROLLER", "Exam Controller", "EXAM_CONTROLLER", "Demo Exam", "35202-9910005-5", "Exam department: approve and publish results"),
-    ("DEMO_HOSTEL", "Hostel Warden", "HOSTEL_WARDEN", "Demo Warden", "35202-9910006-6", "(no portal of its own yet: tasks and applications only)"),
+    ("DEMO_HOSTEL", "Hostel Warden", "HOSTEL_WARDEN", "Demo Warden", "35202-9910006-6", "Hostel: rooms, residents, hostel charges"),
+    ("STAFF", "General Staff", "STAFF", "Demo Staff", "35202-9910007-7", "Staff portal: my pay, attendance, tasks and requests"),
 ]
 
 

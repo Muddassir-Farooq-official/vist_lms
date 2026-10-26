@@ -28,9 +28,9 @@ from app.tasks.models import (
     TaskStatus,
 )
 
-STAFF_ROLES = (Roles.ADMIN, Roles.TEACHER, Roles.LIBRARIAN, Roles.ACCOUNTS_OFFICER, Roles.HOSTEL_WARDEN, Roles.SECURITY_GUARD, Roles.EXAM_CONTROLLER)
-PORTAL = {Roles.ADMIN: "admin", Roles.TEACHER: "faculty", Roles.LIBRARIAN: "library", Roles.ACCOUNTS_OFFICER: "accounts", Roles.SECURITY_GUARD: "gate", Roles.EXAM_CONTROLLER: "exam", Roles.HOSTEL_WARDEN: "warden"}
-PORTAL_ORDER = (Roles.ADMIN, Roles.TEACHER, Roles.LIBRARIAN, Roles.ACCOUNTS_OFFICER, Roles.SECURITY_GUARD, Roles.EXAM_CONTROLLER, Roles.HOSTEL_WARDEN)
+STAFF_ROLES = (Roles.ADMIN, Roles.TEACHER, Roles.LIBRARIAN, Roles.ACCOUNTS_OFFICER, Roles.HOSTEL_WARDEN, Roles.SECURITY_GUARD, Roles.EXAM_CONTROLLER, Roles.STAFF)
+PORTAL = {Roles.ADMIN: "admin", Roles.TEACHER: "faculty", Roles.LIBRARIAN: "library", Roles.ACCOUNTS_OFFICER: "accounts", Roles.SECURITY_GUARD: "gate", Roles.EXAM_CONTROLLER: "exam", Roles.HOSTEL_WARDEN: "warden", Roles.STAFF: "staff"}
+PORTAL_ORDER = (Roles.ADMIN, Roles.TEACHER, Roles.LIBRARIAN, Roles.ACCOUNTS_OFFICER, Roles.SECURITY_GUARD, Roles.EXAM_CONTROLLER, Roles.HOSTEL_WARDEN, Roles.STAFF)
 
 
 def _now() -> datetime:

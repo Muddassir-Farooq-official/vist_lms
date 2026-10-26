@@ -1,0 +1,7 @@
+{% extends "staff/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Purchase requests{% endblock %}
+{% block page_title %}Purchase requests{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Ask for something to be bought, and follow it from approval to delivery.</div>{% endblock %}
+{% block content %}{% include "shared/purchases_content.html" %}{% endblock %}
+{% block extra_scripts %}<script src="/static/js/purchases-staff.js"></script>{% endblock %}

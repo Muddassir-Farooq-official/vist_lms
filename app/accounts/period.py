@@ -46,7 +46,9 @@ async def ensure_open(session: AsyncSession, day: date | datetime | None, what: 
             "Use a date after that (a correcting entry), or ask the administrator to reopen the period.")
 
 
-async def set_closed_through(session: AsyncSession, day: date | None, *, actor_id: uuid.UUID, reason: str | None) -> date | None:
+async def set_closed_through(session: AsyncSession, day: date | None, *, actor_id: uuid.UUID, reason: str | None, approved: bool = False):
+    """Close the books up to `day`. Reopening (moving the date back, or clearing it) needs a second administrator
+    (owner decision 10): unless `approved`, it returns the approval request instead of changing anything."""
     from app.audit.service import AuditService
     from app.core.clock import institute_today
     from app.policy.models import PolicySetting
@@ -56,6 +58,14 @@ async def set_closed_through(session: AsyncSession, day: date | None, *, actor_i
         raise BusinessRuleViolationError("You can only close a period that has already ended (a date before today).")
     if before is not None and (day is None or day < before) and len((reason or "").strip()) < 10:
         raise BusinessRuleViolationError("Reopening closed books needs a reason (at least 10 letters). It is kept in the audit log.")
+    if before is not None and (day is None or day < before) and not approved:
+        from app.approvals.service import gate
+
+        req = await gate(session, kind="BOOKS_REOPEN", actor_id=actor_id, target_id=None, reason=reason,
+                         payload={"closed_through": day.isoformat() if day else None, "reason": reason},
+                         summary=f"Reopen the books: closed up to {before:%d %b %Y}, move to " + (f"{day:%d %b %Y}" if day else "fully open"))
+        if req is not None:
+            return req
     row = await session.get(PolicySetting, KEY)
     now = datetime.now(timezone.utc)
     if day is None:

@@ -33,6 +33,7 @@ ROLE_NAMES = {
     Roles.SECURITY_GUARD: "Security Guard",
     Roles.EXAM_CONTROLLER: "Exam Controller",
     Roles.HOSTEL_WARDEN: "Hostel Warden",
+    Roles.STAFF: "General Staff",
     Roles.HOD: "Head of Department / Coordinator",
     Roles.PRINCIPAL: "Principal / Director",
     Roles.PARENT: "Parent / Guardian",

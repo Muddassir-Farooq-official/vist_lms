@@ -11,18 +11,19 @@ from reportlab.pdfgen import canvas
 INK, MUTED, LINE, RED = colors.HexColor("#0f1b3d"), colors.HexColor("#5b6785"), colors.HexColor("#c5cde0"), colors.HexColor("#b42318")
 
 
-def render_admit_card_pdf(card: dict, institute: str) -> bytes:
+def render_admit_card_pdf(card: dict, institute: str | None = None) -> bytes:
+    from app.core import brand
+
     buf = io.BytesIO()
     w, h = A4
     c = canvas.Canvas(buf, pagesize=A4)
     st, sc = card["student"], card["schedule"]
     c.setTitle(f"Admit card {st['roll_number']} {sc['name']}")
-    x0, y = 16 * mm, h - 20 * mm
+    x0 = 16 * mm
+    y = brand.draw_header(c, x=x0, y_top=h - 12 * mm, width=w - 2 * x0 - 40 * mm, center=False) - 2 * mm
     c.setFillColor(INK)
-    c.setFont("Helvetica-Bold", 15)
-    c.drawString(x0, y, institute)
     c.setFont("Helvetica-Bold", 12)
-    c.drawRightString(w - x0, y, "ADMIT CARD")
+    c.drawRightString(w - x0, h - 18 * mm, "ADMIT CARD")
     c.setFont("Helvetica", 10)
     c.setFillColor(MUTED)
     c.drawString(x0, y - 6 * mm, f"{sc['name']} examination \u2014 {sc['term_label']}")
@@ -84,6 +85,7 @@ def render_admit_card_pdf(card: dict, institute: str) -> bytes:
     c.drawText(text)
     c.drawString(x0, 16 * mm, f"Issued {card['issued_at']:%d %b %Y %H:%M} UTC \u00b7 computer-generated")
     c.drawRightString(w - x0, 16 * mm, "Controller of Examinations")
+    brand.draw_footer(c, x=x0, y=10 * mm, width=w - 2 * x0)
     c.showPage()
     c.save()
     return buf.getvalue()

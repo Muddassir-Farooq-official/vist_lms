@@ -28,6 +28,29 @@ NEXT = (THIS + timedelta(days=32)).replace(day=1)
 DIM = rules.days_in(THIS)
 _cache: dict = {}
 
+async def _advance(client, team, payload):
+    """Advances: the accounts office asks, an administrator approves, the accounts office pays it out."""
+    await _as(client, team, "officer")
+    asked = await client.post(f"{PR}/advances", json={k: v for k, v in payload.items() if k not in ("reference_no",)})
+    assert asked.status_code == 201, asked.text
+    await _login_admin(client)
+    ok = await client.post(f"{PR}/advances/{asked.json()['id']}/decision", json={"approve": True})
+    assert ok.status_code == 200, ok.text
+    await _as(client, team, "officer")
+    paid = await client.post(f"{PR}/advances/{asked.json()['id']}/pay", json={"payment_method": payload["payment_method"], "reference_no": payload.get("reference_no"),
+                                                                             "paid_on": payload.get("granted_on") or str(TODAY)})
+    assert paid.status_code == 200, paid.text
+    return paid
+
+
+async def _approve(client, run_id):
+    """Payroll now goes DRAFT -> SUBMITTED (accounts office) -> APPROVED (administration). Submit, then approve."""
+    sub = await client.post(f"/api/v1/payroll/runs/{run_id}/submit")
+    if sub.status_code != 200 and "Only a draft" not in sub.text:     # already submitted is fine; a real problem is returned
+        return sub
+    return await client.post(f"/api/v1/payroll/runs/{run_id}/approve")
+
+
 
 @pytest.fixture(autouse=True)
 def _quiet(monkeypatch):
@@ -173,7 +196,7 @@ async def test_unpaid_days_adjustments_and_holding_a_payslip(app_client, admin_u
     r = (await edit(b, held=False)).json()
     assert r["employees_count"] == 3 and _slip(r, team, "b")["held_reason"] is None
     await _login_admin(app_client)
-    await app_client.post(f"{PR}/runs/{run['id']}/approve")
+    await _approve(app_client, run['id'])
     assert (await edit(a, unpaid_days=1)).status_code == 422                                                                               # locked once approved
 
 
@@ -196,10 +219,10 @@ async def test_approve_pay_and_the_salary_lands_in_the_accounts(app_client, admi
     await app_client.post(f"{PR}/items", json={"employee_id": team["a"]["id"], "kind": "DEDUCTION", "name": "Income tax", "calc": "FIXED", "value": 2000})
     run = await _prepare(app_client)
     rid = run["id"]
-    assert (await app_client.post(f"{PR}/runs/{rid}/approve")).status_code == 403                                                          # the accounts office cannot approve
+    assert (await _approve(app_client, rid)).status_code == 403                                                          # the accounts office cannot approve
     assert (await app_client.post(f"{PR}/runs/{rid}/pay", json={"payment_method": "CASH", "paid_date": str(TODAY)})).status_code == 422       # not approved yet
     await _login_admin(app_client)
-    ok = (await app_client.post(f"{PR}/runs/{rid}/approve")).json()
+    ok = (await _approve(app_client, rid)).json()
     assert ok["status"] == "APPROVED" and ok["approved_by_name"] and ok["total_net"] == 148000.0                                              # 58,000 + 30,000 + the officer's 60,000
     await _as(app_client, team, "officer")
     step = lambda **kw: app_client.post(f"{PR}/runs/{rid}/pay", json=kw)                                                                    # noqa: E731
@@ -224,7 +247,7 @@ async def test_employees_see_only_their_own_payslip_and_only_once_paid(app_clien
     a, b = _slip(run, team, "a"), _slip(run, team, "b")
     await app_client.patch(f"{PR}/runs/{run['id']}/payslips/{b['id']}", json={"held": True, "held_reason": "Documents incomplete"})
     await _login_admin(app_client)
-    await app_client.post(f"{PR}/runs/{run['id']}/approve")
+    await _approve(app_client, run['id'])
     await _as(app_client, team, "a")
     assert (await app_client.get(f"{PR}/me")).json() == [] and (await app_client.get(f"{PR}/payslips/{a['id']}")).status_code == 404         # approved is not paid
     await _as(app_client, team, "officer")
@@ -251,7 +274,7 @@ async def test_the_payslip_pdf(app_client, admin_user, db_session):
     pdf = await app_client.get(f"{PR}/payslips/{a['id']}/pdf")
     assert pdf.status_code == 200 and pdf.content[:5] == b"%PDF-" and pdf.headers["x-content-type-options"] == "nosniff" and f"payslip-{team['a'] and 'EMP'}" or True   # the officer may preview a draft
     await _login_admin(app_client)
-    await app_client.post(f"{PR}/runs/{run['id']}/approve")
+    await _approve(app_client, run['id'])
     await _as(app_client, team, "officer")
     await app_client.post(f"{PR}/runs/{run['id']}/pay", json={"payment_method": "CASH", "paid_date": str(TODAY)})
     await _as(app_client, team, "a")
@@ -272,12 +295,12 @@ async def test_a_deduction_bigger_than_the_pay_blocks_approval(app_client, admin
     run = await _prepare(app_client)
     assert run["problems"] == ["BBB Z: pay would be below zero"]
     await _login_admin(app_client)
-    refused = await app_client.post(f"{PR}/runs/{run['id']}/approve")
+    refused = await _approve(app_client, run['id'])
     assert refused.status_code == 422 and "BBB Z" in refused.text
     await _as(app_client, team, "officer")
     await app_client.patch(f"{PR}/runs/{run['id']}/payslips/{_slip(run, team, 'b')['id']}", json={"held": True, "held_reason": "Loan needs sorting out"})
     await _login_admin(app_client)
-    assert (await app_client.post(f"{PR}/runs/{run['id']}/approve")).json()["status"] == "APPROVED"                                          # holding it lets the rest be paid
+    assert (await _approve(app_client, run['id'])).json()["status"] == "APPROVED"                                          # holding it lets the rest be paid
 
 
 # ====================================================================== advances
@@ -285,26 +308,26 @@ async def test_an_advance_is_paid_now_and_recovered_from_the_next_payslips(app_c
     team = await _team(app_client, db_session)
     await _as(app_client, team, "officer")
     adv = {"employee_id": team["a"]["id"], "amount": 12000, "monthly_recovery": 5000, "reason": "Family medical expense", "payment_method": "CASH", "granted_on": str(TODAY)}
-    for change, word in (({"monthly_recovery": 13000}, "recovery"), ({"amount": 0}, None), ({"granted_on": str(TODAY + timedelta(days=1))}, "future"), ({"payment_method": "CHEQUE"}, "cheque number")):
+    for change, word in (({"monthly_recovery": 13000}, "recovery"), ({"amount": 0}, None), ({"amount": 999999}, "at most")):
         r = await app_client.post(f"{PR}/advances", json={**adv, **change})
         assert r.status_code == 422 and (word is None or word in r.text), (change, r.text)
-    made = (await app_client.post(f"{PR}/advances", json=adv)).json()
+    made = (await _advance(app_client, team, adv)).json()
     assert (made["amount"], made["balance"], made["status"]) == (12000.0, 12000.0, "ACTIVE")
     exp = (await db_session.execute(select(Expense).where(Expense.title.like("Salary advance%")))).scalars().one()
     assert float(exp.amount) == 12000.0 and exp.source.value == "PAYROLL"                                                                    # the cash left the institute today
-    assert (await db_session.execute(select(Notification).where(Notification.title.like("Salary advance%")))).scalars().one().message.startswith("It will be taken back")
+    assert (await db_session.execute(select(Notification).where(Notification.title.like("Salary advance: %")))).scalars().one().message.startswith("It will be taken back")
     run = await _prepare(app_client)
     a = _slip(run, team, "a")
     assert a["net"] == 55000.0 and (await app_client.get(f"{PR}/payslips/{a['id']}")).json()["deduction_lines"][0]["source"] == "ADVANCE"
     await _login_admin(app_client)
-    await app_client.post(f"{PR}/runs/{run['id']}/approve")
+    await _approve(app_client, run['id'])
     await _as(app_client, team, "officer")
     await app_client.post(f"{PR}/runs/{run['id']}/pay", json={"payment_method": "CASH", "paid_date": str(TODAY)})
     assert (await app_client.get(f"{PR}/advances")).json()[0]["balance"] == 7000.0
     nxt = await _prepare(app_client, NEXT)                                                                                                    # next month: 5,000 more
     assert _slip(nxt, team, "a")["net"] == 55000.0
     await _login_admin(app_client)
-    await app_client.post(f"{PR}/runs/{nxt['id']}/approve")
+    await _approve(app_client, nxt['id'])
     await _as(app_client, team, "officer")
     await app_client.post(f"{PR}/runs/{nxt['id']}/pay", json={"payment_method": "CASH", "paid_date": str(TODAY)})
     assert (await app_client.get(f"{PR}/advances")).json()[0]["balance"] == 2000.0
@@ -313,10 +336,10 @@ async def test_an_advance_is_paid_now_and_recovered_from_the_next_payslips(app_c
 async def test_a_small_advance_is_cleared_and_never_over_recovered(app_client, admin_user, db_session):
     team = await _team(app_client, db_session)
     await _as(app_client, team, "officer")
-    await app_client.post(f"{PR}/advances", json={"employee_id": team["b"]["id"], "amount": 3000, "monthly_recovery": 3000, "reason": "Emergency", "payment_method": "CASH", "granted_on": str(TODAY)})
+    await _advance(app_client, team, {"employee_id": team["b"]["id"], "amount": 3000, "monthly_recovery": 3000, "reason": "Emergency", "payment_method": "CASH", "granted_on": str(TODAY)})
     run = await _prepare(app_client)
     await _login_admin(app_client)
-    await app_client.post(f"{PR}/runs/{run['id']}/approve")
+    await _approve(app_client, run['id'])
     await _as(app_client, team, "officer")
     await app_client.post(f"{PR}/runs/{run['id']}/pay", json={"payment_method": "CASH", "paid_date": str(TODAY)})
     cleared = (await app_client.get(f"{PR}/advances")).json()[0]
@@ -328,10 +351,10 @@ async def test_a_small_advance_is_cleared_and_never_over_recovered(app_client, a
 async def test_reversing_a_payment_restores_advances_and_voids_the_expense(app_client, admin_user, db_session):
     team = await _team(app_client, db_session)
     await _as(app_client, team, "officer")
-    await app_client.post(f"{PR}/advances", json={"employee_id": team["a"]["id"], "amount": 12000, "monthly_recovery": 5000, "reason": "Medical", "payment_method": "CASH", "granted_on": str(TODAY)})
+    await _advance(app_client, team, {"employee_id": team["a"]["id"], "amount": 12000, "monthly_recovery": 5000, "reason": "Medical", "payment_method": "CASH", "granted_on": str(TODAY)})
     run = await _prepare(app_client)
     await _login_admin(app_client)
-    await app_client.post(f"{PR}/runs/{run['id']}/approve")
+    await _approve(app_client, run['id'])
     await _as(app_client, team, "officer")
     await app_client.post(f"{PR}/runs/{run['id']}/pay", json={"payment_method": "CASH", "paid_date": str(TODAY)})
     assert (await app_client.post(f"{PR}/runs/{run['id']}/reverse-payment", json={"reason": "Wrong account used"})).status_code == 403
@@ -358,7 +381,7 @@ async def test_a_cancelled_run_releases_its_bonuses(app_client, admin_user, db_s
     second = await _prepare(app_client)
     assert _slip(second, team, "b")["gross"] == 34000.0                                                                                      # the bonus is back in the next run
     await _login_admin(app_client)
-    await app_client.post(f"{PR}/runs/{second['id']}/approve")
+    await _approve(app_client, second['id'])
     await _as(app_client, team, "officer")
     await app_client.post(f"{PR}/runs/{second['id']}/pay", json={"payment_method": "CASH", "paid_date": str(TODAY)})
     third = await _prepare(app_client, NEXT)

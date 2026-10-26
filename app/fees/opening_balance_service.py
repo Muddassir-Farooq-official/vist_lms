@@ -56,6 +56,8 @@ class OpeningBalanceService:
         if amount <= 0 or amount > MAX_AMOUNT:
             raise BusinessRuleViolationError("The amount must be more than 0 and at most Rs. 10,000,000.")
         structure = await self.structure(actor_id)
+        if await self.already_recorded(student_id, amount, due_date):
+            raise BusinessRuleViolationError(f"Previous dues of Rs. {amount:,.2f} due {due_date:%d %b %Y} are already recorded for this student.")
         assignment = (await self.session.execute(select(FeeAssignment).where(FeeAssignment.fee_structure_id == structure.id, FeeAssignment.payer_type == PayerType.STUDENT,
                                                                              FeeAssignment.payer_id == student_id))).scalars().first()
         if assignment is None:
@@ -73,6 +75,67 @@ class OpeningBalanceService:
             await create_notification(self.session, user_id=student.user_id, category=NotificationCategory.FEE, title="Previous dues added to your account",
                                       message=f"Rs. {amount:,.2f}, due {due_date:%d %b %Y}.", link="/dashboard/student/fees")
         return {"assignment_id": assignment.id, "ledger_entry_id": entry.id, "challan_id": challan.id, "consumer_number": challan.consumer_number}
+
+    async def already_recorded(self, student_id: uuid.UUID, amount: Decimal, due_date: date) -> bool:
+        """The same previous-dues amount and due date already on this student's account (the same sheet imported twice)."""
+        structure = (await self.session.execute(select(FeeStructure).where(FeeStructure.name == STRUCTURE_NAME))).scalars().first()
+        if structure is None:
+            return False
+        n = (await self.session.execute(select(func.count()).select_from(FeeLedgerEntry).join(FeeAssignment, FeeAssignment.id == FeeLedgerEntry.fee_assignment_id).where(
+            FeeAssignment.fee_structure_id == structure.id, FeeAssignment.payer_type == PayerType.STUDENT, FeeAssignment.payer_id == student_id,
+            FeeLedgerEntry.entry_type == LedgerEntryType.DEBIT, FeeLedgerEntry.amount == amount, FeeLedgerEntry.due_date == due_date))).scalar_one()
+        return n > 0
+
+    async def listing(self, *, q: str | None = None, limit: int = 300) -> list[dict]:
+        """Every previous-dues entry, newest first, with what is still owed on it."""
+        from app.fees.assignment_service import FeeStatusCalculator
+
+        structure = (await self.session.execute(select(FeeStructure).where(FeeStructure.name == STRUCTURE_NAME))).scalars().first()
+        if structure is None:
+            return []
+        stmt = select(FeeAssignment, Student).join(Student, Student.id == FeeAssignment.payer_id).where(
+            FeeAssignment.fee_structure_id == structure.id, FeeAssignment.payer_type == PayerType.STUDENT)
+        if q and q.strip():
+            like = f"%{q.strip()}%"
+            stmt = stmt.where((Student.roll_number.ilike(like)) | (Student.first_name.ilike(like)) | (Student.last_name.ilike(like)))
+        out = []
+        for a, st in (await self.session.execute(stmt.limit(limit))).all():
+            entries = list((await self.session.execute(select(FeeLedgerEntry).where(FeeLedgerEntry.fee_assignment_id == a.id))).scalars())
+            rows = {r["ledger_entry_id"]: r for r in FeeStatusCalculator.installments(entries, None)}
+            for e in entries:
+                r = rows.get(e.id)
+                if r is None:
+                    continue
+                out.append({"ledger_entry_id": e.id, "assignment_id": a.id, "student_id": st.id, "student_name": f"{st.first_name} {st.last_name}",
+                            "roll_number": st.roll_number, "amount": r["charged"], "cancelled": r["concession"], "paid": r["paid"], "remaining": r["remaining"],
+                            "due_date": e.due_date, "note": e.description, "status": r["status"], "created_at": e.created_at})
+        out.sort(key=lambda x: x["created_at"], reverse=True)
+        return out
+
+    async def cancel_entry(self, ledger_entry_id: uuid.UUID, *, reason: str, actor_id: uuid.UUID) -> dict:
+        """A previous-dues entry typed in by mistake: what is still owed on it is written off (the ledger is append-only,
+        so the entry stays, with a matching write-off). Money already paid against it stays recorded."""
+        from app.fees.assignment_service import FeeStatusCalculator, lock_assignment, sync_challans
+
+        if len((reason or "").strip()) < 5:
+            raise BusinessRuleViolationError("Say why this previous-dues entry is being cancelled.")
+        entry = await self.session.get(FeeLedgerEntry, ledger_entry_id)
+        structure = (await self.session.execute(select(FeeStructure).where(FeeStructure.name == STRUCTURE_NAME))).scalars().first()
+        a = await self.session.get(FeeAssignment, entry.fee_assignment_id) if entry is not None else None
+        if entry is None or entry.entry_type != LedgerEntryType.DEBIT or structure is None or a is None or a.fee_structure_id != structure.id:
+            raise BusinessRuleViolationError("That is not a previous-dues entry.")
+        a = await lock_assignment(self.session, a.id)
+        entries = list((await self.session.execute(select(FeeLedgerEntry).where(FeeLedgerEntry.fee_assignment_id == a.id))).scalars())
+        row = next((r for r in FeeStatusCalculator.installments(entries, None) if r["ledger_entry_id"] == entry.id), None)
+        if row is None or row["remaining"] <= 0.005:
+            raise BusinessRuleViolationError("Nothing is still owed on this entry, so there is nothing to cancel.")
+        self.session.add(FeeLedgerEntry(fee_assignment_id=a.id, entry_type=LedgerEntryType.CONCESSION, amount=row["remaining"], installment_number=entry.installment_number,
+                                        related_entry_id=entry.id, description=f"Previous dues cancelled: {reason.strip()}"[:255], created_by=actor_id,
+                                        created_at=datetime.now(timezone.utc)))
+        await sync_challans(self.session, a)
+        await self.audit.log(actor_user_id=actor_id, action="opening_balance.cancelled", entity_type="fee_ledger_entry", entity_id=entry.id,
+                             after={"written_off": row["remaining"]}, metadata={"reason": reason.strip()})
+        return {"ledger_entry_id": entry.id, "written_off": row["remaining"]}
 
     # ------------------------------------------------------------------ a whole sheet of them
     @staticmethod
@@ -126,6 +189,8 @@ class OpeningBalanceService:
             key = (roll.lower(), str(amount), str(due_date), note.lower())
             if not errors and key in seen:
                 errors.append("this exact row appears twice in the file")
+            if not errors and await self.already_recorded(student.id, amount, due_date):
+                errors.append("these previous dues (same amount and due date) are already recorded for this student")
             seen.add(key)
             rows.append({"line": i, "roll_number": roll, "student_id": student.id if student else None, "student_name": f"{student.first_name} {student.last_name}" if student else None,
                          "amount": float(amount) if amount is not None and not errors else (float(amount) if amount is not None else None), "due_date": due_date, "note": note, "errors": errors, "ok": not errors})

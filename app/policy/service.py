@@ -68,6 +68,11 @@ POLICY: tuple[Policy, ...] = (
            "The goods are received, but cannot be paid until an administrator approves the higher price."),
     Policy("fee_late_fee_cap", "Late fee: most one instalment can build up (Rs., 0 = no cap)", "Fees", float, 0, 1_000_000,
            "Stops a forgotten instalment from growing a late fee without limit."),
+    Policy("fee_late_fee_grace_days", "Late fee: grace days after the due date", "Fees", int, 0, 60,
+           "No late fee is charged for this many days after an instalment falls due; after that it counts from the end of the grace days. "
+           "It never runs while a student is suspended or after they leave."),
+    Policy("purchase_second_approval_above", "Purchases: a second administrator approves above (Rs., 0 = never)", "Accounts", float, 0, 100_000_000,
+           "A purchase above this amount needs approval from an administrator other than the one who asked for it or recorded it."),
     Policy("fee_payment_max_backdate_days", "Payments may be dated back at most (days)", "Fees", int, 1, 365,
            "Staff cannot record a payment dated earlier than this."),
     Policy("payroll_default_working_days", "Working days in a month (suggested for each payroll; 0 = calendar days)", "Payroll", int, 0, 31,
@@ -84,6 +89,8 @@ POLICY: tuple[Policy, ...] = (
            "Stops people from simply not marking out."),
     Policy("payroll_security_percent", "Security deposit: % of basic held each month", "Payroll", float, 0, 100,
            "Held from each payslip until the total equals one basic salary. 0 = off. Can be changed per employee."),
+    Policy("payroll_advance_max_salary_multiple", "Salary advance: most one employee may owe (x basic salary)", "Payroll", float, 0.1, 6,
+           "1 = at most one month's basic salary outstanding in advances, including the one being asked for. Every advance needs administrator approval."),
     Policy("graduation_min_cgpa", "Lowest CGPA that can graduate", "Exams", float, 0, 4,
            "The degree audit asks for every curriculum course passed and at least this CGPA before a student is marked graduated."),
 )
@@ -139,6 +146,14 @@ async def apply_from_db(session: AsyncSession) -> None:
         elif p.key in _applied:
             setattr(settings, p.key, _default(p.key))
             _applied.discard(p.key)
+    # The institute's name, logos, colour and bank details (Settings -> Institute) are refreshed the same way.
+    try:
+        from app.branding.service import apply_from_db as apply_branding
+
+        async with session.begin_nested():
+            await apply_branding(session)
+    except Exception:  # noqa: BLE001 - before its migration the table does not exist; keep the current values
+        pass
     _last_refresh = time.monotonic()
 
 
@@ -193,4 +208,7 @@ def reset_for_tests() -> None:
     for k in list(_applied):
         setattr(settings, k, _defaults[k])
     _applied.clear()
+    from app.branding.service import reset_for_tests as reset_branding
+
+    reset_branding()
     _last_refresh = 0.0

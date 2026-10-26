@@ -104,7 +104,7 @@ async def merit_pdf(round_id: uuid.UUID, list_no: int, current_user: CurrentUser
     from app.admissions.merit_pdf import render_merit_list_pdf
 
     m = await AdmissionService(db).merit_list(round_id, list_no)
-    return Response(content=await run_in_threadpool(render_merit_list_pdf, m, settings.app_name), media_type="application/pdf",
+    return Response(content=await run_in_threadpool(render_merit_list_pdf, m), media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="merit-list-{list_no}-{m["program"]}.pdf"'})
 
 

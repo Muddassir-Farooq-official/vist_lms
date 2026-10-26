@@ -14,6 +14,10 @@ from fastapi.templating import Jinja2Templates
 from app.admissions.router import router as admissions_router
 from app.fees.refund_router import router as refund_router
 from app.inventory.router import router as inventory_router
+from app.assets.router import router as assets_router
+from app.approvals.router import router as approvals_router
+from app.branding.router import public_router as branding_public_router
+from app.branding.router import router as branding_router
 from app.supplementary.router import router as supplementary_router
 from app.sms.router import router as sms_router
 from app.exams.router import router as exams_router
@@ -21,10 +25,14 @@ from app.policy.router import router as policy_router
 from app.parents.router import router as parents_router
 from app.academics.router import router as academics_router
 from app.attendance.router import router as attendance_router
+from app.audit.activity import router as activity_router
 from app.audit.router import router as audit_router
 from app.auth.permissions import Roles
-from app.auth.redirects import home_for_roles
+from app.auth.redirects import home_for_roles, profile_for_roles
 from app.auth.router import router as auth_router
+from app.auth.view_as import READ_ONLY_ALLOWED, read_only_reason
+from app.auth.view_as import router as view_as_router
+from app.selfservice.router import router as profile_changes_router
 from app.announcements.router import router as announcements_router
 from app.applications.router import router as applications_router
 from app.tasks.router import router as tasks_router
@@ -113,6 +121,10 @@ class CachedStaticFiles(StaticFiles):
 
 app.mount("/static", CachedStaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+# `brand` in every template: the institute's current name, logo, colour... (Settings -> Institute).
+from app.core.brand import BrandView  # noqa: E402
+
+templates.env.globals["brand"] = BrandView()
 
 # Role cards shown on the landing page (Section 18 roles). Purely
 # presentational — actual authorization is still enforced entirely by the
@@ -178,6 +190,7 @@ ADMIN_NAV_ITEMS = [
     _nav("admissions", "Admissions", "imports", "/dashboard/admin/admissions", group="People"),
     _nav("employees", "Employees", "employees", "/dashboard/admin/employees", group="People"),
     _nav("hostel", "Hostel", "students", "/dashboard/admin/hostel", group="People"),
+    _nav("profile-changes", "Profile changes", "user", "/dashboard/admin/profile-changes", group="People"),
     _nav("programs", "Programs", "programs", "/dashboard/admin/programs", group="Academics"),
     _nav("courses", "Courses", "graduation-cap", "/dashboard/admin/courses", group="Academics", mobile=True),
     _nav("timetable", "Timetable", "clock", "/dashboard/admin/timetable", group="Academics"),
@@ -192,12 +205,23 @@ ADMIN_NAV_ITEMS = [
     _nav("fees", "Fees", "fees", "/dashboard/admin/fees", group="Finance"),
     _nav("refunds", "Refunds", "fees", "/dashboard/admin/refunds", group="Finance"),
     _nav("inventory", "Inventory / Store", "tasks", "/dashboard/admin/inventory", group="Finance"),
+    _nav("assets", "Fixed assets", "tasks", "/dashboard/admin/assets", group="Finance"),
+    _nav("approvals", "Approvals", "tasks", "/dashboard/admin/approvals", group="Finance"),
     _nav("finance", "Accounts", "tasks", "/dashboard/admin/finance", group="Finance"),
+    _nav("reports", "Reports", "exams", "/dashboard/admin/reports", group="Reports"),
     _nav("finance-reports", "Finance reports", "exams", "/dashboard/admin/finance-reports", group="Finance"),
     _nav("payroll", "Payroll", "fees", "/dashboard/admin/payroll", group="Finance"),
     _nav("staff-attendance", "Staff attendance", "clock", "/dashboard/admin/staff-attendance", group="Finance"),
     _nav("fines", "Fines", "ban", "/dashboard/admin/fines", group="Finance"),
     _nav("library", "Library", "library", "/dashboard/library", group="Library"),
+    # Every other office's panel, opened with the administrator's own login (like Library), and "view as" a person.
+    _nav("panel-accounts", "Accounts office", "fees", "/dashboard/accounts", group="Panels"),
+    _nav("panel-exam", "Exam department", "exams", "/dashboard/exam/home", group="Panels"),
+    _nav("panel-principal", "Principal", "dashboard", "/dashboard/principal", group="Panels"),
+    _nav("panel-gate", "Gate", "shield", "/dashboard/gate/home", group="Panels"),
+    _nav("panel-warden", "Hostel warden", "hostel", "/dashboard/warden/home", group="Panels"),
+    _nav("panel-staff", "General staff", "employees", "/dashboard/staff", group="Panels"),
+    _nav("view-as", "View as a person", "user", "/dashboard/admin/view-as", group="Panels"),
     _nav("announcements", "Announcements", "megaphone", "/dashboard/admin/announcements", group="Support"),
     _nav("gate", "Gate visitors", "shield", "/dashboard/admin/gate", group="Support"),
     _nav("tasks", "Tasks", "tasks", "/dashboard/admin/tasks", group="Support"),
@@ -205,6 +229,7 @@ ADMIN_NAV_ITEMS = [
     _nav("complaints", "Complaints", "ban", "/dashboard/admin/complaints", group="Support"),
     _nav("imports", "CSV Imports", "imports", "/dashboard/admin/imports", group="System"),
     _nav("sms", "SMS", "megaphone", "/dashboard/admin/sms", group="System"),
+    _nav("activity", "Activity log", "clock", "/dashboard/admin/activity", group="System"),
     _nav("settings", "Settings", "settings", "/dashboard/admin/settings", group="System"),
 ]
 
@@ -224,80 +249,109 @@ LIBRARY_NAV_ITEMS = [
     _nav("purchases", "Purchase requests", "tasks", "/dashboard/library/purchases", group="Services"),
     _nav("payslips", "My pay & attendance", "file", "/dashboard/library/payslips", group="Services"),
     _nav("calendar", "Calendar", "clock", "/dashboard/library/calendar", group="Services"),
+    _nav("profile", "My Profile", "user", "/dashboard/library/profile", group="Services"),
 ]
 
 # Accounts Officer's own portal.
 GATE_NAV_ITEMS = [
+    _nav("home", "Home", "dashboard", "/dashboard/gate/home", mobile=True, short="Home"),
     _nav("gate", "Visitors", "shield", "/dashboard/gate", mobile=True),
-    _nav("log", "Visitor log book", "file", "/dashboard/gate/log", mobile=True),
-    _nav("staff", "Staff in / out", "clock", "/dashboard/gate/staff", mobile=True),
+    _nav("log", "Visitor log book", "file", "/dashboard/gate/log", mobile=True, short="Log book"),
+    _nav("staff", "Staff in / out", "clock", "/dashboard/gate/staff", mobile=True, short="Staff"),
     _nav("announcements", "Announcements", "megaphone", "/dashboard/gate/announcements"),
-    _nav("tasks", "Tasks", "tasks", "/dashboard/gate/tasks", mobile=True),
+    _nav("tasks", "Tasks", "tasks", "/dashboard/gate/tasks"),
     _nav("applications", "Applications", "file", "/dashboard/gate/applications"),
     _nav("purchases", "Purchase requests", "tasks", "/dashboard/gate/purchases"),
     _nav("payslips", "My pay & attendance", "file", "/dashboard/gate/payslips"),
     _nav("calendar", "Calendar", "clock", "/dashboard/gate/calendar"),
+    _nav("profile", "My Profile", "user", "/dashboard/gate/profile"),
+]
+
+# General staff (office boy, IT, driver, cleaner...): only their own things.
+STAFF_NAV_ITEMS = [
+    _nav("home", "Home", "dashboard", "/dashboard/staff", mobile=True, short="Home"),
+    _nav("tasks", "Tasks", "tasks", "/dashboard/staff/tasks", mobile=True),
+    _nav("payslips", "My pay & attendance", "file", "/dashboard/staff/payslips", mobile=True, short="Pay"),
+    _nav("announcements", "Announcements", "megaphone", "/dashboard/staff/announcements", mobile=True, short="News"),
+    _nav("applications", "Applications", "file", "/dashboard/staff/applications", group="Requests"),
+    _nav("purchases", "Purchase requests", "tasks", "/dashboard/staff/purchases", group="Requests"),
+    _nav("complaints", "Feedback & Complaints", "ban", "/dashboard/staff/complaints", group="Requests"),
+    _nav("calendar", "Calendar", "clock", "/dashboard/staff/calendar", group="Account"),
+    _nav("profile", "My Profile", "user", "/dashboard/staff/profile", group="Account"),
 ]
 
 PARENT_NAV_ITEMS = [
-    _nav("children", "My children", "students", "/dashboard/parent", mobile=True),
+    _nav("children", "My children", "students", "/dashboard/parent", mobile=True, short="Children"),
     _nav("calendar", "Calendar", "clock", "/dashboard/parent/calendar"),
 ]
 
 PRINCIPAL_NAV_ITEMS = [
     _nav("overview", "Institute overview", "dashboard", "/dashboard/principal", mobile=True, short="Home"),
-    _nav("progress", "Teacher progress", "exams", "/dashboard/principal/progress", mobile=True),
-    _nav("students", "Student lookup", "students", "/dashboard/principal/students", mobile=True),
+    _nav("progress", "Teacher progress", "exams", "/dashboard/principal/progress", mobile=True, short="Progress"),
+    _nav("students", "Student lookup", "students", "/dashboard/principal/students", mobile=True, short="Students"),
+    _nav("reports", "Reports", "exams", "/dashboard/principal/reports"),
     _nav("staff-attendance", "Staff attendance", "clock", "/dashboard/principal/staff-attendance"),
     _nav("calendar", "Calendar", "clock", "/dashboard/principal/calendar"),
     _nav("hostel", "Hostel", "students", "/dashboard/principal/hostel"),
+    _nav("assets", "Fixed assets", "tasks", "/dashboard/principal/assets"),
+    _nav("activity", "Activity log", "clock", "/dashboard/principal/activity"),
 ]
 
 HOD_NAV_ITEMS = [
-    _nav("attendance", "Attendance oversight", "attendance", "/dashboard/hod", mobile=True),
-    _nav("progress", "Teacher progress", "exams", "/dashboard/hod/progress", mobile=True),
-    _nav("students", "Student lookup", "students", "/dashboard/hod/students", mobile=True),
+    _nav("attendance", "Attendance oversight", "attendance", "/dashboard/hod", mobile=True, short="Attendance"),
+    _nav("progress", "Teacher progress", "exams", "/dashboard/hod/progress", mobile=True, short="Progress"),
+    _nav("students", "Student lookup", "students", "/dashboard/hod/students", mobile=True, short="Students"),
+    _nav("reports", "Reports", "exams", "/dashboard/hod/reports"),
     _nav("calendar", "Calendar", "clock", "/dashboard/hod/calendar"),
 ]
 
 EXAM_NAV_ITEMS = [
-    _nav("results", "Result approval", "tasks", "/dashboard/exam", mobile=True),
-    _nav("result-types", "Result types", "exams", "/dashboard/exam/result-types", mobile=True),
+    _nav("home", "Home", "dashboard", "/dashboard/exam/home", mobile=True, short="Home"),
+    _nav("results", "Result approval", "tasks", "/dashboard/exam", mobile=True, short="Results"),
+    _nav("result-types", "Result types", "exams", "/dashboard/exam/result-types"),
     _nav("datesheets", "Datesheets & admit cards", "clock", "/dashboard/exam/datesheets"),
     _nav("supplementary", "Supplementary exams", "exams", "/dashboard/exam/supplementary"),
     _nav("students", "Student lookup", "students", "/dashboard/exam/students"),
-    _nav("announcements", "Announcements", "megaphone", "/dashboard/exam/announcements", mobile=True),
+    _nav("reports", "Reports", "exams", "/dashboard/exam/reports"),
+    _nav("announcements", "Announcements", "megaphone", "/dashboard/exam/announcements", mobile=True, short="News"),
     _nav("tasks", "Tasks", "tasks", "/dashboard/exam/tasks", mobile=True),
     _nav("applications", "Applications", "file", "/dashboard/exam/applications"),
     _nav("purchases", "Purchase requests", "tasks", "/dashboard/exam/purchases"),
     _nav("payslips", "My pay & attendance", "file", "/dashboard/exam/payslips"),
     _nav("calendar", "Calendar", "clock", "/dashboard/exam/calendar"),
+    _nav("profile", "My Profile", "user", "/dashboard/exam/profile"),
 ]
 
 WARDEN_NAV_ITEMS = [
+    _nav("home", "Home", "dashboard", "/dashboard/warden/home", mobile=True, short="Home"),
     _nav("hostel", "Hostel", "students", "/dashboard/warden/hostel", mobile=True),
-    _nav("announcements", "Announcements", "megaphone", "/dashboard/warden", mobile=True),
+    _nav("announcements", "Announcements", "megaphone", "/dashboard/warden", mobile=True, short="News"),
     _nav("tasks", "Tasks", "tasks", "/dashboard/warden/tasks", mobile=True),
-    _nav("applications", "Applications", "file", "/dashboard/warden/applications", mobile=True),
+    _nav("applications", "Applications", "file", "/dashboard/warden/applications"),
     _nav("purchases", "Purchase requests", "tasks", "/dashboard/warden/purchases"),
     _nav("payslips", "My pay & attendance", "file", "/dashboard/warden/payslips"),
     _nav("calendar", "Calendar", "clock", "/dashboard/warden/calendar"),
+    _nav("profile", "My Profile", "user", "/dashboard/warden/profile"),
 ]
 
 ACCOUNTS_NAV_ITEMS = [
-    _nav("announcements", "Announcements", "megaphone", "/dashboard/accounts/announcements", mobile=True),
+    _nav("home", "Home", "dashboard", "/dashboard/accounts", mobile=True, short="Home"),
+    _nav("announcements", "Announcements", "megaphone", "/dashboard/accounts/announcements"),
     _nav("fees", "Fees", "fees", "/dashboard/accounts/fees", mobile=True),
     _nav("finance", "Accounts", "tasks", "/dashboard/accounts/finance", mobile=True),
+    _nav("reports", "Reports", "exams", "/dashboard/accounts/reports", mobile=False),
     _nav("finance-reports", "Finance reports", "exams", "/dashboard/accounts/finance-reports"),
     _nav("refunds", "Refunds", "fees", "/dashboard/accounts/refunds"),
     _nav("inventory", "Inventory / Store", "tasks", "/dashboard/accounts/inventory"),
+    _nav("assets", "Fixed assets", "tasks", "/dashboard/accounts/assets"),
+    _nav("approvals", "My approval requests", "tasks", "/dashboard/accounts/approvals"),
     _nav("payroll", "Payroll", "fees", "/dashboard/accounts/payroll"),
-    _nav("staff-attendance", "Staff attendance", "clock", "/dashboard/accounts/staff-attendance"),
     _nav("payslips", "My pay & attendance", "file", "/dashboard/accounts/payslips"),
     _nav("fines", "Fines", "ban", "/dashboard/accounts/fines", mobile=True),
     _nav("tasks", "Tasks", "tasks", "/dashboard/accounts/tasks"),
     _nav("applications", "Applications", "file", "/dashboard/accounts/applications"),
     _nav("calendar", "Calendar", "clock", "/dashboard/accounts/calendar"),
+    _nav("profile", "My Profile", "user", "/dashboard/accounts/profile"),
 ]
 
 # Student self-service. Home is a real overview; Library is one service among
@@ -345,11 +399,23 @@ FACULTY_NAV_ITEMS = [
 
 @app.middleware("http")
 async def policy_refresh(request: Request, call_next):
-    """Keeps this worker's copy of the administrator-editable policy (app/policy) at most a minute old."""
-    if request.url.path.startswith("/api/"):
+    """Keeps this worker's copy of the administrator-editable policy and institute profile at most a minute old."""
+    if not request.url.path.startswith("/static/"):
         from app.policy.service import refresh_if_stale
 
         await refresh_if_stale()
+    return await call_next(request)
+
+
+@app.middleware("http")
+async def view_as_is_read_only(request: Request, call_next):
+    """While an administrator is viewing someone's screens ("view as"), nothing can be changed: every request that could
+    change data is refused here, before it reaches any route. Leaving the view, refreshing and signing out still work."""
+    if request.method not in ("GET", "HEAD", "OPTIONS") and request.url.path not in READ_ONLY_ALLOWED:
+        viewer = read_only_reason(request.cookies.get("access_token"))
+        if viewer:
+            return JSONResponse(status_code=403, content={"error": {"code": "READ_ONLY_VIEW", "details": None, "message":
+                "You are viewing this person's screens read-only. Exit the view to make changes in your own account."}})
     return await call_next(request)
 
 
@@ -446,6 +512,9 @@ app.include_router(policy_router, prefix=settings.api_v1_prefix)
 app.include_router(exams_router, prefix=settings.api_v1_prefix)
 app.include_router(sms_router, prefix=settings.api_v1_prefix)
 from app.reports.finance_router import router as finance_reports_router  # noqa: E402
+from app.reports.center_router import router as report_center_router  # noqa: E402
+
+app.include_router(report_center_router, prefix=settings.api_v1_prefix)
 
 app.include_router(finance_reports_router, prefix=settings.api_v1_prefix)
 from app.calendar.router import router as calendar_router  # noqa: E402
@@ -461,6 +530,13 @@ app.include_router(hostel_router, prefix=settings.api_v1_prefix)
 app.include_router(supplementary_router, prefix=settings.api_v1_prefix)
 app.include_router(refund_router, prefix=settings.api_v1_prefix)
 app.include_router(inventory_router, prefix=settings.api_v1_prefix)
+app.include_router(assets_router, prefix=settings.api_v1_prefix)
+app.include_router(approvals_router, prefix=settings.api_v1_prefix)
+app.include_router(branding_router, prefix=settings.api_v1_prefix)
+app.include_router(branding_public_router)
+app.include_router(view_as_router, prefix=settings.api_v1_prefix)
+app.include_router(activity_router, prefix=settings.api_v1_prefix)
+app.include_router(profile_changes_router, prefix=settings.api_v1_prefix)
 app.include_router(admissions_router, prefix=settings.api_v1_prefix)
 app.include_router(parents_router, prefix=settings.api_v1_prefix)
 app.include_router(audit_router, prefix=settings.api_v1_prefix)
@@ -574,7 +650,7 @@ _CALENDAR_PAGES = {
     "exam": ("exam/_base.html", "EXAM_NAV_ITEMS", None), "warden": ("warden/_base.html", "WARDEN_NAV_ITEMS", None),
     "faculty": ("faculty/_base.html", "FACULTY_NAV_ITEMS", None), "student": ("student/_base.html", "STUDENT_NAV_ITEMS", None),
     "parent": ("parent/_base.html", "PARENT_NAV_ITEMS", None), "principal": ("admin/_base.html", "PRINCIPAL_NAV_ITEMS", "ADMIN,PRINCIPAL"),
-    "hod": ("admin/_base.html", "HOD_NAV_ITEMS", "ADMIN,HOD"),
+    "hod": ("admin/_base.html", "HOD_NAV_ITEMS", "ADMIN,HOD"), "staff": ("staff/_base.html", "STAFF_NAV_ITEMS", None),
 }
 
 
@@ -599,6 +675,55 @@ async def verify_certificate_page(code: str, request: Request, db=Depends(get_db
                                           status_code=200 if result else 404)
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+_REPORT_PAGES = {
+    "admin": ("admin/_base.html", "ADMIN_NAV_ITEMS", "ADMIN"), "accounts": ("accounts/_base.html", "ACCOUNTS_NAV_ITEMS", "ADMIN,ACCOUNTS_OFFICER"),
+    "principal": ("admin/_base.html", "PRINCIPAL_NAV_ITEMS", "ADMIN,PRINCIPAL"), "hod": ("admin/_base.html", "HOD_NAV_ITEMS", "ADMIN,HOD"),
+    "exam": ("exam/_base.html", "EXAM_NAV_ITEMS", "ADMIN,EXAM_CONTROLLER"),
+}
+
+
+@app.get("/dashboard/{portal}/reports", include_in_schema=False)
+async def reports_page(portal: str, request: Request):
+    """One Reports page for every office; each person sees only the reports their permissions allow (checked again by the API)."""
+    if portal not in _REPORT_PAGES:
+        raise HTTPException(status_code=404)
+    base, nav, roles = _REPORT_PAGES[portal]
+    return templates.TemplateResponse(request, "shared/reports.html", {"base_template": base, "nav_items": globals()[nav], "active_nav": "reports",
+                                                                      "allowed_roles": roles, "app_name": settings.institute_name})
+
+
+@app.get("/dashboard/admin/approvals", include_in_schema=False)
+async def approvals_page_admin(request: Request):
+    return templates.TemplateResponse(request, "admin/approvals.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "approvals", "allowed_roles": "ADMIN"})
+
+
+@app.get("/dashboard/accounts/approvals", include_in_schema=False)
+async def approvals_page_accounts(request: Request):
+    return templates.TemplateResponse(request, "admin/approvals.html", {"nav_items": ACCOUNTS_NAV_ITEMS, "active_nav": "approvals",
+                                                                       "allowed_roles": "ADMIN,ACCOUNTS_OFFICER"})
+
+
+_ASSET_PAGES = {"admin": ("ADMIN_NAV_ITEMS", "ADMIN"), "accounts": ("ACCOUNTS_NAV_ITEMS", "ADMIN,ACCOUNTS_OFFICER"),
+                "principal": ("PRINCIPAL_NAV_ITEMS", "ADMIN,PRINCIPAL")}
+
+
+@app.get("/dashboard/assets/tag", include_in_schema=False)
+async def asset_label_scan(request: Request):
+    """Where a scanned asset label (QR) lands: sends the person to the fixed-asset page of their own portal, keeping #tag=..."""
+    return HTMLResponse("""<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Asset</title>
+<p>Opening the asset&hellip;</p>
+<script src="/static/js/asset-scan.js"></script>""")
+
+
+@app.get("/dashboard/{portal}/assets", include_in_schema=False)
+async def assets_page(portal: str, request: Request):
+    if portal not in _ASSET_PAGES:
+        raise HTTPException(status_code=404)
+    nav, roles = _ASSET_PAGES[portal]
+    return templates.TemplateResponse(request, "admin/assets.html", {"nav_items": globals()[nav], "active_nav": "assets", "allowed_roles": roles,
+                                                                     "app_name": settings.institute_name})
 
 
 @app.get("/dashboard/student/records", include_in_schema=False)
@@ -964,6 +1089,12 @@ async def admin_tasks_page(request: Request):
     return templates.TemplateResponse(request, "admin/tasks.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "tasks"})
 
 
+@app.get("/dashboard/gate/home", include_in_schema=False)
+async def gate_dashboard_page(request: Request):
+    """The gate's dashboard: who is inside, today's visitors and staff in / out."""
+    return templates.TemplateResponse(request, "gate/dashboard.html", {"nav_items": GATE_NAV_ITEMS, "active_nav": "home"})
+
+
 @app.get("/dashboard/gate", include_in_schema=False)
 async def gate_home_page(request: Request):
     return templates.TemplateResponse(request, "gate/home.html", {"nav_items": GATE_NAV_ITEMS, "active_nav": "gate"})
@@ -986,7 +1117,8 @@ async def admin_staff_attendance_page(request: Request):
 
 @app.get("/dashboard/accounts/staff-attendance", include_in_schema=False)
 async def accounts_staff_attendance_page(request: Request):
-    return templates.TemplateResponse(request, "admin/staff_attendance.html", {"nav_items": ACCOUNTS_NAV_ITEMS, "active_nav": "staff-attendance"})
+    """The accounts office no longer sees staff attendance (old bookmarks land on payroll)."""
+    return RedirectResponse("/dashboard/accounts/payroll", status_code=302)
 
 
 @app.get("/dashboard/gate/announcements", include_in_schema=False)
@@ -1032,6 +1164,12 @@ async def accounts_finance_reports_page(request: Request):
 @app.get("/dashboard/admin/finance", include_in_schema=False)
 async def admin_finance_page(request: Request):
     return templates.TemplateResponse(request, "admin/finance.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "finance"})
+
+
+@app.get("/dashboard/accounts", include_in_schema=False)
+async def accounts_home_page(request: Request):
+    """The accounts office's dashboard: today's collection, the month's money, what is waiting."""
+    return templates.TemplateResponse(request, "accounts/home.html", {"nav_items": ACCOUNTS_NAV_ITEMS, "active_nav": "home"})
 
 
 @app.get("/dashboard/accounts/finance", include_in_schema=False)
@@ -1143,6 +1281,12 @@ async def hod_progress_page(request: Request):
                                                                         "allowed_roles": "ADMIN,HOD"})
 
 
+@app.get("/dashboard/exam/home", include_in_schema=False)
+async def exam_dashboard_page(request: Request):
+    """The exam department's dashboard: result sheets by step, who to chase, datesheets."""
+    return templates.TemplateResponse(request, "exam/dashboard.html", {"nav_items": EXAM_NAV_ITEMS, "active_nav": "home"})
+
+
 @app.get("/dashboard/exam", include_in_schema=False)
 async def exam_home_page(request: Request):
     return templates.TemplateResponse(request, "admin/result_sheets.html", {"nav_items": EXAM_NAV_ITEMS, "active_nav": "results"})
@@ -1151,6 +1295,26 @@ async def exam_home_page(request: Request):
 @app.get("/dashboard/exam/datesheets", include_in_schema=False)
 async def exam_datesheets_page(request: Request):
     return templates.TemplateResponse(request, "admin/datesheets.html", {"nav_items": EXAM_NAV_ITEMS, "active_nav": "datesheets"})
+
+
+@app.get("/dashboard/admin/view-as", include_in_schema=False)
+async def admin_view_as_page(request: Request):
+    return templates.TemplateResponse(request, "admin/view_as.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "view-as"})
+
+
+@app.get("/dashboard/admin/profile-changes", include_in_schema=False)
+async def admin_profile_changes_page(request: Request):
+    return templates.TemplateResponse(request, "admin/profile_changes.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "profile-changes"})
+
+
+@app.get("/dashboard/admin/activity", include_in_schema=False)
+async def admin_activity_page(request: Request):
+    return templates.TemplateResponse(request, "shared/activity.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "activity", "portal": "admin"})
+
+
+@app.get("/dashboard/principal/activity", include_in_schema=False)
+async def principal_activity_page(request: Request):
+    return templates.TemplateResponse(request, "shared/activity.html", {"nav_items": PRINCIPAL_NAV_ITEMS, "active_nav": "activity", "portal": "principal"})
 
 
 @app.get("/dashboard/admin/sms", include_in_schema=False)
@@ -1211,6 +1375,12 @@ async def exam_purchases_page(request: Request):
 @app.get("/dashboard/exam/payslips", include_in_schema=False)
 async def exam_payslips_page(request: Request):
     return templates.TemplateResponse(request, "exam/payslips.html", {"nav_items": EXAM_NAV_ITEMS, "active_nav": "payslips"})
+
+
+@app.get("/dashboard/warden/home", include_in_schema=False)
+async def warden_dashboard_page(request: Request):
+    """The hostel warden's dashboard: rooms, beds, residents and unpaid hostel charges."""
+    return templates.TemplateResponse(request, "warden/dashboard.html", {"nav_items": WARDEN_NAV_ITEMS, "active_nav": "home"})
 
 
 @app.get("/dashboard/warden", include_in_schema=False)
@@ -1318,6 +1488,55 @@ async def faculty_profile_page(request: Request):
     return templates.TemplateResponse(
         request, "faculty/profile.html", {"nav_items": FACULTY_NAV_ITEMS, "active_nav": "profile"}
     )
+
+
+_PROFILE_PAGES = {"accounts": ("accounts/_base.html", "ACCOUNTS_NAV_ITEMS"), "library": ("library/_base.html", "LIBRARY_NAV_ITEMS"),
+                  "exam": ("exam/_base.html", "EXAM_NAV_ITEMS"), "gate": ("gate/_base.html", "GATE_NAV_ITEMS"),
+                  "warden": ("warden/_base.html", "WARDEN_NAV_ITEMS"), "staff": ("staff/_base.html", "STAFF_NAV_ITEMS")}
+
+
+def _office_profile_page(portal: str):
+    base, nav = _PROFILE_PAGES[portal]
+
+    async def page(request: Request):
+        """My Profile for an office portal or general staff (same page as faculty): details, photo and change requests."""
+        return templates.TemplateResponse(request, "shared/staff_profile.html", {"base_template": base, "nav_items": globals()[nav], "active_nav": "profile"})
+    return page
+
+
+# One real route per portal (not "/dashboard/{portal}/profile"), so notification links and the page checks see each page.
+for _portal in _PROFILE_PAGES:
+    app.add_api_route(f"/dashboard/{_portal}/profile", _office_profile_page(_portal), methods=["GET"], include_in_schema=False)
+
+
+_STAFF_PAGES = {"tasks": "tasks", "payslips": "payslips", "announcements": "announcements", "applications": "applications",
+                "purchases": "purchases", "complaints": "complaints"}
+
+
+@app.get("/dashboard/my-profile", include_in_schema=False)
+async def my_profile_redirect(request: Request):
+    """Sends anyone to the My Profile page of their own portal (used by profile-change notifications)."""
+    try:
+        roles = decode_access_token(request.cookies.get("access_token") or "").get("roles", [])
+    except Exception:
+        return RedirectResponse("/?reauth=1", status_code=302)
+    return RedirectResponse(profile_for_roles(roles) or "/", status_code=302)
+
+
+@app.get("/dashboard/staff", include_in_schema=False)
+async def staff_home_page(request: Request):
+    """General staff (office boy, IT, driver, cleaner...): today's attendance, tasks, requests and notices."""
+    return templates.TemplateResponse(request, "staff/home.html", {"nav_items": STAFF_NAV_ITEMS, "active_nav": "home"})
+
+
+def _staff_page(page: str):
+    async def view(request: Request):
+        return templates.TemplateResponse(request, f"staff/{_STAFF_PAGES[page]}.html", {"nav_items": STAFF_NAV_ITEMS, "active_nav": page})
+    return view
+
+
+for _page in _STAFF_PAGES:
+    app.add_api_route(f"/dashboard/staff/{_page}", _staff_page(_page), methods=["GET"], include_in_schema=False)
 
 
 @app.get("/dashboard/student/courses", include_in_schema=False)

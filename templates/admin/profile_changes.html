@@ -1,0 +1,40 @@
+{% extends "admin/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Profile changes{% endblock %}
+{% block page_title %}Profile changes{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Students and staff ask to change their contact details and photo. Nothing changes on their record until you approve.</div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" id="pcr-tabs">
+  <button class="portal-tab active" data-status="PENDING" role="tab" aria-selected="true"><span>Waiting <b id="pcr-count"></b></span></button>
+  <button class="portal-tab" data-status="APPROVED" role="tab" aria-selected="false"><span>Approved</span></button>
+  <button class="portal-tab" data-status="REJECTED" role="tab" aria-selected="false"><span>Rejected</span></button>
+  <button class="portal-tab" data-status="CANCELLED" role="tab" aria-selected="false"><span>Withdrawn</span></button>
+</div>
+<section class="panel">
+  <div class="toolbar"><input id="pcr-q" class="text-input" type="search" placeholder="Name, roll number or employee code" aria-label="Search" /></div>
+  <div class="pcr-list" id="pcr-list"><div class="skeleton-line"></div></div>
+  <p class="empty-state" id="pcr-empty" hidden>Nothing here.</p>
+</section>
+
+<dialog id="pcr-reject" class="modal" aria-labelledby="pcr-reject-h">
+  <form class="modal-body" id="pcr-reject-form" method="dialog">
+    <h2 id="pcr-reject-h">Reject this request</h2>
+    <p class="panel-hint" id="pcr-reject-who"></p>
+    <div class="form-field"><label for="pcr-reason">Reason (the person will see it)</label>
+      <textarea id="pcr-reason" class="text-input" rows="3" maxlength="1000" required placeholder="e.g. The photo is not clear: your face is partly covered."></textarea></div>
+    <div class="pcr-quick" id="pcr-quick">
+      <button type="button" class="chip-btn">The face is covered (mask, niqab or sunglasses).</button>
+      <button type="button" class="chip-btn">The photo is not clear. Use good light and face the camera.</button>
+      <button type="button" class="chip-btn">This is not a passport-style photo of you alone.</button>
+      <button type="button" class="chip-btn">The phone number is not correct.</button>
+    </div>
+    <div class="form-actions"><button type="submit" class="danger-btn" id="pcr-reject-go">Reject</button></div>
+    <button type="button" class="modal-close-btn" id="pcr-reject-close">Cancel</button>
+  </form>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/profile-changes-admin.js"></script>
+{% endblock %}

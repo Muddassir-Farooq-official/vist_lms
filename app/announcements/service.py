@@ -29,6 +29,7 @@ from app.students.models import Student, StudentStatus
 PORTAL_FOR_ROLE = {
     Roles.STUDENT: "/dashboard/student/announcements", Roles.TEACHER: "/dashboard/faculty/announcements",
     Roles.LIBRARIAN: "/dashboard/library/announcements", Roles.ACCOUNTS_OFFICER: "/dashboard/accounts/announcements", Roles.SECURITY_GUARD: "/dashboard/gate/announcements", Roles.EXAM_CONTROLLER: "/dashboard/exam/announcements", Roles.HOSTEL_WARDEN: "/dashboard/warden",
+    Roles.STAFF: "/dashboard/staff/announcements",
 }
 
 
@@ -193,7 +194,7 @@ class AnnouncementService:
         if student:
             row = (await self.session.execute(select(Student.program_id).where(Student.user_id == user_id))).first()
             program_id = row[0] if row else None
-        staff = any(r not in (Roles.STUDENT, Roles.TEACHER, Roles.ADMIN) for r in roles)
+        staff = any(r not in (Roles.STUDENT, Roles.TEACHER, Roles.ADMIN, Roles.PARENT) for r in roles)
         return Viewer(user_id=user_id, is_admin=is_admin, student=student, teacher=Roles.TEACHER in roles, staff=staff, program_id=program_id)
 
     @staticmethod
@@ -244,7 +245,7 @@ class AnnouncementService:
         if a.audience_teachers:
             wanted.append(lambda code: code == Roles.TEACHER)
         if a.audience_staff:
-            wanted.append(lambda code: code not in (Roles.STUDENT, Roles.TEACHER, Roles.ADMIN))
+            wanted.append(lambda code: code not in (Roles.STUDENT, Roles.TEACHER, Roles.ADMIN, Roles.PARENT))
         if wanted:
             rows = (await self.session.execute(
                 select(User.id, Role.code).join(UserRole, UserRole.user_id == User.id).join(Role, Role.id == UserRole.role_id).where(User.is_active.is_(True))

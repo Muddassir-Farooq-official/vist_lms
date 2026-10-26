@@ -1,0 +1,63 @@
+{% extends "admin/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block allowed_roles %}ADMIN,PRINCIPAL{% endblock %}
+{% block title %}Activity log{% endblock %}
+{% block page_title %}Activity log{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Everything done in the system: who did it (administrator, staff, student, parent or the system itself), what, when and from where.</div>{% endblock %}
+
+{% block content %}
+<div class="dash" id="activity-page">
+  <section class="panel dash-panel" aria-labelledby="al-filter-h">
+    <div class="dash-panel-head"><h2 id="al-filter-h">Find activity</h2>
+      <button type="button" class="role-btn small-btn secondary-btn" id="al-export" hidden>Download CSV</button></div>
+    <div class="al-chips" role="group" aria-label="Quick filters">
+      <button type="button" class="chip-btn" data-quick="today">Today</button>
+      <button type="button" class="chip-btn" data-quick="week">Last 7 days</button>
+      <button type="button" class="chip-btn" data-quick="logins">Sign-ins</button>
+      <button type="button" class="chip-btn" data-quick="money">Money</button>
+      <button type="button" class="chip-btn" data-quick="viewas">View as</button>
+      <button type="button" class="chip-btn" data-quick="clear">Clear filters</button>
+    </div>
+    <form class="al-filters" id="al-form">
+      <label class="al-q">Search<input id="al-q" class="text-input" type="search" placeholder="Username, action, record or record ID" /></label>
+      <label>Done by<select id="al-kind" class="select-input">
+        <option value="">Anyone</option><option value="admin">Administrators</option><option value="staff">Staff</option>
+        <option value="student">Students</option><option value="parent">Parents</option><option value="system">The system</option></select></label>
+      <label>Area<select id="al-action" class="select-input"><option value="">All areas</option></select></label>
+      <label>Record<select id="al-entity" class="select-input"><option value="">All records</option></select></label>
+      <label>From<input id="al-from" class="text-input" type="date" /></label>
+      <label>To<input id="al-to" class="text-input" type="date" /></label>
+      <button type="submit" class="role-btn">Show</button>
+    </form>
+    <p class="al-person" id="al-person" hidden></p>
+  </section>
+
+  <section class="panel dash-panel" aria-labelledby="al-list-h">
+    <div class="dash-panel-head"><h2 id="al-list-h">Activity</h2><small class="al-count" id="al-count"></small></div>
+    <ol class="al-list" id="al-list" aria-live="polite"><li class="skeleton-line"></li><li class="skeleton-line"></li></ol>
+    <p class="empty-state" id="al-empty" hidden>No activity matches these filters.</p>
+    <div class="pager">
+      <button type="button" class="page-btn" id="al-prev">&larr; Newer</button>
+      <span class="page-info" id="al-page"></span>
+      <button type="button" class="page-btn" id="al-next">Older &rarr;</button>
+    </div>
+  </section>
+</div>
+
+<dialog id="al-dialog" class="modal modal-wide" aria-labelledby="al-d-title">
+  <div class="modal-body">
+    <h2 id="al-d-title">Activity</h2>
+    <dl class="al-meta" id="al-d-meta"></dl>
+    <h3 class="dash-sub-h">What changed</h3>
+    <div class="table-scroll"><table class="dash-table al-diff"><thead><tr><th>Field</th><th>Before</th><th>After</th></tr></thead><tbody id="al-d-diff"></tbody></table></div>
+    <p class="dash-empty" id="al-d-nodiff" hidden>This entry records an event; no stored values changed.</p>
+    <h3 class="dash-sub-h">Other details</h3>
+    <pre class="al-json" id="al-d-extra"></pre>
+    <button type="button" class="modal-close-btn" id="al-d-close">Close</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/activity.js"></script>
+{% endblock %}

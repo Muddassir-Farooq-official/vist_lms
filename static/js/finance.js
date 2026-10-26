@@ -417,7 +417,7 @@
       }
       const res = await VA.fetchJson(API + "/period-close", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ closed_through: day || null, reason: reason }) });
       if (!res.ok) return VA.toast((res.body && res.body.error && res.body.error.message) || "Could not change it.", "error");
-      VA.toast(res.body.closed_through ? "Books closed up to " + res.body.closed_through + "." : "All periods are open again.");
+      VA.toast(res.body.pending_approval ? res.body.message : res.body.closed_through ? "Books closed up to " + res.body.closed_through + "." : "All periods are open again.");
       loadClose();
     });
     box.appendChild(b);

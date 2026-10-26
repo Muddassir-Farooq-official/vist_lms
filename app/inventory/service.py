@@ -140,8 +140,13 @@ class InventoryService:
 
     # ------------------------------------------------------------------ in: from purchases
     async def _stocked(self, purchase_item_id: uuid.UUID) -> Decimal:
+        """How much of a purchase-order line has been taken in: put into the store, or added to the fixed-asset register
+        (one asset per unit). Counting both stops the same goods being taken in twice."""
+        from app.assets.models import Asset
+
         total = (await self.session.execute(select(func.coalesce(func.sum(StockMovement.quantity), 0)).where(StockMovement.purchase_item_id == purchase_item_id))).scalar_one()
-        return _d(total)
+        assets = (await self.session.execute(select(func.count()).select_from(Asset).where(Asset.purchase_item_id == purchase_item_id))).scalar_one()
+        return _d(total) + _d(assets)
 
     async def purchases_to_stock(self) -> list[dict]:
         """Received purchase orders with lines not yet (fully) put into stock."""

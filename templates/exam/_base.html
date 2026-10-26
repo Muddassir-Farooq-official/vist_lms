@@ -3,9 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>{% block title %}Dashboard{% endblock %} — VIST LMS Exams</title>
+  <title>{% block title %}Dashboard{% endblock %} — {{ brand.short_name }} Exams</title>
   <link rel="stylesheet" href="/static/css/theme.css" />
   <link rel="stylesheet" href="/static/css/dashboard.css" />
+  {% from "_brand.html" import brand_head, brand_mark %}{{ brand_head() }}
   {% block extra_head %}{% endblock %}
 </head>
 <body data-allowed-roles="ADMIN,EXAM_CONTROLLER" data-login-path="/?reauth=1">
@@ -18,8 +19,7 @@
 
     <aside id="drawer" class="drawer">
       <div class="drawer-brand">
-        <span class="brand-mark">V</span>
-        VIST Exams
+        {{ brand_mark("Exams") }}
         <button id="drawer-close" class="drawer-close" type="button" aria-label="Close menu">{{ nav_icon("close") }}</button>
       </div>
 

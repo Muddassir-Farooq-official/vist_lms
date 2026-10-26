@@ -42,7 +42,10 @@ def amount_in_words(amount: float) -> str:
     return text.strip() + " Only"
 
 
-def render_challan_pdf(d: dict, *, institute_name: str = "Vertex Institute of Science & Technology") -> bytes:
+def render_challan_pdf(d: dict, *, institute_name: str | None = None) -> bytes:
+    from app.core import brand
+
+    institute_name = institute_name or brand.name()
     buf = io.BytesIO()
     w, h = landscape(A4)
     c = canvas.Canvas(buf, pagesize=(w, h))
@@ -55,13 +58,10 @@ def render_challan_pdf(d: dict, *, institute_name: str = "Vertex Institute of Sc
         right = x0 + col_w - pad
         if i:
             c.setDash(2, 2); c.setStrokeColor(LINE); c.line(x0, 8 * mm, x0, h - 8 * mm); c.setDash()
-        c.setFillColor(INK); c.setFont("Helvetica-Bold", 10.2)
-        name = institute_name
-        while c.stringWidth(name, "Helvetica-Bold", 10.2) > col_w - 2 * pad - 2 and len(name) > 12:
-            name = name[:-2]
-        c.drawCentredString(x0 + col_w / 2, top, name)
-        c.setFont("Helvetica-Bold", 9); c.setFillColor(BLUE); c.drawCentredString(x0 + col_w / 2, top - 5 * mm, f"FEE CHALLAN \u2014 {copy}")
-        y = top - 10.5 * mm
+        # Logo, institute name and address (Settings -> Institute), then which copy this is.
+        hy = brand.draw_header(c, x=x, y_top=top + 4 * mm, width=right - x, compact=True, logo_h=8 * mm)
+        c.setFont("Helvetica-Bold", 9); c.setFillColor(BLUE); c.drawCentredString(x0 + col_w / 2, hy - 1 * mm, f"FEE CHALLAN \u2014 {copy}")
+        y = hy - 6.5 * mm
         c.setStrokeColor(LINE); c.line(x, y + 2 * mm, right, y + 2 * mm)
 
         def row(label, value, bold=False, size=8.4):
@@ -99,8 +99,8 @@ def render_challan_pdf(d: dict, *, institute_name: str = "Vertex Institute of Sc
         row("Due date", d["due_date"].strftime("%d %b %Y"), bold=True)
         if d.get("late_fee_per_day"):
             c.setFillColor(colors.HexColor("#92400e")); c.setFont("Helvetica", 7.4)
-            c.drawString(x, y + 3.2 * mm, f"Late fee: Rs. {d['late_fee_per_day']:,.0f} for every day after the due date.")
-            y -= 2 * mm
+            c.drawString(x, y + 1 * mm, f"Late fee: Rs. {d['late_fee_per_day']:,.0f} for every day after the due date.")
+            y -= 3.5 * mm
         bar = code128.Code128(d["consumer_number"], barHeight=11 * mm, barWidth=0.33 * mm, humanReadable=False)
         bar.drawOn(c, x + max(0, ((right - x) - bar.width) / 2), y - 12 * mm)
         y -= 14.5 * mm
@@ -109,6 +109,13 @@ def render_challan_pdf(d: dict, *, institute_name: str = "Vertex Institute of Sc
         c.setFont("Helvetica", 6.9)
         for line in ("Pay with this consumer number at any bank branch,", "ATM or banking app (1LINK / 1Bill). Keep your copy.", "A payment is shown on your account after the bank confirms it."):
             c.drawCentredString(x0 + col_w / 2, y, line); y -= 3.2 * mm
+        bank = brand.bank_lines()
+        if bank:
+            y -= 1 * mm
+            c.setFillColor(INK); c.setFont("Helvetica-Bold", 6.9)
+            for line in bank:
+                c.drawCentredString(x0 + col_w / 2, y, brand.fit_text(c, line, "Helvetica-Bold", 6.9, right - x)); y -= 3.2 * mm
+            c.setFillColor(MUTED); c.setFont("Helvetica", 6.9)
         if copy == "BANK COPY":
             c.setStrokeColor(MUTED); c.line(x + 4 * mm, 18 * mm, right - 4 * mm, 18 * mm); c.drawCentredString(x0 + col_w / 2, 14.5 * mm, "Bank stamp and signature")
         if d["status"] == "PAID":
@@ -121,6 +128,7 @@ def render_challan_pdf(d: dict, *, institute_name: str = "Vertex Institute of Sc
             c.saveState(); c.translate(x0 + col_w / 2, h / 2 - 8 * mm); c.rotate(24); c.setFillColor(colors.HexColor("#c62828")); c.setFont("Helvetica-Bold", 20)
             c.drawCentredString(0, 0, "NOT VALID" if d["status"] == "CANCELLED" else "EXPIRED"); c.restoreState()
     c.setFillColor(MUTED); c.setFont("Helvetica", 6.8)
-    c.drawString(10 * mm, 5 * mm, f"Computer-generated on {d['generated_on'].strftime('%d %b %Y')}. The amount above is what is payable now; if a scholarship is given later, the new amount appears on a new copy.")
+    c.drawString(10 * mm, 5 * mm, brand.fit_text(c, f"Computer-generated on {d['generated_on'].strftime('%d %b %Y')}. The amount above is what is payable now; if a scholarship is given later, the new amount appears on a new copy."
+                                                  + (f"  \u00b7  {brand.settings.document_footer}" if brand.settings.document_footer else ""), "Helvetica", 6.8, w - 20 * mm))
     c.showPage(); c.save()
     return buf.getvalue()

@@ -15,9 +15,9 @@
 
 <div class="portal-tab-panel" data-tab-panel="runs">
   <section class="sh-card">
-    <div class="ann-toolbar"><p class="panel-hint" style="margin:0;flex:1">Prepare a month, adjust anything that needs it (unpaid days, extras), then the administration approves it and the accounts office pays it. Everyone gets their payslip when it is paid.</p>
+    <div class="ann-toolbar"><p class="panel-hint" style="margin:0;flex:1">The accounts office prepares a month, adjusts anything that needs it (unpaid days, extras) and sends it for approval. The administration approves it (or sends it back with a note), then the accounts office pays the salaries and marks it paid. Everyone gets their payslip when it is paid.</p>
       <input id="pr-month" class="text-input" type="month" aria-label="Month" /><input id="pr-wd" class="text-input small-input" type="number" min="1" max="31" placeholder="Working days" aria-label="Working days in the month" title="A day's pay = basic / working days (e.g. 26 or 22). Empty = the default in Settings." /><button type="button" class="role-btn" id="pr-prepare">Prepare payroll</button></div>
-    <p class="panel-hint">Absences and late arrivals / early leavings come from <a href="/dashboard/admin/staff-attendance">Staff attendance</a>. The rules (casual leaves, how many late marks make a day, security %) are in Settings &rarr; Payroll and can be changed any time; press Recalculate on a draft to apply them.</p>
+    <p class="panel-hint">Absences and late arrivals / early leavings come from staff attendance. The rules (casual leaves, how many late marks make a day, security %) are in Settings &rarr; Payroll and can be changed any time; press Recalculate on a draft to apply them.</p>
     <p id="pr-prep-error" class="dash-alert error" hidden></p>
     <div class="table-scroll"><table class="tk-table"><thead><tr><th>Month</th><th>Status</th><th class="num">Employees</th><th class="num">Gross</th><th class="num">Deductions</th><th class="num">Net pay</th></tr></thead><tbody id="rn-body"></tbody></table></div>
     <p class="empty-state" id="rn-empty" hidden>No payroll has been prepared yet.</p>
@@ -45,23 +45,21 @@
 
 <div class="portal-tab-panel" data-tab-panel="advances" hidden>
   <section class="sh-card">
-    <div class="sh-card-head"><h2>Pay an advance</h2></div>
-    <p class="panel-hint">Money paid to a member of staff before payday. It is paid now (and recorded as an expense) and then taken back a little at a time from their payslips.</p>
+    <div class="sh-card-head"><h2>Ask for a salary advance</h2></div>
+    <p class="panel-hint">Money paid to a member of staff before payday. Three steps: the accounts office asks for it here, an administrator approves it, then the accounts office hands it over (it is recorded as an expense) and it is taken back a little at a time from the next payslips. One person may owe at most the limit in Settings &rarr; Payroll (normally one month's basic salary), and nobody can ask for or pay an advance to themselves.</p>
     <form id="ad-form" class="form-grid two-col" novalidate>
       <div class="form-field two-span"><label for="ad-emp">Employee</label><input id="ad-emp" class="text-input" type="search" placeholder="Search by name or employee code&hellip;" autocomplete="off" /><div id="ad-emp-list" class="picker-list"></div></div>
       <div class="form-field"><label for="ad-amount">Advance (Rs.)</label><input id="ad-amount" class="text-input" type="number" min="1" step="0.01" /></div>
       <div class="form-field"><label for="ad-rec">Taken back each month (Rs.)</label><input id="ad-rec" class="text-input" type="number" min="1" step="0.01" /></div>
-      <div class="form-field"><label for="ad-method">Paid by</label><select id="ad-method" class="select-input"><option value="CASH">Cash</option><option value="BANK_TRANSFER">Bank transfer</option><option value="CHEQUE">Cheque</option><option value="ONLINE">Online</option></select></div>
-      <div class="form-field"><label for="ad-ref">Cheque no. / reference <small class="field-hint inline">(for cheques and transfers)</small></label><input id="ad-ref" class="text-input" maxlength="80" /></div>
-      <div class="form-field"><label for="ad-date">Date paid</label><input id="ad-date" class="text-input" type="date" /></div>
+      <div class="form-field"><label for="ad-method">Will be paid by</label><select id="ad-method" class="select-input"><option value="CASH">Cash</option><option value="BANK_TRANSFER">Bank transfer</option><option value="CHEQUE">Cheque</option><option value="ONLINE">Online</option></select></div>
       <div class="form-field"><label for="ad-reason">Reason</label><input id="ad-reason" class="text-input" maxlength="300" /></div>
       <p id="ad-error" class="dash-alert error two-span" hidden></p>
-      <div class="form-actions two-span"><button type="button" class="role-btn" id="ad-save">Pay the advance</button></div>
+      <div class="form-actions two-span"><button type="button" class="role-btn" id="ad-save">Send for approval</button></div>
     </form>
   </section>
   <section class="sh-card">
     <div class="sh-card-head"><h2>Advances</h2></div>
-    <div class="table-scroll"><table class="tk-table"><thead><tr><th>Employee</th><th>Date</th><th class="num">Advance</th><th class="num">Each month</th><th class="num">Still owed</th><th>Status</th></tr></thead><tbody id="ad-body"></tbody></table></div>
+    <div class="table-scroll"><table class="tk-table"><thead><tr><th>Employee</th><th>Date</th><th class="num">Advance</th><th class="num">Each month</th><th class="num">Still owed</th><th>Status</th><th></th></tr></thead><tbody id="ad-body"></tbody></table></div>
     <p class="empty-state" id="ad-empty" hidden>No advances yet.</p>
   </section>
 </div>

@@ -2,96 +2,178 @@
 {% from "_icons.html" import nav_icon %}
 {% block title %}Dashboard{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
-{% block page_subtitle %}<div class="content-subtitle">Welcome back! Here's what's happening at your institute.</div>{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Everything happening at {{ brand.short_name }} today, in one place.</div>{% endblock %}
 
 {% block content %}
-<section class="stat-grid" id="stat-grid" aria-label="Student status overview">
-  <div class="stat-card stat-card--blue">
-    <div class="stat-icon-badge">{{ nav_icon("students") }}</div>
-    <span class="stat-label">Total Students</span>
-    <span class="stat-value" id="stat-total">&mdash;</span>
-    <span class="stat-trend" id="stat-total-trend"></span>
-  </div>
-  <div class="stat-card stat-card--green">
-    <div class="stat-icon-badge">{{ nav_icon("check-circle") }}</div>
-    <span class="stat-label">Active</span>
-    <span class="stat-value" id="stat-active">&mdash;</span>
-    <span class="stat-trend" id="stat-active-trend"></span>
-  </div>
-  <div class="stat-card stat-card--purple">
-    <div class="stat-icon-badge">{{ nav_icon("ban") }}</div>
-    <span class="stat-label">Suspended</span>
-    <span class="stat-value" id="stat-suspended">&mdash;</span>
-    <span class="stat-trend" id="stat-suspended-trend"></span>
-  </div>
-  <div class="stat-card stat-card--orange">
-    <div class="stat-icon-badge">{{ nav_icon("graduation-cap") }}</div>
-    <span class="stat-label">Graduated</span>
-    <span class="stat-value" id="stat-graduated">&mdash;</span>
-    <span class="stat-trend" id="stat-graduated-trend"></span>
-  </div>
-  <div class="stat-card stat-card--red">
-    <div class="stat-icon-badge">{{ nav_icon("trash") }}</div>
-    <span class="stat-label">Dropped</span>
-    <span class="stat-value" id="stat-dropped">&mdash;</span>
-    <span class="stat-trend" id="stat-dropped-trend"></span>
-  </div>
-  <div class="stat-card stat-card--teal">
-    <div class="stat-icon-badge">{{ nav_icon("grid") }}</div>
-    <span class="stat-label">Programs</span>
-    <span class="stat-value" id="stat-programs">&mdash;</span>
-    <span class="stat-trend">Total programs</span>
-  </div>
-</section>
+<div class="dash" id="admin-dash">
 
-<div class="dash-columns">
-  <section class="panel">
-    <div class="panel-header">
-      <div class="panel-header-left">
-        <div class="panel-icon-badge">{{ nav_icon("graduation-cap") }}</div>
-        <h2>Students by Program</h2>
-      </div>
-      <a href="/dashboard/admin/students" class="view-all-link">View all {{ nav_icon("arrow-right") }}</a>
+  <!-- Greeting, term and quick actions -->
+  <section class="dash-hero" aria-labelledby="dh-greet">
+    <div class="dash-hero-text">
+      <h2 id="dh-greet">Welcome back</h2>
+      <p id="dh-sub"><span id="dh-date"></span><span class="dash-chip" id="dh-term" hidden></span></p>
     </div>
-    <div id="programs-table-wrap">
-      <table class="dash-table" id="programs-table">
-        <thead><tr><th>Program</th><th>Code</th><th class="num">Students</th></tr></thead>
-        <tbody id="programs-tbody"></tbody>
-      </table>
-      <p class="empty-state" id="programs-empty" hidden>No programs yet.</p>
-    </div>
+    <nav class="dash-actions" aria-label="Quick actions">
+      <a href="/dashboard/admin/students" class="dash-action">{{ nav_icon("students") }}<span>Add student</span></a>
+      <a href="/dashboard/admin/fees" class="dash-action">{{ nav_icon("fees") }}<span>Fees</span></a>
+      <a href="/dashboard/admin/announcements" class="dash-action">{{ nav_icon("megaphone") }}<span>Announce</span></a>
+      <a href="/dashboard/admin/staff-attendance" class="dash-action">{{ nav_icon("clock") }}<span>Staff in / out</span></a>
+      <a href="/dashboard/admin/reports" class="dash-action">{{ nav_icon("file") }}<span>Reports</span></a>
+    </nav>
   </section>
 
-  <section class="panel">
-    <div class="panel-header">
-      <div class="panel-header-left">
-        <div class="panel-icon-badge">{{ nav_icon("cloud-upload") }}</div>
-        <h2>Recent Imports</h2>
+  <p class="dash-alert error" id="dash-error" hidden></p>
+
+  <!-- Key numbers -->
+  <section class="kpi-row" aria-label="Key numbers">
+    <a class="kpi" href="/dashboard/admin/students" data-tone="blue">
+      <span class="kpi-icon">{{ nav_icon("students") }}</span>
+      <span class="kpi-label">Active students</span>
+      <strong class="kpi-value" id="k-students">&mdash;</strong>
+      <span class="kpi-sub" id="k-students-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/admin/finance" data-tone="green">
+      <span class="kpi-icon">{{ nav_icon("fees") }}</span>
+      <span class="kpi-label">Fees collected this month</span>
+      <strong class="kpi-value" id="k-collected">&mdash;</strong>
+      <span class="kpi-sub" id="k-collected-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/admin/finance-reports" data-tone="orange">
+      <span class="kpi-icon">{{ nav_icon("file") }}</span>
+      <span class="kpi-label">Fees still owed</span>
+      <strong class="kpi-value" id="k-owed">&mdash;</strong>
+      <span class="kpi-sub" id="k-owed-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/admin/attendance" data-tone="purple">
+      <span class="kpi-icon">{{ nav_icon("attendance") }}</span>
+      <span class="kpi-label">Class attendance</span>
+      <strong class="kpi-value" id="k-attendance">&mdash;</strong>
+      <span class="kpi-sub" id="k-attendance-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/admin/staff-attendance" data-tone="teal">
+      <span class="kpi-icon">{{ nav_icon("employees") }}</span>
+      <span class="kpi-label">Staff in today</span>
+      <strong class="kpi-value" id="k-staff">&mdash;</strong>
+      <span class="kpi-sub" id="k-staff-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="#dh-attention-panel" data-tone="red">
+      <span class="kpi-icon">{{ nav_icon("tasks") }}</span>
+      <span class="kpi-label">Waiting for you</span>
+      <strong class="kpi-value" id="k-waiting">&mdash;</strong>
+      <span class="kpi-sub" id="k-waiting-sub">&nbsp;</span>
+    </a>
+  </section>
+
+  <!-- Money + attention -->
+  <div class="dash-grid dash-grid--2-1">
+    <section class="panel dash-panel" aria-labelledby="dh-money-h">
+      <div class="dash-panel-head">
+        <h2 id="dh-money-h">Money in and out</h2>
+        <a href="/dashboard/admin/finance" class="view-all-link">Accounts {{ nav_icon("arrow-right") }}</a>
       </div>
-      <a href="/dashboard/admin/imports" class="view-all-link">View all {{ nav_icon("arrow-right") }}</a>
+      <div class="money-figs">
+        <div><span>Income, last 12 months</span><strong id="m-income">&mdash;</strong></div>
+        <div><span>Expenses</span><strong id="m-expenses">&mdash;</strong></div>
+        <div><span>Surplus</span><strong id="m-net">&mdash;</strong></div>
+      </div>
+      <div class="money-chart" id="m-chart"><div class="skeleton-line"></div></div>
+    </section>
+
+    <section class="panel dash-panel" id="dh-attention-panel" aria-labelledby="dh-att-h">
+      <div class="dash-panel-head"><h2 id="dh-att-h">Needs your attention</h2></div>
+      <ul class="attn-list" id="attn-list"><li class="skeleton-line"></li><li class="skeleton-line short"></li></ul>
+      <p class="attn-clear" id="attn-clear" hidden>{{ nav_icon("check-circle") }} All clear. Nothing is waiting for you.</p>
+    </section>
+  </div>
+
+  <!-- Students, campus today, teaching -->
+  <div class="dash-grid dash-grid--3">
+    <section class="panel dash-panel" aria-labelledby="dh-stu-h">
+      <div class="dash-panel-head">
+        <h2 id="dh-stu-h">Students</h2>
+        <a href="/dashboard/admin/students" class="view-all-link">All {{ nav_icon("arrow-right") }}</a>
+      </div>
+      <div class="status-bar" id="st-bar" aria-hidden="true"></div>
+      <ul class="status-legend" id="st-legend"></ul>
+      <h3 class="dash-sub-h">By program</h3>
+      <div id="st-programs"></div>
+    </section>
+
+    <section class="panel dash-panel" aria-labelledby="dh-today-h">
+      <div class="dash-panel-head"><h2 id="dh-today-h">On campus today</h2></div>
+      <div class="today-block">
+        <div class="today-head"><span>{{ nav_icon("employees") }} Staff</span><a href="/dashboard/admin/staff-attendance">Open</a></div>
+        <div class="meter" id="t-staff-meter" aria-hidden="true"></div>
+        <ul class="mini-stats" id="t-staff"></ul>
+      </div>
+      <div class="today-block">
+        <div class="today-head"><span>{{ nav_icon("shield") }} Gate</span><a href="/dashboard/admin/gate">Open</a></div>
+        <ul class="mini-stats" id="t-gate"></ul>
+      </div>
+      <div class="today-block">
+        <div class="today-head"><span>{{ nav_icon("hostel") }} Hostel</span><a href="/dashboard/admin/hostel">Open</a></div>
+        <ul class="mini-stats" id="t-hostel"></ul>
+      </div>
+    </section>
+
+    <section class="panel dash-panel" aria-labelledby="dh-teach-h">
+      <div class="dash-panel-head">
+        <h2 id="dh-teach-h">Teaching this term</h2>
+        <a href="/dashboard/admin/overview" class="view-all-link">Overview {{ nav_icon("arrow-right") }}</a>
+      </div>
+      <ul class="fact-list" id="teach-list"><li class="skeleton-line"></li></ul>
+      <h3 class="dash-sub-h">Results</h3>
+      <ul class="fact-list" id="results-list"></ul>
+    </section>
+  </div>
+
+  <!-- Calendar, announcements, activity -->
+  <div class="dash-grid dash-grid--3">
+    <section class="panel dash-panel" aria-labelledby="dh-cal-h">
+      <div class="dash-panel-head">
+        <h2 id="dh-cal-h">Coming up</h2>
+        <a href="/dashboard/admin/calendar" class="view-all-link">Calendar {{ nav_icon("arrow-right") }}</a>
+      </div>
+      <ul class="event-list" id="cal-list"></ul>
+      <p class="dash-empty" id="cal-empty" hidden>Nothing on the calendar for the next two weeks.</p>
+    </section>
+
+    <section class="panel dash-panel" aria-labelledby="dh-ann-h">
+      <div class="dash-panel-head">
+        <h2 id="dh-ann-h">Announcements</h2>
+        <a href="/dashboard/admin/announcements" class="view-all-link">All {{ nav_icon("arrow-right") }}</a>
+      </div>
+      <ul class="note-list" id="ann-list"></ul>
+      <p class="dash-empty" id="ann-empty" hidden>No announcements yet. <a href="/dashboard/admin/announcements">Write the first one</a>.</p>
+    </section>
+
+    <section class="panel dash-panel" aria-labelledby="dh-act-h">
+      <div class="dash-panel-head">
+        <h2 id="dh-act-h">Recent activity</h2>
+        <a href="/dashboard/admin/activity" class="view-all-link">View all {{ nav_icon("arrow-right") }}</a>
+      </div>
+      <ul class="timeline" id="activity-list"></ul>
+      <p class="dash-empty" id="activity-empty" hidden>No activity recorded yet.</p>
+    </section>
+  </div>
+
+  <!-- Imports (kept from the old dashboard, shown only when there are any) -->
+  <section class="panel dash-panel" id="imports-panel" hidden aria-labelledby="dh-imp-h">
+    <div class="dash-panel-head">
+      <h2 id="dh-imp-h">Recent imports</h2>
+      <a href="/dashboard/admin/imports" class="view-all-link">All {{ nav_icon("arrow-right") }}</a>
     </div>
-    <div id="imports-table-wrap">
-      <table class="dash-table" id="imports-table">
+    <div class="table-scroll">
+      <table class="dash-table">
         <thead><tr><th>File</th><th>Status</th><th class="num">Rows</th><th>When</th></tr></thead>
         <tbody id="imports-tbody"></tbody>
       </table>
-      <p class="empty-state" id="imports-empty" hidden>No imports yet. <a href="/dashboard/admin/imports">Upload a CSV</a>.</p>
     </div>
   </section>
 </div>
-
-<section class="panel">
-  <div class="panel-header">
-    <div class="panel-header-left">
-      <div class="panel-icon-badge">{{ nav_icon("clock") }}</div>
-      <h2>Recent Activity</h2>
-    </div>
-  </div>
-  <ul class="activity-list" id="activity-list"></ul>
-  <p class="empty-state" id="activity-empty" hidden>No activity recorded yet.</p>
-</section>
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="/static/js/charts.js"></script>
 <script src="/static/js/dashboard.js"></script>
 {% endblock %}

@@ -367,6 +367,9 @@ class FeeStructureService:
         structure = await self.get(structure_id)
         if structure.status != FeeStructureStatus.ACTIVE:
             raise BusinessRuleViolationError("Only an active fee structure has an activation to undo.")
+        fee_type = await self.session.get(FeeType, structure.fee_type_id)
+        if fee_type is not None and fee_type.code == "OPENING":
+            raise BusinessRuleViolationError("Previous dues cannot be undone in bulk. Cancel a wrong entry on its own in Fees \u2192 Previous dues.")
         if len((reason or "").strip()) < 5:
             raise BusinessRuleViolationError("Say why the activation is being undone.")
         ids = list((await self.session.execute(select(FeeAssignment.id).where(FeeAssignment.fee_structure_id == structure_id))).scalars())
@@ -377,6 +380,13 @@ class FeeStructureService:
             if touched or refunds:
                 raise BusinessRuleViolationError(
                     f"This activation cannot be undone: payments, discounts or refunds already exist on {max(touched, refunds)} fee(s). Reverse those first, or close this fee instead.")
+            # Only unused charges reach this point (no payment, discount or refund). Financial rows are protected from
+            # cascading deletes (audit DB-03), so the challans, charges and fees are removed explicitly, in order.
+            from app.fees.payment_models import PaymentChallan
+
+            await self.session.execute(delete(PaymentChallan).where(PaymentChallan.fee_assignment_id.in_(ids)))
+            await self.session.execute(delete(FeeLedgerEntry).where(FeeLedgerEntry.fee_assignment_id.in_(ids), FeeLedgerEntry.related_entry_id.is_not(None)))
+            await self.session.execute(delete(FeeLedgerEntry).where(FeeLedgerEntry.fee_assignment_id.in_(ids)))
             await self.session.execute(delete(FeeAssignment).where(FeeAssignment.id.in_(ids)))
         structure.status = FeeStructureStatus.DRAFT
         structure.activated_at = None
@@ -536,6 +546,18 @@ class FeeStructureService:
 
         return newly_assigned
 
+    async def _still_current(self, structure: FeeStructure) -> bool:
+        """Whether a still-ACTIVE fee belongs to a term that is running now, so a student admitted, moved or promoted
+        today should be charged it. A fee whose academic term is closed, or whose term's end date has passed, is not.
+        (Every fee structure names its term; on the live system terms must be registered, so this is always known.)"""
+        from app.academics.terms import AcademicTermService, TermStatus
+        from app.core.clock import institute_today
+
+        term = await AcademicTermService(self.session).by_label(structure.term_label)
+        if term is None:
+            return True
+        return not (term.status == TermStatus.CLOSED or (term.end_date is not None and term.end_date < institute_today()))
+
     async def assign_matching_active_structures_to_student(self, student: Student, *, actor_id: uuid.UUID) -> int:
         """Closes a real gap: activating a fee structure only ever
         charged students who were ALREADY at the matching semester at
@@ -560,6 +582,8 @@ class FeeStructureService:
 
         newly_assigned = 0
         for structure in active_structures:
+            if not await self._still_current(structure):
+                continue                                   # an earlier term's fee: never charged to someone joining or moving now
             program_links = await self.repo.get_program_links(structure.id)
             if program_links and student.program_id not in [link.program_id for link in program_links]:
                 continue

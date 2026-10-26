@@ -21,19 +21,22 @@ def render_receipt_pdf(data: dict) -> bytes:
     w, h = A5
     c = canvas.Canvas(buf, pagesize=A5)
     c.setTitle(f"Receipt {data['receipt_number']}" + (" (VOID)" if data.get("void") else ""))
-    x0, y = 14 * mm, h - 18 * mm
-    c.setFillColor(INK)
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(x0, y, data.get("institute") or "Fee Receipt")
-    c.setFont("Helvetica", 9)
-    c.setFillColor(MUTED)
+    from app.core import brand
+
+    x0 = 14 * mm
     refund = data.get("kind") == "refund"
-    c.drawString(x0, y - 5 * mm, "Refund voucher \u2014 money paid back" if refund else "Official payment receipt")
+    # The institute's logo, name, address and contact (Settings -> Institute).
+    y = brand.draw_header(c, x=x0, y_top=h - 10 * mm, width=w - 2 * x0, center=False, compact=True) - 2 * mm
     c.setFillColor(INK)
     c.setFont("Helvetica-Bold", 11)
+    c.drawString(x0, y, "REFUND VOUCHER" if refund else "PAYMENT RECEIPT")
     c.drawRightString(w - x0, y, data["receipt_number"])
+    c.setFont("Helvetica", 8.5)
+    c.setFillColor(MUTED)
+    c.drawString(x0, y - 4.5 * mm, "Money paid back" if refund else "Official payment receipt")
     c.setStrokeColor(LINE)
-    c.line(x0, y - 9 * mm, w - x0, y - 9 * mm)
+    c.line(x0, y - 7 * mm, w - x0, y - 7 * mm)
+    y += 2 * mm
 
     payer = data.get("payer") or {}
     rows = [
@@ -47,7 +50,7 @@ def render_receipt_pdf(data: dict) -> bytes:
         ("Reference", data.get("reference") or "\u2014"),
         ("Details", (data.get("description") or "\u2014")[:70]),
     ]
-    yy = y - 17 * mm
+    yy = y - 15 * mm
     for label, value in rows:
         c.setFont("Helvetica", 9)
         c.setFillColor(MUTED)
@@ -72,6 +75,7 @@ def render_receipt_pdf(data: dict) -> bytes:
     c.drawString(x0, 20 * mm, f"Recorded on {data.get('recorded_on')}" + (f" by {data['recorded_by']}" if data.get("recorded_by") else ""))
     c.drawString(x0, 15 * mm, "Received the above amount: ______________________ (signature)" if refund
                  else "Computer-generated receipt. Keep it until the fee shows as paid on your account.")
+    brand.draw_footer(c, x=x0, y=9 * mm, width=w - 2 * x0)
     if data.get("void"):
         c.saveState()
         c.setFillColor(colors.Color(0.8, 0.1, 0.1, alpha=0.28))

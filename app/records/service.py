@@ -162,16 +162,33 @@ class RecordsService:
         return {"clear": not problems, "problems": problems, "store_items": store, "to_settle": to_settle}
 
     async def _student_fee_problems(self, student_id: uuid.UUID) -> list[str]:
-        from app.fees.assignment_service import FeeStatusCalculator
+        """Clearance needs ALL fees settled, including installments not yet due and late fees not yet posted
+        (owner decision 7). Unpaid fines are checked separately."""
+        from app.fees.assignment_service import FeeStatusCalculator, late_pause
         from app.fees.models import AssignmentStatus, FeeAssignment, FeeLedgerEntry, FeeStructure, PayerType
 
         rows = (await self.session.execute(select(FeeAssignment, FeeStructure.late_fee_per_day).join(FeeStructure, FeeStructure.id == FeeAssignment.fee_structure_id).where(
             FeeAssignment.payer_type == PayerType.STUDENT, FeeAssignment.payer_id == student_id, FeeAssignment.status == AssignmentStatus.ACTIVE))).all()
-        overdue = 0.0
-        for a, late in rows:
+        overdue = upcoming = late = 0.0
+        for a, per_day in rows:
             entries = list((await self.session.execute(select(FeeLedgerEntry).where(FeeLedgerEntry.fee_assignment_id == a.id))).scalars())
-            overdue += FeeStatusCalculator.compute(entries, float(late) if late else None)["overdue_principal"]
-        return [f"Fees overdue: Rs. {overdue:,.0f}."] if overdue > 0.005 else []
+            for r in FeeStatusCalculator.installments(entries, float(per_day) if per_day else None, pause=late_pause(a)):
+                if r["status"] == "OVERDUE":
+                    overdue += r["remaining"]
+                else:
+                    upcoming += r["remaining"]
+                late += max(r["late_fee"] - r["late_fee_posted"], 0.0)       # posted late fees are fines, counted with the fines
+        out = []
+        if overdue > 0.005:
+            out.append(f"Fees overdue: Rs. {overdue:,.0f}.")
+        if upcoming > 0.005:
+            out.append(f"Fees not yet due: Rs. {upcoming:,.0f}.")
+        if late > 0.005:
+            out.append(f"Late fee: Rs. {late:,.0f}.")
+        return out
+
+    async def fee_dues_total(self, student_id: uuid.UUID) -> list[str]:
+        return await self._student_fee_problems(student_id)
 
     # ------------------------------------------------------------------ certificates
     async def _register(self, kind: str, owner_type: str, owner_id: uuid.UUID, name: str, details: dict, actor_id) -> IssuedDocument:

@@ -23,6 +23,14 @@ LAST = (institute_today().replace(day=1) - timedelta(days=1)).replace(day=1)    
 LAST_DAYS = pay_rules.days_in(LAST)
 ALL_WEEK = {"in_time": "09:00", "out_time": "17:00", "grace_in_minutes": 10, "grace_out_minutes": 5, "working_days": [0, 1, 2, 3, 4, 5, 6]}
 
+async def _approve(client, run_id):
+    """Payroll now goes DRAFT -> SUBMITTED (accounts office) -> APPROVED (administration). Submit, then approve."""
+    sub = await client.post(f"/api/v1/payroll/runs/{run_id}/submit")
+    if sub.status_code != 200 and "Only a draft" not in sub.text:     # already submitted is fine; a real problem is returned
+        return sub
+    return await client.post(f"/api/v1/payroll/runs/{run_id}/approve")
+
+
 
 @pytest.fixture(autouse=True)
 def _quiet(monkeypatch):
@@ -183,7 +191,7 @@ async def test_security_deposit_is_held_until_it_equals_the_basic_salary(app_cli
             return {ln["source"]: ln["amount"] for ln in got[who]}
         assert lines("TCH") == {"SECURITY": 5000.0}                          # 10% = 6,000 but only 5,000 was still to hold
         assert lines("STF") == {"SECURITY": 3000.0} and lines("NON") == {}  # 10% of 30,000; NON is excused (0%)
-        assert (await app_client.post(f"{PR}/runs/{run['id']}/approve")).status_code == 200
+        assert (await _approve(app_client, run['id'])).status_code == 200
         paid = await app_client.post(f"{PR}/runs/{run['id']}/pay", json={"payment_method": "CASH", "paid_date": institute_today().isoformat()})
         assert paid.status_code == 200, paid.text
         rep = {p["name"].split()[0]: p for p in (await app_client.get(f"{PR}/security")).json()["people"]}

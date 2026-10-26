@@ -73,7 +73,8 @@ class PayrollService:
             return "/dashboard"
         codes = set((await self.session.execute(select(Role.code).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == user_id))).scalars())
         for role, link in ((Roles.ACCOUNTS_OFFICER, "/dashboard/accounts/payslips"), (Roles.TEACHER, "/dashboard/faculty/payslips"), (Roles.LIBRARIAN, "/dashboard/library/payslips"),
-                           (Roles.SECURITY_GUARD, "/dashboard/gate/payslips"), (Roles.EXAM_CONTROLLER, "/dashboard/exam/payslips"), (Roles.HOSTEL_WARDEN, "/dashboard/warden/payslips")):
+                           (Roles.SECURITY_GUARD, "/dashboard/gate/payslips"), (Roles.EXAM_CONTROLLER, "/dashboard/exam/payslips"), (Roles.HOSTEL_WARDEN, "/dashboard/warden/payslips"),
+                           (Roles.STAFF, "/dashboard/staff/payslips")):
             if role in codes:
                 return link
         return "/dashboard"
@@ -116,8 +117,13 @@ class PayrollService:
         if valid_from and valid_until and valid_until < valid_from:
             raise BusinessRuleViolationError("The end date cannot be before the start date.")
 
+    @staticmethod
+    def _not_own_pay(e: Employee, actor_id: uuid.UUID, what: str) -> None:
+        if e.user_id is not None and e.user_id == actor_id:
+            raise BusinessRuleViolationError(f"You cannot {what} for yourself. Another member of staff must do it.")
+
     async def add_pay_item(self, data: dict, *, actor_id: uuid.UUID) -> EmployeePayItem:
-        await self._employee(data["employee_id"])
+        self._not_own_pay(await self._employee(data["employee_id"]), actor_id, "change pay items")
         self._check_item(data["calc"], data["value"], data.get("valid_from"), data.get("valid_until"))
         i = EmployeePayItem(**{**data, "name": data["name"].strip()})
         self.session.add(i)
@@ -129,6 +135,7 @@ class PayrollService:
         i = await self.session.get(EmployeePayItem, item_id)
         if i is None:
             raise ResourceNotFoundError("Pay item not found.")
+        self._not_own_pay(await self._employee(i.employee_id), actor_id, "change pay items")
         for k, v in changes.items():
             setattr(i, k, v.strip() if isinstance(v, str) else v)
         self._check_item(i.calc, i.value, i.valid_from, i.valid_until)
@@ -137,40 +144,138 @@ class PayrollService:
 
     # ------------------------------------------------------------------ advances
     async def advances(self, employee_id: uuid.UUID | None, status: AdvanceStatus | None) -> list[dict]:
-        stmt = select(SalaryAdvance, Employee).join(Employee, Employee.id == SalaryAdvance.employee_id).order_by(SalaryAdvance.granted_on.desc())
+        stmt = select(SalaryAdvance, Employee).join(Employee, Employee.id == SalaryAdvance.employee_id).order_by(SalaryAdvance.created_at.desc())
         if employee_id:
             stmt = stmt.where(SalaryAdvance.employee_id == employee_id)
         if status:
             stmt = stmt.where(SalaryAdvance.status == status)
-        return [{"id": a.id, "employee_id": e.id, "employee_name": f"{e.first_name} {e.last_name}", "employee_code": e.employee_code, "amount": _f(a.amount), "monthly_recovery": _f(a.monthly_recovery),
-                 "balance": _f(a.balance), "status": a.status, "reason": a.reason, "granted_on": a.granted_on} for a, e in (await self.session.execute(stmt.limit(500))).all()]
+        rows = (await self.session.execute(stmt.limit(500))).all()
+        names = await self.accounts._names({u for a, _ in rows for u in (a.requested_by, a.decided_by, a.paid_by, a.granted_by)})
+        return [{"id": a.id, "employee_id": e.id, "employee_name": f"{e.first_name} {e.last_name}", "employee_code": e.employee_code, "amount": _f(a.amount),
+                 "monthly_recovery": _f(a.monthly_recovery), "balance": _f(a.balance), "status": a.status, "reason": a.reason, "granted_on": a.granted_on,
+                 "payment_method": a.payment_method, "payment_reference": a.payment_reference,
+                 "requested_by_name": names.get(a.requested_by or a.granted_by), "decided_by_name": names.get(a.decided_by), "decided_at": a.decided_at,
+                 "decision_note": a.decision_note, "paid_by_name": names.get(a.paid_by), "paid_at": a.paid_at, "created_at": a.created_at} for a, e in rows]
 
-    async def grant_advance(self, *, actor_id: uuid.UUID, employee_id: uuid.UUID, amount: Decimal, monthly_recovery: Decimal, reason: str, method: PaymentMethod,
-                            reference: str | None, granted_on: date) -> SalaryAdvance:
+    async def _advance(self, advance_id: uuid.UUID) -> SalaryAdvance:
+        a = (await self.session.execute(select(SalaryAdvance).where(SalaryAdvance.id == advance_id).with_for_update()
+                                        .execution_options(populate_existing=True))).scalar_one_or_none()
+        if a is None:
+            raise ResourceNotFoundError("Advance not found.")
+        return a
+
+    async def _check_advance_limit(self, e: Employee, amount: Decimal, *, ignore: uuid.UUID | None = None) -> None:
+        """At most `payroll_advance_max_salary_multiple` months of basic salary may be owed in advances at once,
+        counting what is still to be recovered and what is waiting for approval or payout."""
+        base = (await self._salaries([e.id], institute_today())).get(e.id) or Decimal(0)
+        if base <= 0:
+            raise BusinessRuleViolationError("This employee has no basic salary on record, so no advance can be given.")
+        cap = rules.q2(base * Decimal(str(settings.payroll_advance_max_salary_multiple or 1)))
+        open_rows = (await self.session.execute(select(SalaryAdvance).where(
+            SalaryAdvance.employee_id == e.id,
+            SalaryAdvance.status.in_((AdvanceStatus.REQUESTED, AdvanceStatus.APPROVED, AdvanceStatus.ACTIVE))))).scalars().all()
+        owed = sum((Decimal(str(a.balance if a.status == AdvanceStatus.ACTIVE else a.amount)) for a in open_rows if a.id != ignore), Decimal(0))
+        if owed + amount > cap:
+            raise BusinessRuleViolationError(
+                f"Too much: {e.first_name} {e.last_name} may owe at most Rs. {float(cap):,.0f} in advances "
+                f"({float(settings.payroll_advance_max_salary_multiple or 1):g} x basic salary). "
+                f"Already owed or waiting: Rs. {float(owed):,.0f}; at most Rs. {float(max(cap - owed, Decimal(0))):,.0f} more.")
+
+    async def request_advance(self, *, actor_id: uuid.UUID, employee_id: uuid.UUID, amount: Decimal, monthly_recovery: Decimal, reason: str,
+                              method: PaymentMethod, reference: str | None = None, granted_on: date | None = None) -> SalaryAdvance:
+        """Step 1: the accounts office asks for an advance. Nothing is paid yet; an administrator must approve it."""
         e = await self._employee(employee_id)
         if e.status not in ACTIVE:
             raise BusinessRuleViolationError("Choose a current member of staff.")
+        if e.user_id is not None and e.user_id == actor_id:
+            raise BusinessRuleViolationError("You cannot ask for an advance for yourself here. Another member of staff must request it.")
         amount, recovery = rules.q2(amount), rules.q2(monthly_recovery)
         if amount <= 0 or amount > MAX_MONEY or recovery <= 0 or recovery > amount:
             raise BusinessRuleViolationError("The advance must be more than 0, and the monthly recovery must be more than 0 and no more than the advance.")
-        if granted_on > institute_today():
+        if len((reason or "").strip()) < 3:
+            raise BusinessRuleViolationError("Give the reason for the advance.")
+        await self._check_advance_limit(e, amount)
+        a = SalaryAdvance(employee_id=e.id, amount=amount, monthly_recovery=recovery, balance=amount, status=AdvanceStatus.REQUESTED, reason=reason.strip(),
+                          granted_by=None, granted_on=granted_on or institute_today(), payment_method=method, requested_by=actor_id)
+        self.session.add(a)
+        await self.session.flush()
+        await self.audit.log(actor_user_id=actor_id, action="payroll.advance_requested", entity_type="salary_advance", entity_id=a.id, metadata={"amount": str(amount)})
+        for admin in await self._approver_ids():
+            if admin != actor_id:
+                await create_notification(self.session, user_id=admin, category=NotificationCategory.PAYROLL, title=f"Salary advance to approve: Rs. {float(amount):,.0f}",
+                                          message=f"{e.first_name} {e.last_name}: {reason.strip()}", link="/dashboard/admin/payroll?open=advances")
+        return a
+
+    async def _approver_ids(self) -> list[uuid.UUID]:
+        from app.auth.models import Permission, RolePermission, User
+
+        return list(set((await self.session.execute(
+            select(User.id).join(UserRole, UserRole.user_id == User.id).join(RolePermission, RolePermission.role_id == UserRole.role_id)
+            .join(Permission, Permission.id == RolePermission.permission_id).where(Permission.code == "payroll.approve", User.is_active.is_(True)))).scalars()))
+
+    async def decide_advance(self, advance_id: uuid.UUID, *, admin_id: uuid.UUID, approve: bool, note: str | None) -> SalaryAdvance:
+        """Step 2: an administrator approves or rejects. Never their own request, never an advance to themselves."""
+        a = await self._advance(advance_id)
+        if a.status != AdvanceStatus.REQUESTED:
+            raise BusinessRuleViolationError("This advance is not waiting for a decision.")
+        e = await self._employee(a.employee_id)
+        from app.core.controls import four_eyes, refuse_self
+
+        refuse_self(admin_id, e.user_id, "An advance to yourself must be decided by another administrator.")
+        # Whoever asked for it does not approve it; an institute with a single administrator is not left stuck.
+        await four_eyes(self.session, admin_id, [a.requested_by], "payroll.approve",
+                        "You asked for this advance, so another administrator must decide it.")
+        if not approve and len((note or "").strip()) < 3:
+            raise BusinessRuleViolationError("Say why the advance is rejected.")
+        if approve:
+            await self._check_advance_limit(e, Decimal(str(a.amount)), ignore=a.id)
+        a.status = AdvanceStatus.APPROVED if approve else AdvanceStatus.REJECTED
+        a.decided_by, a.decided_at, a.decision_note = admin_id, datetime.now(timezone.utc), (note or "").strip() or None
+        await self.audit.log(actor_user_id=admin_id, action="payroll.advance_approved" if approve else "payroll.advance_rejected", entity_type="salary_advance", entity_id=a.id)
+        if a.requested_by and a.requested_by != admin_id:
+            await create_notification(self.session, user_id=a.requested_by, category=NotificationCategory.PAYROLL,
+                                      title=f"Salary advance {'approved' if approve else 'rejected'}: {e.first_name} {e.last_name}",
+                                      message=f"Rs. {float(a.amount):,.0f}" + (" \u2014 it can be paid now." if approve else f" \u2014 {a.decision_note}"),
+                                      link="/dashboard/accounts/payroll?open=advances")
+        return a
+
+    async def pay_advance(self, advance_id: uuid.UUID, *, actor_id: uuid.UUID, method: PaymentMethod, reference: str | None, paid_on: date) -> SalaryAdvance:
+        """Step 3: the accounts office hands the approved advance over. It becomes an expense and is recovered from the next payslips."""
+        a = await self._advance(advance_id)
+        if a.status != AdvanceStatus.APPROVED:
+            raise BusinessRuleViolationError("Only an approved advance can be paid." if a.status == AdvanceStatus.REQUESTED else f"This advance is {a.status.value.lower()}.")
+        e = await self._employee(a.employee_id)
+        if e.user_id is not None and e.user_id == actor_id:
+            raise BusinessRuleViolationError("You cannot pay an advance to yourself. Another member of staff must hand it over.")
+        if paid_on > institute_today():
             raise BusinessRuleViolationError("The date cannot be in the future.")
         if method in NEEDS_REFERENCE and not (reference or "").strip():
             raise BusinessRuleViolationError("Enter the cheque number or the bank transaction reference.")
+        from app.accounts.period import ensure_open
+
+        await ensure_open(self.session, paid_on, "This advance")
         category = await self._salary_category()
-        expense = Expense(category_id=category.id, title=f"Salary advance: {e.first_name} {e.last_name}", description=reason.strip(), amount=amount, expense_date=granted_on, payment_method=method,
-                          reference_no=(reference or "").strip() or None, status=ExpenseStatus.APPROVED, source=ExpenseSource.PAYROLL, recorded_by=actor_id, decided_by=actor_id, decided_at=datetime.now(timezone.utc))
+        expense = Expense(category_id=category.id, title=f"Salary advance: {e.first_name} {e.last_name}", description=a.reason, amount=a.amount, expense_date=paid_on,
+                          payment_method=method, reference_no=(reference or "").strip() or None, status=ExpenseStatus.APPROVED, source=ExpenseSource.PAYROLL,
+                          source_ref_id=a.id, recorded_by=actor_id, decided_by=a.decided_by, decided_at=a.decided_at, decision_note="Approved as a salary advance.")
         self.session.add(expense)
         await self.session.flush()
-        a = SalaryAdvance(employee_id=e.id, amount=amount, monthly_recovery=recovery, balance=amount, status=AdvanceStatus.ACTIVE, reason=reason.strip(), granted_by=actor_id, granted_on=granted_on,
-                          payment_method=method, expense_id=expense.id)
-        self.session.add(a)
-        await self.session.flush()
-        expense.source_ref_id = a.id
-        await self.audit.log(actor_user_id=actor_id, action="payroll.advance_granted", entity_type="salary_advance", entity_id=a.id, metadata={"amount": str(amount)})
+        a.status, a.expense_id, a.payment_method, a.payment_reference = AdvanceStatus.ACTIVE, expense.id, method, (reference or "").strip() or None
+        a.granted_on, a.granted_by, a.paid_by, a.paid_at = paid_on, a.decided_by, actor_id, datetime.now(timezone.utc)
+        await self.audit.log(actor_user_id=actor_id, action="payroll.advance_paid", entity_type="salary_advance", entity_id=a.id, metadata={"amount": str(a.amount), "expense": str(expense.id)})
         if e.user_id:
-            await create_notification(self.session, user_id=e.user_id, category=NotificationCategory.PAYROLL, title=f"Salary advance: Rs. {float(amount):,.0f}",
-                                      message=f"It will be taken back at Rs. {float(recovery):,.0f} a month from your salary.", link=await self._link_for(e.user_id))
+            await create_notification(self.session, user_id=e.user_id, category=NotificationCategory.PAYROLL, title=f"Salary advance: Rs. {float(a.amount):,.0f}",
+                                      message=f"It will be taken back at Rs. {float(a.monthly_recovery):,.0f} a month from your salary.", link=await self._link_for(e.user_id))
+        return a
+
+    async def cancel_advance(self, advance_id: uuid.UUID, *, actor_id: uuid.UUID, reason: str) -> SalaryAdvance:
+        a = await self._advance(advance_id)
+        if a.status not in (AdvanceStatus.REQUESTED, AdvanceStatus.APPROVED):
+            raise BusinessRuleViolationError("Only an advance that has not been paid can be cancelled.")
+        if len((reason or "").strip()) < 3:
+            raise BusinessRuleViolationError("Say why it is cancelled.")
+        a.status, a.decision_note = AdvanceStatus.CANCELLED, f"Cancelled: {reason.strip()}"[:300]
+        await self.audit.log(actor_user_id=actor_id, action="payroll.advance_cancelled", entity_type="salary_advance", entity_id=a.id, metadata={"reason": reason.strip()})
         return a
 
     async def _salary_category(self) -> AccountCategory:
@@ -410,10 +515,51 @@ class PayrollService:
         await self.audit.log(actor_user_id=actor_id, action="payroll.payslip_adjusted", entity_type="payslip", entity_id=slip.id)
         return slip
 
-    async def approve(self, run_id: uuid.UUID, *, admin_id: uuid.UUID) -> PayrollRun:
-        run = await self._run(run_id)
+    async def _run_locked(self, run_id: uuid.UUID) -> PayrollRun:
+        run = (await self.session.execute(select(PayrollRun).where(PayrollRun.id == run_id).with_for_update()
+                                          .execution_options(populate_existing=True))).scalar_one_or_none()
+        if run is None:
+            raise ResourceNotFoundError("Payroll run not found.")
+        return run
+
+    async def submit(self, run_id: uuid.UUID, *, actor_id: uuid.UUID) -> PayrollRun:
+        """The accounts office has checked the draft and sends it to the administration. It is locked until approved or sent back."""
+        run = await self._run_locked(run_id)
         if run.status != S.DRAFT:
-            raise BusinessRuleViolationError("Only a draft can be approved.")
+            raise BusinessRuleViolationError("Only a draft can be sent for approval.")
+        slips = [s for s in await self._payslips(run.id) if not s.held]
+        if not slips:
+            raise BusinessRuleViolationError("Every payslip is held back, so there is nothing to send for approval.")
+        negative = [s.employee_name for s in slips if Decimal(str(s.net)) < 0]
+        if negative:
+            raise BusinessRuleViolationError("These people would be paid less than nothing: " + ", ".join(negative[:5]) + ". Adjust their deductions or hold their payslip.")
+        await self._totals(run)
+        run.status, run.submitted_by, run.submitted_at = S.SUBMITTED, actor_id, datetime.now(timezone.utc)
+        await self.audit.log(actor_user_id=actor_id, action="payroll.submitted", entity_type="payroll_run", entity_id=run.id, metadata={"net": str(run.total_net)})
+        for admin in await self._approver_ids():
+            if admin != actor_id:
+                await create_notification(self.session, user_id=admin, category=NotificationCategory.PAYROLL, title=f"Payroll to approve: {run.month:%B %Y}",
+                                          message=f"{run.employees_count} employees, net Rs. {float(run.total_net):,.0f}.", link="/dashboard/admin/payroll")
+        return run
+
+    async def send_back(self, run_id: uuid.UUID, *, admin_id: uuid.UUID, reason: str) -> PayrollRun:
+        """The administration returns a submitted run to the accounts office for corrections."""
+        run = await self._run_locked(run_id)
+        if run.status != S.SUBMITTED:
+            raise BusinessRuleViolationError("Only a run waiting for approval can be sent back.")
+        if len((reason or "").strip()) < 3:
+            raise BusinessRuleViolationError("Say what needs correcting.")
+        run.status, run.returned_reason = S.DRAFT, reason.strip()
+        await self.audit.log(actor_user_id=admin_id, action="payroll.sent_back", entity_type="payroll_run", entity_id=run.id, metadata={"reason": reason.strip()})
+        if run.submitted_by and run.submitted_by != admin_id:
+            await create_notification(self.session, user_id=run.submitted_by, category=NotificationCategory.PAYROLL, title=f"Payroll sent back: {run.month:%B %Y}",
+                                      message=reason.strip(), link="/dashboard/accounts/payroll")
+        return run
+
+    async def approve(self, run_id: uuid.UUID, *, admin_id: uuid.UUID) -> PayrollRun:
+        run = await self._run_locked(run_id)
+        if run.status != S.SUBMITTED:
+            raise BusinessRuleViolationError("The accounts office must send this payroll for approval first." if run.status == S.DRAFT else "Only a payroll waiting for approval can be approved.")
         slips = [s for s in await self._payslips(run.id) if not s.held]
         if not slips:
             raise BusinessRuleViolationError("Every payslip is held back, so there is nothing to approve.")
@@ -423,11 +569,14 @@ class PayrollService:
         await self._totals(run)
         run.status, run.approved_by, run.approved_at = S.APPROVED, admin_id, datetime.now(timezone.utc)
         await self.audit.log(actor_user_id=admin_id, action="payroll.approved", entity_type="payroll_run", entity_id=run.id, metadata={"net": str(run.total_net)})
+        if run.submitted_by and run.submitted_by != admin_id:
+            await create_notification(self.session, user_id=run.submitted_by, category=NotificationCategory.PAYROLL, title=f"Payroll approved: {run.month:%B %Y}",
+                                      message="It can be paid now.", link="/dashboard/accounts/payroll")
         return run
 
     async def cancel(self, run_id: uuid.UUID, *, actor_id: uuid.UUID, reason: str) -> PayrollRun:
-        run = await self._run(run_id)
-        if run.status not in (S.DRAFT, S.APPROVED):
+        run = await self._run_locked(run_id)
+        if run.status not in (S.DRAFT, S.SUBMITTED, S.APPROVED):
             raise BusinessRuleViolationError("Only a payroll run that has not been paid can be cancelled." if run.status == S.PAID else "This run is already cancelled.")
         if len((reason or "").strip()) < 3:
             raise BusinessRuleViolationError("Say why you are cancelling it.")
@@ -436,13 +585,16 @@ class PayrollService:
         return run
 
     async def pay(self, run_id: uuid.UUID, *, actor_id: uuid.UUID, method: PaymentMethod, reference: str | None, paid_date: date) -> PayrollRun:
-        run = await self._run(run_id)
+        run = await self._run_locked(run_id)
         if run.status != S.APPROVED:
             raise BusinessRuleViolationError("Only an approved payroll run can be paid.")
         if method in NEEDS_REFERENCE and not (reference or "").strip():
             raise BusinessRuleViolationError("Enter the cheque number or the bank transaction reference.")
         if paid_date > institute_today():
             raise BusinessRuleViolationError("The payment date cannot be in the future.")
+        from app.accounts.period import ensure_open
+
+        await ensure_open(self.session, paid_date, "This salary payment")
         slips = [s for s in await self._payslips(run.id) if not s.held]
         total = sum((Decimal(str(s.net)) for s in slips), Decimal(0))
         if total <= 0:
@@ -472,16 +624,20 @@ class PayrollService:
         return run
 
     async def reverse_payment(self, run_id: uuid.UUID, *, admin_id: uuid.UUID, reason: str) -> PayrollRun:
-        run = await self._run(run_id)
+        run = await self._run_locked(run_id)
         if run.status != S.PAID:
             raise BusinessRuleViolationError("Only a paid payroll run can have its payment reversed.")
+        e = await self.session.get(Expense, run.expense_id) if run.expense_id else None
+        from app.accounts.period import ensure_open
+
+        # Voiding the salary expense changes the month it was booked in, so that month must still be open.
+        await ensure_open(self.session, e.expense_date if e is not None else run.paid_date, "This salary payment")
         for s in [s for s in await self._payslips(run.id) if not s.held]:
             for ln in (await self.session.execute(select(PayslipLine).where(PayslipLine.payslip_id == s.id, PayslipLine.source == "ADVANCE"))).scalars():
                 adv = await self.session.get(SalaryAdvance, ln.ref_id)
                 if adv is not None:
                     adv.balance = min(Decimal(str(adv.amount)), Decimal(str(adv.balance)) + Decimal(str(ln.amount)))
                     adv.status = AdvanceStatus.ACTIVE
-        e = await self.session.get(Expense, run.expense_id) if run.expense_id else None
         if e is not None:
             e.status, e.voided_at, e.void_reason = ExpenseStatus.VOIDED, datetime.now(timezone.utc), f"Payroll payment reversed: {reason.strip()}"
         run.status, run.paid_by, run.paid_at, run.paid_date, run.payment_method, run.payment_reference, run.expense_id = S.APPROVED, None, None, None, None, None, None
@@ -500,12 +656,13 @@ class PayrollService:
                 "gross": _f(s.gross), "deductions": _f(s.deductions), "net": _f(s.net)}
 
     async def _run_row(self, r: PayrollRun) -> dict:
-        names = await self.accounts._names({r.created_by, r.approved_by, r.paid_by})
+        names = await self.accounts._names({r.created_by, r.submitted_by, r.approved_by, r.paid_by})
         exp = await self.session.get(Expense, r.expense_id) if r.expense_id else None
         return {"id": r.id, "reference": run_ref(r), "month": r.month, "month_label": r.month.strftime("%B %Y"), "status": r.status, "working_days": r.working_days, "employees_count": r.employees_count, "total_gross": _f(r.total_gross),
                 "total_deductions": _f(r.total_deductions), "total_net": _f(r.total_net), "created_by_name": names.get(r.created_by), "approved_by_name": names.get(r.approved_by), "approved_at": r.approved_at,
                 "paid_by_name": names.get(r.paid_by), "paid_at": r.paid_at, "paid_date": r.paid_date, "payment_method": r.payment_method, "payment_reference": r.payment_reference,
-                "expense_reference": expense_ref(exp) if exp else None, "cancel_reason": r.cancel_reason, "created_at": r.created_at}
+                "expense_reference": expense_ref(exp) if exp else None, "cancel_reason": r.cancel_reason, "created_at": r.created_at,
+                "submitted_by_name": names.get(r.submitted_by), "submitted_at": r.submitted_at, "returned_reason": r.returned_reason}
 
     async def runs(self) -> list[dict]:
         return [await self._run_row(r) for r in (await self.session.execute(select(PayrollRun).order_by(PayrollRun.month.desc(), PayrollRun.created_at.desc()).limit(120))).scalars()]
@@ -574,8 +731,8 @@ class PayrollService:
             raise ResourceNotFoundError("Payslip not found.")
         if not slip.held:
             raise BusinessRuleViolationError("This payslip is not held back.")
-        if run.status in (S.DRAFT, S.CANCELLED):
-            raise BusinessRuleViolationError("Release it only once the payroll is approved; until then, untick 'hold back' on the payslip.")
+        if run.status in (S.DRAFT, S.SUBMITTED, S.CANCELLED):
+            raise BusinessRuleViolationError("Release it only once the payroll is approved; until then, untick 'hold back' on the payslip (in a draft).")
         if run.status == S.APPROVED:
             slip.held, slip.held_reason = False, None
             await self.session.flush()
@@ -604,6 +761,7 @@ class PayrollService:
         from app.accounts.period import ensure_open
 
         e = await self._employee(employee_id)
+        self._not_own_pay(e, actor_id, "pay back a security deposit")
         if paid_date > institute_today():
             raise BusinessRuleViolationError("The date cannot be in the future.")
         if method in NEEDS_REFERENCE and not (reference or "").strip():

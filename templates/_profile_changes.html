@@ -1,0 +1,42 @@
+{# Self-service: ask the office to change contact details or the photo. Included on the student and staff "My Profile" pages. #}
+<section class="panel pc-panel" id="pc-panel" aria-labelledby="pc-h">
+  <div class="panel-header">
+    <div class="panel-header-left"><h2 id="pc-h">Update my details</h2></div>
+    <span class="status-pill pending" id="pc-badge" hidden>Waiting for approval</span>
+  </div>
+  <p class="panel-hint">Change your phone, email, address or emergency contact here. The office checks every change before it appears on your record.
+    Your name, CNIC, date of birth{% if portal == "student" %}, roll number and program{% endif %} can only be corrected by the office.</p>
+
+  <div class="pc-pending" id="pc-pending" hidden>
+    <h3 class="dash-sub-h">Sent for approval</h3>
+    <ul class="pc-diff" id="pc-pending-list"></ul>
+    <div class="pc-pending-photo" id="pc-pending-photo" hidden>
+      <img id="pc-pending-img" alt="The new photo you sent" />
+      <div><strong>New photo</strong><small>It replaces your current photo once the office approves it.</small>
+        <button type="button" class="link-btn" id="pc-photo-drop">Take this photo back</button></div>
+    </div>
+    <button type="button" class="role-btn small-btn secondary-btn" id="pc-withdraw">Withdraw the whole request</button>
+  </div>
+
+  <form class="pc-form" id="pc-form" novalidate>
+    <div class="pc-fields" id="pc-fields"></div>
+    <label class="pc-note">Note for the office (optional)<input id="pc-note" class="text-input" maxlength="500" placeholder="e.g. My old number is no longer in use" /></label>
+    <p class="dash-alert error" id="pc-error" hidden></p>
+    <button type="submit" class="role-btn" id="pc-submit">Send for approval</button>
+  </form>
+
+  <div class="pc-photo-rules">
+    <h3 class="dash-sub-h">Photo rules</h3>
+    <ul>
+      <li>Only you, facing the camera, head and shoulders, plain background.</li>
+      <li>Your whole face uncovered: no mask, niqab, sunglasses or cap covering it.</li>
+      <li>Good light, not blurred. JPG or PNG, at most 5 MB.</li>
+    </ul>
+    <p class="panel-hint">Photos are checked automatically first, then by the office. To send a new photo, click your photo at the top of the page.</p>
+  </div>
+
+  <div id="pc-history-wrap" hidden>
+    <h3 class="dash-sub-h">Earlier requests</h3>
+    <ul class="person-list" id="pc-history"></ul>
+  </div>
+</section>

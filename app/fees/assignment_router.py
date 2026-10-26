@@ -136,7 +136,7 @@ async def get_statement(
     current_user: CurrentUser = Depends(_STAFF_ONLY),
     db=Depends(get_db),
 ) -> dict:
-    from app.fees.assignment_service import FeeStatusCalculator
+    from app.fees.assignment_service import FeeStatusCalculator, late_pause
     from app.fees.models import FeeAssignment, LedgerEntryType
 
     assignment = await db.get(FeeAssignment, assignment_id)
@@ -145,14 +145,16 @@ async def get_statement(
     structure = await db.get(FeeStructure, assignment.fee_structure_id)
     entries = await FeeAssignmentRepository(db).get_ledger(assignment_id)
     late = float(structure.late_fee_per_day) if structure and structure.late_fee_per_day else None
-    rows = FeeStatusCalculator.installments(entries, late)
+    rows = FeeStatusCalculator.installments(entries, late, pause=late_pause(assignment))
     label = {r["ledger_entry_id"]: (f"Installment {r['installment_number']}" if r["installment_number"] else (r["description"] or "Charge")) for r in rows}
     applied: dict = {}
     for r in rows:
         for part in r["paid_from"]:
             applied.setdefault(part["ledger_entry_id"], []).append({"installment": label[r["ledger_entry_id"]], "amount": part["amount"]})
     # Running balance: charges add, discounts / payments reduce, refunds add back (money returned).
-    reversed_ids = {e.related_entry_id for e in entries if e.related_entry_id and FeeStatusCalculator._is_reversal(e)}
+    from app.fees.assignment_service import credit_is_reversed
+
+    reversed_ids = {e.id for e in entries if e.entry_type == LedgerEntryType.CREDIT and await credit_is_reversed(db, e)}
     sign = {LedgerEntryType.DEBIT: 1, LedgerEntryType.CONCESSION: -1, LedgerEntryType.CREDIT: -1, LedgerEntryType.REFUND: 1}
     names = {LedgerEntryType.DEBIT: "Charge", LedgerEntryType.CONCESSION: "Discount", LedgerEntryType.CREDIT: "Payment", LedgerEntryType.REFUND: "Refund paid back"}
     ordered = sorted(entries, key=lambda e: (e.created_at, 0 if e.entry_type == LedgerEntryType.DEBIT else 1))
@@ -265,6 +267,13 @@ async def change_status(
     current_user: CurrentUser = Depends(require_permission(Permissions.FEE_MANAGE)),
     db=Depends(get_db),
 ) -> FeeAssignmentOut:
+    from fastapi.responses import JSONResponse
+
+    from app.approvals.models import ApprovalRequest
+    from app.approvals.service import pending_response
+
     service = FeeAssignmentService(db)
-    assignment = await service.change_status(assignment_id, status=payload.status, actor_id=current_user.id)
+    assignment = await service.change_status(assignment_id, status=payload.status, actor_id=current_user.id, reason=payload.reason)
+    if isinstance(assignment, ApprovalRequest):
+        return JSONResponse(status_code=202, content=pending_response(assignment))
     return await _to_assignment_out(db, assignment)

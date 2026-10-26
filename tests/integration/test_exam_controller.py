@@ -34,9 +34,9 @@ async def _as_exam(client, creds):
 
 
 def test_the_exam_department_has_its_own_login_destination():
-    assert home_for_roles(["EXAM_CONTROLLER"]) == "/dashboard/exam"
+    assert home_for_roles(["EXAM_CONTROLLER"]) == "/dashboard/exam/home"                         # their dashboard
     assert home_for_roles(["EXAM_CONTROLLER", "ADMIN"]) == "/dashboard/admin"                      # the most privileged portal still wins
-    assert [i["slug"] for i in EXAM_NAV_ITEMS][:2] == ["results", "result-types"] and EXAM_NAV_ITEMS[0]["href"] == "/dashboard/exam"
+    assert [i["slug"] for i in EXAM_NAV_ITEMS][:3] == ["home", "results", "result-types"] and EXAM_NAV_ITEMS[1]["href"] == "/dashboard/exam"
 
 
 async def test_the_exam_department_runs_the_whole_result_process(app_client, admin_user, db_session):
@@ -110,20 +110,20 @@ async def test_the_exam_portal_pages_exist_and_are_for_the_exam_department(app_c
     assert 'data-allowed-roles="ADMIN,EXAM_CONTROLLER"' in html and 'data-tab="SCALE"' in html and 'data-tab="CARDS"' in html
     assert 'data-allowed-roles="ADMIN,EXAM_CONTROLLER"' in (await app_client.get("/dashboard/exam/result-types")).text
     tasks = (await app_client.get("/dashboard/exam/tasks")).text
-    assert 'data-allowed-roles="ADMIN,EXAM_CONTROLLER"' in tasks and "VIST Exams" in tasks
+    assert 'data-allowed-roles="ADMIN,EXAM_CONTROLLER"' in tasks and "VIST LMS Exams" in tasks
 
 
 # ====================================================================== the hostel warden also has somewhere to land
 async def test_the_hostel_warden_has_a_portal_of_their_own():
     from app.main import WARDEN_NAV_ITEMS
-    assert home_for_roles(["HOSTEL_WARDEN"]) == "/dashboard/warden"
+    assert home_for_roles(["HOSTEL_WARDEN"]) == "/dashboard/warden/home"
     assert home_for_roles(["HOSTEL_WARDEN"], must_change_password=True) == "/change-password"
-    assert [i["slug"] for i in WARDEN_NAV_ITEMS] == ["hostel", "announcements", "tasks", "applications", "purchases", "payslips", "calendar"]
-    assert "/dashboard/warden" in {i["href"] for i in WARDEN_NAV_ITEMS}                                            # the sign-in landing page is in the menu
+    assert [i["slug"] for i in WARDEN_NAV_ITEMS] == ["home", "hostel", "announcements", "tasks", "applications", "purchases", "payslips", "calendar", "profile"]
+    assert "/dashboard/warden/home" in {i["href"] for i in WARDEN_NAV_ITEMS}                                            # the sign-in landing page is in the menu
 
 
 async def test_every_hostel_warden_page_opens_and_belongs_to_the_warden(app_client):
     from app.main import WARDEN_NAV_ITEMS
     for item in WARDEN_NAV_ITEMS:
         r = await app_client.get(item["href"])
-        assert r.status_code == 200 and 'data-allowed-roles="ADMIN,HOSTEL_WARDEN"' in r.text and "VIST Hostel" in r.text, item["href"]
+        assert r.status_code == 200 and 'data-allowed-roles="ADMIN,HOSTEL_WARDEN"' in r.text and "VIST LMS Hostel" in r.text, item["href"]

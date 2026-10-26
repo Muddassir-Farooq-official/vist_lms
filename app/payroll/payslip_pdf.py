@@ -20,14 +20,18 @@ def _m(v) -> str:
     return f"{float(v):,.2f}"
 
 
-def render_payslip_pdf(p: dict, *, institute_name: str = "Vertex Institute of Science & Technology") -> bytes:
+def render_payslip_pdf(p: dict, *, institute_name: str | None = None) -> bytes:
+    from app.core import brand
+
+    institute_name = institute_name or brand.name()
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=16 * mm, bottomMargin=16 * mm, title=f"Salary slip {p['month_label']}", author=institute_name)
     base = getSampleStyleSheet()
     h1 = ParagraphStyle("h1", parent=base["Title"], fontName="Helvetica-Bold", fontSize=17, textColor=INK, spaceAfter=1)
     sub = ParagraphStyle("sub", parent=base["Normal"], fontName="Helvetica-Bold", fontSize=10, textColor=BLUE, alignment=1, spaceAfter=10)
     small = ParagraphStyle("small", parent=base["Normal"], fontName="Helvetica", fontSize=8, textColor=MUTED, leading=11)
-    story = [Paragraph(institute_name, h1), Paragraph(f"SALARY SLIP \u2014 {p['month_label'].upper()}", sub)]
+    story = brand.platypus_header(A4[0] - 36 * mm) + [Paragraph(f"SALARY SLIP \u2014 {p['month_label'].upper()}", sub)]
+    _ = h1
     info = [["Name", p["employee_name"], "Employee code", p["employee_code"]], ["Designation", p["job_title"] or "\u2014", "Department", p.get("department") or "\u2014"],
             ["Days paid", f"{p['days_payable']} of {p['days_in_month']}", "Unpaid days", f"{p['unpaid_days']:g}"]]
     t = Table(info, colWidths=[28 * mm, 58 * mm, 30 * mm, 58 * mm])
@@ -56,7 +60,9 @@ def render_payslip_pdf(p: dict, *, institute_name: str = "Vertex Institute of Sc
 
     def footer(canvas, document):
         canvas.saveState(); canvas.setFont("Helvetica", 7.3); canvas.setFillColor(MUTED)
-        canvas.drawString(18 * mm, 9 * mm, f"Computer-generated on {datetime.now():%d %b %Y}. Valid without signature."); canvas.drawRightString(A4[0] - 18 * mm, 9 * mm, "Confidential")
+        canvas.drawString(18 * mm, 9 * mm, brand.fit_text(canvas, f"Computer-generated on {datetime.now():%d %b %Y}. Valid without signature."
+                                                          + (f"  \u00b7  {brand.platypus_footer_text()}" if brand.platypus_footer_text() else ""), "Helvetica", 7.3, A4[0] - 60 * mm))
+        canvas.drawRightString(A4[0] - 18 * mm, 9 * mm, "Confidential")
         canvas.restoreState()
 
     doc.build(story, onFirstPage=footer, onLaterPages=footer)

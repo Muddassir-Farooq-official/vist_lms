@@ -49,6 +49,13 @@ class StudentListItem(BaseModel):
     current_semester: int | None = None
     section_label: str | None = None
     status: StudentStatus
+    # For a readable directory table. Still no CNIC, guardian or address here.
+    program_code: str | None = None
+    program_name: str | None = None
+    gender: str | None = None
+    contact_no: str | None = None
+    admission_session: str | None = None
+    has_photo: bool = False
 
 
 class StudentAdminDetail(BaseModel):
@@ -132,6 +139,8 @@ class StudentSelfDetail(BaseModel):
 class StudentStatusChangeRequest(BaseModel):
     new_status: StudentStatus
     reason: str | None = None
+    # Leaving (DROPPED) cancels the fee installments not yet due; True keeps them for this student.
+    keep_future_fees: bool = False
 
 
 class StudentCreateRequest(BaseModel):

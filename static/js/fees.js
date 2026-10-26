@@ -440,8 +440,9 @@
       tr.innerHTML =
         "<td>" + VA.escapeHtml(a.payer_name) + " (" + VA.escapeHtml(a.payer_type) + ")</td>" +
         "<td>" + VA.escapeHtml(a.fee_structure_name) + "</td>" +
-        '<td class="num">' + money(a.total_charged) + "</td>" +
+        '<td class="num">' + money(a.total_payable) + "</td>" +
         '<td class="num">' + money(a.total_paid) + "</td>" +
+        '<td class="num">' + money(a.total_remaining) + "</td>" +
         '<td class="num">' + money(a.total_due_now) + "</td>" +
         "<td>" + standingPillHtml(a.is_in_good_standing) + "</td>" +
         '<td class="num"><button type="button" class="row-action manage-assignment-btn" data-id="' + a.id + '">Manage</button></td>';
@@ -573,7 +574,9 @@
     assignmentModalTitle.textContent = a.payer_name + " \u2014 " + a.fee_structure_name;
     assignmentDetailList.innerHTML =
       "<dt>Charged</dt><dd>" + money(a.total_charged) + "</dd>" +
+      (a.total_concession ? "<dt>Discounts</dt><dd>" + money(a.total_concession) + "</dd>" : "") +
       "<dt>Paid</dt><dd>" + money(a.total_paid) + "</dd>" +
+      "<dt>Still owed</dt><dd>" + money(a.total_remaining) + "</dd>" +
       "<dt>Overdue Principal</dt><dd>" + money(a.overdue_principal) + "</dd>" +
       "<dt>Accrued Fine</dt><dd>" + money(a.accrued_fine) + "</dd>" +
       "<dt>Total Due Now</dt><dd><strong>" + money(a.total_due_now) + "</strong></dd>" +
@@ -654,14 +657,17 @@
       return;
     }
 
-    assignmentModalSuccess.textContent = "Status updated.";
+    assignmentModalSuccess.textContent = result.body && result.body.pending_approval ? result.body.message : "Status updated.";
     assignmentModalSuccess.hidden = false;
     loadAssignments();
   });
 
   closeAssignmentModalBtn.addEventListener("click", function () {
     assignmentModal.close();
+    document.dispatchEvent(new CustomEvent("fees:changed"));
   });
+  // The Student accounts tab opens the same payment / status window for one of the student's fees.
+  document.addEventListener("fees:open-assignment", function (event) { openAssignmentModal(event.detail.id); });
 
   document.addEventListener("vistadmin:ready", function (event) {
     const roles = (event.detail && event.detail.me && event.detail.me.roles) || [];
@@ -678,7 +684,7 @@
       });
       if (feeTypesSection) feeTypesSection.hidden = true;
       if (structuresSection) structuresSection.hidden = true;
-      activateTab("assignments");
+      activateTab("accounts");
     } else {
       loadFeeTypes();
       loadPrograms();

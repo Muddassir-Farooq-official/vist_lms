@@ -44,6 +44,10 @@ from app.sms import models as sms_models  # noqa: F401
 from app.supplementary import models as supplementary_models  # noqa: F401
 from app.admissions import models as admissions_models  # noqa: F401
 from app.inventory import models as inventory_models  # noqa: F401
+from app.assets import models as assets_models  # noqa: F401
+from app.approvals import models as approvals_models  # noqa: F401
+from app.branding import models as branding_models  # noqa: F401
+from app.selfservice import models as selfservice_models  # noqa: F401
 from app.timekeeping import models as timekeeping_models  # noqa: F401
 from app.calendar import models as calendar_models  # noqa: F401
 from app.records import models as records_models  # noqa: F401
@@ -54,7 +58,8 @@ from app.academics import terms as academics_terms  # noqa: F401
 config = context.config
 # ALEMBIC_DATABASE_URL lets CI/tests migrate a scratch database without touching .env
 import os as _os
-config.set_main_option("sqlalchemy.url", _os.environ.get("ALEMBIC_DATABASE_URL", settings.database_url).replace("%", "%%"))
+# MIGRATION_DATABASE_URL: the table owner's login (scripts/db_roles.sql); the app itself runs with a login that cannot change tables.
+config.set_main_option("sqlalchemy.url", (_os.environ.get("ALEMBIC_DATABASE_URL") or _os.environ.get("MIGRATION_DATABASE_URL") or settings.database_url).replace("%", "%%"))
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 

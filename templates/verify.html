@@ -4,19 +4,20 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="robots" content="noindex" />
-  <title>Check a certificate &mdash; {{ app_name }}</title>
+  <title>Check a certificate &mdash; {{ brand.name }}</title>
   <link rel="stylesheet" href="/static/css/theme.css" />
+  {% from "_brand.html" import brand_head %}{{ brand_head() }}
 </head>
 <body class="auth-body">
   <main class="auth-shell">
     <section class="auth-card" aria-labelledby="auth-title">
       <div class="auth-brand">
-        <span class="auth-logo" aria-hidden="true">V</span>
-        <span class="auth-brand-text"><strong>{{ app_name }}</strong><small>Certificate check</small></span>
+        <span class="auth-logo{% if brand.has_logo %} has-logo{% endif %}" aria-hidden="true">{% if brand.has_logo %}<img src="{{ brand.logo_url }}" alt="" />{% else %}{{ brand.initials }}{% endif %}</span>
+        <span class="auth-brand-text"><strong>{{ brand.name }}</strong><small>Certificate check</small></span>
       </div>
       {% if result and not result.revoked %}
       <h1 id="auth-title">&#10003; This is genuine</h1>
-      <p class="auth-sub">{{ result.kind_label }} <strong>{{ result.reference }}</strong> was issued by {{ app_name }}.</p>
+      <p class="auth-sub">{{ result.kind_label }} <strong>{{ result.reference }}</strong> was issued by {{ brand.name }}.</p>
       <dl class="auth-help">
         <dt>Issued to</dt><dd><strong>{{ result.owner_name }}</strong></dd>
         <dt>Issued on</dt><dd>{{ result.issued_on.strftime("%d %B %Y") }}</dd>
@@ -31,7 +32,7 @@
       <p class="auth-error" role="alert">No certificate or ID card has the code <strong>{{ code }}</strong>. It may be mistyped, or it is not genuine.</p>
       {% endif %}
     </section>
-    <p class="auth-foot">&copy; {{ app_name }}</p>
+    <p class="auth-foot">&copy; {{ brand.name }}</p>
   </main>
 </body>
 </html>

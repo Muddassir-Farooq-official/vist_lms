@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.fees.assignment_service import FeeAssignmentService, FeeStatusCalculator
+from app.fees.assignment_service import FeeAssignmentService, FeeStatusCalculator, late_pause
 from app.fees.models import (
     AssignmentStatus,
     FeeLedgerEntry,
@@ -32,38 +32,18 @@ class FeeDashboardService:
             )
         ).scalar_one()
 
-        total_collected = (
-            await self.session.execute(
-                select(func.coalesce(func.sum(FeeLedgerEntry.amount), 0)).where(
-                    FeeLedgerEntry.entry_type == LedgerEntryType.CREDIT
-                )
-            )
-        ).scalar_one()
-        total_charged = (
-            await self.session.execute(
-                select(func.coalesce(func.sum(FeeLedgerEntry.amount), 0)).where(
-                    FeeLedgerEntry.entry_type == LedgerEntryType.DEBIT
-                )
-            )
-        ).scalar_one() - (
-            await self.session.execute(
-                select(func.coalesce(func.sum(FeeLedgerEntry.amount), 0)).where(
-                    FeeLedgerEntry.entry_type == LedgerEntryType.CONCESSION
-                )
-            )
-        ).scalar_one()      # what is actually owed: charges minus scholarships
+        # Money actually kept: payments in, minus payments reversed and refunds paid back (same as the accounts summary).
+        from app.fees import money as fee_money
+
+        total_collected = (await self.session.execute(
+            select(func.coalesce(func.sum(fee_money.signed_amount()), 0)).where(fee_money.moves_money()))).scalar_one()
 
         assignments = await self.assignment_repo.list_all()
         active_assignments = [a for a in assignments if a.status == AssignmentStatus.ACTIVE]
 
-        # Real N+1 fix: this used to call get_status() per assignment,
-        # each doing its OWN separate ledger query — for N active
-        # assignments that's N+1 round trips (or worse, since get_status
-        # also re-fetches the structure each time). Batch both the
-        # ledger entries and the structures in two queries total,
-        # regardless of how many assignments there are, then run the
-        # (unavoidably per-assignment) FIFO calculation in Python
-        # against already-fetched data.
+        # Billed, outstanding and overdue come from the same per-installment calculation the student's own
+        # fee account uses (scholarships and write-offs taken off; waived and cancelled fees left out).
+        total_charged = 0.0
         total_outstanding = 0.0
         total_overdue = 0.0
         overdue_count = 0
@@ -84,10 +64,10 @@ class FeeDashboardService:
                 entries = entries_by_assignment.get(assignment.id, [])
                 structure = structures_by_id.get(assignment.fee_structure_id)
                 late_fee = float(structure.late_fee_per_day) if structure and structure.late_fee_per_day else None
-                status_data = FeeStatusCalculator.compute(entries, late_fee)
+                status_data = FeeStatusCalculator.compute(entries, late_fee, pause=late_pause(assignment))
 
-                outstanding = status_data["total_charged"] - status_data["total_paid"]
-                total_outstanding += max(0.0, outstanding)
+                total_charged += status_data["total_payable"]
+                total_outstanding += status_data["total_remaining"]
                 if status_data["total_due_now"] > 0:
                     total_overdue += status_data["total_due_now"]
                     overdue_count += 1

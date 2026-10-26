@@ -3,14 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>VIST LMS</title>
+  <title>{{ brand.short_name }}</title>
   <link rel="stylesheet" href="/static/css/theme.css" />
+  {% from "_brand.html" import brand_head %}{{ brand_head() }}
 </head>
 <body>
   {% from "_icons.html" import role_icon %}
   <div class="wrap">
     <div class="hero">
-      <h1>Vertex Institute of <span class="accent">Science &amp; Technology</span></h1>
+      <h1>{{ brand.name }}</h1>{% if brand.tagline %}<p class="landing-tagline">{{ brand.tagline }}</p>{% endif %}
       <p>Learning Management System — choose your role below to sign in.</p>
     </div>
 
@@ -25,7 +26,7 @@
       {% endfor %}
     </div>
 
-    <div class="footer-note">VIST LMS &middot; Phase A</div>
+    <div class="footer-note">{{ brand.short_name }}</div>
   </div>
 </body>
 </html>

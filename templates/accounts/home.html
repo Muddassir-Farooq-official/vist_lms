@@ -1,0 +1,162 @@
+{% extends "accounts/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Home{% endblock %}
+{% block page_title %}Accounts office{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Today's collection, this month's money and what is waiting for you.</div>{% endblock %}
+
+{% block content %}
+<div class="dash" id="accounts-dash">
+
+  <section class="dash-hero" aria-labelledby="ac-greet">
+    <div class="dash-hero-text">
+      <h2 id="ac-greet">Welcome</h2>
+      <p><span id="ac-date"></span><span class="dash-chip" id="ac-books" hidden></span></p>
+    </div>
+    <nav class="dash-actions" aria-label="Quick actions">
+      <a href="/dashboard/accounts/fees" class="dash-action">{{ nav_icon("fees") }}<span>Take a payment</span></a>
+      <a href="/dashboard/accounts/finance" class="dash-action">{{ nav_icon("file") }}<span>Add expense</span></a>
+      <a href="/dashboard/accounts/refunds" class="dash-action">{{ nav_icon("issue-return") }}<span>Refunds</span></a>
+      <a href="/dashboard/accounts/payroll" class="dash-action">{{ nav_icon("payroll") }}<span>Payroll</span></a>
+      <a href="/dashboard/accounts/finance-reports" class="dash-action">{{ nav_icon("exams") }}<span>Reports</span></a>
+    </nav>
+  </section>
+
+  <p class="dash-alert error" id="ac-error" hidden></p>
+
+  <section class="kpi-row" aria-label="Key numbers">
+    <a class="kpi" href="/dashboard/accounts/finance-reports" data-tone="green">
+      <span class="kpi-icon">{{ nav_icon("fees") }}</span>
+      <span class="kpi-label">Collected today</span>
+      <strong class="kpi-value" id="k-today">&mdash;</strong>
+      <span class="kpi-sub" id="k-today-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/accounts/fees" data-tone="blue">
+      <span class="kpi-icon">{{ nav_icon("fees") }}</span>
+      <span class="kpi-label">Fees this month</span>
+      <strong class="kpi-value" id="k-fees">&mdash;</strong>
+      <span class="kpi-sub" id="k-fees-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/accounts/finance-reports" data-tone="orange">
+      <span class="kpi-icon">{{ nav_icon("file") }}</span>
+      <span class="kpi-label">Fees still owed</span>
+      <strong class="kpi-value" id="k-owed">&mdash;</strong>
+      <span class="kpi-sub" id="k-owed-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/accounts/finance" data-tone="teal">
+      <span class="kpi-icon">{{ nav_icon("check-circle") }}</span>
+      <span class="kpi-label">Income this month</span>
+      <strong class="kpi-value" id="k-income">&mdash;</strong>
+      <span class="kpi-sub" id="k-income-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/accounts/finance" data-tone="red">
+      <span class="kpi-icon">{{ nav_icon("trash") }}</span>
+      <span class="kpi-label">Expenses this month</span>
+      <strong class="kpi-value" id="k-exp">&mdash;</strong>
+      <span class="kpi-sub" id="k-exp-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/accounts/finance" data-tone="purple">
+      <span class="kpi-icon">{{ nav_icon("grid") }}</span>
+      <span class="kpi-label">Surplus this month</span>
+      <strong class="kpi-value" id="k-net">&mdash;</strong>
+      <span class="kpi-sub" id="k-net-sub">&nbsp;</span>
+    </a>
+  </section>
+
+  <div class="dash-grid dash-grid--2-1">
+    <section class="panel dash-panel" aria-labelledby="ac-money-h">
+      <div class="dash-panel-head">
+        <h2 id="ac-money-h">Money in and out</h2>
+        <a href="/dashboard/accounts/finance" class="view-all-link">Accounts {{ nav_icon("arrow-right") }}</a>
+      </div>
+      <div class="money-figs">
+        <div><span>Income, last 12 months</span><strong id="m-income">&mdash;</strong></div>
+        <div><span>Expenses</span><strong id="m-expenses">&mdash;</strong></div>
+        <div><span>Surplus</span><strong id="m-net">&mdash;</strong></div>
+      </div>
+      <div class="money-chart" id="m-chart"><div class="skeleton-line"></div></div>
+    </section>
+
+    <section class="panel dash-panel" id="dh-attention-panel" aria-labelledby="ac-todo-h">
+      <div class="dash-panel-head"><h2 id="ac-todo-h">Waiting for you</h2></div>
+      <ul class="attn-list" id="attn-list"><li class="skeleton-line"></li><li class="skeleton-line short"></li></ul>
+      <p class="attn-clear" id="attn-clear" hidden>{{ nav_icon("check-circle") }} All clear. Nothing is waiting.</p>
+    </section>
+  </div>
+
+  <div class="dash-grid dash-grid--3">
+    <section class="panel dash-panel" aria-labelledby="ac-def-h">
+      <div class="dash-panel-head">
+        <h2 id="ac-def-h">Overdue fees</h2>
+        <a href="/dashboard/accounts/finance-reports" class="view-all-link">Defaulters {{ nav_icon("arrow-right") }}</a>
+      </div>
+      <div class="aging" id="def-aging"></div>
+      <h3 class="dash-sub-h">Owing the most</h3>
+      <ul class="person-list" id="def-list"></ul>
+      <p class="dash-empty" id="def-empty" hidden>No student has overdue fees.</p>
+    </section>
+
+    <section class="panel dash-panel" aria-labelledby="ac-today-h">
+      <div class="dash-panel-head">
+        <h2 id="ac-today-h">Today's counter</h2>
+        <a href="/dashboard/accounts/finance-reports" class="view-all-link">Day report {{ nav_icon("arrow-right") }}</a>
+      </div>
+      <ul class="mini-stats" id="today-methods"></ul>
+      <h3 class="dash-sub-h">Latest payments</h3>
+      <ul class="person-list" id="pay-list"></ul>
+      <p class="dash-empty" id="pay-empty" hidden>No fee payments recorded yet.</p>
+    </section>
+
+    <section class="panel dash-panel" aria-labelledby="ac-cat-h">
+      <div class="dash-panel-head"><h2 id="ac-cat-h">This month by category</h2></div>
+      <h3 class="dash-sub-h dash-sub-h--first">Spent on</h3>
+      <div id="cat-exp"></div>
+      <h3 class="dash-sub-h">Received from</h3>
+      <div id="cat-inc"></div>
+    </section>
+  </div>
+
+  <div class="dash-grid dash-grid--3">
+    <section class="panel dash-panel" aria-labelledby="ac-pay-h">
+      <div class="dash-panel-head">
+        <h2 id="ac-pay-h">Payroll</h2>
+        <a href="/dashboard/accounts/payroll" class="view-all-link">Open {{ nav_icon("arrow-right") }}</a>
+      </div>
+      <div id="payroll-box"></div>
+    </section>
+
+    <section class="panel dash-panel" aria-labelledby="ac-store-h">
+      <div class="dash-panel-head"><h2 id="ac-store-h">Purchases, store and assets</h2></div>
+      <div class="today-block">
+        <div class="today-head"><span>{{ nav_icon("tasks") }} Purchases</span><a href="/dashboard/accounts/inventory">Open</a></div>
+        <ul class="mini-stats" id="t-purchases"></ul>
+      </div>
+      <div class="today-block">
+        <div class="today-head"><span>{{ nav_icon("grid") }} Store</span><a href="/dashboard/accounts/inventory">Open</a></div>
+        <ul class="mini-stats" id="t-store"></ul>
+      </div>
+      <div class="today-block">
+        <div class="today-head"><span>{{ nav_icon("file") }} Fixed assets</span><a href="/dashboard/accounts/assets">Open</a></div>
+        <ul class="mini-stats" id="t-assets"></ul>
+      </div>
+    </section>
+
+    <section class="panel dash-panel" aria-labelledby="ac-cal-h">
+      <div class="dash-panel-head">
+        <h2 id="ac-cal-h">Coming up</h2>
+        <a href="/dashboard/accounts/calendar" class="view-all-link">Calendar {{ nav_icon("arrow-right") }}</a>
+      </div>
+      <ul class="event-list" id="cal-list"></ul>
+      <p class="dash-empty" id="cal-empty" hidden>Nothing on the calendar for the next two weeks.</p>
+      <h3 class="dash-sub-h">Latest announcement</h3>
+      <ul class="note-list" id="ann-list"></ul>
+      <p class="dash-empty" id="ann-empty" hidden>No announcements.</p>
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/charts.js"></script>
+<script src="/static/js/dash-common.js"></script>
+<script src="/static/js/accounts-home.js"></script>
+{% endblock %}

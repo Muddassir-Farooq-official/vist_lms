@@ -91,7 +91,7 @@ class CalendarService:
         from app.notifications.service import create_notification
 
         roles = (["STUDENT", "PARENT"] if e.for_students else []) + (["TEACHER", "ADMIN", "ACCOUNTS_OFFICER", "LIBRARIAN", "SECURITY_GUARD",
-                                                                     "EXAM_CONTROLLER", "WARDEN", "PRINCIPAL", "HOD"] if e.for_staff else [])
+                                                                     "EXAM_CONTROLLER", "HOSTEL_WARDEN", "STAFF", "PRINCIPAL", "HOD"] if e.for_staff else [])
         users = set((await self.session.execute(select(User.id).join(UserRole, UserRole.user_id == User.id).join(Role, Role.id == UserRole.role_id)
                                                 .where(Role.code.in_(roles), User.is_active.is_(True)))).scalars())
         when = e.start_date.strftime("%d %b %Y") + ("" if e.end_date == e.start_date else " to " + e.end_date.strftime("%d %b %Y"))

@@ -534,10 +534,10 @@ window.VistAdmin = (function () {
 
   // Staff holding several roles (e.g. Teacher + Exam Controller) get a "Switch portal" menu in the top bar.
   const PORTALS = [
-    ["ADMIN", "Administration", "/dashboard/admin"], ["ACCOUNTS_OFFICER", "Accounts", "/dashboard/accounts/fees"],
+    ["ADMIN", "Administration", "/dashboard/admin"], ["ACCOUNTS_OFFICER", "Accounts", "/dashboard/accounts"],
     ["LIBRARIAN", "Library", "/dashboard/library"], ["PRINCIPAL", "Principal", "/dashboard/principal"], ["HOD", "Department (HOD)", "/dashboard/hod"], ["TEACHER", "Faculty", "/dashboard/faculty"],
-    ["EXAM_CONTROLLER", "Exam Department", "/dashboard/exam"], ["HOSTEL_WARDEN", "Hostel", "/dashboard/warden"],
-    ["SECURITY_GUARD", "Gate", "/dashboard/gate"], ["STUDENT", "Student", "/dashboard/student"],
+    ["EXAM_CONTROLLER", "Exam Department", "/dashboard/exam/home"], ["HOSTEL_WARDEN", "Hostel", "/dashboard/warden/home"],
+    ["SECURITY_GUARD", "Gate", "/dashboard/gate/home"], ["STAFF", "Staff", "/dashboard/staff"], ["STUDENT", "Student", "/dashboard/student"],
   ];
   function addPortalSwitcher(me) {
     const holder = document.querySelector(".content-topbar-right");
@@ -821,7 +821,8 @@ window.VistAdmin = (function () {
   // =========================================================================
   // Who is signed in: photo (or initials), real name, roll number / role. Shown in the top bar.
   // =========================================================================
-  const ROLE_LABEL = { ADMIN: "Administrator", TEACHER: "Teacher", LIBRARIAN: "Librarian", ACCOUNTS_OFFICER: "Accounts Officer", STUDENT: "Student" };
+  const ROLE_LABEL = { ADMIN: "Administrator", TEACHER: "Teacher", LIBRARIAN: "Librarian", ACCOUNTS_OFFICER: "Accounts Officer", STUDENT: "Student",
+    SECURITY_GUARD: "Security Guard", HOSTEL_WARDEN: "Hostel Warden", EXAM_CONTROLLER: "Exam Department", STAFF: "General Staff" };
   const IDENT_KEY = "vist_ident";
 
   function readCachedIdentity(me) {
@@ -865,8 +866,10 @@ window.VistAdmin = (function () {
   function paintWhoami(me, ident) {
     const whoami = document.getElementById("whoami");
     if (!whoami) return;
-    const name = (ident && ident.name) || me.username;
-    const sub = (ident && ident.sub) || (me.roles && ROLE_LABEL[me.roles[0]]) || "";
+    // A parent signs in with the guardian's CNIC: show "Guardian" rather than a number as their name.
+    const isParent = !ident && (me.roles || []).indexOf("PARENT") !== -1 && !/[A-Za-z]/.test(me.username || "");
+    const name = (ident && ident.name) || (isParent ? "Guardian" : me.username);
+    const sub = (ident && ident.sub) || (isParent ? me.username : (me.roles && ROLE_LABEL[me.roles[0]]) || "");
     whoami.innerHTML =
       '<span class="whoami-avatar" aria-hidden="true">' +
       (ident && ident.photo ? '<img src="' + escapeHtml(ident.photo) + '" alt="" />' : escapeHtml(initialsOf(name))) + "</span>" +
@@ -876,11 +879,31 @@ window.VistAdmin = (function () {
     if (img) img.addEventListener("error", function () { img.replaceWith(document.createTextNode(initialsOf(name))); });
   }
 
+  function showViewAsBar(me) {
+    if (document.getElementById("viewas-bar")) return;
+    const bar = document.createElement("div");
+    bar.id = "viewas-bar";
+    bar.className = "viewas-bar";
+    bar.setAttribute("role", "status");
+    bar.innerHTML = '<span class="viewas-eye" aria-hidden="true"></span><span class="viewas-text">Viewing as <b id="viewas-name">' + escapeHtml(me.username) +
+      "</b> · read-only · opened by " + escapeHtml(me.viewing_as_by) + '</span><button type="button" class="viewas-exit">Exit view</button>';
+    document.body.prepend(bar);
+    document.body.classList.add("is-viewing-as");
+    loadIdentity(me).then(function (ident) { if (ident && ident.name) document.getElementById("viewas-name").textContent = ident.name; }).catch(function () {});
+    bar.querySelector(".viewas-exit").addEventListener("click", async function () {
+      this.disabled = true;
+      const r = await fetchJson("/api/v1/view-as/stop", { method: "POST" });
+      try { sessionStorage.removeItem(IDENT_KEY); } catch (e) { /* ignore */ }
+      location.href = (r.ok && r.body && r.body.redirect) || "/dashboard/admin";
+    });
+  }
+
   // The number of announcements I have not opened yet, shown beside "Announcements" in the menu.
   function wireAnnouncementBadge(me) {
     if ((me.roles || []).indexOf("ADMIN") !== -1 && (me.roles || []).length === 1) return;
     const paint = function (n) {
-      document.querySelectorAll('a[href$="/announcements"]').forEach(function (link) {
+      // Only the menu links (side menu, phone bar), not "View all" links inside pages.
+      document.querySelectorAll('.drawer a[href$="/announcements"], .bottom-nav a[href$="/announcements"], .bottom-sheet a[href$="/announcements"]').forEach(function (link) {
         const old = link.querySelector(".nav-badge");
         if (old) old.remove();
         if (n > 0) {
@@ -1035,6 +1058,9 @@ window.VistAdmin = (function () {
     // An admin visiting the Library / Accounts portals gets a way back.
     const backToAdmin = document.getElementById("back-to-admin");
     if (backToAdmin && (me.roles || []).indexOf("ADMIN") !== -1) backToAdmin.hidden = false;
+
+    // An administrator looking at this person's screens ("view as"): say so on every page, read-only, with a way out.
+    if (me.viewing_as_by) showViewAsBar(me);
 
     insertSkeletons(document.querySelector(".content-main") || document);
     addPortalSwitcher(me);

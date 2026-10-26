@@ -53,11 +53,11 @@
     const tb = $("co-table").tBodies[0];
     const r = await VA.fetchJson(API + "/collection?" + q);
     if (!r.ok) return failRow(tb, 6, r, loadCollection);
-    kpis($("co-kpis"), [["Total recorded", money(r.body.total)]].concat(Object.keys(r.body.by_method).map(function (m) { return [METHOD[m] || m, money(r.body.by_method[m])]; })));
+    kpis($("co-kpis"), [["Net collected", money(r.body.total)], ["Received", money(r.body.received)], ["Reversed or refunded", money(r.body.taken_back)]].concat(Object.keys(r.body.by_method).map(function (m) { return [METHOD[m] || m, money(r.body.by_method[m])]; })));
     $("co-empty").hidden = r.body.rows.length > 0;
     tb.innerHTML = r.body.rows.map(function (g) {
       const parts = Object.keys(g.by_method).map(function (m) { return esc(METHOD[m] || m) + " " + money(g.by_method[m]); }).join(" · ");
-      return "<tr><td>" + esc(day(g.day)) + "</td><td>" + esc(g.cashier) + '</td><td class="num">' + g.count + "</td><td>" + parts + '</td><td class="num"><b>' + money(g.cash) + '</b></td><td class="num">' + money(g.total) + "</td></tr>";
+      return "<tr><td>" + esc(day(g.day)) + "</td><td>" + esc(g.cashier) + '</td><td class="num">' + g.count + "</td><td>" + parts + (g.taken_back ? "<br><small>reversed or refunded " + money(g.taken_back) + "</small>" : "") + '</td><td class="num"><b>' + money(g.cash) + '</b></td><td class="num">' + money(g.total) + "</td></tr>";
     }).join("");
   }
 

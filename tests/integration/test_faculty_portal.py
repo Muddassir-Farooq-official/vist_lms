@@ -27,11 +27,11 @@ async def test_every_page_loads_the_shared_ui_file_if_any_of_its_scripts_use_it(
 
 async def test_faculty_home_is_a_dashboard_of_cards(app_client):
     html = (await app_client.get("/dashboard/faculty")).text
-    for needle in ("sh-grid", "home-today", "home-classes", 'id="sh-att"', 'id="sh-alerts"', 'id="sh-courses"', "sh-quick", "portal-footer",
-                   "data-card-tables", "student-ui.js", "VIST Faculty", "Needs your attention", "Attendance in my classes"):
+    for needle in ("kpi-row", 'id="today-list"', 'id="next-list"', 'id="week-strip"', 'id="attn-list"', 'id="course-cards"', "dash-actions", "portal-footer",
+                   "data-card-tables", "faculty-home.js", "dash-common.js", "VIST LMS Faculty", "Needs your attention", "My courses"):
         assert needle in html, needle
-    js = (await app_client.get("/static/js/portal-home.js")).text
-    for needle in ("offerings/me/overview", "teacherClassCard", "unmarked_past_classes", "const settle = function"):
+    js = (await app_client.get("/static/js/faculty-home.js")).text
+    for needle in ("offerings/me/overview", "offerings/me/schedule", "unmarked_past_classes", "Take attendance", "/results/offerings/"):
         assert needle in js, needle
     shared = (await app_client.get("/static/js/student-ui.js")).text
     assert "teacherClassCard" in shared and "window.PortalUI = window.StudentUI" in shared and "Take attendance" in shared

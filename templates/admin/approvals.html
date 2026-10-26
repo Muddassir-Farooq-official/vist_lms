@@ -1,0 +1,28 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}{{ allowed_roles }}{% endblock %}
+{% block title %}Approvals{% endblock %}
+{% block page_title %}Approvals{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Actions that need a second person: waiving or cancelling a fee, waiving a fine, writing off previous dues, reopening closed books and new scholarships or discounts. Approving carries the action out exactly as asked; nobody can approve their own request.</div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="REQUESTED" role="tab" aria-selected="true"><span>Waiting</span></button>
+  <button class="portal-tab" data-tab="APPROVED" role="tab" aria-selected="false"><span>Approved</span></button>
+  <button class="portal-tab" data-tab="REJECTED" role="tab" aria-selected="false"><span>Rejected</span></button>
+  <button class="portal-tab" data-tab="CANCELLED" role="tab" aria-selected="false"><span>Withdrawn</span></button>
+</div>
+<p id="ap-msg" class="panel-hint" role="status" hidden></p>
+<section class="panel">
+  <div class="table-scroll">
+  <table class="dash-table">
+    <thead><tr><th>Asked</th><th>What</th><th class="num">Amount</th><th>Why</th><th>Decision</th><th></th></tr></thead>
+    <tbody id="ap-rows"></tbody>
+  </table>
+  </div>
+  <p class="empty-state" id="ap-empty" hidden>Nothing here.</p>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/approvals.js"></script>
+{% endblock %}

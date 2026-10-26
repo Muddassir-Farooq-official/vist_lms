@@ -50,3 +50,7 @@ class CurrentUser(BaseModel):
     roles: list[str]
     permissions: list[str]
     must_change_password: bool
+    # Set when an administrator is looking at this person's screens through "view as": who is looking.
+    # Such a session is read-only (see app/auth/view_as.py and the guard in app/main.py).
+    viewing_as_by: str | None = None
+    viewing_as_by_id: uuid.UUID | None = None

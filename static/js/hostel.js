@@ -95,7 +95,11 @@
       if (!reason) return;
       const r = await VA.fetchJson(API + "/stays/" + out.getAttribute("data-out") + "/out", json("POST", { reason: reason }));
       if (!r.ok) return VA.toast(err(r, "Could not record it."), "error");
-      VA.toast("Recorded. They are not charged after today."); loadRooms();
+      const b = r.body || {};
+      VA.toast("Recorded. They are not charged after today." +
+        (b.credited > 0 ? " This month's unpaid charge was reduced by " + VA.formatMoney(b.credited) + "." : "") +
+        (b.refund_due > 0 ? " They already paid " + VA.formatMoney(b.refund_due) + " for days after leaving: give it back through Accounts (Expenses, Hostel refunds)." : ""));
+      loadRooms();
     } else if (mv) {
       const code = await VA.ask({ title: "Move to which room?", label: "Room (e.g. B-12)", min: 1 });
       if (!code) return;
@@ -156,7 +160,10 @@
     }).join("") : '<tr><td colspan="5">Nothing yet.</td></tr>';
   }
   $("h-hq").addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(history, 300); });
-  document.querySelector('[data-tab="history"]').addEventListener("click", history);
+  // The history is a section of its own on the page (there is no "history" tab): load it with the page, and again
+  // when a tab of that name exists and is opened. A missing tab used to stop the script before the rooms loaded.
+  const historyTab = document.querySelector('[data-tab="history"]');
+  if (historyTab) historyTab.addEventListener("click", history); else document.addEventListener("vistadmin:ready", history);
 
   document.addEventListener("vistadmin:ready", function (ev) {
     const perms = (ev.detail && ev.detail.me && ev.detail.me.permissions) || [];

@@ -192,4 +192,12 @@ async def get_period_close(current_user: CurrentUser = Depends(view), db=Depends
 async def set_period_close(payload: PeriodCloseIn, current_user: CurrentUser = Depends(approve), db=Depends(get_db)) -> dict:
     from app.accounts.period import set_closed_through
 
-    return {"closed_through": await set_closed_through(db, payload.closed_through, actor_id=current_user.id, reason=payload.reason)}
+    from fastapi.responses import JSONResponse
+
+    from app.approvals.models import ApprovalRequest
+    from app.approvals.service import pending_response
+
+    out = await set_closed_through(db, payload.closed_through, actor_id=current_user.id, reason=payload.reason)
+    if isinstance(out, ApprovalRequest):
+        return JSONResponse(status_code=202, content=pending_response(out))
+    return {"closed_through": out}

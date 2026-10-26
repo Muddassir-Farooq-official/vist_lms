@@ -33,8 +33,9 @@ class Roles:
     PRINCIPAL = "PRINCIPAL"
     PARENT = "PARENT"   # a student's guardian: read-only view of their own children (attendance, results, fees)
     EXAM_CONTROLLER = "EXAM_CONTROLLER"    # the exam department: approves, publishes and corrects results, and keeps the grading scale
+    STAFF = "STAFF"                        # general staff (office boy, IT, driver, cleaner...): only their own pay, attendance, tasks and requests
 
-    ALL = (ADMIN, TEACHER, STUDENT, ACCOUNTS_OFFICER, LIBRARIAN, HOSTEL_WARDEN, SECURITY_GUARD, EXAM_CONTROLLER)
+    ALL = (ADMIN, TEACHER, STUDENT, ACCOUNTS_OFFICER, LIBRARIAN, HOSTEL_WARDEN, SECURITY_GUARD, EXAM_CONTROLLER, STAFF)
 
 
 class Permissions:
@@ -94,6 +95,12 @@ class Permissions:
     PAYMENT_REVERSE = "payment.reverse"
     # Granting a scholarship or concession reduces what a student owes, so it stays with the administration (the accounts office records balances and payments).
     SCHOLARSHIP_MANAGE = "scholarship.manage"
+    # The accounts office proposes a scholarship or discount; an administrator approves it (Approvals page).
+    SCHOLARSHIP_PROPOSE = "scholarship.propose"
+    # Decide second-person approval requests: fee waivers, fine waivers, write-offs, reopening books, scholarships.
+    APPROVALS_DECIDE = "approvals.decide"
+    # Change the institute's name, logos, colour, contact and bank details shown on every page and document.
+    INSTITUTE_PROFILE_MANAGE = "institute.profile.manage"
 
     # Fines — deliberately separate from Fees: ad-hoc, reason-driven,
     # single-entry (a library late fee, a disciplinary fine), not a
@@ -168,6 +175,11 @@ class Permissions:
     INVENTORY_VIEW = "inventory.view"
     INVENTORY_MANAGE = "inventory.manage"
     INVENTORY_ADJUST = "inventory.adjust"
+    # Fixed assets (furniture, computers, equipment, vehicles, buildings): see the register; add, move, check and post
+    # depreciation (accounts office); approve disposals and correct posted figures (administration).
+    ASSET_VIEW = "asset.view"
+    ASSET_MANAGE = "asset.manage"
+    ASSET_APPROVE = "asset.approve"
     # Staff timekeeping: mark staff in / out (guard, office); see the records; set timings and correct days (administration).
     STAFF_ATTENDANCE_MARK = "staff_attendance.mark"
     STAFF_ATTENDANCE_VIEW = "staff_attendance.view"
@@ -239,6 +251,12 @@ class Permissions:
     # changes, etc.). Kept distinct from AUDIT_VIEW rather than widening
     # it, to preserve separation of duties.
     AUDIT_VIEW_FINANCIAL = "audit.view.financial"
+    # Download the whole activity log as CSV (administration only; the principal may read it but not export it).
+    AUDIT_EXPORT = "audit.export"
+    # Open a teacher's, student's or parent's own screens, read-only, to see exactly what they see (administration).
+    VIEW_AS = "view_as.use"
+    # Approve or reject students' and employees' own requests to change their contact details and photo (administration).
+    PROFILE_CHANGE_DECIDE = "profile.change.decide"
 
 
 # Role -> permission seed mapping used by scripts/seed_permissions.py.
@@ -292,6 +310,9 @@ ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
         Permissions.REPORTS_VIEW,
         Permissions.ROLE_MANAGE,
         Permissions.AUDIT_VIEW,
+        Permissions.AUDIT_EXPORT,
+        Permissions.VIEW_AS,
+        Permissions.PROFILE_CHANGE_DECIDE,
         Permissions.FINE_ISSUE,
         Permissions.FINE_VIEW,
         Permissions.FINE_MANAGE,
@@ -311,6 +332,12 @@ ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
         Permissions.INVENTORY_VIEW,
         Permissions.INVENTORY_MANAGE,
         Permissions.INVENTORY_ADJUST,
+        Permissions.ASSET_VIEW,
+        Permissions.ASSET_MANAGE,
+        Permissions.ASSET_APPROVE,
+        Permissions.APPROVALS_DECIDE,
+        Permissions.SCHOLARSHIP_PROPOSE,
+        Permissions.INSTITUTE_PROFILE_MANAGE,
         Permissions.STAFF_ATTENDANCE_MARK,
         Permissions.STAFF_ATTENDANCE_VIEW,
         Permissions.STAFF_ATTENDANCE_MANAGE,
@@ -398,8 +425,11 @@ ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
         Permissions.ACCOUNT_RECORD,
         Permissions.INVENTORY_VIEW,
         Permissions.INVENTORY_MANAGE,
-        Permissions.STAFF_ATTENDANCE_MARK,
-        Permissions.STAFF_ATTENDANCE_VIEW,
+        Permissions.ASSET_VIEW,
+        Permissions.ASSET_MANAGE,
+        Permissions.SCHOLARSHIP_PROPOSE,
+        # No staff attendance (timings, in/out): the accounts office prepares payroll, which uses the attendance
+        # totals, but does not see or mark anyone's attendance. Revoked in migration f1e2d3c4b5a6.
         Permissions.PURCHASE_REQUEST,
         Permissions.PAYROLL_VIEW,
         Permissions.PAYROLL_MANAGE,
@@ -408,12 +438,15 @@ ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
     Roles.HOSTEL_WARDEN: (Permissions.HOSTEL_VIEW, Permissions.HOSTEL_MANAGE, Permissions.STUDENT_VIEW, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
     Roles.EXAM_CONTROLLER: (Permissions.EXAM_SCHEDULE_MANAGE, Permissions.COURSE_VIEW, Permissions.RESULT_APPROVE, Permissions.MARKS_ENTER, Permissions.STUDENT_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
     Roles.PARENT: (Permissions.PARENT_VIEW,),
-    Roles.PRINCIPAL: (Permissions.INSTITUTE_OVERVIEW, Permissions.HOSTEL_VIEW, Permissions.INVENTORY_VIEW, Permissions.STAFF_ATTENDANCE_VIEW, Permissions.ACADEMIC_OVERSIGHT, Permissions.ATTENDANCE_VIEW,
+    Roles.PRINCIPAL: (Permissions.INSTITUTE_OVERVIEW, Permissions.AUDIT_VIEW, Permissions.HOSTEL_VIEW, Permissions.INVENTORY_VIEW, Permissions.ASSET_VIEW, Permissions.STAFF_ATTENDANCE_VIEW, Permissions.ACADEMIC_OVERSIGHT, Permissions.ATTENDANCE_VIEW,
                       Permissions.COURSE_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.STUDENT_VIEW,
                       Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
     Roles.HOD: (Permissions.ATTENDANCE_CORRECTION_DECIDE, Permissions.ACADEMIC_OVERSIGHT, Permissions.ATTENDANCE_VIEW,
                 Permissions.COURSE_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.STUDENT_VIEW,
                 Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
+    # General staff: nothing about students, fees, marks or another office's data. Only their own applications, tasks,
+    # purchase requests and complaints (payslips, attendance, announcements, calendar and profile need no permission: they are "mine").
+    Roles.STAFF: (Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST, Permissions.COMPLAINT_SUBMIT),
     Roles.SECURITY_GUARD: (Permissions.GATE_OPERATE, Permissions.STAFF_ATTENDANCE_MARK, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
     # LIBRARIAN owns the full library domain, same reasoning as
     # ACCOUNTS_OFFICER owning fee submission — this is their job.

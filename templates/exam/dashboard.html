@@ -1,0 +1,114 @@
+{% extends "exam/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Home{% endblock %}
+{% block page_title %}Exam department{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Results waiting for you, who to chase, and the exams coming up.</div>{% endblock %}
+
+{% block content %}
+<div class="dash" id="exam-dash">
+
+  <section class="dash-hero" aria-labelledby="ex-greet">
+    <div class="dash-hero-text">
+      <h2 id="ex-greet">Welcome</h2>
+      <p><span id="ex-date"></span><span class="dash-chip" id="ex-term" hidden></span></p>
+    </div>
+    <nav class="dash-actions" aria-label="Quick actions">
+      <a href="/dashboard/exam" class="dash-action">{{ nav_icon("tasks") }}<span>Approve results</span></a>
+      <a href="/dashboard/exam/datesheets" class="dash-action">{{ nav_icon("clock") }}<span>Datesheets</span></a>
+      <a href="/dashboard/exam/supplementary" class="dash-action">{{ nav_icon("exams") }}<span>Supplementary</span></a>
+      <a href="/dashboard/exam/students" class="dash-action">{{ nav_icon("students") }}<span>Find a student</span></a>
+      <a href="/dashboard/exam/reports" class="dash-action">{{ nav_icon("file") }}<span>Reports</span></a>
+    </nav>
+  </section>
+
+  <p class="dash-alert error" id="ex-error" hidden></p>
+
+  <section class="kpi-row" aria-label="Key numbers">
+    <a class="kpi" href="/dashboard/exam" data-tone="orange">
+      <span class="kpi-icon">{{ nav_icon("tasks") }}</span>
+      <span class="kpi-label">Waiting for approval</span>
+      <strong class="kpi-value" id="k-sub">&mdash;</strong>
+      <span class="kpi-sub" id="k-sub-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/exam#APPROVED" data-tone="blue">
+      <span class="kpi-icon">{{ nav_icon("check-circle") }}</span>
+      <span class="kpi-label">Ready to publish</span>
+      <strong class="kpi-value" id="k-appr">&mdash;</strong>
+      <span class="kpi-sub" id="k-appr-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/exam" data-tone="green">
+      <span class="kpi-icon">{{ nav_icon("graduation-cap") }}</span>
+      <span class="kpi-label">Published</span>
+      <strong class="kpi-value" id="k-pub">&mdash;</strong>
+      <span class="kpi-sub" id="k-pub-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/exam" data-tone="red">
+      <span class="kpi-icon">{{ nav_icon("ban") }}</span>
+      <span class="kpi-label">Not submitted yet</span>
+      <strong class="kpi-value" id="k-out">&mdash;</strong>
+      <span class="kpi-sub" id="k-out-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/exam/datesheets" data-tone="purple">
+      <span class="kpi-icon">{{ nav_icon("clock") }}</span>
+      <span class="kpi-label">Next exam paper</span>
+      <strong class="kpi-value" id="k-next">&mdash;</strong>
+      <span class="kpi-sub" id="k-next-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/exam/supplementary" data-tone="teal">
+      <span class="kpi-icon">{{ nav_icon("exams") }}</span>
+      <span class="kpi-label">Supplementary</span>
+      <strong class="kpi-value" id="k-supp">&mdash;</strong>
+      <span class="kpi-sub" id="k-supp-sub">&nbsp;</span>
+    </a>
+  </section>
+
+  <div class="dash-grid dash-grid--2-1">
+    <section class="panel dash-panel" aria-labelledby="ex-wait-h">
+      <div class="dash-panel-head">
+        <h2 id="ex-wait-h">Result sheets waiting for you</h2>
+        <a href="/dashboard/exam" class="view-all-link">Result approval {{ nav_icon("arrow-right") }}</a>
+      </div>
+      <ol class="pipeline" id="res-pipeline"></ol>
+      <ul class="person-list" id="wait-list"></ul>
+      <p class="attn-clear" id="wait-empty" hidden>{{ nav_icon("check-circle") }} No sheet is waiting for you.</p>
+    </section>
+
+    <section class="panel dash-panel" id="dh-attention-panel" aria-labelledby="ex-att-h">
+      <div class="dash-panel-head"><h2 id="ex-att-h">Needs your attention</h2></div>
+      <ul class="attn-list" id="attn-list"></ul>
+      <p class="attn-clear" id="attn-clear" hidden>{{ nav_icon("check-circle") }} All clear.</p>
+    </section>
+  </div>
+
+  <div class="dash-grid dash-grid--3">
+    <section class="panel dash-panel" aria-labelledby="ex-chase-h">
+      <div class="dash-panel-head"><h2 id="ex-chase-h">Who to chase</h2></div>
+      <ul class="person-list" id="chase-list"></ul>
+      <p class="dash-empty" id="chase-empty" hidden>Every course has submitted its marks.</p>
+    </section>
+
+    <section class="panel dash-panel" aria-labelledby="ex-papers-h">
+      <div class="dash-panel-head">
+        <h2 id="ex-papers-h">Exam papers coming up</h2>
+        <a href="/dashboard/exam/datesheets" class="view-all-link">Datesheets {{ nav_icon("arrow-right") }}</a>
+      </div>
+      <ul class="event-list" id="paper-list"></ul>
+      <p class="dash-empty" id="paper-empty" hidden>No exam papers are scheduled.</p>
+    </section>
+
+    <section class="panel dash-panel" aria-labelledby="ex-ds-h">
+      <div class="dash-panel-head"><h2 id="ex-ds-h">Datesheets</h2></div>
+      <ul class="person-list" id="ds-list"></ul>
+      <p class="dash-empty" id="ds-empty" hidden>No datesheet yet. <a href="/dashboard/exam/datesheets">Create one</a>.</p>
+      <h3 class="dash-sub-h">Coming up</h3>
+      <ul class="event-list" id="cal-list"></ul>
+      <p class="dash-empty" id="cal-empty" hidden>Nothing on the calendar for the next two weeks.</p>
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/dash-common.js"></script>
+<script src="/static/js/exam-home.js"></script>
+{% endblock %}

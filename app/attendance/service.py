@@ -261,6 +261,13 @@ class AttendanceService:
         offering = await self.offering_repo.get_by_id(course_offering_id)
         if offering is None:
             raise ResourceNotFoundError("Course offering not found.")
+        # Lock the offering row: two people pressing "Lock" at once must not both fine and drop (audit ACAD-02).
+        from sqlalchemy import select as _select
+
+        from app.academics.models import CourseOffering
+
+        offering = (await self.session.execute(_select(CourseOffering).where(CourseOffering.id == offering.id).with_for_update()
+                                               .execution_options(populate_existing=True))).scalar_one()
         if offering.attendance_locked_at is not None:
             raise BusinessRuleViolationError("Attendance for this offering is already locked.")
 
@@ -318,8 +325,8 @@ class AttendanceService:
                         f"({settings.attendance_drop_threshold_percent}%). You have been withdrawn from this course.",
                     )
             elif percentage <= settings.attendance_fine_threshold_percent:
-                await self._issue_attendance_fine_and_block(student_id, percentage, actor_id=actor_id)
-                fined_count += 1
+                if await self._issue_attendance_fine_and_block(student_id, percentage, actor_id=actor_id, offering=offering):
+                    fined_count += 1
 
         await self.audit.log(
             actor_user_id=actor_id,
@@ -330,17 +337,40 @@ class AttendanceService:
         )
         return {"enrolled_count": len(enrolled_ids), "dropped_count": dropped_count, "fined_count": fined_count}
 
-    async def _issue_attendance_fine_and_block(self, student_id: uuid.UUID, percentage: float, *, actor_id: uuid.UUID) -> None:
-        from app.fines.models import FinePayerType, FineSource
+    async def _issue_attendance_fine_and_block(self, student_id: uuid.UUID, percentage: float, *, actor_id: uuid.UUID, offering=None) -> bool:
+        """One attendance fine per student per term, however many courses are short (owner decision 8). A second short
+        course in the same term is added to the existing fine's description; no second fine. Returns True if a fine was issued."""
+        from sqlalchemy import select as _select
+
+        from app.academics.models import Course, CourseOffering
+        from app.fines.models import Fine, FinePayerType, FineSource, FineStatus
         from app.fines.service import FineService
 
+        course = await self.session.get(Course, offering.course_id) if offering is not None else None
+        label = course.code if course is not None else "a course"
+        if offering is not None:
+            earlier = (await self.session.execute(
+                _select(Fine).join(CourseOffering, CourseOffering.id == Fine.related_entity_id)
+                .where(Fine.payer_type == FinePayerType.STUDENT, Fine.payer_id == student_id, Fine.source == FineSource.ATTENDANCE,
+                       Fine.related_entity_type == "course_offering", CourseOffering.term_label == offering.term_label,
+                       Fine.status.not_in((FineStatus.REJECTED,)))
+                .with_for_update(of=Fine))).scalars().first()
+            if earlier is not None:
+                if earlier.status == FineStatus.PENDING and label not in (earlier.reason or ""):
+                    earlier.reason = f"{earlier.reason}; also {label} ({percentage}%)"[:500]
+                await self.audit.log(actor_user_id=actor_id, action="attendance.fine_already_issued_this_term", entity_type="fine", entity_id=earlier.id,
+                                     metadata={"student_id": str(student_id), "course": label, "percentage": percentage, "term": offering.term_label})
+                return False
         await FineService(self.session).issue(
             payer_type=FinePayerType.STUDENT,
             payer_id=student_id,
             amount=settings.attendance_fine_amount,
-            reason=f"Attendance below {settings.attendance_fine_threshold_percent}% (actual: {percentage}%)",
+            reason=(f"Attendance below {settings.attendance_fine_threshold_percent}% in {offering.term_label}: {label} ({percentage}%)" if offering is not None
+                    else f"Attendance below {settings.attendance_fine_threshold_percent}% (actual: {percentage}%)"),
             source=FineSource.ATTENDANCE,
             actor_id=actor_id,
+            related_entity_type="course_offering" if offering is not None else None,
+            related_entity_id=offering.id if offering is not None else None,
         )
         from app.sms.service import SmsService
 
@@ -361,7 +391,7 @@ class AttendanceService:
                         f"A fine of Rs. {settings.attendance_fine_amount:,.0f} was issued. Course registration and your "
                         "result card are on hold until it is paid.",
             )
-            return
+            return True
 
         student = await self.session.get(Student, student_id)
         if student is not None and student.user_id is not None:
@@ -380,6 +410,7 @@ class AttendanceService:
                     entity_id=student.id,
                     after={"reason": "unpaid attendance fine", "attendance_percentage": percentage},
                 )
+        return True
 
     async def _notify_student(self, student_id: uuid.UUID, *, title: str, message: str) -> None:
         student = await self.session.get(Student, student_id)

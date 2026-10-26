@@ -59,7 +59,9 @@ def _fit(c: canvas.Canvas, text: str, font: str, size: float, width: float) -> s
 
 
 def _logo_reader() -> ImageReader | None:
-    path = Path(settings.institute_logo_path)
+    from app.core import brand
+
+    path = brand.logo_path() or Path(settings.institute_logo_path)       # Settings -> Institute -> Logo
     if not path.is_absolute():
         path = Path(__file__).resolve().parents[2] / path
     try:
@@ -76,12 +78,14 @@ def _draw_logo(c: canvas.Canvas, x: float, y: float, size: float, logo: ImageRea
         w, h = iw * scale, ih * scale
         c.drawImage(logo, x + (size - w) / 2, y + (size - h) / 2, w, h, mask="auto", preserveAspectRatio=True)
         return
+    from app.core import brand
+
     c.saveState()
-    c.setFillColor(NAVY)
+    c.setFillColor(colors.HexColor(brand.color("#14307a")))
     c.circle(x + size / 2, y + size / 2, size / 2, stroke=0, fill=1)
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", size * 0.8)
-    c.drawCentredString(x + size / 2, y + size * 0.3, "V")
+    c.drawCentredString(x + size / 2, y + size * 0.3, brand.initials())
     c.restoreState()
 
 
@@ -139,9 +143,22 @@ def render_certificate_pdf(*, institute: str, kind: str, reference: str, code: s
     c.setStrokeColor(LINE)
     c.rect(13 * mm, 13 * mm, w - 26 * mm, h - 26 * mm)
     _draw_logo(c, w / 2 - 12 * mm, h - 40 * mm, 24 * mm, _logo_reader())
+    from app.core import brand
+
     c.setFillColor(INK)
-    c.setFont("Helvetica-Bold", 19)
+    size = 19
+    while size > 12 and c.stringWidth(institute.upper(), "Helvetica-Bold", size) > w - 40 * mm:
+        size -= 0.5
+    c.setFont("Helvetica-Bold", size)
     c.drawCentredString(w / 2, h - 50 * mm, institute.upper())
+    c.setFont("Helvetica", 8.5)
+    c.setFillColor(MUTED)
+    sub = "  ·  ".join(x for x in (brand.address_line(), brand.contact_line()) if x)
+    if sub:
+        c.drawCentredString(w / 2, h - 55 * mm, _fit(c, sub, "Helvetica", 8.5, w - 40 * mm))
+    if settings.institute_registration_no:
+        c.drawCentredString(w / 2, h - 59 * mm, _fit(c, settings.institute_registration_no, "Helvetica", 8.5, w - 40 * mm))
+    c.setFillColor(INK)
     c.setFont("Helvetica-Bold", 14)
     c.drawCentredString(w / 2, h - 63 * mm, TITLES.get(kind, kind))
     c.setStrokeColor(INK)
@@ -162,11 +179,9 @@ def render_certificate_pdf(*, institute: str, kind: str, reference: str, code: s
     c.setFont("Helvetica", 8)
     c.setFillColor(MUTED)
     c.drawString(24 * mm, 26 * mm, f"Check this certificate online: code {code}")
-    c.setStrokeColor(INK)
-    c.line(w - 80 * mm, 38 * mm, w - 24 * mm, 38 * mm)
-    c.setFont("Helvetica-Bold", 10)
-    c.setFillColor(INK)
-    c.drawCentredString(w - 52 * mm, 32 * mm, signatory)
+    # The signatory's signature image (when uploaded), name and title (Settings -> Institute).
+    brand.draw_signature(c, x=w - 80 * mm, y=38 * mm, width=56, label=settings.institute_signatory_title or signatory)
+    brand.draw_footer(c, x=24 * mm, y=17 * mm, width=w - 48 * mm)
     c.showPage()
     c.save()
     return buf.getvalue()
@@ -183,6 +198,8 @@ def render_id_cards_pdf(*, institute: str, cards: list[dict]) -> bytes:
     cw, ch = 85.6 * mm, 54 * mm
     c = canvas.Canvas(buf, pagesize=A4)
     c.setTitle("ID cards")
+    from app.core import brand
+
     logo = _logo_reader()
     words = institute.upper().split()
     half = (len(words) + 1) // 2
@@ -194,7 +211,7 @@ def render_id_cards_pdf(*, institute: str, cards: list[dict]) -> bytes:
         x = 14 * mm + (pos % 2) * (cw + 6 * mm)
         y = h - 14 * mm - ch - (pos // 2) * (ch + 6 * mm)
         staff = card.get("kind") == "STAFF"
-        accent = TEAL if staff else NAVY
+        accent = TEAL if staff else colors.HexColor(brand.color("#14307a"))
 
         c.setStrokeColor(LINE)
         c.setFillColor(colors.white)

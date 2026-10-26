@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clock import institute_today
 from app.core.exceptions import AuthorizationError, BusinessRuleViolationError, ResourceNotFoundError, ValidationAppError
-from app.fees.assignment_service import FeeStatusCalculator, validate_paid_on
+from app.fees.assignment_service import FeeStatusCalculator, lock_assignment, validate_paid_on
 from app.fees.models import AssignmentStatus, FeeAssignment, FeeLedgerEntry, FeeStructure, LedgerEntryType
 from app.fees.refund_models import FeeRefund, RefundKind, RefundStatus
 
@@ -48,8 +48,8 @@ class RefundService:
             raise ResourceNotFoundError("Fee not found.")
         entries = await self._ledger(assignment_id)
         rows = FeeStatusCalculator.installments(entries, None)
-        net_paid = sum(float(e.amount) for e in entries if e.entry_type == LedgerEntryType.CREDIT) - \
-            sum(float(e.amount) for e in entries if FeeStatusCalculator._is_reversal(e))
+        net_paid = sum(float(e.amount) for e in entries if e.entry_type in (LedgerEntryType.CREDIT, LedgerEntryType.CREDIT_IN)) - \
+            sum(float(e.amount) for e in entries if FeeStatusCalculator._is_reversal(e) or e.entry_type == LedgerEntryType.CREDIT_OUT)
         owed = sum(r["charged"] - r["concession"] for r in rows)
         return {"fee_assignment_id": a.id, "net_paid": round(net_paid, 2), "owed_after_discounts": round(owed, 2),
                 "credit_balance": round(max(0.0, net_paid - owed), 2), "max_write_off": round(owed, 2),
@@ -111,6 +111,7 @@ class RefundService:
                 raise ValidationAppError("Say why the refund is rejected.")
             r.status = RefundStatus.REJECTED
         else:
+            await lock_assignment(self.session, r.fee_assignment_id)
             await self._check_amounts(r.fee_assignment_id, float(r.amount), float(r.write_off))
             if float(r.write_off) > 0:
                 await self._write_off(r, actor_id)
@@ -158,7 +159,8 @@ class RefundService:
         return r
 
     async def _restore_write_off(self, r: FeeRefund, actor_id: uuid.UUID) -> None:
-        """The ledger is append-only, so a cancelled write-off is put back as a new charge for the same amount and instalment."""
+        """The ledger is append-only, so a cancelled write-off is undone by a new row linked to it (see
+        FeeStatusCalculator._is_concession_reversal); the installment is owed again, with no extra installment."""
         tag = f"Withdrawal write-off (refund {str(r.id)[:8]})"
         entries = await self._ledger(r.fee_assignment_id)
         by_id = {e.id: e for e in entries}
@@ -166,8 +168,11 @@ class RefundService:
         for e in entries:
             if e.entry_type == LedgerEntryType.CONCESSION and (e.description or "") == tag:
                 original = by_id.get(e.related_entry_id)
+                # Linked to the write-off it undoes (related_entry_id), so it puts that installment's amount back
+                # instead of showing as a new installment (audit FIN-18).
                 self.session.add(FeeLedgerEntry(fee_assignment_id=r.fee_assignment_id, entry_type=LedgerEntryType.DEBIT, amount=float(e.amount),
                                                 installment_number=e.installment_number, due_date=original.due_date if original else None,
+                                                related_entry_id=e.id,
                                                 description=f"Write-off cancelled (refund {str(r.id)[:8]})", created_by=actor_id, created_at=now))
         await self.session.flush()
         a = await self.session.get(FeeAssignment, r.fee_assignment_id)
@@ -183,6 +188,10 @@ class RefundService:
         if method != "CASH" and not (reference or "").strip():
             raise ValidationAppError("Give the cheque / transfer reference (needed to match the bank statement).")
         day = validate_paid_on(paid_on)
+        from app.accounts.period import ensure_open
+
+        await ensure_open(self.session, day, "This refund")
+        await lock_assignment(self.session, r.fee_assignment_id)
         p = await self.position(r.fee_assignment_id)
         if float(r.amount) > p["credit_balance"] + 0.005:
             raise BusinessRuleViolationError(f"Only Rs. {p['credit_balance']:,.2f} is refundable on this fee now (it changed since approval).")
@@ -193,6 +202,9 @@ class RefundService:
                                created_by=actor_id, created_at=datetime.now(timezone.utc))
         self.session.add(entry)
         await self.session.flush()
+        from app.fees.assignment_service import sync_challans
+
+        await sync_challans(self.session, await self.session.get(FeeAssignment, r.fee_assignment_id))
         r.status, r.paid_by, r.ledger_entry_id, r.voucher_number, r.paid_on = RefundStatus.PAID, actor_id, entry.id, voucher, day
         await self.session.flush()
         await self._audit(actor_id, "fee_refund.paid", r, {"voucher": voucher, "method": method, "reference": reference})

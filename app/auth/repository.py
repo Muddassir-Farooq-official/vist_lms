@@ -37,9 +37,15 @@ class AuthRepository:
         ip_address: str | None,
         user_agent: str | None,
     ) -> None:
+        import ipaddress
+
+        try:
+            ip_address = str(ipaddress.ip_address(ip_address)) if ip_address else None
+        except ValueError:
+            ip_address = None                      # "unknown" or a broken value: the INET column would refuse it
         self.session.add(
             LoginAttempt(
-                username_attempted=username_attempted,
+                username_attempted=username_attempted[:64],
                 user_id=user_id,
                 success=success,
                 ip_address=ip_address,

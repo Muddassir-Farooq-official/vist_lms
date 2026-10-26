@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ResourceNotFoundError
 from app.employees.models import Employee
-from app.fees.assignment_service import FeeStatusCalculator
+from app.fees.assignment_service import FeeStatusCalculator, late_pause
 from app.fees.models import AssignmentStatus, FeeStructure, FeeType, LedgerEntryType, PayerType
 from app.fees.payment_models import PaymentChallan
 from app.fees.repository import FeeAssignmentRepository
@@ -47,8 +47,8 @@ class AccountService:
             fee_type = await self.session.get(FeeType, structure.fee_type_id)
             late = float(structure.late_fee_per_day) if structure.late_fee_per_day else None
             entries = await self.repo.get_ledger(a.id)
-            rows = FeeStatusCalculator.installments(entries, late)
-            status = FeeStatusCalculator.compute(entries, late)
+            rows = FeeStatusCalculator.installments(entries, late, pause=late_pause(a))
+            status = FeeStatusCalculator.compute(entries, late, pause=late_pause(a))
             challans = {c.fee_ledger_entry_id: c for c in (await self.session.execute(select(PaymentChallan).where(PaymentChallan.fee_assignment_id == a.id))).scalars()}
             for r in rows:
                 c = challans.get(r["ledger_entry_id"])
@@ -57,10 +57,16 @@ class AccountService:
                 if e.entry_type == LedgerEntryType.CREDIT:
                     payments.append({"id": e.id, "date": e.paid_on or e.created_at, "amount": float(e.amount), "description": e.description or "Payment", "fee": structure.name,
                                      "method": e.payment_method, "reference": e.payment_reference, "receipt_number": e.receipt_number})
+                elif e.entry_type in (LedgerEntryType.CREDIT_IN, LedgerEntryType.CREDIT_OUT):     # advance credit moved between fees (no money moved)
+                    payments.append({"id": e.id, "date": e.paid_on or e.created_at, "amount": float(e.amount) * (1 if e.entry_type == LedgerEntryType.CREDIT_IN else -1),
+                                     "description": e.description or "Credit moved", "fee": structure.name, "method": "CREDIT", "reference": None, "receipt_number": None})
                 elif FeeStatusCalculator._is_reversal(e):  # a staff reversal cancels an earlier payment: show it as a negative line
                     payments.append({"id": e.id, "date": e.paid_on or e.created_at, "amount": -float(e.amount), "description": e.description or "Payment reversed", "fee": structure.name,
                                      "method": e.payment_method, "reference": e.payment_reference, "receipt_number": e.receipt_number})
             conc = [{"name": e.description, "amount": float(e.amount), "installment_number": e.installment_number} for e in entries if e.entry_type == LedgerEntryType.CONCESSION]
+            conc_ids = {e.id for e in entries if e.entry_type == LedgerEntryType.CONCESSION}
+            conc += [{"name": e.description, "amount": -float(e.amount), "installment_number": e.installment_number} for e in entries
+                     if FeeStatusCalculator._is_concession_reversal(e, conc_ids)]
             active = a.status == AssignmentStatus.ACTIVE
             charged, concession = sum(r["charged"] for r in rows), sum(r["concession"] for r in rows)
             paid, remaining = sum(r["paid"] for r in rows), sum(r["remaining"] for r in rows)
@@ -71,6 +77,7 @@ class AccountService:
             out.append({"id": a.id, "fee_name": structure.name, "term_label": structure.term_label, "is_previous_dues": fee_type.code == OPENING_CODE, "status": a.status.value,
                         "late_fee_per_day": late, "charged": round(charged, 2), "concession": round(concession, 2), "payable": round(charged - concession, 2), "paid": round(paid, 2),
                         "remaining": round(remaining, 2), "overdue": round(status["overdue_principal"], 2), "late_fee_accrued": round(status["accrued_fine"], 2),
+                        "credit": status["credit"], "late_fee_paused_from": a.late_fee_paused_from, "late_fee_paused_until": a.late_fee_paused_until,
                         "installments": rows, "concessions": conc})
         fines_unpaid, fines_count = 0.0, 0
         if payer_type == PayerType.STUDENT:

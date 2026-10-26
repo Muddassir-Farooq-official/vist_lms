@@ -1,0 +1,120 @@
+{% extends "staff/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Home{% endblock %}
+{% block page_title %}Home{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Your day, your tasks and your requests in one place.</div>{% endblock %}
+
+{% block content %}
+<div class="dash" id="staff-dash">
+
+  <section class="dash-hero" aria-labelledby="st-greet">
+    <div class="dash-hero-text">
+      <h2 id="st-greet">Welcome</h2>
+      <p><span id="st-date"></span><span class="dash-chip" id="st-today" hidden></span></p>
+    </div>
+    <nav class="dash-actions dash-actions--big" aria-label="Quick actions">
+      <a href="/dashboard/staff/tasks" class="dash-action dash-action--primary">{{ nav_icon("tasks") }}<span>My tasks</span></a>
+      <a href="/dashboard/staff/applications" class="dash-action">{{ nav_icon("file") }}<span>Apply for leave</span></a>
+      <a href="/dashboard/staff/purchases" class="dash-action">{{ nav_icon("fees") }}<span>Ask to buy something</span></a>
+    </nav>
+  </section>
+
+  <p class="dash-alert error" id="st-error" hidden></p>
+
+  <section class="kpi-row" aria-label="Key numbers">
+    <a class="kpi" href="/dashboard/staff/payslips" data-tone="green">
+      <span class="kpi-icon">{{ nav_icon("clock") }}</span>
+      <span class="kpi-label">Today</span>
+      <strong class="kpi-value" id="k-today">&mdash;</strong>
+      <span class="kpi-sub" id="k-today-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/staff/payslips" data-tone="blue">
+      <span class="kpi-icon">{{ nav_icon("check-circle") }}</span>
+      <span class="kpi-label">Days present this month</span>
+      <strong class="kpi-value" id="k-present">&mdash;</strong>
+      <span class="kpi-sub" id="k-present-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/staff/payslips" data-tone="red">
+      <span class="kpi-icon">{{ nav_icon("ban") }}</span>
+      <span class="kpi-label">Late this month</span>
+      <strong class="kpi-value" id="k-late">&mdash;</strong>
+      <span class="kpi-sub" id="k-late-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/staff/tasks" data-tone="orange">
+      <span class="kpi-icon">{{ nav_icon("tasks") }}</span>
+      <span class="kpi-label">Open tasks</span>
+      <strong class="kpi-value" id="k-tasks">&mdash;</strong>
+      <span class="kpi-sub" id="k-tasks-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/staff/applications" data-tone="purple">
+      <span class="kpi-icon">{{ nav_icon("file") }}</span>
+      <span class="kpi-label">Requests waiting</span>
+      <strong class="kpi-value" id="k-req">&mdash;</strong>
+      <span class="kpi-sub" id="k-req-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/staff/payslips" data-tone="teal">
+      <span class="kpi-icon">{{ nav_icon("fees") }}</span>
+      <span class="kpi-label">Last salary</span>
+      <strong class="kpi-value" id="k-pay">&mdash;</strong>
+      <span class="kpi-sub" id="k-pay-sub">&nbsp;</span>
+    </a>
+  </section>
+
+  <div class="dash-grid dash-grid--2-1">
+    <section class="panel dash-panel" aria-labelledby="st-tasks-h">
+      <div class="dash-panel-head">
+        <h2 id="st-tasks-h">My tasks</h2>
+        <a href="/dashboard/staff/tasks" class="view-all-link">All tasks {{ nav_icon("arrow-right") }}</a>
+      </div>
+      <ul class="person-list" id="task-list"></ul>
+      <p class="attn-clear" id="task-empty" hidden>{{ nav_icon("check-circle") }} No open tasks. Well done.</p>
+    </section>
+
+    <section class="panel dash-panel" aria-labelledby="st-att-h">
+      <div class="dash-panel-head"><h2 id="st-att-h">Needs your attention</h2></div>
+      <ul class="attn-list" id="attn-list"></ul>
+      <p class="attn-clear" id="attn-clear" hidden>{{ nav_icon("check-circle") }} All clear.</p>
+    </section>
+  </div>
+
+  <div class="dash-grid dash-grid--3">
+    <section class="panel dash-panel" aria-labelledby="st-month-h">
+      <div class="dash-panel-head">
+        <h2 id="st-month-h">This month</h2>
+        <a href="/dashboard/staff/payslips" class="view-all-link">Day by day {{ nav_icon("arrow-right") }}</a>
+      </div>
+      <div class="ring-row">
+        <div class="ring" id="att-ring" aria-hidden="true"><span id="att-ring-val">&mdash;</span></div>
+        <p class="ring-text" id="att-ring-text">of your working days so far you were present.</p>
+      </div>
+      <ul class="fact-list" id="att-facts"></ul>
+    </section>
+
+    <section class="panel dash-panel" aria-labelledby="st-req-h">
+      <div class="dash-panel-head">
+        <h2 id="st-req-h">My requests</h2>
+        <a href="/dashboard/staff/applications" class="view-all-link">Applications {{ nav_icon("arrow-right") }}</a>
+      </div>
+      <ul class="person-list" id="req-list"></ul>
+      <p class="dash-empty" id="req-empty" hidden>You have not sent any application or purchase request yet.</p>
+    </section>
+
+    <section class="panel dash-panel" aria-labelledby="st-cal-h">
+      <div class="dash-panel-head">
+        <h2 id="st-cal-h">Coming up</h2>
+        <a href="/dashboard/staff/calendar" class="view-all-link">Calendar {{ nav_icon("arrow-right") }}</a>
+      </div>
+      <ul class="event-list" id="cal-list"></ul>
+      <p class="dash-empty" id="cal-empty" hidden>Nothing on the calendar for the next two weeks.</p>
+      <h3 class="dash-sub-h">Latest announcement</h3>
+      <ul class="note-list" id="ann-list"></ul>
+      <p class="dash-empty" id="ann-empty" hidden>No announcements.</p>
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/dash-common.js"></script>
+<script src="/static/js/staff-home.js"></script>
+{% endblock %}

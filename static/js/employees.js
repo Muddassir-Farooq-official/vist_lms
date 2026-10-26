@@ -489,7 +489,7 @@
 
   // ---- extra access roles (teacher + exam controller, second administrator, ...)
   const ROLE_NAMES = { ADMIN: "Administrator", PRINCIPAL: "Principal / Director (view only)", HOD: "Head of Department / Coordinator", TEACHER: "Teacher", EXAM_CONTROLLER: "Exam Controller", ACCOUNTS_OFFICER: "Accounts Officer",
-    LIBRARIAN: "Librarian", SECURITY_GUARD: "Security Guard", HOSTEL_WARDEN: "Hostel Warden" };
+    LIBRARIAN: "Librarian", SECURITY_GUARD: "Security Guard", HOSTEL_WARDEN: "Hostel Warden", STAFF: "General Staff" };
   async function loadAccessRoles(employeeId) {
     const box = document.getElementById("access-roles-box");
     const msgEl = document.getElementById("access-roles-msg");

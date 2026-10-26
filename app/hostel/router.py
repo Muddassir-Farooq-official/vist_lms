@@ -94,7 +94,8 @@ async def check_in(payload: CheckInIn, current_user: CurrentUser = Depends(manag
 @router.post("/stays/{stay_id}/out", summary="A student leaves the hostel")
 async def check_out(stay_id: uuid.UUID, payload: CheckOutIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
     st = await HostelService(db).check_out(stay_id, end_date=payload.end_date, reason=payload.reason, actor_id=current_user.id)
-    return {"id": st.id, "end_date": st.end_date}
+    credit = getattr(st, "credit_result", None) or {}
+    return {"id": st.id, "end_date": st.end_date, "credited": credit.get("credited", 0.0), "refund_due": credit.get("refund_due", 0.0)}
 
 
 @router.post("/stays/{stay_id}/move", summary="Move a student to another room")

@@ -1,0 +1,167 @@
+{#- One student's record in a dialog. Shared by the admin Students page (editable) and the principal / HOD / exam lookup (read-only).
+    Set `editable` before including. Filled by static/js/student-sheet.js (+ students.js for the admin tabs). -#}
+{% from "_icons.html" import nav_icon %}
+<dialog id="student-sheet" class="ss" aria-labelledby="ss-name" data-editable="{{ 'true' if editable else 'false' }}">
+  <div class="ss-shell">
+    <header class="ss-head">
+      <div class="ss-avatar-wrap">
+        {% if editable %}
+        <button type="button" class="ss-avatar is-editable" id="ss-avatar" aria-label="Change photo" title="Click to upload or replace the photo">
+          <img id="ss-photo" alt="" hidden /><span id="ss-initials" aria-hidden="true"></span>
+          <span class="ss-avatar-cam" aria-hidden="true">{{ nav_icon("camera") }}</span>
+        </button>
+        <input type="file" id="ss-photo-input" accept="image/jpeg,image/png,image/webp" hidden />
+        {% else %}
+        <span class="ss-avatar" id="ss-avatar"><img id="ss-photo" alt="" hidden /><span id="ss-initials" aria-hidden="true"></span></span>
+        {% endif %}
+        <div class="ss-avatar-tools">
+          {% if editable %}<label for="ss-photo-input" class="ss-mini-btn" title="Upload or replace photo" aria-label="Upload or replace photo">{{ nav_icon("camera") }}</label>{% endif %}
+          <a href="#" class="ss-mini-btn" id="ss-photo-dl" data-download="photo.jpg" data-label="Photo" title="Download photo" aria-label="Download photo" hidden>{{ nav_icon("download") }}</a>
+          {% if editable %}<button type="button" class="ss-mini-btn danger" id="ss-photo-rm" title="Remove photo" aria-label="Remove photo" hidden>{{ nav_icon("trash") }}</button>{% endif %}
+        </div>
+      </div>
+
+      <div class="ss-title">
+        <h2 id="ss-name">Loading&hellip;</h2>
+        <p class="ss-sub" id="ss-sub"></p>
+        <div class="ss-chips" id="ss-chips"></div>
+      </div>
+
+      <div class="ss-head-actions">
+        <a href="#" class="ss-icon-btn" id="ss-transcript" data-download="transcript.pdf" data-label="Transcript" title="Download transcript (PDF)" aria-label="Download transcript">{{ nav_icon("file") }}</a>
+        {% if editable %}
+        <a href="#" class="ss-icon-btn" id="print-slip-link" target="_blank" rel="noopener" title="Print admission slip" aria-label="Print admission slip">{{ nav_icon("printer") }}</a>
+        <button type="button" class="ss-icon-btn" id="records-btn" title="Documents, certificates &amp; clearance" aria-label="Documents, certificates and clearance">{{ nav_icon("folder") }}</button>
+        {% endif %}
+        <button type="button" class="ss-icon-btn ss-close" id="ss-close" title="Close" aria-label="Close">{{ nav_icon("close") }}</button>
+      </div>
+    </header>
+    <p class="ss-photo-msg" id="ss-photo-msg" role="status" hidden></p>
+
+    <nav class="ss-tabs" role="tablist" aria-label="Student record">
+      <button type="button" class="ss-tab active" role="tab" aria-selected="true" data-ss-tab="overview">Overview</button>
+      <button type="button" class="ss-tab" role="tab" aria-selected="false" data-ss-tab="family">Guardians</button>
+      <button type="button" class="ss-tab" role="tab" aria-selected="false" data-ss-tab="academics">Courses <span class="ss-count" id="ss-course-count"></span></button>
+      {% if editable %}
+      <button type="button" class="ss-tab" role="tab" aria-selected="false" data-ss-tab="edit">Edit details</button>
+      <button type="button" class="ss-tab" role="tab" aria-selected="false" data-ss-tab="account">Status &amp; access</button>
+      {% endif %}
+    </nav>
+
+    <div class="ss-body">
+      <p class="dash-alert error" id="modal-error" hidden></p>
+
+      <section class="ss-panel" data-ss-panel="overview">
+        <div class="ss-kpis" id="ss-kpis"></div>
+        <div class="ss-groups">
+          <section class="ss-group"><h3>Admission</h3><dl id="ss-admission"></dl></section>
+          <section class="ss-group"><h3>Personal</h3><dl id="ss-personal"></dl></section>
+          <section class="ss-group ss-group--wide"><h3>Contact &amp; address</h3><dl id="ss-contact"></dl></section>
+        </div>
+      </section>
+
+      <section class="ss-panel" data-ss-panel="family" hidden>
+        <h3 class="ss-h">Guardians</h3>
+        <div class="ss-cards" id="ss-guardians"></div>
+        <h3 class="ss-h">Emergency contacts</h3>
+        <div class="ss-cards" id="ss-emergency"></div>
+      </section>
+
+      <section class="ss-panel" data-ss-panel="academics" hidden>
+        <div class="ss-terms" id="ss-terms"></div>
+        <p class="ss-empty" id="ss-terms-empty" hidden>No courses yet.</p>
+        <h3 class="ss-h">Earlier qualifications</h3>
+        <div class="ss-cards" id="ss-quals"></div>
+      </section>
+
+      {% if editable %}
+      <section class="ss-panel" data-ss-panel="edit" hidden>
+        <form id="edit-student-form" class="ss-form" novalidate>
+          <fieldset><legend>Personal</legend>
+            <div class="ss-fields">
+              <label>First name<input type="text" id="es-first-name" class="text-input" maxlength="100" /></label>
+              <label>Last name<input type="text" id="es-last-name" class="text-input" maxlength="100" /></label>
+              <label>Date of birth<input type="date" id="es-dob" class="text-input" /></label>
+              <label>Gender<select id="es-gender" class="select-input"><option>Male</option><option>Female</option><option>Other</option></select></label>
+              <label>Marital status<select id="es-marital" class="select-input"><option value="Single">Single</option><option value="Married">Married</option><option value="Divorced">Divorced</option><option value="Widowed">Widowed</option></select></label>
+              <label>Religion<select id="es-religion" class="select-input"></select></label>
+              <label>Nationality<input type="text" id="es-nationality" class="text-input" maxlength="50" /></label>
+              <label>Blood group<select id="es-blood-group" class="select-input"><option value="">Unknown</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></label>
+            </div>
+          </fieldset>
+          <fieldset><legend>Contact &amp; address</legend>
+            <div class="ss-fields">
+              <label>Mobile number<input type="tel" id="es-contact" class="text-input" placeholder="03XXXXXXXXX" /></label>
+              <label>Email<input type="email" id="es-email" class="text-input" maxlength="255" /></label>
+              <label class="span-2">Present address<input type="text" id="es-address" class="text-input" maxlength="255" /></label>
+              <label>Province<select id="es-province" class="select-input"></select></label>
+              <label>District<select id="es-district" class="select-input"></select></label>
+              <label>City<select id="es-city" class="select-input"></select></label>
+            </div>
+          </fieldset>
+          <fieldset><legend>Admission</legend>
+            <div class="ss-fields">
+              <label>Roll number <small>(login username)</small><input type="text" id="es-roll" class="text-input" readonly disabled /></label>
+              <label>Program<select id="es-program" class="select-input"><option value="">None</option></select></label>
+              <label>Current semester<input type="number" id="es-semester" class="text-input" min="1" max="20" /></label>
+              <label>Section / shift<input type="text" id="es-section" class="text-input" maxlength="30" /></label>
+              <label>Admission session<input type="text" id="es-admission-session" class="text-input" maxlength="50" /></label>
+              <label>Admission category<input type="text" id="es-admission-category" class="text-input" maxlength="50" /></label>
+            </div>
+          </fieldset>
+          <div class="ss-form-foot">
+            <span class="ss-saved" id="edit-student-success" hidden></span>
+            <button type="submit" class="role-btn" id="edit-student-submit">Save changes</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="ss-panel" data-ss-panel="account" hidden>
+        <div class="ss-blocks">
+          <section class="ss-block">
+            <h3>Status</h3>
+            <p class="ss-hint">Suspend, graduate or mark a student as left. The reason is kept on record.</p>
+            <div class="ss-inline">
+              <select id="new-status" class="select-input" aria-label="New status">
+                <option value="ACTIVE">Active</option><option value="SUSPENDED">Suspended</option>
+                <option value="GRADUATED">Graduated</option><option value="DROPPED">Left (dropped)</option>
+              </select>
+              <input id="status-reason" class="text-input" maxlength="300" placeholder="Reason" aria-label="Reason for the status change" />
+              <button id="save-status" class="role-btn" type="button">Update</button>
+            </div>
+            <label class="check-row" id="keep-fees-row" hidden><input type="checkbox" id="keep-future-fees" /> Keep the fees not yet due (normally they are cancelled when a student leaves)</label>
+          </section>
+
+          <section class="ss-block">
+            <h3>Student sign-in</h3>
+            <p class="ss-hint">Forgot the password? Issue a new one-time password; the student must change it at first sign-in.</p>
+            <button id="reset-password-btn" class="role-btn secondary-btn" type="button">Reset password</button>
+            <p class="ss-result" id="reset-password-confirm" hidden></p>
+          </section>
+
+          <section class="ss-block" id="parent-access-row">
+            <h3>Parent portal</h3>
+            <p class="ss-hint" id="parent-access-text">&hellip;</p>
+            <div class="ss-inline">
+              <button id="parent-access-btn" class="role-btn" type="button" hidden>Give guardian a login</button>
+              <button id="parent-reset-btn" class="role-btn secondary-btn" type="button" hidden>New guardian password</button>
+              <button id="parent-revoke-btn" class="danger-btn" type="button" hidden>Remove guardian access</button>
+            </div>
+            <p class="ss-result" id="parent-access-result" hidden></p>
+            <div id="parent-siblings" hidden></div>
+          </section>
+
+          <section class="ss-block">
+            <h3>Corrections &amp; records</h3>
+            <p class="ss-hint">Fix a mistyped CNIC or guardian detail (recorded with a reason), or manage documents, certificates and clearance.</p>
+            <div class="ss-inline">
+              <button id="identity-btn" class="role-btn secondary-btn" type="button">Correct CNIC / guardian</button>
+              <button id="records-btn-2" class="role-btn secondary-btn" type="button">Documents &amp; clearance</button>
+            </div>
+          </section>
+        </div>
+      </section>
+      {% endif %}
+    </div>
+  </div>
+</dialog>

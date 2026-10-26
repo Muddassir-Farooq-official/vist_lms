@@ -14,16 +14,17 @@ CHANGE_PASSWORD_PATH = "/change-password"
 # privileged portal they have.
 PORTAL_BY_ROLE: tuple[tuple[str, str], ...] = (
     (Roles.ADMIN, "/dashboard/admin"),
-    (Roles.ACCOUNTS_OFFICER, "/dashboard/accounts/fees"),
+    (Roles.ACCOUNTS_OFFICER, "/dashboard/accounts"),
     (Roles.LIBRARIAN, "/dashboard/library"),
     (Roles.PRINCIPAL, "/dashboard/principal"),
     (Roles.HOD, "/dashboard/hod"),
     (Roles.TEACHER, "/dashboard/faculty"),
     (Roles.STUDENT, "/dashboard/student"),
     (Roles.PARENT, "/dashboard/parent"),
-    (Roles.EXAM_CONTROLLER, "/dashboard/exam"),
-    (Roles.HOSTEL_WARDEN, "/dashboard/warden"),
-    (Roles.SECURITY_GUARD, "/dashboard/gate"),
+    (Roles.EXAM_CONTROLLER, "/dashboard/exam/home"),
+    (Roles.HOSTEL_WARDEN, "/dashboard/warden/home"),
+    (Roles.SECURITY_GUARD, "/dashboard/gate/home"),
+    (Roles.STAFF, "/dashboard/staff"),
 )
 
 
@@ -34,6 +35,26 @@ def home_for_roles(roles: list[str] | tuple[str, ...], must_change_password: boo
         return CHANGE_PASSWORD_PATH
     held = set(roles)
     for role, path in PORTAL_BY_ROLE:
+        if role in held:
+            return path
+    return None
+
+# "My Profile" for each kind of person (a notification about a profile change links here through /dashboard/my-profile).
+PROFILE_BY_ROLE: tuple[tuple[str, str], ...] = (
+    (Roles.STUDENT, "/dashboard/student/profile"),
+    (Roles.TEACHER, "/dashboard/faculty/profile"),
+    (Roles.ACCOUNTS_OFFICER, "/dashboard/accounts/profile"),
+    (Roles.LIBRARIAN, "/dashboard/library/profile"),
+    (Roles.EXAM_CONTROLLER, "/dashboard/exam/profile"),
+    (Roles.HOSTEL_WARDEN, "/dashboard/warden/profile"),
+    (Roles.SECURITY_GUARD, "/dashboard/gate/profile"),
+    (Roles.STAFF, "/dashboard/staff/profile"),
+)
+
+
+def profile_for_roles(roles: list[str] | tuple[str, ...]) -> str | None:
+    held = set(roles)
+    for role, path in PROFILE_BY_ROLE:
         if role in held:
             return path
     return None

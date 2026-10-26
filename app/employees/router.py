@@ -521,10 +521,16 @@ def _serve_file(storage_key: str | None, original_name: str | None, media_type: 
     return Response(content=path.read_bytes(), media_type=media_type, headers=headers)
 
 
-@router.post("/me/photo", response_model=EmployeeDetail, summary="Upload my own profile photo")
-async def upload_my_photo(file: UploadFile, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> EmployeeDetail:
-    employee = await _resolve_own_employee(db, current_user)
-    return await _upload_photo(db, employee, file)
+@router.post("/me/photo", status_code=202, summary="Send a new photo of myself for approval (it goes live only when the office approves)")
+async def upload_my_photo(file: UploadFile, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    """A person's own photo is never published directly: it must pass the automatic face check and then wait for an
+    administrator (app/selfservice). The administration's own upload, /{id}/photo, still publishes at once."""
+    from app.selfservice.service import ProfileChangeService, request_out, subject_for_user
+
+    subj = await subject_for_user(db, current_user.id)
+    req = await ProfileChangeService(db).ask_photo(subj, current_user.id, await file.read(), file.filename or "photo.jpg", file.content_type or "")
+    await db.commit()
+    return {"pending_approval": True, "request": await request_out(db, req)}
 
 
 @router.get("/me/photo", summary="Download my own profile photo")
@@ -704,23 +710,15 @@ async def get_employee_full_profile(
                 pass_rate=(passed_count / graded) if graded > 0 else None,
             )
 
-    # Fee summary (as an employee payer)
-    from app.fees.models import LedgerEntryType, PayerType
-    from app.fees.repository import FeeAssignmentRepository
+    # Fee summary (as an employee payer): the same figures as their own fee account.
+    from app.fees.account_service import AccountService
+    from app.fees.models import PayerType
 
-    fee_repo = FeeAssignmentRepository(db)
-    assignments = await fee_repo.list_for_payer(PayerType.EMPLOYEE, employee_id)
-    total_due, total_paid = 0.0, 0.0
-    for assignment in assignments:
-        ledger = await fee_repo.get_ledger(assignment.id)
-        for entry in ledger:
-            if entry.entry_type == LedgerEntryType.DEBIT:
-                total_due += float(entry.amount)
-            else:
-                total_paid += float(entry.amount)
+    fee_acct = await AccountService(db).build(PayerType.EMPLOYEE, employee_id, staff_view=True)
+    fs = fee_acct["summary"]
     fee_summary = EmployeeFeeSummary(
-        total_assignments=len(assignments), total_due=total_due, total_paid=total_paid,
-        total_outstanding=max(0.0, total_due - total_paid),
+        total_assignments=sum(1 for a in fee_acct["assignments"] if a["status"] == "ACTIVE"),
+        total_due=round(fs["charged"] - fs["concession"], 2), total_paid=fs["paid"], total_outstanding=fs["remaining"],
     )
 
     # Library summary (as an employee borrower)

@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.audit.service import AuditService
 from app.core.clock import institute_today
 from app.core.exceptions import BusinessRuleViolationError, ResourceNotFoundError
-from app.fees.assignment_service import FeeStatusCalculator
+from app.fees.assignment_service import FeeStatusCalculator, late_pause, lock_assignment, sync_challans
 from app.fees.models import (
     AssignmentStatus,
     FeeAssignment,
@@ -34,6 +34,13 @@ OPENING_CODE = "OPENING"          # the fee type of "previous dues": scholarship
 Q = Decimal("0.01")
 
 
+def covers(s: "Scholarship", due: date | None) -> bool:
+    """Whether a scholarship covers an installment due on `due` (inside valid_from .. valid_until, both included)."""
+    if due is None:
+        return True
+    return due >= s.valid_from and (s.valid_until is None or due <= s.valid_until)
+
+
 def _d(v) -> Decimal:
     return Decimal(str(v))
 
@@ -52,7 +59,9 @@ class ScholarshipService:
         return s
 
     async def grant(self, *, student_id: uuid.UUID, name: str, kind: ScholarshipKind, value: float, fee_structure_id: uuid.UUID | None, auto_apply: bool,
-                    valid_from: date | None, valid_until: date | None, reason: str, actor_id: uuid.UUID) -> tuple[Scholarship, dict]:
+                    valid_from: date | None, valid_until: date | None, reason: str, actor_id: uuid.UUID, approved: bool = False):
+        """Give a scholarship or discount. Unless `approved`, an administrator other than the person asking must approve it
+        first (owner decision 2/10): then the approval request is returned and nothing is applied yet."""
         student = await self.session.get(Student, student_id)
         if student is None or student.status != StudentStatus.ACTIVE:
             raise BusinessRuleViolationError("Choose an active student.")
@@ -65,9 +74,20 @@ class ScholarshipService:
             raise BusinessRuleViolationError("Give the reason for this scholarship (it is kept on record).")
         if fee_structure_id is not None and await self.session.get(FeeStructure, fee_structure_id) is None:
             raise BusinessRuleViolationError("That fee does not exist.")
-        start = valid_from or institute_today()
+        start = valid_from or await self._default_start()
         if valid_until is not None and valid_until < start:
             raise BusinessRuleViolationError("The end date cannot be before the start date.")
+        if not approved:
+            from app.approvals.service import gate
+
+            what = f"{float(value):g}%" if kind == ScholarshipKind.PERCENT else f"Rs. {float(value):,.0f}"
+            req = await gate(self.session, kind="SCHOLARSHIP", actor_id=actor_id, target_id=None, reason=reason,
+                             amount=None if kind == ScholarshipKind.PERCENT else float(value),
+                             payload={"student_id": student_id, "name": name, "kind": kind.value, "value": float(value), "fee_structure_id": fee_structure_id,
+                                      "auto_apply": auto_apply, "valid_from": valid_from, "valid_until": valid_until, "reason": reason},
+                             summary=f"{name.strip()} ({what}) for {student.first_name} {student.last_name} ({student.roll_number or 'no roll no.'})")
+            if req is not None:
+                return req, None
         s = Scholarship(student_id=student_id, name=name.strip(), kind=kind, value=float(value), fee_structure_id=fee_structure_id, auto_apply=auto_apply, valid_from=start,
                         valid_until=valid_until, status=ScholarshipStatus.ACTIVE, reason=reason.strip(), granted_by=actor_id)
         self.session.add(s)
@@ -83,6 +103,18 @@ class ScholarshipService:
             await create_notification(self.session, user_id=student.user_id, category=NotificationCategory.FEE, title=f"Scholarship applied: {s.name}",
                                       message=f"Rs. {total:,.2f} has been taken off what you owe.", link="/dashboard/student/fees")
         return s, {"assignments_updated": applied, "total_concession": float(total)}
+
+    async def _default_start(self) -> date:
+        """With no start date given, a scholarship covers the current term: from the start of the latest open academic
+        term that has begun (so this term's installments already due are included, earlier terms' dues are not).
+        Without registered terms, from 1 January of this year."""
+        from app.academics.terms import AcademicTerm, TermStatus
+
+        today = institute_today()
+        started = (await self.session.execute(select(AcademicTerm.start_date).where(
+            AcademicTerm.status == TermStatus.OPEN, AcademicTerm.start_date.is_not(None), AcademicTerm.start_date <= today)
+            .order_by(AcademicTerm.start_date.desc()).limit(1))).scalar_one_or_none()
+        return started or date(today.year, 1, 1)
 
     async def end(self, scholarship_id: uuid.UUID, *, actor_id: uuid.UUID) -> Scholarship:
         s = await self.get(scholarship_id)
@@ -116,6 +148,7 @@ class ScholarshipService:
             return Decimal(0)
         if s.fee_structure_id is not None and s.fee_structure_id != assignment.fee_structure_id:
             return Decimal(0)
+        await lock_assignment(self.session, assignment.id)
         structure = await self.session.get(FeeStructure, assignment.fee_structure_id)
         fee_type = await self.session.get(FeeType, structure.fee_type_id)
         if fee_type is not None and fee_type.code == OPENING_CODE:
@@ -123,7 +156,11 @@ class ScholarshipService:
         entries = await self.repo.get_ledger(assignment.id)
         if any(e.entry_type == LedgerEntryType.CONCESSION and e.scholarship_id == s.id for e in entries):
             return Decimal(0)                                                    # already applied to this fee
-        rows = [r for r in FeeStatusCalculator.installments(entries, float(structure.late_fee_per_day) if structure.late_fee_per_day else None) if r["remaining"] > 0.005]
+        # Only installments due inside the scholarship's dates: one granted for next term leaves this term alone,
+        # and one that starts this term never reaches dues from earlier terms.
+        rows = [r for r in FeeStatusCalculator.installments(entries, float(structure.late_fee_per_day) if structure.late_fee_per_day else None,
+                                                            pause=late_pause(assignment))
+                if r["remaining"] > 0.005 and covers(s, r["due_date"])]
         if not rows:
             return Decimal(0)
         shares: dict = {}
@@ -152,7 +189,7 @@ class ScholarshipService:
         if total <= 0:
             return Decimal(0)
         await self.session.flush()
-        await self._refresh_challans(assignment, structure)
+        await sync_challans(self.session, assignment)
         await self.audit.log(actor_user_id=actor_id, action="scholarship.applied", entity_type="fee_assignment", entity_id=assignment.id,
                              after={"scholarship_id": str(s.id), "total": float(total)})
         if notify:
@@ -163,24 +200,13 @@ class ScholarshipService:
         return total
 
     async def _refresh_challans(self, assignment: FeeAssignment, structure: FeeStructure) -> None:
-        """An unpaid challan must show what is now payable, not the old figure (otherwise the student could pay too much)."""
-        entries = await self.repo.get_ledger(assignment.id)
-        rows = {r["ledger_entry_id"]: r for r in FeeStatusCalculator.installments(entries, float(structure.late_fee_per_day) if structure.late_fee_per_day else None)}
-        for ch in (await self.session.execute(select(PaymentChallan).where(PaymentChallan.fee_assignment_id == assignment.id, PaymentChallan.status == ChallanStatus.PENDING))).scalars():
-            r = rows.get(ch.fee_ledger_entry_id)
-            if r is None:
-                continue
-            if r["remaining"] <= 0.005:
-                ch.status = ChallanStatus.CANCELLED
-            else:
-                ch.amount = r["remaining"]
+        """Kept for callers elsewhere; the shared sync keeps challans in step with installments."""
+        await sync_challans(self.session, assignment)
 
     async def apply_active_to_assignment(self, assignment: FeeAssignment, *, actor_id: uuid.UUID) -> None:
         """Called whenever a fee is charged to a student: any running scholarship that covers it is applied straight away."""
         if assignment.payer_type != PayerType.STUDENT:
             return
-        today = institute_today()
-        stmt = select(Scholarship).where(Scholarship.student_id == assignment.payer_id, Scholarship.status == ScholarshipStatus.ACTIVE, Scholarship.auto_apply.is_(True), Scholarship.valid_from <= today)
+        stmt = select(Scholarship).where(Scholarship.student_id == assignment.payer_id, Scholarship.status == ScholarshipStatus.ACTIVE, Scholarship.auto_apply.is_(True))
         for s in (await self.session.execute(stmt)).scalars().all():
-            if s.valid_until is None or s.valid_until >= today:
-                await self.apply_to_assignment(s, assignment, actor_id=actor_id)
+            await self.apply_to_assignment(s, assignment, actor_id=actor_id)        # covers() picks the installments inside its dates

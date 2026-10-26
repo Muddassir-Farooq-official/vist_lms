@@ -1,0 +1,10 @@
+{# The institute's identity on every page (Settings -> Institute). #}
+{% macro brand_head() -%}
+  <link rel="icon" type="{{ 'image/png' if brand.has_logo else 'image/svg+xml' }}" href="{{ brand.favicon_url }}" />
+  {% if brand.theme_css %}<style id="brand-theme">{{ brand.theme_css }}</style>{% endif %}
+{%- endmacro %}
+
+{% macro brand_mark(portal) -%}
+  <span class="brand-mark{% if brand.has_logo %} has-logo{% endif %}">{% if brand.has_logo %}<img src="{{ brand.logo_dark_url if brand.has_logo_dark else brand.logo_url }}" alt="" />{% else %}{{ brand.initials }}{% endif %}</span>
+  <span class="brand-text"><b>{{ brand.short_name }}</b>{% if portal %}<small>{{ portal }}</small>{% endif %}</span>
+{%- endmacro %}

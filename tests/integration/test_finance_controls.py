@@ -23,6 +23,14 @@ pytestmark = pytest.mark.asyncio
 FA = "/api/v1/fees/assignments"
 A = "/api/v1/accounts"
 
+async def _approve(client, run_id):
+    """Payroll now goes DRAFT -> SUBMITTED (accounts office) -> APPROVED (administration). Submit, then approve."""
+    sub = await client.post(f"/api/v1/payroll/runs/{run_id}/submit")
+    if sub.status_code != 200 and "Only a draft" not in sub.text:     # already submitted is fine; a real problem is returned
+        return sub
+    return await client.post(f"/api/v1/payroll/runs/{run_id}/approve")
+
+
 
 @pytest.fixture(autouse=True)
 def _quiet(monkeypatch):
@@ -109,7 +117,7 @@ async def test_a_security_deposit_is_paid_back_once(app_client, admin_user, db_s
     await _as(app_client, team, "officer")
     run = await _prepare(app_client)
     await _login_admin(app_client)
-    await app_client.post(f"{PR}/runs/{run['id']}/approve")
+    await _approve(app_client, run['id'])
     await _as(app_client, team, "officer")
     await app_client.post(f"{PR}/runs/{run['id']}/pay", json={"payment_method": "CASH", "paid_date": str(TODAY)})
     sec = (await app_client.get(f"{PR}/security")).json()

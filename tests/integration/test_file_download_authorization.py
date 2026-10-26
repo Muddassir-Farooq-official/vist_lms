@@ -14,6 +14,8 @@ _SLOT_DAY_OF_WEEK = _DAY_NAMES[_TERM_START.weekday()]
 pytestmark = pytest.mark.asyncio
 
 ADMIN = {"username": "admin_test", "password": "AdminPass123!"}
+STUDENT_PASSWORD = "StudentPass123!"
+TEACHER_PASSWORD = "TeacherReal123!"
 
 
 def _student_payload(**overrides):
@@ -91,12 +93,16 @@ async def _create_teacher(app_client, db_session, *, code, cnic) -> tuple[str, s
 # ---------------------------------------------------------------------------
 class TestStudentFileDownloadAuthorization:
     async def test_student_can_download_own_photo_via_me_endpoint(self, app_client, admin_user, db_session):
-        _student_id, _username = await _create_and_activate_student(app_client, cnic="91001-0000001-1")
+        # A person's own photo waits for the office (app/selfservice); the office's upload publishes it.
+        student_id, _username = await _create_and_activate_student(app_client, cnic="91001-0000001-1")
         photo_bytes = b"\xff\xd8\xff\xe0\x00\x10JFIF" + b"\x00" * 32
-        upload = await app_client.post(
-            "/api/v1/students/me/photo", files={"file": ("me.jpg", photo_bytes, "image/jpeg")}
-        )
+        own = await app_client.post("/api/v1/students/me/photo", files={"file": ("me.jpg", photo_bytes, "image/jpeg")})
+        assert own.status_code == 422                                   # not a real face: refused before it reaches the office
+        assert (await app_client.get("/api/v1/students/me/photo")).status_code == 404
+        await _login_admin(app_client)
+        upload = await app_client.post(f"/api/v1/students/{student_id}/photo", files={"file": ("me.jpg", photo_bytes, "image/jpeg")})
         assert upload.status_code == 200, upload.text
+        await _login(app_client, _username, STUDENT_PASSWORD)
         download = await app_client.get("/api/v1/students/me/photo")
         assert download.status_code == 200
         assert download.content == photo_bytes
@@ -149,12 +155,15 @@ class TestEmployeeFileDownloadAuthorization:
         assert resp.status_code == 403
 
     async def test_employee_can_download_own_photo_via_me_endpoint(self, app_client, admin_user, db_session):
-        _, _username = await _create_teacher(app_client, db_session, code="T-SELF", cnic="82003-0000001-1")
+        # A person's own photo waits for the office (app/selfservice); the office's upload publishes it.
+        employee_id, _username = await _create_teacher(app_client, db_session, code="T-SELF", cnic="82003-0000001-1")
         photo_bytes = b"\xff\xd8\xff\xe0\x00\x10JFIF" + b"\x00" * 32
-        upload = await app_client.post(
-            "/api/v1/employees/me/photo", files={"file": ("me.jpg", photo_bytes, "image/jpeg")}
-        )
+        own = await app_client.post("/api/v1/employees/me/photo", files={"file": ("me.jpg", photo_bytes, "image/jpeg")})
+        assert own.status_code == 422
+        await _login_admin(app_client)
+        upload = await app_client.post(f"/api/v1/employees/{employee_id}/photo", files={"file": ("me.jpg", photo_bytes, "image/jpeg")})
         assert upload.status_code == 200, upload.text
+        await _login(app_client, _username, TEACHER_PASSWORD)
         resp = await app_client.get("/api/v1/employees/me/photo")
         assert resp.status_code == 200
         assert resp.content == photo_bytes

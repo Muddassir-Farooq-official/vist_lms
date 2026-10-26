@@ -81,11 +81,11 @@ async def test_each_upcoming_class_names_its_teacher_and_section(app_client, adm
 
 async def test_student_home_ships_the_dashboard_cards_and_header_identity(app_client):
     html = (await app_client.get("/dashboard/student")).text
-    for needle in ("sh-classes", "sh-attendance", "sh-alerts", "sh-courses", "sh-quick", "portal-footer",
-                   "weekly.pdf", "/dashboard/student/library", "VIST Student", "Vertex Institute of Science"):
+    for needle in ("kpi-row", 'id="class-list"', 'id="attn-list"', 'id="course-cards"', "dash-actions", "Alerts &amp; deadlines", "portal-footer",
+                   "weekly.pdf", "/dashboard/student/library", "VIST LMS Student", "Vertex Institute of Science", "Nothing needs your attention"):
         assert needle in html, needle
-    js = (await app_client.get("/static/js/portal-home.js")).text
-    for needle in ("StudentUI", "enrollments/me/overview", "attendanceRing", "Nothing needs your attention", "Fee payment due", "Overdue book"):
+    js = (await app_client.get("/static/js/student-home.js")).text
+    for needle in ("enrollments/me/overview", "enrollments/me/schedule", "attendance/config", "Fee payment due", "Overdue book", "calendar.ics", "results/me/transcript"):
         assert needle in js, needle
     shared = (await app_client.get("/static/js/student-ui.js")).text
     for needle in ("classCard", "calendar.ics", "downloadFile", "Add to Calendar", "function ring"):

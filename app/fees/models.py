@@ -51,6 +51,9 @@ class LedgerEntryType(str, enum.Enum):
     CREDIT = "CREDIT"  # a payment recorded against the assignment
     CONCESSION = "CONCESSION"  # a scholarship/discount taken off one installment (reduces what is owed, is not a payment)
     REFUND = "REFUND"  # money paid BACK to the payer (an approved refund); cancels part of earlier payments
+    # Advance credit moved between two fees of the same payer (no money moves, so the cash book ignores both rows):
+    CREDIT_OUT = "CREDIT_OUT"  # taken off the fee that was overpaid
+    CREDIT_IN = "CREDIT_IN"    # put on the fee it pays
 
 
 class PaymentMethod(str, enum.Enum):
@@ -151,9 +154,9 @@ class FeeStructure(UUIDPKMixin, TimestampMixin, Base):
     semesters: Mapped[list["FeeStructureSemester"]] = relationship(
         back_populates="fee_structure", cascade="all, delete-orphan"
     )
-    assignments: Mapped[list["FeeAssignment"]] = relationship(
-        back_populates="fee_structure", cascade="all, delete-orphan"
-    )
+    # Charges are never removed by deleting their fee (audit DB-03): the database refuses (RESTRICT), and the ORM
+    # does not cascade the delete either. "Undo activation" removes unused charges explicitly.
+    assignments: Mapped[list["FeeAssignment"]] = relationship(back_populates="fee_structure", passive_deletes="all")
 
 
 class FeeStructureProgram(Base):
@@ -227,7 +230,7 @@ class FeeAssignment(UUIDPKMixin, TimestampMixin, Base):
     )
 
     fee_structure_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("fee_structures.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("fee_structures.id", ondelete="RESTRICT"), nullable=False
     )
     payer_type: Mapped[PayerType] = mapped_column(Enum(PayerType, name="fee_payer_type"), nullable=False)
     payer_id: Mapped[uuid.UUID] = mapped_column(nullable=False)  # students.id or employees.id
@@ -240,11 +243,13 @@ class FeeAssignment(UUIDPKMixin, TimestampMixin, Base):
     status: Mapped[AssignmentStatus] = mapped_column(
         Enum(AssignmentStatus, name="fee_assignment_status"), default=AssignmentStatus.ACTIVE, nullable=False
     )
+    # Late fees do not run while the student is suspended or has left: from `paused_from` up to `paused_until`
+    # (empty = still paused). Set by a student status change.
+    late_fee_paused_from: Mapped[date | None] = mapped_column(Date, nullable=True)
+    late_fee_paused_until: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     fee_structure: Mapped[FeeStructure] = relationship(back_populates="assignments")
-    ledger_entries: Mapped[list["FeeLedgerEntry"]] = relationship(
-        back_populates="assignment", cascade="all, delete-orphan"
-    )
+    ledger_entries: Mapped[list["FeeLedgerEntry"]] = relationship(back_populates="assignment", passive_deletes="all")
 
 
 class FeeLedgerEntry(UUIDPKMixin, Base):
@@ -262,7 +267,7 @@ class FeeLedgerEntry(UUIDPKMixin, Base):
     )
 
     fee_assignment_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("fee_assignments.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("fee_assignments.id", ondelete="RESTRICT"), nullable=False
     )
     entry_type: Mapped[LedgerEntryType] = mapped_column(Enum(LedgerEntryType, name="fee_ledger_entry_type"), nullable=False)
     amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
@@ -280,10 +285,16 @@ class FeeLedgerEntry(UUIDPKMixin, Base):
     description: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # CONCESSION rows only — the DEBIT installment this concession reduces, and the scholarship that granted it.
     related_entry_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("fee_ledger_entries.id", ondelete="CASCADE"), nullable=True
+        ForeignKey("fee_ledger_entries.id", ondelete="RESTRICT"), nullable=True
     )
     scholarship_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("scholarships.id", ondelete="SET NULL"), nullable=True
+    )
+    # CREDIT rows only — the installment (DEBIT) this payment was made for, when it was made against that
+    # installment's own challan. It settles that installment first; anything left over follows the usual
+    # oldest-first rule. Empty for counter payments (oldest installment first) and for older rows.
+    applies_to_entry_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("fee_ledger_entries.id", ondelete="SET NULL"), nullable=True, index=True
     )
     # CREDIT rows only — what the bank statement / cash book shows, so every
     # payment can be reconciled, and the receipt handed to the payer.

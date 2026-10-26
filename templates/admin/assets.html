@@ -1,0 +1,204 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}{{ allowed_roles }}{% endblock %}
+{% block title %}Fixed assets{% endblock %}
+{% block page_title %}Fixed assets{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Everything the institute owns that lasts for years: furniture, computers, lab equipment, vehicles, buildings. Each item has its own tag number, a place, a holder, a cost and a book value that falls with monthly depreciation. Every change is kept in its history.</div>{% endblock %}
+
+{% block content %}
+<div id="as-tiles"></div>
+
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="register" role="tab" aria-selected="true"><span>Register</span></button>
+  <button class="portal-tab" data-tab="add" role="tab" aria-selected="false" data-manage><span>Add assets</span></button>
+  <button class="portal-tab" data-tab="depreciation" role="tab" aria-selected="false"><span>Depreciation</span></button>
+  <button class="portal-tab" data-tab="disposals" role="tab" aria-selected="false"><span>Disposals</span></button>
+  <button class="portal-tab" data-tab="checks" role="tab" aria-selected="false"><span>Physical checks</span></button>
+  <button class="portal-tab" data-tab="setup" role="tab" aria-selected="false"><span>Categories &amp; places</span></button>
+</div>
+
+<p id="as-msg" class="panel-hint" role="status" hidden></p>
+
+<!-- ============================================================ register -->
+<div class="portal-tab-panel" data-tab-panel="register">
+<section class="panel">
+  <div class="toolbar">
+    <input id="rg-q" class="text-input" type="search" placeholder="Tag, name, serial or model" aria-label="Search assets" />
+    <select id="rg-cat" class="select-input" aria-label="Category"><option value="">All categories</option></select>
+    <select id="rg-loc" class="select-input" aria-label="Place"><option value="">All places</option></select>
+    <select id="rg-status" class="select-input" aria-label="Status">
+      <option value="">On the books</option><option value="IN_USE">In use</option><option value="IN_STORE">In store</option>
+      <option value="UNDER_REPAIR">Under repair</option><option value="MISSING">Missing</option><option value="DISPOSED">Disposed of</option></select>
+    <button type="button" class="role-btn secondary-btn" id="rg-labels">Print labels for this list</button>
+  </div>
+  <div class="table-scroll">
+  <table class="dash-table">
+    <thead><tr><th>Tag</th><th>Asset</th><th>Category</th><th>Place</th><th>Held by</th><th>Status</th><th class="num">Cost</th><th class="num">Book value</th><th></th></tr></thead>
+    <tbody id="rg-rows"></tbody>
+  </table>
+  </div>
+  <p class="empty-state" id="rg-empty" hidden>No assets match. Start under <strong>Categories &amp; places</strong>, then <strong>Add assets</strong>.</p>
+  <p class="cc-meta" id="rg-count"></p>
+</section>
+</div>
+
+<!-- ============================================================ add -->
+<div class="portal-tab-panel" data-tab-panel="add" hidden>
+<section class="panel">
+  <h2>Add an asset</h2>
+  <p class="panel-hint">Bought now: give the purchase date and cost. <strong>Owned before the system</strong>: give the real purchase date and cost if you know them (the system works out how much has already been used up), or tick "value is an estimate" and enter what it is worth today.</p>
+  <form id="ad-form" class="form-grid two-col as-form">
+    <div class="form-field"><label for="ad-source">How it came</label>
+      <select id="ad-source" class="select-input"><option value="PURCHASE">Bought</option><option value="OPENING">Owned before the system</option><option value="DONATION">Donated</option><option value="OTHER">Other</option></select></div>
+    <div class="form-field"><label for="ad-cat">Category</label><select id="ad-cat" class="select-input" required></select></div>
+    <div class="form-field two-span"><label for="ad-name">Name</label><input id="ad-name" class="text-input" maxlength="150" required placeholder="e.g. Dell OptiPlex 7090 desktop" /></div>
+    <div class="form-field"><label for="ad-make">Make / model</label><input id="ad-make" class="text-input" maxlength="150" /></div>
+    <div class="form-field"><label for="ad-serial">Maker's serial no.</label><input id="ad-serial" class="text-input" maxlength="100" /></div>
+    <div class="form-field"><label for="ad-loc">Place</label><select id="ad-loc" class="select-input"></select></div>
+    <div class="form-field"><label for="ad-dept">Department</label><input id="ad-dept" class="text-input" maxlength="100" /></div>
+    <div class="form-field"><label for="ad-emp">Held by (optional)</label><input id="ad-emp" class="text-input" maxlength="60" placeholder="Name or employee code" autocomplete="off" />
+      <div id="ad-emp-list" class="picker-list"></div><input type="hidden" id="ad-emp-id" /></div>
+    <div class="form-field"><label for="ad-cond">Condition</label>
+      <select id="ad-cond" class="select-input"><option value="GOOD">Good</option><option value="FAIR">Fair</option><option value="POOR">Poor</option><option value="UNUSABLE">Unusable</option></select></div>
+    <div class="form-field"><label for="ad-date">Purchase date</label><input id="ad-date" type="date" class="text-input" /></div>
+    <div class="form-field"><label for="ad-cost">Cost (Rs.) — each</label><input id="ad-cost" type="number" class="text-input" min="0" step="0.01" required /></div>
+    <label class="check-row" data-opening hidden><input type="checkbox" id="ad-estimate" /> Value is an estimate (real cost / date not known)</label>
+    <div class="form-field" data-opening hidden><label for="ad-golive">Depreciate in this system from</label><input id="ad-golive" type="date" class="text-input" /></div>
+    <div class="form-field"><label for="ad-qty">How many (each gets its own tag)</label><input id="ad-qty" type="number" class="text-input" min="1" max="500" value="1" /></div>
+    <div class="form-field"><label for="ad-tag">Tag (empty = automatic)</label><input id="ad-tag" class="text-input" maxlength="30" placeholder="Only if it already has a number" /></div>
+    <div class="form-field"><label for="ad-warranty">Warranty until</label><input id="ad-warranty" type="date" class="text-input" /></div>
+    <div class="form-field"><label for="ad-invoice">Invoice no.</label><input id="ad-invoice" class="text-input" maxlength="60" /></div>
+    <details class="two-span"><summary>Depreciation different from the category (optional)</summary>
+      <div class="form-grid two-col as-form">
+        <div class="form-field"><label for="ad-method">Method</label>
+          <select id="ad-method" class="select-input"><option value="">Same as the category</option><option value="STRAIGHT_LINE">Straight line</option><option value="REDUCING_BALANCE">Reducing balance</option><option value="NONE">Not depreciated</option></select></div>
+        <div class="form-field"><label for="ad-life">Useful life (years)</label><input id="ad-life" type="number" class="text-input" min="0.5" step="0.5" /></div>
+        <div class="form-field"><label for="ad-rate">Rate % a year</label><input id="ad-rate" type="number" class="text-input" min="1" max="100" step="0.5" /></div>
+        <div class="form-field"><label for="ad-residual">Residual value (Rs.)</label><input id="ad-residual" type="number" class="text-input" min="0" step="0.01" /></div>
+      </div>
+    </details>
+    <div class="form-field two-span"><label for="ad-notes">Notes</label><input id="ad-notes" class="text-input" maxlength="2000" /></div>
+    <div class="form-actions two-span"><button type="submit" class="role-btn" id="ad-save">Add</button></div>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>From received purchases</h2>
+  <p class="panel-hint">Goods received on a purchase order that are equipment rather than store stock. Each unit becomes one asset with its own tag, at the purchase price. A line taken into the store cannot also be added here (and the other way round).</p>
+  <div id="po-list"></div>
+  <p class="empty-state" id="po-empty" hidden>Nothing waiting.</p>
+</section>
+
+<section class="panel">
+  <h2>Bring in many assets at once (spreadsheet)</h2>
+  <p class="panel-hint">For everything owned before the system. Download the template, fill one row per item (category by code or name; places are created if new), then check the file. Nothing is added until every row is right.</p>
+  <div class="toolbar">
+    <a class="role-btn secondary-btn" href="/api/v1/assets/import/template.csv" data-download="assets-import-template.csv" id="im-template">Download template</a>
+    <input type="file" id="im-file" accept=".csv,text/csv" aria-label="CSV file" />
+    <label for="im-golive">Depreciate from</label><input id="im-golive" type="date" class="text-input" />
+    <button type="button" class="role-btn" id="im-check">Check the file</button>
+    <button type="button" class="role-btn" id="im-go" hidden>Add them</button>
+  </div>
+  <div id="im-result"></div>
+</section>
+</div>
+
+<!-- ============================================================ depreciation -->
+<div class="portal-tab-panel" data-tab-panel="depreciation" hidden>
+<section class="panel" data-manage>
+  <h2>Post depreciation</h2>
+  <p class="panel-hint">Once a month, after the month ends. Each asset is charged from where it was left up to the chosen month end (months missed are caught up). Only the latest run can be undone (by the administration), and never inside closed books.</p>
+  <div class="toolbar">
+    <label for="dp-month">Up to the end of</label><input id="dp-month" type="month" class="text-input" />
+    <button type="button" class="role-btn secondary-btn" id="dp-preview">Preview</button>
+    <button type="button" class="role-btn" id="dp-post" disabled>Post</button>
+  </div>
+  <div id="dp-preview-box"></div>
+</section>
+<section class="panel">
+  <h2>Runs</h2>
+  <table class="dash-table"><thead><tr><th>Up to</th><th class="num">Assets</th><th class="num">Depreciation</th><th>Posted by</th><th>Status</th><th></th></tr></thead><tbody id="dp-runs"></tbody></table>
+  <p class="empty-state" id="dp-runs-empty" hidden>No depreciation posted yet.</p>
+</section>
+</div>
+
+<!-- ============================================================ disposals -->
+<div class="portal-tab-panel" data-tab-panel="disposals" hidden>
+<section class="panel">
+  <h2>Disposals</h2>
+  <p class="panel-hint">Sold, scrapped, donated, lost or written off. The office asks (from the asset's page); the administration approves. On approval the last part of the depreciation is posted, the book value is kept, and money from a sale goes into Accounts as income.</p>
+  <table class="dash-table"><thead><tr><th>Asked</th><th>Asset</th><th>How</th><th>Date</th><th class="num">Book value</th><th class="num">Received</th><th class="num">Gain / (loss)</th><th>Status</th><th></th></tr></thead><tbody id="ds-rows"></tbody></table>
+  <p class="empty-state" id="ds-empty" hidden>No disposals.</p>
+</section>
+</div>
+
+<!-- ============================================================ checks -->
+<div class="portal-tab-panel" data-tab-panel="checks" hidden>
+<section class="panel" data-manage>
+  <h2>Start a physical check</h2>
+  <p class="panel-hint">Choose a place (or all). Walk round and scan each label with a barcode scanner, or type the tag. Anything on the list that is not seen becomes <strong>Missing</strong> when you close the check; anything from elsewhere is marked as found in the wrong place.</p>
+  <div class="toolbar">
+    <select id="ck-loc" class="select-input" aria-label="Place"><option value="">Every place</option></select>
+    <input id="ck-title" class="text-input" maxlength="150" placeholder="Title (optional)" aria-label="Title" />
+    <button type="button" class="role-btn" id="ck-start">Start</button>
+  </div>
+</section>
+<section class="panel" id="ck-open" hidden>
+  <h2 id="ck-open-title"></h2>
+  <p class="cc-meta" id="ck-open-meta"></p>
+  <form class="toolbar" id="ck-scan-form" data-manage>
+    <input id="ck-scan" class="text-input" placeholder="Scan or type a tag, then Enter" autocomplete="off" aria-label="Tag" />
+    <select id="ck-cond" class="select-input" aria-label="Condition"><option value="">Condition unchanged</option><option value="GOOD">Good</option><option value="FAIR">Fair</option><option value="POOR">Poor</option><option value="UNUSABLE">Unusable</option></select>
+    <button type="submit" class="role-btn">Record</button>
+    <label class="check-row"><input type="checkbox" id="ck-moves" /> On closing, move things found elsewhere to where they were found</label>
+    <button type="button" class="role-btn danger-btn" id="ck-close">Close the check</button>
+  </form>
+  <table class="dash-table"><thead><tr><th>Tag</th><th>Asset</th><th>Should be in</th><th>Result</th><th>Found in</th><th>Condition</th><th></th></tr></thead><tbody id="ck-lines"></tbody></table>
+</section>
+<section class="panel">
+  <h2>Checks</h2>
+  <table class="dash-table"><thead><tr><th>Started</th><th>Check</th><th>Place</th><th>Result</th><th>Status</th><th></th></tr></thead><tbody id="ck-rows"></tbody></table>
+  <p class="empty-state" id="ck-empty" hidden>No checks yet.</p>
+</section>
+</div>
+
+<!-- ============================================================ setup -->
+<div class="portal-tab-panel" data-tab-panel="setup" hidden>
+<section class="panel">
+  <div class="panel-header"><div class="panel-header-left"><h2>Categories</h2></div>
+    <button type="button" class="role-btn secondary-btn" id="ct-suggested" data-manage>Add the usual categories</button></div>
+  <p class="panel-hint">Each category has a code (used in tag numbers) and a depreciation method. The usual categories use the reducing-balance rates commonly used in Pakistan (buildings 10%, furniture, equipment and vehicles 15%, computers 30%, land not depreciated). <strong>Confirm them with your auditor</strong> and change them before posting depreciation.</p>
+  <table class="dash-table"><thead><tr><th>Code</th><th>Category</th><th>Method</th><th class="num">Assets</th><th></th></tr></thead><tbody id="ct-rows"></tbody></table>
+  <form id="ct-form" class="form-grid two-col as-form" data-manage>
+    <div class="form-field"><label for="ct-code">Code</label><input id="ct-code" class="text-input" maxlength="10" placeholder="IT" required /></div>
+    <div class="form-field"><label for="ct-name">Name</label><input id="ct-name" class="text-input" maxlength="100" required /></div>
+    <div class="form-field"><label for="ct-method">Method</label>
+      <select id="ct-method" class="select-input"><option value="STRAIGHT_LINE">Straight line (same amount each year)</option><option value="REDUCING_BALANCE">Reducing balance (% of what is left)</option><option value="NONE">Not depreciated</option></select></div>
+    <div class="form-field"><label for="ct-life">Useful life (years)</label><input id="ct-life" type="number" class="text-input" min="0.5" step="0.5" /></div>
+    <div class="form-field"><label for="ct-rate">Rate % a year</label><input id="ct-rate" type="number" class="text-input" min="1" max="100" step="0.5" /></div>
+    <div class="form-field"><label for="ct-residual">Residual value (% of cost)</label><input id="ct-residual" type="number" class="text-input" min="0" max="99" step="1" value="0" /></div>
+    <div class="form-actions two-span"><button type="submit" class="role-btn">Add category</button></div>
+  </form>
+</section>
+<section class="panel">
+  <h2>Places</h2>
+  <table class="dash-table"><thead><tr><th>Place</th><th>Building</th><th>Department</th><th class="num">Assets</th><th></th></tr></thead><tbody id="lc-rows"></tbody></table>
+  <form id="lc-form" class="toolbar" data-manage>
+    <input id="lc-name" class="text-input" maxlength="120" placeholder="e.g. Computer Lab 2" aria-label="Place" required />
+    <input id="lc-building" class="text-input" maxlength="120" placeholder="Building" aria-label="Building" />
+    <input id="lc-dept" class="text-input" maxlength="100" placeholder="Department" aria-label="Department" />
+    <button type="submit" class="role-btn">Add place</button>
+  </form>
+</section>
+</div>
+
+<dialog id="as-modal" class="modal modal-wide as-modal">
+  <div class="modal-body">
+    <div id="as-detail"></div>
+    <button id="as-close" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/assets.js"></script>
+{% endblock %}

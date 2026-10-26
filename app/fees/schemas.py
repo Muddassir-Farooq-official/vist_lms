@@ -120,6 +120,8 @@ class FeeAssignmentOut(BaseModel):
     status: AssignmentStatus
     total_concession: float = 0.0
     total_charged: float
+    total_payable: float = 0.0       # charged minus scholarships / write-offs
+    total_remaining: float = 0.0     # still to be paid, due now or later
     total_paid: float
     overdue_principal: float
     accrued_fine: float
@@ -168,6 +170,7 @@ class RecordPaymentRequest(PaymentDetails):
 
 class AssignmentStatusUpdateRequest(BaseModel):
     status: AssignmentStatus
+    reason: str | None = Field(default=None, max_length=500)     # required by the service (kept in the audit log)
 
 
 class MarkUnpaidRequest(BaseModel):

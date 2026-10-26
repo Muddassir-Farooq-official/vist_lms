@@ -1,43 +1,158 @@
 {% extends "admin/_base.html" %}
 {% block title %}Settings{% endblock %}
 {% block page_title %}Settings{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Your institute's name, logo and details (they appear on every page, document and SMS), its look, the rules the system applies, and your own account.</div>{% endblock %}
 
 {% block content %}
-<section class="panel">
-  <h2>Account</h2>
-  <dl class="detail-list" id="account-details">
-    <dt>Username</dt><dd id="acct-username">&mdash;</dd>
-    <dt>Roles</dt><dd id="acct-roles">&mdash;</dd>
-  </dl>
-</section>
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="institute" role="tab" aria-selected="true" data-admin-only><span>Institute</span></button>
+  <button class="portal-tab" data-tab="look" role="tab" aria-selected="false" data-admin-only><span>Look &amp; documents</span></button>
+  <button class="portal-tab" data-tab="rules" role="tab" aria-selected="false" data-admin-only><span>Rules</span></button>
+  <button class="portal-tab" data-tab="account" role="tab" aria-selected="false"><span>My account</span></button>
+</div>
 
-<section class="panel">
-  <h2>Change Password</h2>
-  <form id="change-password-form" class="form-grid">
-    <div class="form-field">
-      <label for="current-password">Current Password</label>
-      <input type="password" id="current-password" class="text-input" required autocomplete="current-password" />
+<!-- ============================================================ institute -->
+<div class="portal-tab-panel st-grid" data-tab-panel="institute">
+  <section class="panel">
+    <h2>Institute details</h2>
+    <p class="panel-hint">Shown on the sign-in page, the menu, every PDF (challans, receipts, certificates, ID cards, result cards, payslips, admit cards) and in SMS.</p>
+    <form id="pf-form" class="form-grid two-col st-form" novalidate>
+      <div class="form-field two-span"><label for="pf-name">Full name *</label><input id="pf-name" class="text-input" maxlength="200" required data-field="name" /></div>
+      <div class="form-field"><label for="pf-short">Short name * <small>(menu, page titles, SMS)</small></label><input id="pf-short" class="text-input" maxlength="40" required data-field="short_name" /></div>
+      <div class="form-field"><label for="pf-tagline">Motto / tagline</label><input id="pf-tagline" class="text-input" maxlength="200" data-field="tagline" /></div>
+      <div class="form-field two-span"><label for="pf-address">Address</label><input id="pf-address" class="text-input" maxlength="300" data-field="address" placeholder="Street, area" /></div>
+      <div class="form-field"><label for="pf-city">City</label><input id="pf-city" class="text-input" maxlength="80" data-field="city" /></div>
+      <div class="form-field"><label for="pf-phone">Phone</label><input id="pf-phone" class="text-input" maxlength="60" data-field="phone" inputmode="tel" /></div>
+      <div class="form-field"><label for="pf-email">Email</label><input id="pf-email" class="text-input" maxlength="150" data-field="email" type="email" /></div>
+      <div class="form-field"><label for="pf-website">Website</label><input id="pf-website" class="text-input" maxlength="150" data-field="website" placeholder="www.example.edu.pk" /></div>
+      <div class="form-field two-span"><label for="pf-reg">Registration / affiliation no.</label><input id="pf-reg" class="text-input" maxlength="120" data-field="registration_no" placeholder="e.g. Affiliated with … / Reg. No. …" /></div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Logo</h2>
+    <p class="panel-hint">PNG or JPG, at most 2 MB. A square or wide logo with a transparent background looks best. It is resized automatically.</p>
+    <div class="st-images">
+      <div class="st-image" data-kind="logo">
+        <div class="st-image-box"><img id="img-logo" alt="Logo" /></div>
+        <strong>Logo</strong><small>Pages, PDFs, browser tab</small>
+        <div class="st-image-actions"><label class="role-btn small-btn">Upload<input type="file" accept="image/png,image/jpeg" hidden data-upload="logo" /></label>
+          <button type="button" class="role-btn small-btn secondary-btn" data-remove="logo">Remove</button></div>
+      </div>
+      <div class="st-image" data-kind="logo_dark">
+        <div class="st-image-box dark"><img id="img-logo_dark" alt="Logo for dark backgrounds" /></div>
+        <strong>Logo on dark</strong><small>The menu (optional; a white version)</small>
+        <div class="st-image-actions"><label class="role-btn small-btn">Upload<input type="file" accept="image/png,image/jpeg" hidden data-upload="logo_dark" /></label>
+          <button type="button" class="role-btn small-btn secondary-btn" data-remove="logo_dark">Remove</button></div>
+      </div>
     </div>
-    <div class="form-field">
-      <label for="new-password">New Password</label>
-      <input type="password" id="new-password" class="text-input" required minlength="10" autocomplete="new-password" />
+  </section>
+</div>
+
+<!-- ============================================================ look and documents -->
+<div class="portal-tab-panel st-grid" data-tab-panel="look" hidden>
+  <section class="panel">
+    <h2>Main colour</h2>
+    <p class="panel-hint">Used for the menu, buttons and links, and headings on PDFs. Leave empty for the standard blue.</p>
+    <div class="st-color-row">
+      <input id="pf-color-pick" type="color" value="#2454d6" aria-label="Pick a colour" />
+      <input id="pf-color" class="text-input small-input" maxlength="7" data-field="primary_color" form="pf-form" placeholder="#2454d6" aria-label="Colour code" />
+      <button type="button" class="role-btn small-btn secondary-btn" id="pf-color-clear">Standard blue</button>
     </div>
-    <div class="form-actions">
-      <button type="submit" class="role-btn" id="change-password-btn">Update Password</button>
+    <div class="st-swatches" id="pf-swatches" aria-label="Suggested colours"></div>
+    <p class="dash-alert error" id="pf-contrast" hidden></p>
+
+    <h3>Preview</h3>
+    <div class="st-preview" id="st-preview">
+      <div class="st-prev-menu"><span class="st-prev-mark" id="pv-mark"></span><span><b id="pv-short"></b><small>Admin</small></span></div>
+      <div class="st-prev-body">
+        <div class="st-prev-doc">
+          <div class="st-prev-head"><img id="pv-logo" alt="" hidden /><div><strong id="pv-name"></strong><small id="pv-address"></small><small id="pv-contact"></small></div></div>
+          <div class="st-prev-title">PAYMENT RECEIPT <span>RCPT-2026-000123</span></div>
+          <div class="st-prev-line"><span>Received from</span><b>Sample Student</b></div>
+          <div class="st-prev-line"><span>Amount</span><b>Rs. 22,500.00</b></div>
+          <div class="st-prev-foot" id="pv-footer"></div>
+        </div>
+        <button type="button" class="role-btn st-prev-btn">Button</button> <a href="#" class="st-prev-link" tabindex="-1">A link</a>
+      </div>
     </div>
-  </form>
-  <p id="password-error" class="dash-alert error" hidden></p>
-  <p id="password-success" class="success-text" hidden></p>
-</section>
+    <p class="cc-meta"><a href="/api/v1/institute/preview/challan.pdf" target="_blank" rel="noopener">Open a sample challan (PDF)</a> &mdash; saved details only.</p>
+  </section>
+
+  <section class="panel">
+    <h2>On documents</h2>
+    <div class="form-grid two-col st-form">
+      <div class="form-field two-span"><label for="pf-footer">Footer line</label><input id="pf-footer" class="text-input" maxlength="300" data-field="document_footer" form="pf-form"
+        placeholder="e.g. This is a computer-generated document. Fees once paid are not refundable except as per policy." /><small class="panel-hint">At the foot of receipts, challans, certificates, payslips, result cards and admit cards.</small></div>
+    </div>
+    <h3>Bank details on fee challans</h3>
+    <div class="form-grid two-col st-form">
+      <div class="form-field"><label for="pf-bank">Bank</label><input id="pf-bank" class="text-input" maxlength="120" data-field="bank_name" form="pf-form" /></div>
+      <div class="form-field"><label for="pf-branch">Branch</label><input id="pf-branch" class="text-input" maxlength="150" data-field="bank_branch" form="pf-form" /></div>
+      <div class="form-field"><label for="pf-acct-title">Account title</label><input id="pf-acct-title" class="text-input" maxlength="150" data-field="bank_account_title" form="pf-form" /></div>
+      <div class="form-field"><label for="pf-acct-no">Account no. / IBAN</label><input id="pf-acct-no" class="text-input" maxlength="60" data-field="bank_account_no" form="pf-form" /></div>
+    </div>
+    <h3>Signature on certificates and result cards</h3>
+    <div class="form-grid two-col st-form">
+      <div class="form-field"><label for="pf-sig-name">Name</label><input id="pf-sig-name" class="text-input" maxlength="120" data-field="signatory_name" form="pf-form" placeholder="e.g. Dr. Ayesha Khan" /></div>
+      <div class="form-field"><label for="pf-sig-title">Title</label><input id="pf-sig-title" class="text-input" maxlength="120" data-field="signatory_title" form="pf-form" placeholder="Principal" /></div>
+    </div>
+    <div class="st-images">
+      <div class="st-image wide" data-kind="signature">
+        <div class="st-image-box"><img id="img-signature" alt="Signature" /></div>
+        <strong>Signature image</strong><small>Optional. Sign on white paper, scan or photograph it, crop tightly. Leave empty to sign by hand.</small>
+        <div class="st-image-actions"><label class="role-btn small-btn">Upload<input type="file" accept="image/png,image/jpeg" hidden data-upload="signature" /></label>
+          <button type="button" class="role-btn small-btn secondary-btn" data-remove="signature">Remove</button></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================ rules -->
+<div class="portal-tab-panel" data-tab-panel="rules" hidden>
 <section class="panel" id="policy-panel" aria-labelledby="policy-h">
-  <h2 id="policy-h">Institute Policy</h2>
-  <p class="panel-hint">Rules the system applies automatically. Changes take effect straight away (within a minute on every server) and are recorded in the audit log. Leave a box empty to go back to the default.</p>
+  <div class="panel-header"><div class="panel-header-left"><h2 id="policy-h">Rules the system applies</h2></div>
+    <input id="policy-search" class="text-input" type="search" placeholder="Find a rule&hellip;" aria-label="Find a rule" /></div>
+  <p class="panel-hint">Changes apply to everyone straight away (within a minute on every server) and are kept in the audit log. <span class="status-pill pending">changed</span> marks a rule set differently from the default.</p>
   <div id="policy-groups"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
-  <div class="form-actions"><button id="policy-save-btn" class="role-btn" type="button">Save policy</button></div>
-  <p id="policy-error" class="dash-alert error" hidden></p>
-  <p id="policy-success" class="success-text" hidden></p>
+  <p class="empty-state" id="policy-none" hidden>No rule matches.</p>
 </section>
+</div>
 
+<!-- ============================================================ my account -->
+<div class="portal-tab-panel st-grid" data-tab-panel="account" hidden>
+  <section class="panel">
+    <h2>Account</h2>
+    <dl class="detail-list" id="account-details">
+      <dt>Username</dt><dd id="acct-username">&mdash;</dd>
+      <dt>Roles</dt><dd id="acct-roles">&mdash;</dd>
+    </dl>
+  </section>
+  <section class="panel">
+    <h2>Change password</h2>
+    <form id="change-password-form" class="form-grid">
+      <div class="form-field">
+        <label for="current-password">Current password</label>
+        <input type="password" id="current-password" class="text-input" required autocomplete="current-password" />
+      </div>
+      <div class="form-field">
+        <label for="new-password">New password <small>(at least 10 characters)</small></label>
+        <input type="password" id="new-password" class="text-input" required minlength="10" autocomplete="new-password" />
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="role-btn" id="change-password-btn">Update password</button>
+      </div>
+    </form>
+    <p id="password-error" class="dash-alert error" hidden></p>
+    <p id="password-success" class="success-text" hidden></p>
+  </section>
+</div>
+
+<div class="st-savebar" id="st-savebar" hidden role="region" aria-label="Unsaved changes">
+  <span id="st-savebar-text">Unsaved changes</span>
+  <button type="button" class="role-btn secondary-btn" id="st-discard">Discard</button>
+  <button type="button" class="role-btn" id="st-save">Save changes</button>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}

@@ -6,13 +6,14 @@ import re
 import pytest
 
 from app.auth.redirects import PORTAL_BY_ROLE
-from app.main import ACCOUNTS_NAV_ITEMS, ADMIN_NAV_ITEMS, EXAM_NAV_ITEMS, FACULTY_NAV_ITEMS, GATE_NAV_ITEMS, HOD_NAV_ITEMS, LIBRARY_NAV_ITEMS, PARENT_NAV_ITEMS, PRINCIPAL_NAV_ITEMS, STUDENT_NAV_ITEMS, WARDEN_NAV_ITEMS
+from app.main import ACCOUNTS_NAV_ITEMS, ADMIN_NAV_ITEMS, EXAM_NAV_ITEMS, FACULTY_NAV_ITEMS, GATE_NAV_ITEMS, HOD_NAV_ITEMS, LIBRARY_NAV_ITEMS, PARENT_NAV_ITEMS, PRINCIPAL_NAV_ITEMS, STAFF_NAV_ITEMS, STUDENT_NAV_ITEMS, WARDEN_NAV_ITEMS
 
 pytestmark = pytest.mark.asyncio
 
 ALL_NAVS = {
     "admin": ADMIN_NAV_ITEMS, "library": LIBRARY_NAV_ITEMS, "accounts": ACCOUNTS_NAV_ITEMS,
     "student": STUDENT_NAV_ITEMS, "faculty": FACULTY_NAV_ITEMS, "gate": GATE_NAV_ITEMS, "exam": EXAM_NAV_ITEMS, "warden": WARDEN_NAV_ITEMS,
+    "staff": STAFF_NAV_ITEMS,
 }
 
 
@@ -34,10 +35,11 @@ async def test_menu_items_are_unique_and_phone_bar_is_small(portal):
 
 
 async def test_every_sign_in_destination_is_in_that_portals_menu():
-    menus = {"/dashboard/admin": ADMIN_NAV_ITEMS, "/dashboard/accounts/fees": ACCOUNTS_NAV_ITEMS,
+    menus = {"/dashboard/admin": ADMIN_NAV_ITEMS, "/dashboard/accounts": ACCOUNTS_NAV_ITEMS,
              "/dashboard/library": LIBRARY_NAV_ITEMS, "/dashboard/faculty": FACULTY_NAV_ITEMS,
-             "/dashboard/student": STUDENT_NAV_ITEMS, "/dashboard/gate": GATE_NAV_ITEMS, "/dashboard/exam": EXAM_NAV_ITEMS, "/dashboard/warden": WARDEN_NAV_ITEMS,
-             "/dashboard/hod": HOD_NAV_ITEMS, "/dashboard/principal": PRINCIPAL_NAV_ITEMS, "/dashboard/parent": PARENT_NAV_ITEMS}
+             "/dashboard/student": STUDENT_NAV_ITEMS, "/dashboard/gate/home": GATE_NAV_ITEMS, "/dashboard/exam/home": EXAM_NAV_ITEMS, "/dashboard/warden/home": WARDEN_NAV_ITEMS,
+             "/dashboard/hod": HOD_NAV_ITEMS, "/dashboard/principal": PRINCIPAL_NAV_ITEMS, "/dashboard/parent": PARENT_NAV_ITEMS,
+             "/dashboard/staff": STAFF_NAV_ITEMS}
     for _role, path in PORTAL_BY_ROLE:
         assert path in {i["href"] for i in menus[path]}, f"{path} is a landing page but not in its own menu"
 
@@ -54,7 +56,7 @@ async def test_menu_is_grouped_and_shell_has_phone_bar_and_no_api_docs_button(ap
 
 async def test_student_and_teacher_home_are_real_pages_and_library_moved(app_client):
     student = (await app_client.get("/dashboard/student")).text
-    assert 'data-home="student"' in student and "Your next classes" in student and "portal-home.js" in student
+    assert 'data-home="student"' in student and "Your next classes" in student and "student-home.js" in student
     assert "library-portal.js" not in student                          # Library is no longer the home page
     faculty = (await app_client.get("/dashboard/faculty")).text
     assert 'data-home="faculty"' in faculty and "Today" in faculty

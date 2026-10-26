@@ -2,7 +2,8 @@
   "use strict";
 
   const VA = window.VistAdmin;
-  const isFaculty = window.location.pathname.indexOf("/faculty/") !== -1;
+  // The student portal shows the student record; every staff portal (faculty, offices, general staff) the employee record.
+  const isFaculty = window.location.pathname.indexOf("/dashboard/student/") !== 0;   // i.e. any staff portal
   const ENTITY = isFaculty ? "employees" : "students";
 
   let myId = null; // resolved from /me on first load, needed to build the photo/certificate URLs
@@ -37,7 +38,6 @@
     const phAvatar = document.getElementById("ph-avatar");
     if (phAvatar) {
       const SU = window.StudentUI;
-      phAvatar.innerHTML = p.has_photo ? '<img src="/api/v1/' + ENTITY + '/me/photo" alt="" />' : VA.escapeHtml(SU.initials(myFullName));
       document.getElementById("ph-name").textContent = myFullName;
       if (isFaculty) {
         document.getElementById("ph-sub").textContent = (p.employee_code || "") + (p.department ? " \u00b7 " + p.department : "");
@@ -93,72 +93,65 @@
   // Profile photo — self-service equivalent of the admin panel's photo
   // block (static/js/students.js / employees.js), same pattern.
   // ---------------------------------------------------------------------
-  const photoFrame = document.getElementById("my-photo-frame");
+  // Clicking the photo (or the small camera) chooses a new one and sends it at once. Students and staff: it waits for the
+  // office's approval (202); the current photo stays until then.
   const photoInput = document.getElementById("my-photo-input");
-  const photoUploadBtn = document.getElementById("my-photo-upload-btn");
   const photoDownloadLink = document.getElementById("my-photo-download-link");
   const photoRemoveBtn = document.getElementById("my-photo-remove-btn");
   const photoError = document.getElementById("my-photo-error");
+  const avatarBtn = document.getElementById("ph-avatar");
+  const PALETTE = ["#2563eb", "#7c3aed", "#db2777", "#dc2626", "#d97706", "#059669", "#0891b2", "#4f46e5"];
 
   function myPhotoUrl() {
     return "/api/v1/" + ENTITY + "/me/photo";
-  }
-
-  function initialsAvatarHtml(fullName) {
-    const parts = (fullName || "").trim().split(/\s+/).filter(Boolean);
-    const initials = ((parts[0] ? parts[0][0] : "") + (parts[1] ? parts[1][0] : "")).toUpperCase() || "?";
-    const palette = ["#2563eb", "#7c3aed", "#db2777", "#dc2626", "#d97706", "#059669", "#0891b2", "#4f46e5"];
-    let hash = 0;
-    for (let i = 0; i < (fullName || "").length; i++) hash = (hash * 31 + fullName.charCodeAt(i)) >>> 0;
-    const color = palette[hash % palette.length];
-    return '<div class="profile-photo-initials" style="background:' + color + '">' + VA.escapeHtml(initials) + "</div>";
   }
 
   let myFullName = "";
 
   function updatePhotoDisplay(hasPhoto) {
     photoError.hidden = true;
-    if (hasPhoto) {
-      photoFrame.innerHTML = '<img src="' + myPhotoUrl() + "?t=" + Date.now() + '" alt="" />';
-      photoDownloadLink.href = myPhotoUrl();
-      photoDownloadLink.setAttribute("download", "my-photo.jpg");
-      photoDownloadLink.hidden = false;
-      photoRemoveBtn.hidden = false;
-    } else {
-      photoFrame.innerHTML = initialsAvatarHtml(myFullName);
-      photoDownloadLink.hidden = true;
-      photoRemoveBtn.hidden = true;
-    }
+    const img = document.getElementById("ph-photo"), ini = document.getElementById("ph-initials");
+    let h = 0; for (let i = 0; i < myFullName.length; i++) h = (h * 31 + myFullName.charCodeAt(i)) >>> 0;
+    avatarBtn.style.setProperty("--av", PALETTE[h % PALETTE.length]);
+    ini.textContent = window.StudentUI ? window.StudentUI.initials(myFullName) : (myFullName[0] || "?");
+    if (hasPhoto) { img.src = myPhotoUrl() + "?t=" + Date.now(); img.hidden = false; ini.hidden = true; photoDownloadLink.href = myPhotoUrl(); }
+    else { img.hidden = true; img.removeAttribute("src"); ini.hidden = false; }
+    photoDownloadLink.hidden = !hasPhoto;
+    photoRemoveBtn.hidden = !hasPhoto;
   }
 
-  photoUploadBtn.addEventListener("click", async function () {
+  avatarBtn.addEventListener("click", function () { photoInput.click(); });
+  photoInput.addEventListener("change", async function () {
     photoError.hidden = true;
-    if (!photoInput.files.length) {
-      photoError.textContent = "Choose an image file first.";
-      photoError.hidden = false;
-      return;
-    }
-    photoUploadBtn.disabled = true;
+    if (!photoInput.files.length) return;
+    const file = photoInput.files[0];
+    if (file.size > 5 * 1024 * 1024) { photoError.textContent = "That image is larger than 5 MB. Choose a smaller one."; photoError.hidden = false; photoInput.value = ""; return; }
+    avatarBtn.classList.add("is-busy");
     const formData = new FormData();
-    formData.append("file", photoInput.files[0]);
+    formData.append("file", file);
     const result = await VA.fetchJson(myPhotoUrl(), { method: "POST", body: formData });
-    photoUploadBtn.disabled = false;
-
+    avatarBtn.classList.remove("is-busy");
+    photoInput.value = "";
     if (!result.ok) {
       photoError.textContent = extractErrorMessage(result.body, "Could not upload photo.");
       photoError.hidden = false;
       return;
     }
-    photoInput.value = "";
+    if (result.status === 202 || (result.body && result.body.pending_approval)) {
+      const sent = document.getElementById("my-photo-sent");
+      if (sent) sent.hidden = false;
+      document.dispatchEvent(new CustomEvent("profile-changes:refresh"));
+      return;
+    }
     updatePhotoDisplay(true);
   });
 
   photoRemoveBtn.addEventListener("click", async function () {
+    if (!(await VA.confirm("Remove your photo?", "Remove"))) return;
     photoError.hidden = true;
     photoRemoveBtn.disabled = true;
     const result = await VA.fetchJson(myPhotoUrl(), { method: "DELETE" });
     photoRemoveBtn.disabled = false;
-
     if (!result.ok && result.status !== 204) {
       photoError.textContent = extractErrorMessage(result.body, "Could not remove photo.");
       photoError.hidden = false;

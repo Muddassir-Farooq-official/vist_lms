@@ -10,13 +10,15 @@ from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 
-def render_merit_list_pdf(m: dict, institute: str) -> bytes:
+def render_merit_list_pdf(m: dict, institute: str | None = None) -> bytes:
+    from app.core import brand
+
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=14 * mm, rightMargin=14 * mm, topMargin=14 * mm, bottomMargin=14 * mm,
                             title=f"Merit list {m['list_no']} {m['program']} {m['term_label']}")
     ss = getSampleStyleSheet()
     w = m["weights"]
-    story = [Paragraph(institute, ss["Title"]),
+    story = brand.platypus_header(A4[0] - 28 * mm) + [
              Paragraph(f"Merit list {m['list_no']} — {m['program_name']} ({m['program']}), {m['term_label']}", ss["Heading2"]),
              Paragraph(f"Aggregate = matric {w['matric']:g}% + intermediate {w['inter']:g}% + entry test {w['test']:g}%. "
                        f"Selected candidates must complete admission by <b>{m['deadline']:%d %B %Y}</b>, or the seat goes to the next merit list.",

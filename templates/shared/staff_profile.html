@@ -1,0 +1,15 @@
+{% extends base_template %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}My Profile{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Your record as held by the institute. Click your photo to change it, and update your contact details below. The office approves every change.</div>{% endblock %}
+
+{% block content %}
+{% include "shared/my_profile_content.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/student-ui.js"></script>
+<script src="/static/js/my-profile.js"></script>
+<script src="/static/js/profile-changes.js"></script>
+{% endblock %}

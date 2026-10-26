@@ -113,7 +113,7 @@ class FinePaymentReversal(UUIDPKMixin, Base):
     __tablename__ = "fine_payment_reversals"
     __table_args__ = (Index("ix_fine_payment_reversals_fine_id", "fine_id"),)
 
-    fine_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fines.id", ondelete="CASCADE"), nullable=False)
+    fine_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fines.id", ondelete="RESTRICT"), nullable=False)
     receipt_number: Mapped[str | None] = mapped_column(String(30), nullable=True)
     amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     paid_on: Mapped[date | None] = mapped_column(Date, nullable=True)

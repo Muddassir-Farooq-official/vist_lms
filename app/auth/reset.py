@@ -119,10 +119,17 @@ class PasswordResetService:
         if tries == 1:
             await redis.expire(f"pwreset:tries:{user.id}", CODE_MINUTES * 60)
         if tries > MAX_TRIES or not hmac.compare_digest(_hash(token.id, (code or "").strip()), token.token_hash):
-            if tries >= MAX_TRIES:
-                token.used_at = now                                    # five wrong tries: this code is finished
-            await self.audit.log(actor_user_id=None, action="auth.password_reset_wrong_code", entity_type="user", entity_id=user.id, ip=ip)
-            await self.session.flush()
+            # The error below rolls the request back, so the "code finished" mark and the audit row are written in
+            # their own committed session; otherwise five wrong tries were silently undone (audit SEC-03).
+            from app.core.side_log import committed_now
+
+            async with committed_now(self.session) as side:
+                if tries >= MAX_TRIES:
+                    t = await side.get(PasswordResetToken, token.id)
+                    if t is not None and t.used_at is None:
+                        t.used_at = now                                # five wrong tries: this code is finished
+                await AuditService(side).log(actor_user_id=None, action="auth.password_reset_wrong_code", entity_type="user", entity_id=user.id, ip=ip,
+                                             metadata={"try": tries})
             raise wrong
         if len(new_password or "") < 10:
             raise BusinessRuleViolationError("Choose a password of at least 10 characters.")

@@ -634,7 +634,8 @@ class EnrollmentService:
         except (BusinessRuleViolationError, ResourceNotFoundError) as exc:
             return {"can_enroll": False, "reason": exc.message, "is_retake": is_retake, "already_enrolled": already}
 
-    async def withdraw(self, enrollment_id: uuid.UUID, *, student_id: uuid.UUID | None, actor_id: uuid.UUID, reason: str = "REQUEST") -> Enrollment:
+    async def withdraw(self, enrollment_id: uuid.UUID, *, student_id: uuid.UUID | None, actor_id: uuid.UUID, reason: str = "REQUEST",
+                       keep_future_fees: bool = False) -> Enrollment:
         """student_id is provided for self-service withdrawal (ownership
         check); None for an admin-initiated withdrawal (no ownership
         restriction)."""
@@ -662,6 +663,12 @@ class EnrollmentService:
             actor_user_id=actor_id, action="enrollment.withdrawn", entity_type="enrollment", entity_id=enrollment.id,
             metadata={"reason": reason},
         )
+        if not keep_future_fees and reason != "ATTENDANCE":
+            # This course's own fee: installments not yet due are cancelled (owner decision 6). A student struck off for
+            # attendance shortage did not leave by choice: that course's fee stays as it is.
+            from app.fees.status_rules import cancel_course_fee_after_withdrawal
+
+            await cancel_course_fee_after_withdrawal(self.session, enrollment, actor_id=actor_id)
         return enrollment
 
     async def set_outcome(self, enrollment_id: uuid.UUID, *, outcome: EnrollmentOutcome, actor_id: uuid.UUID) -> Enrollment:
@@ -1387,21 +1394,21 @@ class TimetableService:
             class_session.status = ClassSessionStatus.CANCELLED
             class_session.cancelled_reason = "Timetable slot removed"
 
-        # Sessions that never had any attendance, content, resources or
-        # correction requests are just empty calendar rows: remove them
-        # (past ones included) so no orphan "scheduled" class is left behind.
+        # FUTURE sessions that never had any attendance, content, resources or correction requests are just empty
+        # calendar rows: remove them. Past ones stay (audit ACAD-01): a past class with no attendance is a gap that must
+        # still be marked or cancelled, and deleting it would hide the gap and change everyone's attendance %.
         from sqlalchemy import text
 
         await self.session.execute(
             text(
-                "DELETE FROM class_sessions cs WHERE cs.timetable_slot_id = :slot "
+                "DELETE FROM class_sessions cs WHERE cs.timetable_slot_id = :slot AND cs.session_date >= :today "
                 "AND cs.attendance_taken_at IS NULL AND cs.content_locked_at IS NULL "
                 "AND cs.topic_completed = false AND cs.title IS NULL AND cs.description IS NULL "
                 "AND NOT EXISTS (SELECT 1 FROM attendance_records a WHERE a.class_session_id = cs.id) "
                 "AND NOT EXISTS (SELECT 1 FROM attendance_correction_requests r WHERE r.class_session_id = cs.id) "
                 "AND NOT EXISTS (SELECT 1 FROM class_session_resources x WHERE x.class_session_id = cs.id)"
             ),
-            {"slot": slot_id},
+            {"slot": slot_id, "today": today},
         )
 
         # Detach ALL of this slot's sessions (past ones keep their

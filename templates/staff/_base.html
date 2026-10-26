@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>{% block title %}Dashboard{% endblock %} — {{ brand.short_name }} Staff</title>
+  <link rel="stylesheet" href="/static/css/theme.css" />
+  <link rel="stylesheet" href="/static/css/dashboard.css" />
+  {% from "_brand.html" import brand_head, brand_mark %}{{ brand_head() }}
+  {% block extra_head %}{% endblock %}
+</head>
+<body data-allowed-roles="ADMIN,STAFF" data-login-path="/?reauth=1">
+  {% from "_icons.html" import nav_icon %}
+  {% from "_nav.html" import drawer_nav, bottom_nav %}
+  <div id="auth-gate" class="gate-message"><div class="progress-ring"></div><span>Checking your session&hellip;</span></div>
+
+  <div id="app-shell" class="app-shell" hidden>
+    <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
+
+    <aside id="drawer" class="drawer">
+      <div class="drawer-brand">
+        {{ brand_mark("Staff") }}
+        <button id="drawer-close" class="drawer-close" type="button" aria-label="Close menu">{{ nav_icon("close") }}</button>
+      </div>
+
+      {{ drawer_nav(nav_items, active_nav, "Staff navigation", True) }}
+
+      <div class="drawer-footer">
+        <a id="change-password-link" class="drawer-link" href="/change-password?from=menu">
+          {{ nav_icon("settings") }}<span>Change password</span>
+        </a>
+        <button id="logout-btn" class="drawer-link logout-link" type="button">
+          {{ nav_icon("logout") }}<span>Logout</span>
+        </button>
+      </div>
+    </aside>
+
+    <div class="app-content">
+      <header class="content-topbar">
+        <button id="drawer-open" class="drawer-toggle" type="button" aria-label="Open menu">{{ nav_icon("menu") }}</button>
+        <div class="content-title-group">
+          <div class="content-title">{% block page_title %}Dashboard{% endblock %}</div>
+          {% block page_subtitle %}{% endblock %}
+        </div>
+        <div class="content-topbar-right">
+          <span id="whoami" class="whoami"></span>
+        </div>
+      </header>
+
+      <main class="content-main">
+        <div id="error-banner" class="dash-alert error" hidden></div>
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+
+  {{ bottom_nav(nav_items, active_nav) }}
+
+  <script src="/static/js/admin-common.js"></script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

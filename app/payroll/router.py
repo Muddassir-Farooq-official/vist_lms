@@ -50,7 +50,7 @@ class AdvanceIn(BaseModel):
     reason: str = Field(min_length=3, max_length=300)
     payment_method: PaymentMethod
     reference_no: str | None = Field(default=None, max_length=80)
-    granted_on: date
+    granted_on: date | None = None      # the day it is asked for (defaults to today); the payout date is recorded when it is paid
 
 
 class RunIn(BaseModel):
@@ -106,12 +106,44 @@ async def advances(employee_id: uuid.UUID | None = None, status: AdvanceStatus |
     return await PayrollService(db).advances(employee_id, status)
 
 
-@router.post("/advances", status_code=201, summary="Pay an employee an advance; it is recovered from their next payslips")
-async def grant_advance(payload: AdvanceIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+@router.post("/advances", status_code=201, summary="Ask for a salary advance for an employee; an administrator must approve it before it is paid")
+async def request_advance(payload: AdvanceIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
     service = PayrollService(db)
-    a = await service.grant_advance(actor_id=current_user.id, employee_id=payload.employee_id, amount=payload.amount, monthly_recovery=payload.monthly_recovery, reason=payload.reason,
-                                    method=payload.payment_method, reference=payload.reference_no, granted_on=payload.granted_on)
+    a = await service.request_advance(actor_id=current_user.id, employee_id=payload.employee_id, amount=payload.amount, monthly_recovery=payload.monthly_recovery,
+                                      reason=payload.reason, method=payload.payment_method, reference=payload.reference_no, granted_on=payload.granted_on)
     return next(r for r in await service.advances(payload.employee_id, None) if r["id"] == a.id)
+
+
+class AdvanceDecisionIn(BaseModel):
+    approve: bool
+    note: str | None = Field(default=None, max_length=300)
+
+
+@router.post("/advances/{advance_id}/decision", summary="Approve or reject a requested advance (administration; not your own request)")
+async def decide_advance(advance_id: uuid.UUID, payload: AdvanceDecisionIn, current_user: CurrentUser = Depends(approve), db=Depends(get_db)) -> dict:
+    service = PayrollService(db)
+    a = await service.decide_advance(advance_id, admin_id=current_user.id, approve=payload.approve, note=payload.note)
+    return next(r for r in await service.advances(a.employee_id, None) if r["id"] == a.id)
+
+
+class AdvancePayIn(BaseModel):
+    payment_method: PaymentMethod
+    reference_no: str | None = Field(default=None, max_length=80)
+    paid_on: date
+
+
+@router.post("/advances/{advance_id}/pay", summary="Hand over an approved advance: it becomes an expense and is recovered from the next payslips")
+async def pay_advance(advance_id: uuid.UUID, payload: AdvancePayIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    service = PayrollService(db)
+    a = await service.pay_advance(advance_id, actor_id=current_user.id, method=payload.payment_method, reference=payload.reference_no, paid_on=payload.paid_on)
+    return next(r for r in await service.advances(a.employee_id, None) if r["id"] == a.id)
+
+
+@router.post("/advances/{advance_id}/cancel", summary="Call off an advance that has not been paid")
+async def cancel_advance(advance_id: uuid.UUID, payload: ReasonIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    service = PayrollService(db)
+    a = await service.cancel_advance(advance_id, actor_id=current_user.id, reason=payload.reason)
+    return next(r for r in await service.advances(a.employee_id, None) if r["id"] == a.id)
 
 
 # ============================================================ the monthly run
@@ -146,7 +178,21 @@ async def edit_payslip(run_id: uuid.UUID, payslip_id: uuid.UUID, payload: Paysli
     return await service.run_detail(run_id)
 
 
-@router.post("/runs/{run_id}/approve", summary="Approve a draft run (administration)")
+@router.post("/runs/{run_id}/submit", summary="Send a checked draft to the administration for approval (accounts office)")
+async def submit_run(run_id: uuid.UUID, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    service = PayrollService(db)
+    await service.submit(run_id, actor_id=current_user.id)
+    return await service.run_detail(run_id)
+
+
+@router.post("/runs/{run_id}/send-back", summary="Return a submitted run to the accounts office for corrections (administration)")
+async def send_back_run(run_id: uuid.UUID, payload: ReasonIn, current_user: CurrentUser = Depends(approve), db=Depends(get_db)) -> dict:
+    service = PayrollService(db)
+    await service.send_back(run_id, admin_id=current_user.id, reason=payload.reason)
+    return await service.run_detail(run_id)
+
+
+@router.post("/runs/{run_id}/approve", summary="Approve a run the accounts office has submitted (administration)")
 async def approve_run(run_id: uuid.UUID, current_user: CurrentUser = Depends(approve), db=Depends(get_db)) -> dict:
     service = PayrollService(db)
     await service.approve(run_id, admin_id=current_user.id)
@@ -203,8 +249,8 @@ async def security(current_user: CurrentUser = Depends(view), db=Depends(get_db)
     return await PayrollService(db).security_report()
 
 
-@router.post("/runs/{run_id}/payslips/{payslip_id}/release", summary="Release a held payslip: with the month if not yet paid, or pay it on its own if the month is already paid")
-async def release_payslip(run_id: uuid.UUID, payslip_id: uuid.UUID, payload: PayIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+@router.post("/runs/{run_id}/payslips/{payslip_id}/release", summary="Release a held payslip (administration): with the month if not yet paid, or pay it on its own if the month is already paid")
+async def release_payslip(run_id: uuid.UUID, payslip_id: uuid.UUID, payload: PayIn, current_user: CurrentUser = Depends(approve), db=Depends(get_db)) -> dict:
     return await PayrollService(db).release_payslip(run_id, payslip_id, method=payload.payment_method, reference=payload.reference_no, paid_date=payload.paid_date, actor_id=current_user.id)
 
 

@@ -51,7 +51,7 @@ async def _pdf(card: dict) -> Response:
     from app.exams.admit_card_pdf import render_admit_card_pdf
 
     name = f"admit-card-{card['student']['roll_number']}-{card['schedule']['name']}".replace(" ", "-")
-    return Response(content=await run_in_threadpool(render_admit_card_pdf, card, settings.app_name), media_type="application/pdf",
+    return Response(content=await run_in_threadpool(render_admit_card_pdf, card), media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="{name}.pdf"', "Cache-Control": "no-store"})
 
 

@@ -6,6 +6,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, UploadFile
 from fastapi.responses import Response
+from sqlalchemy import select
 
 from app.auth.permissions import Permissions, Roles
 from app.auth.schemas import CurrentUser
@@ -13,6 +14,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_permission
 from app.core.exceptions import AuthorizationError, ResourceNotFoundError, ValidationAppError
 from app.core.pagination import Page, page_params, PageParams
+from app.programs.models import Program
 from app.core.storage import (
     ALLOWED_PDF_CONTENT_TYPES,
     ALLOWED_PHOTO_CONTENT_TYPES,
@@ -85,6 +87,13 @@ def _assert_directory_access(current_user: CurrentUser, *, allow_exam_department
         raise AuthorizationError("You do not have access to the student directory.")
 
 
+@router.get("/programs", summary="Programs for the student directory's filter (anyone who may search the directory)")
+async def directory_programs(current_user: CurrentUser = Depends(require_permission(Permissions.STUDENT_VIEW)), db=Depends(get_db)) -> list[dict]:
+    _assert_directory_access(current_user, allow_exam_department=True)
+    rows = (await db.execute(select(Program).where(Program.is_active.is_(True)).order_by(Program.code))).scalars()
+    return [{"id": p.id, "code": p.code, "name": p.name} for p in rows]
+
+
 @router.get("", response_model=Page[StudentListItem], summary="Search/list students (paginated)")
 async def list_students(
     q: str | None = None,
@@ -100,8 +109,17 @@ async def list_students(
     _assert_directory_access(current_user, allow_exam_department=True)
 
     result = await StudentService(db).search_students(page=page, query=q, program_id=program_id, status=status)
+    ids = {s.program_id for s in result.items if s.program_id}
+    programs = {p.id: p for p in (await db.execute(select(Program).where(Program.id.in_(ids)))).scalars()} if ids else {}
+
+    def row(s: Student) -> StudentListItem:
+        item = StudentListItem.model_validate(s)
+        p = programs.get(s.program_id)
+        item.program_code, item.program_name = (p.code, p.name) if p else (None, None)
+        return item
+
     return Page[StudentListItem](
-        items=[StudentListItem.model_validate(s) for s in result.items],
+        items=[row(s) for s in result.items],
         total=result.total,
         page=result.page,
         page_size=result.page_size,
@@ -229,13 +247,27 @@ async def admission_slip(
     password_row = (
         f"<tr><th>Temporary password</th><td><b>{e(user.temp_password or "")}</b> (change at first login)</td></tr>"
         if show_password
-        else "<tr><th>Password</th><td>Already changed by the student</td></tr>"
+        else ("<tr><th>Password</th><td>Already printed once. To print it again, reset the password (it makes a new one).</td></tr>"
+              if user and user.must_change_password else "<tr><th>Password</th><td>Already changed by the student</td></tr>")
     )
+    if show_password:
+        # The one-time password is kept only until it is printed (audit SEC-04): after this slip it is not stored anywhere.
+        from app.audit.service import AuditService
+
+        user.temp_password = None
+        await AuditService(db).log(actor_user_id=current_user.id, action="student.temp_password_printed", entity_type="student",
+                                   entity_id=student.id, metadata={"roll_number": student.roll_number})
+    from app.core import brand
+    from app.core.config import settings
+
+    logo_img = f'<img src="{brand.BrandView().logo_url}" alt="" style="height:64px">' if brand.logo_path() else ""
+    brand_lines = "".join(f'<div class="small" style="margin:0">{e(x)}</div>' for x in (brand.address_line(), brand.contact_line()) if x)
+    footer = f'<p class="small">{e(settings.document_footer)}</p>' if settings.document_footer else ""
     page = f"""<!doctype html><html><head><meta charset="utf-8"><title>Admission Slip {e(student.roll_number or '')}</title>
 <style>body{{font-family:Arial,sans-serif;margin:40px}}h1{{margin:0}}table{{border-collapse:collapse;margin-top:20px;width:100%}}
 th,td{{border:1px solid #444;padding:8px;text-align:left}}th{{width:35%;background:#eee}}.small{{color:#555;font-size:12px;margin-top:24px}}
 @media print{{.noprint{{display:none}}}}</style></head><body>
-<h1>Vertex Institute of Science &amp; Technology</h1><h3>Admission Slip</h3>
+<div style="display:flex;align-items:center;gap:14px">{logo_img}<div><h1>{e(brand.name())}</h1>{brand_lines}</div></div><h3>Admission Slip</h3>
 <table>
 <tr><th>Name</th><td>{e(student.first_name)} {e(student.last_name)}</td></tr>
 <tr><th>Roll number / Login username</th><td><b>{e(student.roll_number or '')}</b></td></tr>
@@ -248,7 +280,7 @@ th,td{{border:1px solid #444;padding:8px;text-align:left}}th{{width:35%;backgrou
 {password_row}
 </table>
 <p class="small">Keep these details private. Log in at the student portal with your roll number.</p>
-<p class="noprint"><button onclick="window.print()">Print</button></p></body></html>"""
+<p class="noprint small">Print this page with your browser (Ctrl+P).</p>{footer}</body></html>"""
     return HTMLResponse(page)
 
 
@@ -294,7 +326,7 @@ async def change_status(
     db=Depends(get_db),
 ) -> StudentAdminDetail:
     student = await StudentService(db).change_status(
-        student_id, new_status=payload.new_status, reason=payload.reason, actor_id=current_user.id
+        student_id, new_status=payload.new_status, reason=payload.reason, actor_id=current_user.id, keep_future_fees=payload.keep_future_fees
     )
     return await _to_admin_detail(db, student)
 
@@ -397,12 +429,16 @@ def _serve_file(storage_key: str | None, original_name: str | None, media_type: 
     return Response(content=path.read_bytes(), media_type=media_type, headers=headers)
 
 
-@router.post("/me/photo", response_model=StudentAdminDetail, summary="Upload my own profile photo")
-async def upload_my_photo(
-    file: UploadFile, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db),
-) -> StudentAdminDetail:
-    student = await _resolve_own_student(db, current_user)
-    return await _upload_photo(db, student, file, current_user.id)
+@router.post("/me/photo", status_code=202, summary="Send a new photo of myself for approval (it goes live only when the office approves)")
+async def upload_my_photo(file: UploadFile, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    """A person's own photo is never published directly: it must pass the automatic face check and then wait for an
+    administrator (app/selfservice). The administration's own upload, /{id}/photo, still publishes at once."""
+    from app.selfservice.service import ProfileChangeService, request_out, subject_for_user
+
+    subj = await subject_for_user(db, current_user.id)
+    req = await ProfileChangeService(db).ask_photo(subj, current_user.id, await file.read(), file.filename or "photo.jpg", file.content_type or "")
+    await db.commit()
+    return {"pending_approval": True, "request": await request_out(db, req)}
 
 
 @router.get("/me/photo", summary="Download my own profile photo")
@@ -576,25 +612,16 @@ async def get_student_full_profile(
             )
         )
 
-    # Fee summary
-    from app.fees.models import LedgerEntryType, PayerType
-    from app.fees.repository import FeeAssignmentRepository
+    # Fee summary: the same figures as the student's own fee account (waived/cancelled fees left out,
+    # scholarships taken off, reversals and refunds counted).
+    from app.fees.account_service import AccountService
+    from app.fees.models import PayerType
 
-    fee_repo = FeeAssignmentRepository(db)
-    assignments = await fee_repo.list_for_payer(PayerType.STUDENT, student_id)
-    total_due, total_paid = 0.0, 0.0
-    for assignment in assignments:
-        ledger = await fee_repo.get_ledger(assignment.id)
-        for entry in ledger:
-            if entry.entry_type == LedgerEntryType.DEBIT:
-                total_due += float(entry.amount)
-            elif entry.entry_type == LedgerEntryType.CONCESSION:
-                total_due -= float(entry.amount)       # a scholarship reduces what is owed; it is not a payment
-            else:
-                total_paid += float(entry.amount)
+    fee_acct = await AccountService(db).build(PayerType.STUDENT, student_id, staff_view=True)
+    fs = fee_acct["summary"]
     fee_summary = FeeSummary(
-        total_assignments=len(assignments), total_due=total_due, total_paid=total_paid,
-        total_outstanding=max(0.0, total_due - total_paid),
+        total_assignments=sum(1 for a in fee_acct["assignments"] if a["status"] == "ACTIVE"),
+        total_due=round(fs["charged"] - fs["concession"], 2), total_paid=fs["paid"], total_outstanding=fs["remaining"],
     )
 
     # Library summary

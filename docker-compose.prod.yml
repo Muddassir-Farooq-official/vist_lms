@@ -31,9 +31,10 @@ services:
     env_file: .env
     environment:
       REDIS_URL: redis://redis:6379/0
-      # nginx runs on the host, so the app must trust its X-Forwarded-For header
-      # (otherwise every user shows up with the same IP in logs and rate limits).
-      FORWARDED_ALLOW_IPS: "*"
+      # nginx runs on the host. Uvicorn must NOT rewrite the client address from X-Forwarded-For ("*" let any
+      # visitor fake their IP and dodge the login limits - audit SEC-02). The app reads the header itself
+      # (app/core/net.py), trusting only the proxies in TRUSTED_PROXIES and taking the address nginx appended.
+      FORWARDED_ALLOW_IPS: "127.0.0.1"
     # Only reachable from the VPS itself; nginx exposes it to the internet.
     ports:
       - "127.0.0.1:8000:8000"
@@ -53,6 +54,19 @@ services:
       REDIS_URL: redis://redis:6379/0
     volumes:
       - ./var/storage:/app/var/storage
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # SMS sender (audit OPS-03): sends queued SMS (password reset codes, fee reminders, results) every 30 seconds and
+  # queues the daily overdue-fee reminders. Without SMS_PROVIDER_URL in .env messages are only logged, never sent.
+  sms:
+    image: vist-lms:latest
+    restart: unless-stopped
+    command: ["python", "scripts/sms_sender.py"]
+    env_file: .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       redis:
         condition: service_healthy

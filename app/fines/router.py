@@ -270,7 +270,19 @@ async def waive_fine(
     """Waiving is an ADMIN-only administrative decision — deliberately a
     separate permission from FINE_MANAGE (mark-paid), which Accounts
     Officer also holds."""
-    fine = await FineService(db).waive(fine_id, actor_id=current_user.id, note=payload.note)
+    from fastapi.responses import JSONResponse
+
+    from app.approvals.service import gate, pending_response
+
+    service = FineService(db)
+    fine = await service.get(fine_id)
+    if fine.status.value == "PENDING" and len((payload.note or "").strip()) >= 4:
+        # A second administrator approves a waiver (owner decision 10); with one administrator it goes ahead now.
+        req = await gate(db, kind="FINE_WAIVE", actor_id=current_user.id, target_id=fine.id, amount=float(fine.amount), reason=payload.note,
+                         payload={"fine_id": fine.id, "note": payload.note}, summary=f"Waive fine of Rs. {float(fine.amount):,.0f}: {fine.reason}"[:300])
+        if req is not None:
+            return JSONResponse(status_code=202, content=pending_response(req))
+    fine = await service.waive(fine_id, actor_id=current_user.id, note=payload.note)
     return await _to_detail(db, fine)
 
 @router.get("/{fine_id}/receipt.pdf", summary="Receipt for a paid fine (the accounts office, or the person who paid it)")

@@ -35,15 +35,21 @@ def _is_trusted(peer: str) -> bool:
 
 
 def client_ip(request) -> str:
+    """Walk X-Forwarded-For from the RIGHT (the end our own proxies wrote) and return the first address that is not a
+    trusted proxy. The left part of the header is whatever the visitor sent and is never believed: nginx's
+    `$proxy_add_x_forwarded_for` keeps a forged value at the front and appends the real address."""
     peer = getattr(getattr(request, "client", None), "host", None) or "unknown"
     if not _is_trusted(peer):
         return peer
     forwarded = request.headers.get("x-forwarded-for")
     if not forwarded:
         return peer
-    first = forwarded.split(",")[0].strip()
-    try:
-        ipaddress.ip_address(first)
-    except ValueError:
-        return peer
-    return first
+    hops = [h.strip() for h in forwarded.split(",") if h.strip()]
+    for hop in reversed(hops):
+        try:
+            ipaddress.ip_address(hop)
+        except ValueError:
+            return peer                      # a broken header: do not guess
+        if not _is_trusted(hop):
+            return hop
+    return peer

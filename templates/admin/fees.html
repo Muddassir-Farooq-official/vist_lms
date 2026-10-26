@@ -9,12 +9,12 @@
 <section class="stat-grid" id="fee-stat-grid" aria-label="Fee overview">
   <div class="stat-card stat-card--green">
     <div class="stat-icon-badge">{{ nav_icon("check-circle") }}</div>
-    <span class="stat-label">Total Collected</span>
+    <span class="stat-label">Collected (net)</span>
     <span class="stat-value" id="stat-collected">&mdash;</span>
   </div>
   <div class="stat-card stat-card--blue">
     <div class="stat-icon-badge">{{ nav_icon("fees") }}</div>
-    <span class="stat-label">Total Charged</span>
+    <span class="stat-label">Billed (after discounts)</span>
     <span class="stat-value" id="stat-charged">&mdash;</span>
   </div>
   <div class="stat-card stat-card--orange">
@@ -39,7 +39,95 @@
   <button class="portal-tab active" data-tab="types" role="tab">{{ nav_icon("fees") }}<span>Fee Types</span></button>
   <button class="portal-tab" data-tab="structures" role="tab">{{ nav_icon("grid") }}<span>Fee Structures</span></button>
   <button class="portal-tab" data-tab="assignments" role="tab">{{ nav_icon("check-circle") }}<span>Assignments</span></button>
+  <button class="portal-tab" data-tab="accounts" role="tab">{{ nav_icon("students") }}<span>Student accounts</span></button>
+  <button class="portal-tab" data-tab="scholarships" role="tab">{{ nav_icon("graduation-cap") }}<span>Scholarships &amp; discounts</span></button>
+  <button class="portal-tab" data-tab="previous-dues" role="tab">{{ nav_icon("file") }}<span>Previous dues</span></button>
 </div>
+
+<!-- ============ STUDENT ACCOUNTS ============ -->
+<div class="portal-tab-panel" data-tab-panel="accounts" hidden>
+<section class="panel">
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("students") }}</div><h2>Student fee account</h2></div></div>
+  <p class="panel-hint">Find a student to see every fee they owe, installment by installment, with its challan, what was paid, discounts and receipts. Take a payment at the counter, or confirm a challan the bank has collected.</p>
+  <div class="form-field"><label for="sa-search">Student</label><input id="sa-search" class="text-input" type="search" placeholder="Name or roll number&hellip;" autocomplete="off" /><div id="sa-results" class="picker-list"></div></div>
+  <div id="sa-account" hidden>
+    <h3 class="modal-subhead" id="sa-title"></h3>
+    <div id="sa-tiles"></div>
+    <div id="sa-fees"></div>
+    <h3 class="modal-subhead">Payments and refunds</h3>
+    <div class="table-scroll"><table class="dash-table"><thead><tr><th>Date</th><th>Fee</th><th>Receipt</th><th>Method</th><th class="num">Amount</th></tr></thead><tbody id="sa-payments"></tbody></table></div>
+    <h3 class="modal-subhead">Scholarships and discounts</h3>
+    <div class="table-scroll"><table class="dash-table"><thead><tr><th>Name</th><th>Covers</th><th class="num">Given so far</th><th>Status</th></tr></thead><tbody id="sa-scholarships"></tbody></table></div>
+    <p class="form-actions"><button type="button" class="role-btn secondary-btn can-propose" id="sa-grant">Give this student a scholarship or discount</button>
+      <button type="button" class="role-btn secondary-btn admin-only" id="sa-prev">Add previous dues for this student</button></p>
+  </div>
+</section>
+</div>
+
+<!-- ============ SCHOLARSHIPS ============ -->
+<div class="portal-tab-panel" data-tab-panel="scholarships" hidden>
+<section class="panel can-propose" id="sc-grant-panel">
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("graduation-cap") }}</div><h2>Give a scholarship or discount</h2></div></div>
+  <p class="panel-hint">Students in the same class can pay different amounts: a scholarship or discount takes a percentage or a fixed amount off their unpaid installments, and their challans change to the new amount. It never rewrites what was already paid.</p>
+  <form id="sc-form" class="form-grid two-col" novalidate>
+    <div class="form-field two-span"><label for="sc-student">Student</label><input id="sc-student" class="text-input" type="search" placeholder="Name or roll number&hellip;" autocomplete="off" /><div id="sc-student-list" class="picker-list"></div></div>
+    <div class="form-field"><label for="sc-name">Name</label><input id="sc-name" class="text-input" maxlength="120" placeholder="e.g. Merit scholarship, Sibling discount" /></div>
+    <div class="form-field"><label for="sc-kind">Type</label><select id="sc-kind" class="select-input"><option value="PERCENT">A percentage of each installment</option><option value="FIXED">A fixed amount (spread over the installments)</option></select></div>
+    <div class="form-field"><label for="sc-value" id="sc-value-label">Percentage (%)</label><input id="sc-value" class="text-input" type="number" min="0.01" step="0.01" /></div>
+    <div class="form-field"><label for="sc-structure">Applies to</label><select id="sc-structure" class="select-input"><option value="">Every fee of this student</option></select></div>
+    <div class="form-field"><label for="sc-from">Covers installments due from</label><input id="sc-from" class="text-input" type="date" /><small class="field-hint">Empty = from the start of the current term, so this term's installments already due are included. Earlier terms' dues are never touched.</small></div>
+    <div class="form-field"><label for="sc-until">Until <small class="field-hint inline">(optional)</small></label><input id="sc-until" class="text-input" type="date" /></div>
+    <div class="form-field two-span"><label class="check-row"><input type="checkbox" id="sc-auto" checked /> <span>Also take it off fees charged later (while it runs)</span></label></div>
+    <div class="form-field two-span"><label for="sc-reason">Reason (kept on record)</label><input id="sc-reason" class="text-input" maxlength="500" placeholder="e.g. Merit list position 3, Fall 2026" /></div>
+    <p id="sc-error" class="dash-alert error two-span" hidden></p>
+    <div class="form-actions two-span"><button type="button" class="role-btn" id="sc-save">Give it</button></div>
+  </form>
+</section>
+<section class="panel">
+  <div class="panel-header"><div class="panel-header-left"><h2>Scholarships and discounts</h2></div>
+    <select id="sc-filter" class="select-input" aria-label="Show"><option value="ACTIVE">Running</option><option value="ENDED">Ended</option><option value="">All</option></select></div>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Student</th><th>Name</th><th>Amount</th><th>Covers</th><th class="num">Given so far</th><th>Status</th><th></th></tr></thead><tbody id="sc-body"></tbody></table></div>
+  <p class="empty-state" id="sc-empty" hidden>No scholarships or discounts yet.</p>
+</section>
+</div>
+
+<!-- ============ PREVIOUS DUES ============ -->
+<div class="portal-tab-panel" data-tab-panel="previous-dues" hidden>
+<section class="panel admin-only">
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("file") }}</div><h2>Bring in previous dues</h2></div></div>
+  <p class="panel-hint">What each student already owed in the old (manual) system. Enter the amount still owed today. It becomes a normal payable charge with its own challan, shown as "Previous dues" on the student's account. Scholarships never reduce previous dues.</p>
+  <h3 class="modal-subhead">One student</h3>
+  <form id="pd-form" class="form-grid two-col" novalidate>
+    <div class="form-field two-span"><label for="pd-student">Student</label><input id="pd-student" class="text-input" type="search" placeholder="Name or roll number&hellip;" autocomplete="off" /><div id="pd-student-list" class="picker-list"></div></div>
+    <div class="form-field"><label for="pd-amount">Amount still owed (Rs.)</label><input id="pd-amount" class="text-input" type="number" min="1" step="0.01" /></div>
+    <div class="form-field"><label for="pd-due">Pay by</label><input id="pd-due" class="text-input" type="date" /></div>
+    <div class="form-field two-span"><label for="pd-note">Note</label><input id="pd-note" class="text-input" maxlength="300" placeholder="e.g. Balance of Spring 2026 from the fee register" /></div>
+    <p id="pd-error" class="dash-alert error two-span" hidden></p>
+    <div class="form-actions two-span"><button type="button" class="role-btn" id="pd-save">Add previous dues</button></div>
+  </form>
+  <h3 class="modal-subhead">A whole sheet (CSV)</h3>
+  <p class="panel-hint">Columns: <code>roll_number,amount,due_date,note</code> (note is optional). Dates as 2026-12-31 or 31/12/2026. Check it first: nothing is saved until every row is correct, and a row that is already recorded is refused, so importing the same sheet twice cannot double anyone's dues.</p>
+  <div class="inline-form"><input id="pd-file" type="file" accept=".csv,text/csv" class="text-input" /><button type="button" class="role-btn secondary-btn" id="pd-check">Check the sheet</button><button type="button" class="role-btn" id="pd-import" disabled>Import it</button></div>
+  <p class="cc-meta" id="pd-check-summary"></p>
+  <div class="table-scroll"><table class="dash-table" id="pd-check-table" hidden><thead><tr><th>Line</th><th>Roll no.</th><th>Student</th><th class="num">Amount</th><th>Pay by</th><th>Problems</th></tr></thead><tbody></tbody></table></div>
+</section>
+<section class="panel">
+  <div class="panel-header"><div class="panel-header-left"><h2>Previous dues on record</h2></div>
+    <input id="pd-q" class="text-input" type="search" placeholder="Search name or roll number&hellip;" aria-label="Search previous dues" /></div>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Student</th><th>Note</th><th>Pay by</th><th class="num">Amount</th><th class="num">Paid</th><th class="num">Still owed</th><th></th></tr></thead><tbody id="pd-body"></tbody></table></div>
+  <p class="empty-state" id="pd-empty" hidden>No previous dues recorded yet.</p>
+</section>
+</div>
+
+<dialog id="cp-modal" class="modal" aria-labelledby="cp-title"><div class="modal-body">
+  <h2 id="cp-title">Confirm the challan was paid</h2><p class="cc-meta" id="cp-for"></p>
+  <div class="form-field"><label for="cp-method">Paid by</label><select id="cp-method" class="select-input"><option value="BANK_DEPOSIT">Bank deposit (challan)</option><option value="CASH">Cash at counter</option><option value="ONLINE_TRANSFER">Online transfer</option><option value="CHEQUE">Cheque</option></select></div>
+  <div class="form-field"><label for="cp-ref">Slip / transaction / cheque no.</label><input id="cp-ref" class="text-input" maxlength="100" /></div>
+  <div class="form-field"><label for="cp-date">Paid on</label><input id="cp-date" class="text-input" type="date" /></div>
+  <p class="panel-hint">The payment settles this installment. A receipt is issued.</p>
+  <p id="cp-error" class="dash-alert error" hidden></p>
+  <div class="form-actions"><button type="button" class="role-btn" id="cp-ok">Record it</button></div>
+  <button id="cp-cancel" class="back-link modal-close-btn" type="button">Cancel</button></div></dialog>
 
 <!-- ============ FEE TYPES ============ -->
 <div class="portal-tab-panel" data-tab-panel="types">
@@ -129,7 +217,7 @@
     </div>
   </div>
   <table class="dash-table" id="assignments-table">
-    <thead><tr><th>Payer</th><th>Fee</th><th class="num">Charged</th><th class="num">Paid</th><th class="num">Due Now</th><th>Standing</th><th></th></tr></thead>
+    <thead><tr><th>Payer</th><th>Fee</th><th class="num">Payable</th><th class="num">Paid</th><th class="num">Still owed</th><th class="num">Due Now</th><th>Standing</th><th></th></tr></thead>
     <tbody id="assignments-tbody"></tbody>
   </table>
   <p class="empty-state" id="assignments-empty" hidden>No fee assignments yet.</p>
@@ -192,5 +280,6 @@
 
 {% block extra_scripts %}
 <script src="/static/js/fees.js"></script>
+<script src="/static/js/fee-accounts.js"></script>
 <script src="/static/js/academic-terms.js"></script>
 {% endblock %}

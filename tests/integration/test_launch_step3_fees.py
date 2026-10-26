@@ -81,7 +81,8 @@ async def test_challan_already_covered_another_way_cannot_be_marked_paid(app_cli
     await _login_admin(app_client)
     assert (await app_client.post(f"/api/v1/fees/assignments/{aid}/payments", json={"amount": 6000, "method": "CASH"})).status_code == 201
     r = await app_client.post(f"/api/v1/fees/challans/{challan['id']}/mark-paid", json={"method": "BANK_DEPOSIT", "reference": "HBL-9"})
-    assert r.status_code == 422 and "paid another way" in r.text
+    # the counter payment settled the installment, so its challan was cancelled at once and cannot collect twice
+    assert r.status_code == 422 and "cancelled" in r.text
 
 
 async def test_staff_mark_paid_records_the_bank_details(app_client, admin_user):

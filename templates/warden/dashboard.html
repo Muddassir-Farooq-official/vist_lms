@@ -1,0 +1,116 @@
+{% extends "warden/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Home{% endblock %}
+{% block page_title %}Hostel{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Rooms, beds, residents and hostel charges at a glance.</div>{% endblock %}
+
+{% block content %}
+<div class="dash" id="warden-dash">
+
+  <section class="dash-hero" aria-labelledby="wd-greet">
+    <div class="dash-hero-text">
+      <h2 id="wd-greet">Welcome</h2>
+      <p><span id="wd-date"></span><span class="dash-chip" id="wd-occ" hidden></span></p>
+    </div>
+    <nav class="dash-actions" aria-label="Quick actions">
+      <a href="/dashboard/warden/hostel" class="dash-action">{{ nav_icon("students") }}<span>Check a student in</span></a>
+      <a href="/dashboard/warden/hostel" class="dash-action">{{ nav_icon("hostel") }}<span>Rooms</span></a>
+      <a href="/dashboard/warden/hostel" class="dash-action">{{ nav_icon("fees") }}<span>Monthly charge</span></a>
+      <a href="/dashboard/warden/tasks" class="dash-action">{{ nav_icon("tasks") }}<span>Tasks</span></a>
+      <a href="/dashboard/warden/applications" class="dash-action">{{ nav_icon("file") }}<span>Applications</span></a>
+    </nav>
+  </section>
+
+  <p class="dash-alert error" id="wd-error" hidden></p>
+
+  <section class="kpi-row" aria-label="Key numbers">
+    <a class="kpi" href="/dashboard/warden/hostel" data-tone="blue">
+      <span class="kpi-icon">{{ nav_icon("students") }}</span>
+      <span class="kpi-label">Residents</span>
+      <strong class="kpi-value" id="k-res">&mdash;</strong>
+      <span class="kpi-sub" id="k-res-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/warden/hostel" data-tone="green">
+      <span class="kpi-icon">{{ nav_icon("check-circle") }}</span>
+      <span class="kpi-label">Free beds</span>
+      <strong class="kpi-value" id="k-free">&mdash;</strong>
+      <span class="kpi-sub" id="k-free-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/warden/hostel" data-tone="purple">
+      <span class="kpi-icon">{{ nav_icon("grid") }}</span>
+      <span class="kpi-label">Occupancy</span>
+      <strong class="kpi-value" id="k-occ">&mdash;</strong>
+      <span class="kpi-sub" id="k-occ-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/warden/hostel" data-tone="teal">
+      <span class="kpi-icon">{{ nav_icon("hostel") }}</span>
+      <span class="kpi-label">Rooms</span>
+      <strong class="kpi-value" id="k-rooms">&mdash;</strong>
+      <span class="kpi-sub" id="k-rooms-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/warden/hostel" data-tone="red">
+      <span class="kpi-icon">{{ nav_icon("fees") }}</span>
+      <span class="kpi-label">Unpaid hostel charges</span>
+      <strong class="kpi-value" id="k-unpaid">&mdash;</strong>
+      <span class="kpi-sub" id="k-unpaid-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/warden/hostel" data-tone="orange">
+      <span class="kpi-icon">{{ nav_icon("issue-return") }}</span>
+      <span class="kpi-label">Moves in 30 days</span>
+      <strong class="kpi-value" id="k-moves">&mdash;</strong>
+      <span class="kpi-sub" id="k-moves-sub">&nbsp;</span>
+    </a>
+  </section>
+
+  <div class="dash-grid dash-grid--2-1">
+    <section class="panel dash-panel" aria-labelledby="wd-rooms-h">
+      <div class="dash-panel-head">
+        <h2 id="wd-rooms-h">Rooms</h2>
+        <a href="/dashboard/warden/hostel" class="view-all-link">Manage rooms {{ nav_icon("arrow-right") }}</a>
+      </div>
+      <ul class="status-legend status-legend--4" id="room-legend"></ul>
+      <div class="room-grid" id="room-grid"></div>
+      <p class="dash-empty" id="room-empty" hidden>No rooms have been added yet. <a href="/dashboard/warden/hostel">Add the first room</a>.</p>
+    </section>
+
+    <section class="panel dash-panel" id="dh-attention-panel" aria-labelledby="wd-att-h">
+      <div class="dash-panel-head"><h2 id="wd-att-h">Needs your attention</h2></div>
+      <ul class="attn-list" id="attn-list"></ul>
+      <p class="attn-clear" id="attn-clear" hidden>{{ nav_icon("check-circle") }} All clear.</p>
+    </section>
+  </div>
+
+  <div class="dash-grid dash-grid--3">
+    <section class="panel dash-panel" aria-labelledby="wd-block-h">
+      <div class="dash-panel-head"><h2 id="wd-block-h">Beds by block</h2></div>
+      <ul class="att-list" id="block-list"></ul>
+    </section>
+
+    <section class="panel dash-panel" aria-labelledby="wd-moves-h">
+      <div class="dash-panel-head">
+        <h2 id="wd-moves-h">Recent moves</h2>
+        <a href="/dashboard/warden/hostel" class="view-all-link">History {{ nav_icon("arrow-right") }}</a>
+      </div>
+      <ul class="timeline" id="move-list"></ul>
+      <p class="dash-empty" id="move-empty" hidden>No one has moved in or out yet.</p>
+    </section>
+
+    <section class="panel dash-panel" aria-labelledby="wd-cal-h">
+      <div class="dash-panel-head">
+        <h2 id="wd-cal-h">Coming up</h2>
+        <a href="/dashboard/warden/calendar" class="view-all-link">Calendar {{ nav_icon("arrow-right") }}</a>
+      </div>
+      <ul class="event-list" id="cal-list"></ul>
+      <p class="dash-empty" id="cal-empty" hidden>Nothing on the calendar for the next two weeks.</p>
+      <h3 class="dash-sub-h">Latest announcement</h3>
+      <ul class="note-list" id="ann-list"></ul>
+      <p class="dash-empty" id="ann-empty" hidden>No announcements.</p>
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/dash-common.js"></script>
+<script src="/static/js/warden-home.js"></script>
+{% endblock %}

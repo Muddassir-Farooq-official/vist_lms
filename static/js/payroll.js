@@ -10,7 +10,8 @@
   const money = function (v) { return VA.formatMoney(v); };
   const day = function (iso) { return iso ? new Date(String(iso).slice(0, 10) + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "\u2014"; };
   const tile = function (a, b, c, tone) { return '<div class="kpi ' + (tone || "") + '"><span class="kpi-label">' + a + '</span><strong class="kpi-value">' + b + '</strong><span class="kpi-sub">' + (c || "") + "</span></div>"; };
-  const STATUS = { DRAFT: ["Draft", "pending"], APPROVED: ["Approved: ready to pay", "enrolled"], PAID: ["Paid", "active"], CANCELLED: ["Cancelled", ""] };
+  const STATUS = { DRAFT: ["Draft", "pending"], SUBMITTED: ["Waiting for approval", "pending"], APPROVED: ["Approved: ready to pay", "enrolled"], PAID: ["Paid", "active"], CANCELLED: ["Cancelled", ""] };
+  const ADV = { REQUESTED: ["Waiting for approval", "pending"], APPROVED: ["Approved: to be paid", "enrolled"], REJECTED: ["Rejected", "dropped"], CANCELLED: ["Cancelled", ""], ACTIVE: ["Being recovered", "pending"], CLEARED: ["Cleared", "active"] };
   const pill = function (s) { const x = STATUS[s] || [s, ""]; return '<span class="status-pill ' + x[1] + '">' + esc(x[0]) + "</span>"; };
   const fail = function (id, t) { $(id).textContent = t; $(id).hidden = false; };
   let isApprover = false, run = null, slipEdit = null, itemEmployee = null, advEmployee = null, today = new Date().toISOString().slice(0, 10);
@@ -68,9 +69,10 @@
     const d = r.body; run = d;
     $("rd-badges").innerHTML = '<span class="pill">' + esc(d.reference) + "</span>" + pill(d.status);
     $("rd-title").textContent = "Payroll for " + d.month_label;
-    $("rd-meta").textContent = [d.created_by_name ? "Prepared by " + d.created_by_name : "", d.approved_by_name ? "approved by " + d.approved_by_name : "", d.status === "PAID" ? "paid " + day(d.paid_date) + (d.payment_reference ? " (" + d.payment_reference + ")" : "") + " \u00b7 booked as " + (d.expense_reference || "") : ""].filter(Boolean).join(" \u00b7 ");
+    $("rd-meta").textContent = [d.created_by_name ? "Prepared by " + d.created_by_name : "", d.submitted_by_name && d.status !== "DRAFT" ? "sent for approval by " + d.submitted_by_name : "", d.approved_by_name ? "approved by " + d.approved_by_name : "", d.status === "PAID" ? "paid " + day(d.paid_date) + (d.payment_reference ? " (" + d.payment_reference + ")" : "") + " \u00b7 booked as " + (d.expense_reference || "") : ""].filter(Boolean).join(" \u00b7 ");
     $("rd-tiles").innerHTML = '<div class="kpi-grid kpi-grid-6">' + tile("Employees", d.employees_count, d.held_count ? d.held_count + " held back" : "") + tile("Gross pay", money(d.total_gross), "") + tile("Deductions", money(d.total_deductions), "tax, advances, unpaid days...") + tile("Net pay", money(d.total_net), "to be paid out", "good") + "</div>";
-    $("rd-problems").innerHTML = d.problems.length ? '<p class="dash-alert error">' + d.problems.map(esc).join("<br>") + "</p>" : (d.status === "CANCELLED" ? '<div class="cc-note rejected"><strong>Cancelled</strong><span>' + esc(d.cancel_reason || "") + "</span></div>" : "");
+    $("rd-problems").innerHTML = d.problems.length ? '<p class="dash-alert error">' + d.problems.map(esc).join("<br>") + "</p>" : (d.status === "CANCELLED" ? '<div class="cc-note rejected"><strong>Cancelled</strong><span>' + esc(d.cancel_reason || "") + "</span></div>"
+      : (d.status === "DRAFT" && d.returned_reason ? '<div class="cc-note rejected"><strong>Sent back by the administration</strong><span>' + esc(d.returned_reason) + "</span></div>" : ""));
     const body = $("rd-body"); body.innerHTML = "";
     d.payslips.forEach(function (s) {
       const tr = document.createElement("tr");
@@ -81,7 +83,7 @@
       const cell = tr.lastElementChild;
       const pdf = document.createElement("a"); pdf.className = "role-btn small-btn secondary-btn"; pdf.href = API + "/payslips/" + s.id + "/pdf"; pdf.setAttribute("data-download", "payslip-" + s.employee_code + ".pdf"); pdf.setAttribute("data-label", "file"); pdf.textContent = "PDF"; cell.appendChild(pdf);
       if (d.status === "DRAFT") { const b = document.createElement("button"); b.type = "button"; b.className = "role-btn small-btn"; b.textContent = "Adjust"; b.addEventListener("click", function () { openSlip(s); }); cell.appendChild(b); }
-      if (s.held && (d.status === "APPROVED" || d.status === "PAID")) {
+      if (s.held && isApprover && (d.status === "APPROVED" || d.status === "PAID")) {
         const b = document.createElement("button"); b.type = "button"; b.className = "role-btn small-btn"; b.textContent = d.status === "PAID" ? "Pay now\u2026" : "Release";
         b.addEventListener("click", function () {
           if (d.status === "PAID") return openPay(s);
@@ -95,9 +97,13 @@
     });
     const bar = $("rd-actions"); bar.innerHTML = ""; $("rd-error").hidden = true;
     const add = function (label, cls, fn) { const b = document.createElement("button"); b.type = "button"; b.className = "role-btn small-btn " + cls; b.textContent = label; b.addEventListener("click", fn); bar.appendChild(b); };
-    if (d.status === "DRAFT") { add("Recalculate", "secondary-btn", function () { call("recalculate", null, "Worked out again."); }); if (isApprover) add("Approve", "", function () { call("approve", null, "Approved."); }); }
+    if (d.status === "DRAFT") { add("Recalculate", "secondary-btn", function () { call("recalculate", null, "Worked out again."); }); add("Send for approval", "", function () { call("submit", null, "Sent to the administration for approval."); }); }
+    if (d.status === "SUBMITTED" && isApprover) {
+      add("Approve", "", function () { call("approve", null, "Approved. The accounts office can pay it now."); });
+      add("Send back\u2026", "secondary-btn", function () { ask("Send back to the accounts office", "Say what needs correcting. They can adjust the draft and send it again.", "Send back").then(function (t) { if (t) call("send-back", { reason: t }, "Sent back."); }); });
+    }
     if (d.status === "APPROVED") add("Pay the salaries\u2026", "", openPay);
-    if (d.status === "DRAFT" || d.status === "APPROVED") add("Cancel\u2026", "danger-btn", function () { ask("Cancel this payroll run", "Nothing has been paid. You can prepare the month again.", "Cancel it").then(function (t) { if (t) call("cancel", { reason: t }, "Cancelled."); }); });
+    if (d.status === "DRAFT" || d.status === "SUBMITTED" || d.status === "APPROVED") add("Cancel\u2026", "danger-btn", function () { ask("Cancel this payroll run", "Nothing has been paid. You can prepare the month again.", "Cancel it").then(function (t) { if (t) call("cancel", { reason: t }, "Cancelled."); }); });
     if (d.status === "PAID" && isApprover) add("Reverse the payment\u2026", "danger-btn", function () { ask("Reverse this payment", "The salary expense is voided, advances recovered are restored, and the run goes back to Approved.", "Reverse it").then(function (t) { if (t) call("reverse-payment", { reason: t }, "Payment reversed."); }); });
     if (!$("rd-modal").open) $("rd-modal").showModal();
   }
@@ -137,18 +143,23 @@
   let paySlip = null;   // a held payslip paid on its own, or null for the whole month
   let paySecurity = null;   // a security deposit being paid back
   function openPaySecurity(p) {
-    paySlip = null; paySecurity = p;
+    paySlip = null; paySecurity = p; payAdvance = null;
     $("pp-for").textContent = "Security deposit of " + p.name + ": " + money(p.held) + " to pay back";
     $("pp-ref").value = ""; $("pp-date").value = today; $("pp-error").hidden = true; $("pp-modal").showModal();
   }
   function openPay(slip) {
-    paySecurity = null;
+    paySecurity = null; payAdvance = null;
     paySlip = slip && slip.id ? slip : null;
     $("pp-for").textContent = paySlip ? paySlip.employee_name + " \u00b7 held payslip for " + run.month_label + " \u00b7 " + money(paySlip.net)
       : run.month_label + " \u00b7 " + run.employees_count + " employees \u00b7 " + money(run.total_net); $("pp-ref").value = ""; $("pp-date").value = today; $("pp-error").hidden = true; $("pp-modal").showModal(); }
   $("pp-cancel").addEventListener("click", function () { $("pp-modal").close(); });
   $("pp-ok").addEventListener("click", async function () {
     const body = { payment_method: $("pp-method").value, paid_date: $("pp-date").value, reference_no: $("pp-ref").value.trim() || null };
+    if (payAdvance) {
+      const a = await VA.fetchJson(API + "/advances/" + payAdvance.id + "/pay", json("POST", { payment_method: body.payment_method, reference_no: body.reference_no, paid_on: body.paid_date }));
+      if (!a.ok) return fail("pp-error", msg(a.body, "Could not record the payment."));
+      $("pp-modal").close(); VA.toast("Advance paid. It will be taken back from the next payslips."); payAdvance = null; loadAdvances(); return;
+    }
     if (paySecurity) {
       const s = await VA.fetchJson(API + "/security/" + paySecurity.employee_id + "/release", json("POST", body));
       if (!s.ok) return fail("pp-error", msg(s.body, "Could not record the payment."));
@@ -194,21 +205,52 @@
   });
 
   // ------------------------------------------------------------------ advances
+  let payAdvance = null;   // an approved advance being handed over
   async function loadAdvances() {
     const r = await VA.fetchJson(API + "/advances");
     if (!r.ok) return;
-    $("ad-body").innerHTML = r.body.map(function (a) { return "<tr><td><strong>" + esc(a.employee_name) + "</strong><small>" + esc(a.employee_code) + "</small></td><td>" + esc(day(a.granted_on)) + '</td><td class="num">' + money(a.amount) + '</td><td class="num">' + money(a.monthly_recovery) + '</td><td class="num"><b>' + money(a.balance) + '</b></td><td><span class="status-pill ' + (a.status === "ACTIVE" ? "pending" : "active") + '">' + (a.status === "ACTIVE" ? "Being recovered" : "Cleared") + "</span></td></tr>"; }).join("");
+    const tb = $("ad-body"); tb.innerHTML = "";
+    r.body.forEach(function (a) {
+      const st = ADV[a.status] || [a.status, ""];
+      const tr = document.createElement("tr");
+      const who = [a.requested_by_name ? "asked by " + a.requested_by_name : "", a.decided_by_name ? (a.status === "REJECTED" ? "rejected by " : "approved by ") + a.decided_by_name : "", a.paid_by_name ? "paid by " + a.paid_by_name : ""].filter(Boolean).join(" \u00b7 ");
+      tr.innerHTML = "<td><strong>" + esc(a.employee_name) + "</strong><small>" + esc(a.employee_code) + " \u00b7 " + esc(a.reason || "") + "</small></td><td>" + esc(day(a.granted_on)) + '</td><td class="num">' + money(a.amount) + '</td><td class="num">' + money(a.monthly_recovery) +
+        '</td><td class="num"><b>' + (a.status === "ACTIVE" || a.status === "CLEARED" ? money(a.balance) : "\u2014") + '</b></td><td><span class="status-pill ' + st[1] + '">' + esc(st[0]) + "</span><small>" + esc(who) + (a.decision_note ? " \u00b7 " + esc(a.decision_note) : "") + "</small></td><td></td>";
+      const cell = tr.lastElementChild;
+      const btn = function (label, cls, fn) { const b = document.createElement("button"); b.type = "button"; b.className = "role-btn small-btn " + cls; b.textContent = label; b.addEventListener("click", fn); cell.appendChild(b); };
+      if (a.status === "REQUESTED" && isApprover) {
+        btn("Approve", "", function () { decide(a, true, null); });
+        btn("Reject\u2026", "danger-btn", function () { ask("Reject this advance", a.employee_name + ": " + money(a.amount), "Reject").then(function (t) { if (t) decide(a, false, t); }); });
+      }
+      if (a.status === "APPROVED") btn("Pay it\u2026", "", function () { openPayAdvance(a); });
+      if (a.status === "REQUESTED" || a.status === "APPROVED") btn("Cancel\u2026", "secondary-btn", function () {
+        ask("Cancel this advance", "Nothing has been paid yet.", "Cancel it").then(async function (t) {
+          if (!t) return; const x = await VA.fetchJson(API + "/advances/" + a.id + "/cancel", json("POST", { reason: t }));
+          if (!x.ok) return VA.toast(msg(x.body, "Could not cancel it."), "error"); VA.toast("Cancelled."); loadAdvances(); });
+      });
+      tb.appendChild(tr);
+    });
     $("ad-empty").hidden = r.body.length > 0;
+  }
+  async function decide(a, approve, note) {
+    const x = await VA.fetchJson(API + "/advances/" + a.id + "/decision", json("POST", { approve: approve, note: note }));
+    if (!x.ok) return VA.toast(msg(x.body, "That did not work."), "error");
+    VA.toast(approve ? "Approved. The accounts office can pay it now." : "Rejected."); loadAdvances();
+  }
+  function openPayAdvance(a) {
+    paySlip = null; paySecurity = null; payAdvance = a;
+    $("pp-for").textContent = "Salary advance to " + a.employee_name + ": " + money(a.amount) + " (taken back " + money(a.monthly_recovery) + " a month)";
+    $("pp-ref").value = ""; $("pp-date").value = today; $("pp-error").hidden = true; $("pp-modal").showModal();
   }
   const adPick = picker($("ad-emp"), $("ad-emp-list"), function (e) { advEmployee = e; });
   $("ad-save").addEventListener("click", async function () {
     $("ad-error").hidden = true;
     if (!advEmployee) return fail("ad-error", "Choose the employee from the list.");
     if (!($("ad-amount").value > 0) || !($("ad-rec").value > 0)) return fail("ad-error", "Enter the advance and how much is taken back each month.");
-    if (!$("ad-date").value || $("ad-reason").value.trim().length < 3) return fail("ad-error", "Enter the date and the reason.");
-    const r = await VA.fetchJson(API + "/advances", json("POST", { employee_id: advEmployee.id, amount: $("ad-amount").value, monthly_recovery: $("ad-rec").value, reason: $("ad-reason").value.trim(), payment_method: $("ad-method").value, reference_no: $("ad-ref").value.trim() || null, granted_on: $("ad-date").value }));
-    if (!r.ok) return fail("ad-error", msg(r.body, "Could not record it."));
-    VA.toast("Advance paid. It will be taken back from the next payslips."); ["ad-emp", "ad-amount", "ad-rec", "ad-ref", "ad-reason"].forEach(function (id) { $(id).value = ""; }); advEmployee = null; loadAdvances();
+    if ($("ad-reason").value.trim().length < 3) return fail("ad-error", "Enter the reason.");
+    const r = await VA.fetchJson(API + "/advances", json("POST", { employee_id: advEmployee.id, amount: $("ad-amount").value, monthly_recovery: $("ad-rec").value, reason: $("ad-reason").value.trim(), payment_method: $("ad-method").value }));
+    if (!r.ok) return fail("ad-error", msg(r.body, "Could not send it."));
+    VA.toast("Sent to the administration for approval."); ["ad-emp", "ad-amount", "ad-rec", "ad-reason"].forEach(function (id) { $(id).value = ""; }); advEmployee = null; loadAdvances();
   });
 
   // ------------------------------------------------------------------ security deposits
@@ -264,7 +306,7 @@
   document.addEventListener("vistadmin:ready", async function () {
     const me = await VA.fetchJson("/api/v1/auth/me", { quiet: true });
     isApprover = !!(me.ok && (me.body.permissions || []).indexOf("payroll.approve") !== -1);
-    const d = new Date(); $("pr-month").value = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); $("ad-date").value = today;
+    const d = new Date(); $("pr-month").value = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); 
     loadRuns(); loadAdvances();
     const open = new URLSearchParams(window.location.search).get("open");
     if (open === "advances") VA.showTab("advances");

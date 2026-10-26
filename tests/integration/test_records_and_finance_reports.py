@@ -11,6 +11,14 @@ from tests.integration.test_fees import _create_and_activate_student, _login_adm
 pytestmark = pytest.mark.asyncio
 PDF = b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n"
 
+async def _approve(client, run_id):
+    """Payroll now goes DRAFT -> SUBMITTED (accounts office) -> APPROVED (administration). Submit, then approve."""
+    sub = await client.post(f"/api/v1/payroll/runs/{run_id}/submit")
+    if sub.status_code != 200 and "Only a draft" not in sub.text:     # already submitted is fine; a real problem is returned
+        return sub
+    return await client.post(f"/api/v1/payroll/runs/{run_id}/approve")
+
+
 
 async def test_certificate_is_numbered_checkable_and_can_be_cancelled(app_client, admin_user):
     sid, _ = await _create_and_activate_student(app_client, cnic="79001-0000001-1")
@@ -148,7 +156,7 @@ async def test_a_held_payslip_is_released_with_the_month_or_paid_on_its_own(app_
     for s in (a, b):
         assert (await app_client.patch(f"{PR}/runs/{run['id']}/payslips/{s['id']}", json={"held": True, "held_reason": "Documents pending"})).status_code == 200
     await _login_admin(app_client)
-    assert (await app_client.post(f"{PR}/runs/{run['id']}/approve")).status_code == 200
+    assert (await _approve(app_client, run['id'])).status_code == 200
     body = {"payment_method": "CASH", "paid_date": str(TODAY), "reference_no": None}
     same = await app_client.post(f"{PR}/runs/{run['id']}/payslips/{a['id']}/release", json=body)       # month not paid yet: simply goes back in
     assert same.status_code == 200 and same.json() == {"released": True, "paid_separately": False}

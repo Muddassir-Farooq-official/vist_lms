@@ -1,42 +1,41 @@
 {% extends "admin/_base.html" %}
+{% from "_icons.html" import nav_icon %}
 {% block allowed_roles %}{{ allowed_roles|default("ADMIN") }}{% endblock %}
 {% block title %}Students{% endblock %}
 {% block page_title %}Students{% endblock %}
-{% block page_subtitle %}<div class="content-subtitle">Find a student by name, roll number or CNIC and see their courses, guardians and transcript.</div>{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Find a student and open their record: details, guardians, courses and transcript. Read-only.</div>{% endblock %}
 
 {% block content %}
-<section class="sh-card">
-  <form id="sl-form" class="toolbar" novalidate>
-    <input id="sl-q" class="text-input" type="search" placeholder="Name, roll number or CNIC" aria-label="Search students" autofocus />
-    <button type="submit" class="role-btn">Search</button>
-  </form>
-  <div class="table-scroll">
-    <table class="dash-table" id="sl-table">
-      <thead><tr><th>Roll no.</th><th>Name</th><th>Semester</th><th>Section</th><th>Status</th><th></th></tr></thead>
+<section class="panel sd-panel">
+  <div class="sd-toolbar">
+    <label class="sd-search">{{ nav_icon("search") }}<input id="sl-q" type="search" placeholder="Search name, roll number or CNIC" aria-label="Search students" autofocus /></label>
+    <select id="sl-status" class="select-input" aria-label="Status">
+      <option value="">All statuses</option>
+      <option value="ACTIVE">Active</option>
+      <option value="SUSPENDED">Suspended</option>
+      <option value="GRADUATED">Graduated</option>
+      <option value="DROPPED">Left</option>
+    </select>
+    <select id="sl-program" class="select-input" aria-label="Program"><option value="">All programs</option></select>
+  </div>
+  <div class="sd-table-wrap">
+    <table class="dash-table sd-table no-stack" id="sl-table">
+      <thead><tr><th>Student</th><th>Program</th><th>Mobile</th><th>Session</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead>
       <tbody></tbody>
     </table>
+    <p class="empty-state" id="sl-empty" hidden></p>
   </div>
-  <p class="empty-state" id="sl-empty" hidden></p>
+  <div class="pager">
+    <button id="sl-prev" class="page-btn" type="button">&larr; Prev</button>
+    <span id="sl-info" class="page-info"></span>
+    <button id="sl-next" class="page-btn" type="button">Next &rarr;</button>
+  </div>
 </section>
 
-<dialog id="sl-modal" class="modal" aria-labelledby="sl-title">
-  <h2 id="sl-title"></h2>
-  <p class="cc-meta" id="sl-meta"></p>
-  <div class="stat-grid" id="sl-kpis"></div>
-  <div id="sl-guardian"></div>
-  <div class="table-scroll">
-    <table class="dash-table" id="sl-courses">
-      <thead><tr><th>Term</th><th>Course</th><th>Status</th><th>Result</th></tr></thead>
-      <tbody></tbody>
-    </table>
-  </div>
-  <div class="toolbar">
-    <a class="role-btn secondary-btn" id="sl-transcript" href="#" data-download="transcript.pdf">Transcript (PDF)</a>
-    <button type="button" class="role-btn" id="sl-close">Close</button>
-  </div>
-</dialog>
+{% with editable = False %}{% include "_student_sheet.html" %}{% endwith %}
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="/static/js/student-sheet.js"></script>
 <script src="/static/js/student-lookup.js"></script>
 {% endblock %}

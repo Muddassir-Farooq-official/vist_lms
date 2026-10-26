@@ -162,6 +162,7 @@
 
     resolveFineModal.close();
     pendingResolve = null;
+    if (result.body && result.body.pending_approval) VA.toast(result.body.message);   // another administrator approves the waiver
     loadFines();
   });
 

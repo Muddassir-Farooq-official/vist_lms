@@ -270,7 +270,7 @@ class ExamScheduleService:
     async def admit_card(self, schedule_id: uuid.UUID, student_id: uuid.UUID) -> dict:
         from app.attendance.holds import unpaid_attendance_fines
         from app.attendance.service import AttendanceService
-        from app.fees.assignment_service import FeeStatusCalculator
+        from app.fees.assignment_service import FeeStatusCalculator, late_pause
         from app.fees.models import AssignmentStatus, FeeAssignment, FeeStructure, PayerType
         from app.programs.models import Program
         from app.students.models import Student
@@ -309,7 +309,8 @@ class ExamScheduleService:
             repo = FeeAssignmentRepository(self.session)
             for a in assignments:
                 structure = await self.session.get(FeeStructure, a.fee_structure_id)
-                for row in FeeStatusCalculator.installments(await repo.get_ledger(a.id), float(structure.late_fee_per_day) if structure.late_fee_per_day else None):
+                for row in FeeStatusCalculator.installments(await repo.get_ledger(a.id), float(structure.late_fee_per_day) if structure.late_fee_per_day else None,
+                                                            pause=late_pause(a)):
                     if row["status"] == "OVERDUE":
                         overdue += row["remaining"]
             if overdue > 0.005:

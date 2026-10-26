@@ -62,7 +62,7 @@ class StudentService:
         return RawPage[Student](items=items, total=total, page=page.page, page_size=page.page_size)
 
     async def change_status(
-        self, student_id: uuid.UUID, *, new_status: StudentStatus, reason: str | None, actor_id: uuid.UUID
+        self, student_id: uuid.UUID, *, new_status: StudentStatus, reason: str | None, actor_id: uuid.UUID, keep_future_fees: bool = False
     ) -> Student:
         student = await self.get_student(student_id)
         allowed = _ALLOWED_TRANSITIONS.get(student.status, set())
@@ -107,6 +107,15 @@ class StudentService:
                     "checked out. Return them first (library clearance)."
                 )
 
+        if new_status == StudentStatus.GRADUATED and new_status != student.status:
+            # A degree needs every fee settled, including what is not yet due (owner decision 7).
+            from app.records.service import RecordsService
+
+            dues = await RecordsService(self.session).fee_dues_total(student.id)
+            if dues and len((reason or "").strip()) < 10:
+                raise BusinessRuleViolationError("Fees are not cleared: " + " ".join(dues) +
+                                                 " Collect them first, or give a reason (at least 10 letters) to graduate the student anyway.")
+
         old_status = student.status
         student.status = new_status
         student.is_active_flag = new_status == StudentStatus.ACTIVE
@@ -150,7 +159,14 @@ class StudentService:
             enrollments = await enrollment_service.enrollment_repo.list_for_student(student.id)
             for enrollment in enrollments:
                 if enrollment.status == EnrollmentStatus.ENROLLED:
-                    await enrollment_service.withdraw(enrollment.id, student_id=None, actor_id=actor_id)
+                    await enrollment_service.withdraw(enrollment.id, student_id=None, actor_id=actor_id, keep_future_fees=keep_future_fees)
+
+        if new_status != old_status:
+            # Fees follow the status: late fees pause while suspended or after leaving; leaving cancels what is not yet due.
+            from app.fees.status_rules import apply_student_status
+
+            await apply_student_status(self.session, student.id, old_status=old_status, new_status=new_status, actor_id=actor_id,
+                                       keep_future_fees=keep_future_fees, reason=reason)
 
         return student
 

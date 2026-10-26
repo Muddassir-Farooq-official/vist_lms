@@ -29,7 +29,7 @@ class FeeRefund(Base):
     __tablename__ = "fee_refunds"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    fee_assignment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fee_assignments.id", ondelete="CASCADE"), nullable=False, index=True)
+    fee_assignment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fee_assignments.id", ondelete="RESTRICT"), nullable=False, index=True)
     kind: Mapped[RefundKind] = mapped_column(Enum(RefundKind, name="fee_refund_kind"), nullable=False)
     amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)               # to pay back
     write_off: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0, server_default="0")  # charges cancelled on approval

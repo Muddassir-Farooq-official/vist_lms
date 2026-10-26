@@ -121,6 +121,22 @@ async def receipt_pdf(entry_id: uuid.UUID, current_user: CurrentUser = Depends(r
                     headers={"Content-Disposition": f'attachment; filename="receipt-{entry.receipt_number}.pdf"', **_SECURITY_HEADERS})
 
 
+# ============================================================ advance credit
+class MoveCreditIn(BaseModel):
+    from_assignment_id: uuid.UUID
+    to_assignment_id: uuid.UUID
+    amount: float | None = Field(default=None, gt=0, le=100_000_000)     # empty = as much as possible
+    note: str | None = Field(default=None, max_length=200)
+
+
+@router.post("/accounts/credit/move", summary="Use advance credit on one fee to pay another fee of the same person (accounts office)")
+async def move_credit_route(payload: MoveCreditIn, current_user: CurrentUser = Depends(require_permission(Permissions.PAYMENT_RECORD)), db=Depends(get_db)) -> dict:
+    from app.fees.assignment_service import move_credit
+
+    return await move_credit(db, from_assignment_id=payload.from_assignment_id, to_assignment_id=payload.to_assignment_id, amount=payload.amount,
+                             actor_id=current_user.id, note=payload.note)
+
+
 # ============================================================ scholarships and discounts
 class ScholarshipIn(BaseModel):
     student_id: uuid.UUID
@@ -139,10 +155,18 @@ async def list_scholarships(student_id: uuid.UUID | None = None, status: Scholar
     return await ScholarshipService(db).listing(student_id=student_id, status=status)
 
 
-@router.post("/scholarships", status_code=201, summary="Grant a scholarship or discount to a student (admin)")
-async def grant_scholarship(payload: ScholarshipIn, current_user: CurrentUser = Depends(require_permission(Permissions.SCHOLARSHIP_MANAGE)), db=Depends(get_db)) -> dict:
+@router.post("/scholarships", status_code=201, summary="Give a scholarship or discount (the accounts office proposes; another administrator approves)")
+async def grant_scholarship(payload: ScholarshipIn, current_user: CurrentUser = Depends(require_any_permission(Permissions.SCHOLARSHIP_MANAGE, Permissions.SCHOLARSHIP_PROPOSE)),
+                            db=Depends(get_db)) -> dict:
+    from fastapi.responses import JSONResponse
+
+    from app.approvals.models import ApprovalRequest
+    from app.approvals.service import pending_response
+
     s, applied = await ScholarshipService(db).grant(student_id=payload.student_id, name=payload.name.strip(), kind=payload.kind, value=payload.value, fee_structure_id=payload.fee_structure_id,
                                                     auto_apply=payload.auto_apply, valid_from=payload.valid_from, valid_until=payload.valid_until, reason=payload.reason.strip(), actor_id=current_user.id)
+    if isinstance(s, ApprovalRequest):
+        return JSONResponse(status_code=202, content=pending_response(s))
     return {"id": s.id, "status": s.status, "applied": applied}
 
 
@@ -163,6 +187,33 @@ class OpeningBalanceIn(BaseModel):
 @router.post("/opening-balances", status_code=201, summary="Record what one student already owed before this system (accounts office)")
 async def add_opening_balance(payload: OpeningBalanceIn, current_user: CurrentUser = Depends(require_permission(Permissions.FEE_MANAGE)), db=Depends(get_db)) -> dict:
     return await OpeningBalanceService(db).add(student_id=payload.student_id, amount=payload.amount, due_date=payload.due_date, note=payload.note, actor_id=current_user.id)
+
+
+@router.get("/opening-balances", summary="Previous-dues entries, newest first, with what is still owed on each (admin and accounts office)")
+async def list_opening_balances(q: str | None = None, current_user: CurrentUser = Depends(_STAFF), db=Depends(get_db)) -> list[dict]:
+    return await OpeningBalanceService(db).listing(q=q)
+
+
+class CancelOpeningIn(BaseModel):
+    reason: str = Field(min_length=5, max_length=255)
+
+
+@router.post("/opening-balances/{ledger_entry_id}/cancel", summary="Cancel a previous-dues entry typed in by mistake (what is still owed on it is written off)")
+async def cancel_opening_balance(ledger_entry_id: uuid.UUID, payload: CancelOpeningIn, current_user: CurrentUser = Depends(require_permission(Permissions.FEE_MANAGE)),
+                                 db=Depends(get_db)) -> dict:
+    from fastapi.responses import JSONResponse
+
+    from app.approvals.service import gate, pending_response
+
+    entry = await db.get(FeeLedgerEntry, ledger_entry_id)
+    if entry is not None and entry.entry_type == LedgerEntryType.DEBIT:
+        # Writing off previous dues needs a second administrator (owner decision 10).
+        req = await gate(db, kind="PREVIOUS_DUES_CANCEL", actor_id=current_user.id, target_id=entry.id, amount=float(entry.amount), reason=payload.reason,
+                         payload={"ledger_entry_id": entry.id, "reason": payload.reason},
+                         summary=f"Write off previous dues of Rs. {float(entry.amount):,.0f} ({entry.description or 'previous dues'})"[:300])
+        if req is not None:
+            return JSONResponse(status_code=202, content=pending_response(req))
+    return await OpeningBalanceService(db).cancel_entry(ledger_entry_id, reason=payload.reason, actor_id=current_user.id)
 
 
 async def _csv(file: UploadFile) -> bytes:

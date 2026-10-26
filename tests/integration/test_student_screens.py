@@ -1,0 +1,39 @@
+"""Student directory and record screens: readable list columns, the program filter, and the read-only lookup for the exam office."""
+from __future__ import annotations
+
+from app.employees.models import JobRole
+from tests.integration.test_file_download_authorization import _create_and_activate_student, _employee_payload, _login, _login_admin
+
+
+async def test_directory_rows_are_readable_but_hold_no_cnic_guardian_or_address(app_client, admin_user, db_session):
+    await _create_and_activate_student(app_client, cnic="94001-0000001-1")
+    await _login_admin(app_client)
+    row = (await app_client.get("/api/v1/students")).json()["items"][0]
+    for key in ("program_code", "program_name", "gender", "contact_no", "admission_session", "has_photo", "current_semester", "section_label"):
+        assert key in row
+    assert not {"cnic", "guardian_name", "guardian_cnic", "present_address"} & set(row)
+    assert (await app_client.get("/api/v1/students/programs")).status_code == 200
+
+    page = (await app_client.get("/dashboard/admin/students")).text
+    assert 'id="student-sheet"' in page and 'data-editable="true"' in page and "student-sheet.js" in page
+    assert 'id="ss-photo-input"' in page and "Upload / Replace" not in page
+
+
+async def test_exam_office_can_open_a_record_read_only(app_client, admin_user, db_session):
+    sid, _ = await _create_and_activate_student(app_client, cnic="94002-0000001-1")
+    job = JobRole(code="EXAM_T", title="Exam Controller", default_role_code="EXAM_CONTROLLER")
+    db_session.add(job)
+    await db_session.commit()
+    await _login_admin(app_client)
+    made = await app_client.post("/api/v1/employees", json=_employee_payload(job.id, cnic="84002-0000001-1"))
+    assert made.status_code == 201, made.text
+    username = made.json()["username"]
+    await _login(app_client, username, "TeacherPass123!")
+    assert (await app_client.post("/api/v1/auth/change-password", json={"current_password": "TeacherPass123!", "new_password": "ExamReal123!x"})).status_code == 204
+    await _login(app_client, username, "ExamReal123!x")
+
+    assert (await app_client.get("/api/v1/students/programs")).status_code == 200
+    assert (await app_client.get(f"/api/v1/students/{sid}/full-profile")).status_code == 200
+    assert (await app_client.patch(f"/api/v1/students/{sid}", json={"section_label": "Z"})).status_code == 403
+    page = (await app_client.get("/dashboard/exam/students")).text
+    assert 'data-editable="false"' in page and 'id="ss-photo-input"' not in page and 'id="edit-student-form"' not in page

@@ -3,9 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>{% block title %}Dashboard{% endblock %} — VIST Faculty Portal</title>
+  <title>{% block title %}Dashboard{% endblock %} — {{ brand.short_name }} Faculty</title>
   <link rel="stylesheet" href="/static/css/theme.css" />
   <link rel="stylesheet" href="/static/css/dashboard.css" />
+  {% from "_brand.html" import brand_head, brand_mark %}{{ brand_head() }}
   {% block extra_head %}{% endblock %}
 </head>
 <body data-allowed-roles="TEACHER" data-login-path="/?reauth=1" data-card-tables>
@@ -18,8 +19,7 @@
 
     <aside id="drawer" class="drawer">
       <div class="drawer-brand">
-        <span class="brand-mark">V</span>
-        VIST Faculty
+        {{ brand_mark("Faculty") }}
         <button id="drawer-close" class="drawer-close" type="button" aria-label="Close menu">{{ nav_icon("close") }}</button>
       </div>
 
@@ -52,7 +52,7 @@
         {% block content %}{% endblock %}
       </main>
       <footer class="portal-footer">
-        <span>Vertex Institute of Science &amp; Technology</span>
+        <span>{{ brand.name }}</span>
         <nav aria-label="Footer">
           <a href="/dashboard/faculty">Home</a>
           <a href="/dashboard/faculty/timetable">Timetable</a>

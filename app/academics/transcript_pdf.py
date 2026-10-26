@@ -17,16 +17,20 @@ def _f(v, places=2) -> str:
     return "\u2014" if v is None else f"{v:.{places}f}"
 
 
-def render_transcript_pdf(data: dict, *, institute_name: str = "Vertex Institute of Science & Technology") -> bytes:
+def render_transcript_pdf(data: dict, *, institute_name: str | None = None) -> bytes:
+    from app.core import brand
+
+    institute_name = institute_name or brand.name()
     buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm, topMargin=14 * mm, bottomMargin=16 * mm, title="Result card", author=institute_name)
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm, topMargin=14 * mm, bottomMargin=36 * mm, title="Result card", author=institute_name)
     base = getSampleStyleSheet()
     h1 = ParagraphStyle("h1", parent=base["Title"], fontName="Helvetica-Bold", fontSize=17, textColor=INK, spaceAfter=1)
     sub = ParagraphStyle("sub", parent=base["Normal"], fontName="Helvetica", fontSize=9, textColor=MUTED, alignment=1, spaceAfter=8)
     term_style = ParagraphStyle("term", parent=base["Heading3"], fontName="Helvetica-Bold", fontSize=10.5, textColor=BLUE, spaceBefore=9, spaceAfter=3)
     small = ParagraphStyle("small", parent=base["Normal"], fontName="Helvetica", fontSize=7.5, textColor=MUTED, leading=10)
     cell = ParagraphStyle("cell", parent=base["Normal"], fontName="Helvetica", fontSize=8.5, leading=10.5, textColor=INK)
-    story = [Paragraph(institute_name, h1), Paragraph("RESULT CARD (TRANSCRIPT)", sub)]
+    story = brand.platypus_header(A4[0] - 30 * mm) + [Paragraph("RESULT CARD (TRANSCRIPT)", sub)]
+    _ = h1
 
     s, summ = data["student"], data["summary"]
     info = [["Name", s["name"], "Roll number", s["roll_number"] or "\u2014"],
@@ -77,8 +81,11 @@ def render_transcript_pdf(data: dict, *, institute_name: str = "Vertex Institute
     def footer(canvas, document):
         canvas.saveState()
         canvas.setFont("Helvetica", 7.3); canvas.setFillColor(MUTED)
-        canvas.drawString(15 * mm, 9 * mm, f"Computer-generated on {stamp}. Valid without signature.")
+        canvas.drawString(15 * mm, 9 * mm, brand.fit_text(canvas, f"Computer-generated on {stamp}. Valid without signature."
+                                                          + (f"  \u00b7  {brand.platypus_footer_text()}" if brand.platypus_footer_text() else ""), "Helvetica", 7.3, A4[0] - 50 * mm))
         canvas.drawRightString(A4[0] - 15 * mm, 9 * mm, f"Page {document.page}")
+        if document.page == 1:
+            brand.draw_signature(canvas, x=A4[0] - 70 * mm, y=24 * mm, width=50)
         canvas.restoreState()
 
     doc.build(story, onFirstPage=footer, onLaterPages=footer)

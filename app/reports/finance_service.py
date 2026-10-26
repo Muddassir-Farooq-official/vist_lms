@@ -17,7 +17,7 @@ from app.auth.models import User
 from app.core.clock import institute_today, local_date
 from app.core.exceptions import ResourceNotFoundError, ValidationAppError
 from app.employees.models import Employee
-from app.fees.assignment_service import FeeStatusCalculator
+from app.fees.assignment_service import FeeStatusCalculator, late_pause
 from app.fees.models import AssignmentStatus, FeeAssignment, FeeLedgerEntry, FeeStructure, LedgerEntryType, PayerType
 from app.fines.models import Fine, FinePayerType, FineStatus
 from app.payroll.models import PayrollRun, Payslip
@@ -61,7 +61,7 @@ class FinanceReportService:
                 entries.setdefault(e.fee_assignment_id, []).append(e)
         people: dict[uuid.UUID, dict] = {}
         for a, late_per_day, student, program_code in found:
-            for r in FeeStatusCalculator.installments(entries.get(a.id, []), float(late_per_day) if late_per_day else None, as_of=today):
+            for r in FeeStatusCalculator.installments(entries.get(a.id, []), float(late_per_day) if late_per_day else None, as_of=today, pause=late_pause(a)):
                 if r["status"] != "OVERDUE" or r["remaining"] <= 0.005 or r["due_date"] is None:
                     continue
                 p = people.setdefault(student.id, {
@@ -95,30 +95,47 @@ class FinanceReportService:
             raise ValidationAppError("The end date is before the start date.")
         if (to_date - from_date).days > 366:
             raise ValidationAppError("Choose a period of one year or less.")
+        from sqlalchemy.orm import aliased
+
         from app.fees import money as m
 
+        # Payments received, and money taken back on the day it was taken back (reversed payments and refunds
+        # paid out), so the net matches the accounts summary and the day book. A reversal is shown under the
+        # method of the payment it cancels, so the cash total is what should really be in the drawer.
+        original = aliased(FeeLedgerEntry)
+        method = func.coalesce(FeeLedgerEntry.payment_method, original.payment_method)
         rows = (await self.session.execute(
-            select(m.money_day(), FeeLedgerEntry.created_by, FeeLedgerEntry.payment_method, func.count(), func.sum(m.signed_amount()))
-            .where(FeeLedgerEntry.entry_type == LedgerEntryType.CREDIT, m.money_day() >= from_date, m.money_day() <= to_date)
-            .group_by(m.money_day(), FeeLedgerEntry.created_by, FeeLedgerEntry.payment_method))).all()
+            select(m.money_day(), FeeLedgerEntry.created_by, method, FeeLedgerEntry.entry_type, func.count(), func.sum(m.signed_amount()))
+            .outerjoin(original, original.id == FeeLedgerEntry.related_entry_id)
+            .where(m.moves_money(), m.money_day() >= from_date, m.money_day() <= to_date)
+            .group_by(m.money_day(), FeeLedgerEntry.created_by, method, FeeLedgerEntry.entry_type))).all()
         names = {}
         uids = {r[1] for r in rows if r[1]}
         if uids:
             names = {u.id: u.username for u in (await self.session.execute(select(User).where(User.id.in_(uids)))).scalars()}
         groups: dict[tuple, dict] = {}
         by_method: dict[str, float] = {}
-        for day, cashier, method, count, amount in rows:
-            method = (method.value if hasattr(method, "value") else method) or "CASH"
+        received = taken_back = 0.0
+        for day, cashier, pm, kind, count, amount in rows:
+            pm = (pm.value if hasattr(pm, "value") else pm) or "CASH"
             g = groups.setdefault((day, cashier), {"day": day, "cashier": names.get(cashier, "Online / system") if cashier else "Online / system",
-                                                   "count": 0, "by_method": {}, "cash": 0.0, "total": 0.0})
-            g["count"] += count
-            g["by_method"][method] = round(g["by_method"].get(method, 0.0) + _f(amount), 2)
-            g["total"] = round(g["total"] + _f(amount), 2)
-            if method == "CASH":
-                g["cash"] = round(g["cash"] + _f(amount), 2)
-            by_method[method] = round(by_method.get(method, 0.0) + _f(amount), 2)
+                                                   "count": 0, "by_method": {}, "cash": 0.0, "received": 0.0, "taken_back": 0.0, "total": 0.0})
+            amount = _f(amount)
+            if kind == LedgerEntryType.CREDIT:
+                g["count"] += count
+                g["received"] = round(g["received"] + amount, 2)
+                received += amount
+            else:
+                g["taken_back"] = round(g["taken_back"] - amount, 2)
+                taken_back -= amount
+            g["by_method"][pm] = round(g["by_method"].get(pm, 0.0) + amount, 2)
+            g["total"] = round(g["total"] + amount, 2)
+            if pm == "CASH":
+                g["cash"] = round(g["cash"] + amount, 2)
+            by_method[pm] = round(by_method.get(pm, 0.0) + amount, 2)
         out = sorted(groups.values(), key=lambda g: (g["day"], g["cashier"]), reverse=True)
-        return {"from_date": from_date, "to_date": to_date, "total": round(sum(g["total"] for g in out), 2), "by_method": by_method, "rows": out}
+        return {"from_date": from_date, "to_date": to_date, "total": round(sum(g["total"] for g in out), 2), "received": round(received, 2),
+                "taken_back": round(taken_back, 2), "by_method": by_method, "rows": out}
 
     # ------------------------------------------------------------------ owed to vendors
     async def payables(self) -> dict:
@@ -183,23 +200,40 @@ class FinanceReportService:
     async def reconcile(self, raw: bytes) -> dict:
         bank = self._parse_statement(raw)
         lo, hi = min(b["date"] for b in bank), max(b["date"] for b in bank)
-        book = [r for r in await AccountsService(self.session).book(kind=None, from_date=lo - timedelta(days=5), to_date=hi + timedelta(days=5), q=None, limit=500, offset=0)
-                if (r["payment_method"] or "CASH") != "CASH" and r["status"] not in ("REVERSED", "VOIDED")]
+        # Every non-cash entry in the period (the day book is read page by page; it used to stop at 500 rows).
+        book, offset = [], 0
+        while True:
+            page = await AccountsService(self.session).book(kind=None, from_date=lo - timedelta(days=5), to_date=hi + timedelta(days=5), q=None, limit=500, offset=offset)
+            book += [r for r in page if (r["payment_method"] or "CASH") != "CASH" and r["status"] not in ("REVERSED", "VOIDED")]
+            if len(page) < 500:
+                break
+            offset += 500
+
+        def squash(v) -> str:
+            return re.sub(r"[^a-z0-9]", "", (v or "").lower())
         for r in book:
             r["_signed"] = round(r["amount"] if r["kind"] == EntryKind.INCOME else -r["amount"], 2)
         used: set[int] = set()
         matched, unmatched_bank = [], []
         for b in bank:
             hit, how = None, None
-            for i, r in enumerate(book):                  # the reference printed on the bank line wins
-                if i not in used and abs(r["_signed"] - b["amount"]) < 0.005 and r["reference"] and r["reference"].lower() in b["reference"].lower():
-                    hit, how = i, "reference and amount"
+            narration = squash(b["reference"])
+            for i, r in enumerate(book):                  # the slip / cheque / transaction number printed on the bank line wins
+                ref = squash(r.get("bank_reference"))
+                if i not in used and abs(r["_signed"] - b["amount"]) < 0.005 and len(ref) >= 4 and ref in narration:
+                    hit, how = i, "bank reference and amount"
                     break
-            if hit is None:                               # else the same amount within three days
-                for i, r in enumerate(book):
-                    if i not in used and abs(r["_signed"] - b["amount"]) < 0.005 and abs((r["date"] - b["date"]).days) <= 3:
-                        hit, how = i, "amount and date"
+            if hit is None:
+                for i, r in enumerate(book):              # else our receipt number, if the payer wrote it on the slip
+                    if i not in used and abs(r["_signed"] - b["amount"]) < 0.005 and r["reference"] and squash(r["reference"]) in narration:
+                        hit, how = i, "receipt number and amount"
                         break
+            if hit is None:                               # else the same amount within three days, nearest date first; flagged when it is a guess
+                near = sorted((abs((r["date"] - b["date"]).days), i) for i, r in enumerate(book)
+                              if i not in used and abs(r["_signed"] - b["amount"]) < 0.005 and abs((r["date"] - b["date"]).days) <= 3)
+                if near:
+                    hit = near[0][1]
+                    how = "amount and date" + (f" (check: {len(near)} entries have this amount)" if len(near) > 1 else "")
             if hit is None:
                 unmatched_bank.append(b)
                 continue
@@ -207,7 +241,7 @@ class FinanceReportService:
             r = book[hit]
             matched.append({"bank": b, "book": {"kind": r["kind"].value if hasattr(r["kind"], "value") else r["kind"], "receipt": r["reference"], "date": r["date"], "amount": r["_signed"]}, "matched_on": how})
         unmatched_books = [{"date": r["date"], "kind": r["kind"].value if hasattr(r["kind"], "value") else r["kind"], "receipt": r["reference"], "title": r["title"],
-                            "method": r["payment_method"], "reference": "", "amount": r["_signed"]}
+                            "method": r["payment_method"], "reference": r.get("bank_reference") or "", "amount": r["_signed"]}
                            for i, r in enumerate(book) if i not in used and lo <= r["date"] <= hi]
         return {"bank_lines": len(bank), "matched": matched, "unmatched_bank": unmatched_bank, "unmatched_books": unmatched_books,
                 "bank_total": round(sum(b["amount"] for b in bank), 2), "book_total": round(sum(r["_signed"] for r in book if lo <= r["date"] <= hi), 2), "from_date": lo, "to_date": hi}

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from datetime import datetime, timezone
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import AuditService
@@ -132,39 +133,37 @@ class AuthService:
         # leak this ordering avoids.
         password_ok = bool(user) and verify_password(password, user.password_hash)
 
-        await self.repo.record_login_attempt(
-            username_attempted=username,
-            user_id=user.id if user else None,
-            success=password_ok and bool(user) and user.is_active,
-            ip_address=ip,
-            user_agent=user_agent,
-        )
+        success = password_ok and bool(user) and user.is_active
+        if success:
+            await self.repo.record_login_attempt(username_attempted=username, user_id=user.id, success=True, ip_address=ip, user_agent=user_agent)
+        else:
+            # A failed sign-in ends in an error, which rolls the request back; write the evidence in its own
+            # committed session so it is kept (audit SEC-03).
+            from app.core.side_log import committed_now
+
+            async def _write(uid):
+                async with committed_now(self.session) as side:
+                    await AuthRepository(side).record_login_attempt(username_attempted=username, user_id=uid, success=False,
+                                                                    ip_address=ip, user_agent=user_agent)
+                    if not password_ok or user is None:
+                        await AuditService(side).log(actor_user_id=None, action="auth.login_failed", entity_type="user", entity_id=None,
+                                                     metadata={"username": username}, ip=ip, user_agent=user_agent)
+                    else:
+                        await AuditService(side).log(actor_user_id=uid, action="auth.login_blocked_inactive", entity_type="user", entity_id=uid,
+                                                     metadata={"username": username}, ip=ip, user_agent=user_agent)
+
+            try:
+                await _write(user.id if user else None)
+            except IntegrityError:
+                # The account row is not committed yet (created in this same transaction): keep the evidence without the link.
+                await _write(None)
 
         if not password_ok or user is None:
             await self._count_failure(username=username, ip=ip)
-            await self.audit.log(
-                actor_user_id=None,
-                action="auth.login_failed",
-                entity_type="user",
-                entity_id=None,
-                metadata={"username": username},
-                ip=ip,
-                user_agent=user_agent,
-            )
             raise AuthenticationError("Invalid username or password.")
 
         if not user.is_active:
-            reason = await self._deactivation_reason(user)
-            await self.audit.log(
-                actor_user_id=user.id,
-                action="auth.login_blocked_inactive",
-                entity_type="user",
-                entity_id=user.id,
-                metadata={"username": username},
-                ip=ip,
-                user_agent=user_agent,
-            )
-            raise AuthenticationError(reason)
+            raise AuthenticationError(await self._deactivation_reason(user))
 
         # Opportunistic rehash-on-login: this is the only place the
         # plaintext password is ever available, so it's the only place

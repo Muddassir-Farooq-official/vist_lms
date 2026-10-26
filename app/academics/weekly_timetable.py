@@ -271,7 +271,7 @@ def _hsl_to_hex(h: int, s: float, l: float) -> str:
     return "#%02x%02x%02x" % (round(r * 255), round(g * 255), round(b * 255))
 
 
-def render_pdf(data: dict, *, institute_name: str = "Vertex Institute of Science & Technology") -> bytes:
+def render_pdf(data: dict, *, institute_name: str | None = None) -> bytes:
     """A landscape A4 sheet in the same layout as the on-screen grid.
 
     A crowded time slot (dozens of classes at the same hour, as in the whole-institute view) cannot be
@@ -279,6 +279,9 @@ def render_pdf(data: dict, *, institute_name: str = "Vertex Institute of Science
     if it must, to a codes-only layout -- it always produces a readable PDF, never an error."""
     from reportlab.platypus.doctemplate import LayoutError
 
+    from app.core import brand
+
+    institute_name = institute_name or brand.name()
     last_error: Exception | None = None
     for density in (0, 1, 2):
         try:

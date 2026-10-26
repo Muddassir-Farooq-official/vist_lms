@@ -365,7 +365,7 @@ class AccountsService:
             vendors = {v.id: v.name for v in (await self.session.execute(select(Vendor))).scalars()}
             for e in (await self.session.execute(stmt.order_by(Expense.expense_date.desc(), Expense.created_at.desc()).limit(window))).scalars():
                 rows.append({"kind": EntryKind.EXPENSE, "id": e.id, "reference": expense_ref(e), "date": e.expense_date, "title": e.title, "party": vendors.get(e.vendor_id), "category": cats.get(e.category_id, "?"),
-                             "amount": _f(e.amount), "payment_method": e.payment_method, "status": e.status.value, "_t": e.created_at})
+                             "amount": _f(e.amount), "payment_method": e.payment_method, "status": e.status.value, "bank_reference": e.reference_no, "by": e.recorded_by, "_t": e.created_at})
         if kind in (None, EntryKind.INCOME):
             stmt = select(IncomeEntry).where(IncomeEntry.voided_at.is_(None))
             if from_date:
@@ -374,7 +374,7 @@ class AccountsService:
                 stmt = stmt.where(IncomeEntry.income_date <= to_date)
             for i in (await self.session.execute(stmt.order_by(IncomeEntry.income_date.desc(), IncomeEntry.created_at.desc()).limit(window))).scalars():
                 rows.append({"kind": EntryKind.INCOME, "id": i.id, "reference": income_ref(i), "date": i.income_date, "title": i.description or i.received_from, "party": i.received_from, "category": cats.get(i.category_id, "?"),
-                             "amount": _f(i.amount), "payment_method": i.payment_method, "status": "RECEIVED", "_t": i.created_at})
+                             "amount": _f(i.amount), "payment_method": i.payment_method, "status": "RECEIVED", "bank_reference": i.reference_no, "by": i.recorded_by, "_t": i.created_at})
         # Student / staff fee payments (money in) and fee refunds paid back (money out) -- the fee ledger.
         fee_types = []
         if kind in (None, EntryKind.INCOME):
@@ -416,13 +416,13 @@ class AccountsService:
                 if reversal:
                     rows.append({"kind": EntryKind.INCOME, "id": e.id, "reference": "REVERSAL", "date": local_date(e.created_at),
                                  "title": "Fee payment reversed: " + fee_name, "party": names.get(pid), "category": "Student / staff fees",
-                                 "amount": -_f(e.amount), "payment_method": pm, "status": "REVERSED", "_t": e.created_at})
+                                 "amount": -_f(e.amount), "payment_method": pm, "status": "REVERSED", "bank_reference": None, "by": e.created_by, "_t": e.created_at})
                     continue
                 rows.append({"kind": EntryKind.EXPENSE if refund else EntryKind.INCOME, "id": e.id,
                              "reference": e.receipt_number or ("REFUND" if refund else "FEE"), "date": e.paid_on or local_date(e.created_at),
                              "title": ("Fee refund: " if refund else "Fee payment: ") + fee_name, "party": names.get(pid),
                              "category": "Fee refunds" if refund else "Student / staff fees", "amount": _f(e.amount),
-                             "payment_method": pm, "status": "PAID" if refund else "RECEIVED", "_t": e.created_at})
+                             "payment_method": pm, "status": "PAID" if refund else "RECEIVED", "bank_reference": e.payment_reference, "by": e.created_by, "_t": e.created_at})
         if kind in (None, EntryKind.INCOME):
             # Collected fines are income too (library, attendance, late fee, gate, store...).
             paid_day = func.coalesce(Fine.paid_on, func.date(Fine.resolved_at))
@@ -439,7 +439,7 @@ class AccountsService:
                     day = f.paid_on or (f.resolved_at.date() if f.resolved_at else None)
                     rows.append({"kind": EntryKind.INCOME, "id": f.id, "reference": f.receipt_number or f"FINE-{str(f.id)[:8]}", "date": day,
                                  "title": f"Fine: {f.reason}", "party": payer.name, "category": "Fines \u2014 " + f.source.value.replace("_", " ").title(),
-                                 "amount": _f(f.amount), "payment_method": f.payment_method or "CASH", "status": "RECEIVED", "_t": f.resolved_at or f.created_at})
+                                 "amount": _f(f.amount), "payment_method": f.payment_method or "CASH", "status": "RECEIVED", "bank_reference": f.payment_reference, "by": f.resolved_by, "_t": f.resolved_at or f.created_at})
         if kind in (None, EntryKind.INCOME):
             # Fine payments that were later reversed: the money came in on its day and went back out on another.
             from app.fines.models import FinePaymentReversal
@@ -456,7 +456,7 @@ class AccountsService:
                     payer = payer or await resolve_payer(self.session, f.payer_type, f.payer_id)
                     rows.append({"kind": EntryKind.INCOME, "id": rv.id, "reference": ref, "date": day, "title": title, "party": payer.name,
                                  "category": "Fines \u2014 " + f.source.value.replace("_", " ").title(), "amount": amount,
-                                 "payment_method": rv.payment_method or "CASH", "status": status, "_t": rv.reversed_at})
+                                 "payment_method": rv.payment_method or "CASH", "status": status, "bank_reference": rv.payment_reference, "by": rv.reversed_by, "_t": rv.reversed_at})
         if q and q.strip():
             n = q.strip().lower()
             rows = [r for r in rows if n in r["title"].lower() or n in (r["party"] or "").lower() or n in r["reference"].lower() or n in r["category"].lower()]

@@ -30,7 +30,7 @@ from app.students.models import Student
 
 MAX_FILES = 5
 FOLDER = "applications"
-PORTAL = {Roles.STUDENT: "student", Roles.TEACHER: "faculty", Roles.LIBRARIAN: "library", Roles.ACCOUNTS_OFFICER: "accounts", Roles.SECURITY_GUARD: "gate", Roles.EXAM_CONTROLLER: "exam", Roles.HOSTEL_WARDEN: "warden"}
+PORTAL = {Roles.STUDENT: "student", Roles.TEACHER: "faculty", Roles.LIBRARIAN: "library", Roles.ACCOUNTS_OFFICER: "accounts", Roles.SECURITY_GUARD: "gate", Roles.EXAM_CONTROLLER: "exam", Roles.HOSTEL_WARDEN: "warden", Roles.STAFF: "staff"}
 
 
 def reference(app: Application) -> str:

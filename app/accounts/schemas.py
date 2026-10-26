@@ -128,6 +128,8 @@ class BookRow(BaseModel):
     amount: float
     payment_method: str          # accounts methods, or a fee method (BANK_DEPOSIT, ONE_BILL...)
     status: str
+    bank_reference: str | None = None     # the slip / cheque / transaction number, as on the bank statement
+    by: uuid.UUID | None = None           # who recorded it (the cashier, for cash)
 
 
 class CategoryTotal(BaseModel):

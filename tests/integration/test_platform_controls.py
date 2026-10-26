@@ -42,6 +42,15 @@ def test_forwarded_address_is_believed_only_from_a_trusted_proxy():
     assert client_ip(_Req("172.18.0.3", "203.0.113.7")) == "203.0.113.7"          # Docker network
     assert client_ip(_Req("198.51.100.4", "1.2.3.4")) == "198.51.100.4"           # someone on the internet faking it
     assert client_ip(_Req("127.0.0.1", "not-an-ip")) == "127.0.0.1"
+    # SEC-02: a visitor sends their own X-Forwarded-For; nginx appends the real address. The forged front is ignored.
+    assert client_ip(_Req("172.18.0.1", "1.2.3.4, 203.0.113.7")) == "203.0.113.7"
+    assert client_ip(_Req("172.18.0.1", "1.2.3.4, 203.0.113.7, 127.0.0.1")) == "203.0.113.7"
+    assert client_ip(_Req("172.18.0.1", "garbage, 203.0.113.7")) == "203.0.113.7"
+
+
+def test_production_compose_does_not_let_uvicorn_trust_every_forwarded_header():
+    text = (ROOT / "docker-compose.prod.yml").read_text(encoding="utf-8")
+    assert 'FORWARDED_ALLOW_IPS: "*"' not in text
 
 
 def test_error_alerts_are_sent_once_per_error_not_once_per_visitor(monkeypatch):

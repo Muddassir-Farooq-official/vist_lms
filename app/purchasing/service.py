@@ -55,7 +55,8 @@ class PurchasingService:
             return "/dashboard"
         codes = set((await self.session.execute(select(Role.code).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == user_id))).scalars())
         for role, link in ((Roles.ADMIN, "/dashboard/admin/finance?open=purchases"), (Roles.ACCOUNTS_OFFICER, "/dashboard/accounts/finance?open=purchases"), (Roles.TEACHER, "/dashboard/faculty/purchases"),
-                           (Roles.LIBRARIAN, "/dashboard/library/purchases"), (Roles.SECURITY_GUARD, "/dashboard/gate/purchases"), (Roles.EXAM_CONTROLLER, "/dashboard/exam/purchases"), (Roles.HOSTEL_WARDEN, "/dashboard/warden/purchases")):
+                           (Roles.LIBRARIAN, "/dashboard/library/purchases"), (Roles.SECURITY_GUARD, "/dashboard/gate/purchases"), (Roles.EXAM_CONTROLLER, "/dashboard/exam/purchases"), (Roles.HOSTEL_WARDEN, "/dashboard/warden/purchases"),
+                           (Roles.STAFF, "/dashboard/staff/purchases")):
             if role in codes:
                 return link
         return "/dashboard"
@@ -147,6 +148,9 @@ class PurchasingService:
             raise BusinessRuleViolationError("This request is not waiting for a decision.")
         if not approve and len((note or "").strip()) < 3:
             raise BusinessRuleViolationError("Say why you are rejecting it.")
+        if approve and self.above_limit(o.estimated_total):
+            await self._second_person(admin_id, [o.requested_by], f"Rs. {float(o.estimated_total):,.0f} is above the second-approval limit: an administrator "
+                                                                  "other than the one who asked for it must approve it.")
         o.status = S.APPROVED if approve else S.REJECTED
         o.decided_by, o.decided_at, o.decision_note = admin_id, datetime.now(timezone.utc), (note or "").strip() or None
         await self.audit.log(actor_user_id=admin_id, action="purchase.approved" if approve else "purchase.rejected", entity_type="purchase_order", entity_id=o.id)
@@ -215,10 +219,29 @@ class PurchasingService:
         await self._tell(o.requested_by, f"Arrived: {po_ref(o)}", f"{o.title} has been received. Collect it from the accounts office.")
         return o
 
+    @staticmethod
+    def above_limit(amount) -> bool:
+        limit = float(getattr(settings, "purchase_second_approval_above", 0) or 0)
+        return limit > 0 and amount is not None and float(amount) > limit
+
+    async def _second_person(self, actor_id, made_by: list, message: str, permission: str | None = "default") -> None:
+        """Purchases above the limit need two different people (owner decision 10). With a single administrator the step
+        goes ahead and the audit log records it as a sole-approver decision."""
+        from app.auth.permissions import Permissions
+        from app.core.controls import four_eyes
+
+        perm = Permissions.ACCOUNT_APPROVE if permission == "default" else (permission or Permissions.ACCOUNT_RECORD)
+        if await four_eyes(self.session, actor_id, made_by, perm, message):
+            await self.audit.log(actor_user_id=actor_id, action="purchase.sole_approver", entity_type="purchase_order", entity_id=None,
+                                 metadata={"note": message[:200]})
+
     async def approve_price(self, order_id: uuid.UUID, *, admin_id: uuid.UUID) -> PurchaseOrder:
         o = await self._order(order_id)
         if o.status != S.RECEIVED or not self.needs_price_approval(o):
             raise BusinessRuleViolationError("This purchase does not need its price approved.")
+        if self.above_limit(o.actual_total):
+            await self._second_person(admin_id, [o.requested_by, o.received_by], "Above the second-approval limit, the price must be approved by an administrator "
+                                                                                 "who did not ask for or receive this purchase.")
         o.price_approved_by, o.price_approved_at = admin_id, datetime.now(timezone.utc)
         await self.audit.log(actor_user_id=admin_id, action="purchase.price_approved", entity_type="purchase_order", entity_id=o.id,
                              metadata={"estimated_total": str(o.estimated_total), "actual_total": str(o.actual_total)})
@@ -233,9 +256,17 @@ class PurchasingService:
                 f"The goods cost Rs. {float(o.actual_total):,.0f} against an approved Rs. {float(o.estimated_total):,.0f}. An administrator must approve the price before it can be paid.")
         if method in NEEDS_REFERENCE and not (reference or "").strip():
             raise BusinessRuleViolationError("Enter the cheque number or the bank transaction reference.")
+        if self.above_limit(o.actual_total):
+            # Above the limit, whoever pays must not be the one who approved the purchase or its price.
+            await self._second_person(actor_id, [o.decided_by, o.price_approved_by], "Above the second-approval limit, the person who approved this purchase "
+                                                                                     "cannot also pay it. Ask the accounts office (or another administrator).",
+                                      permission=None)
         today = institute_today()
         if paid_date > today:
             raise BusinessRuleViolationError("The payment date cannot be in the future.")
+        from app.accounts.period import ensure_open
+
+        await ensure_open(self.session, paid_date, "This payment")
         if len(files) > MAX_FILES:
             raise BusinessRuleViolationError(f"You can attach at most {MAX_FILES} files.")
         for name, content, ctype in files:
@@ -274,6 +305,9 @@ class PurchasingService:
             raise BusinessRuleViolationError("Only a paid purchase can have its payment reversed.")
         e = await self.session.get(Expense, o.expense_id) if o.expense_id else None
         if e is not None:
+            from app.accounts.period import ensure_open
+
+            await ensure_open(self.session, e.expense_date, "This payment")      # voiding it changes the month it was booked in
             e.status, e.voided_at, e.void_reason = ExpenseStatus.VOIDED, datetime.now(timezone.utc), f"Payment reversed: {reason.strip()}"
         o.status, o.paid_by, o.paid_at, o.payment_method, o.payment_reference, o.expense_id = S.RECEIVED, None, None, None, None, None
         await self.audit.log(actor_user_id=admin_id, action="purchase.payment_reversed", entity_type="purchase_order", entity_id=o.id, metadata={"reason": reason.strip()})

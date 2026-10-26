@@ -23,8 +23,30 @@ class Settings(BaseSettings):
     error_alert_webhook: str = ""
     api_v1_prefix: str = Field(default="/api/v1")
 
+    # The institute's identity. These are only the starting values: an administrator changes them in
+    # Settings -> Institute (stored in the institute_profile table), and app/branding applies them to every page,
+    # PDF, report and SMS within seconds.
     institute_name: str = Field(default="Vertex Institute of Science & Technology")
     institute_logo_path: str = Field(default="static/images/vist_logo.png")
+    institute_tagline: str = ""
+    institute_address: str = ""
+    institute_city: str = ""
+    institute_phone: str = ""
+    institute_email: str = ""
+    institute_website: str = ""
+    institute_registration_no: str = ""
+    institute_logo_dark_path: str = ""
+    institute_favicon_path: str = ""
+    institute_signature_path: str = ""
+    institute_signatory_name: str = ""
+    institute_signatory_title: str = "Principal"
+    brand_color: str = ""                    # e.g. #0b6b5d; empty = the standard blue theme
+    document_footer: str = ""                # printed at the foot of receipts, certificates and challans
+    bank_name: str = ""
+    bank_account_title: str = ""
+    bank_account_no: str = ""
+    bank_branch: str = ""
+    brand_version: int = 0                   # changes whenever the profile or a logo changes (cache-busting)
 
     # Database
     database_url: str
@@ -49,6 +71,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:8000"
     # The address people type to reach the portal (printed on certificates for verification). Empty = the first CORS origin.
     public_url: str = ""
+    asset_tag_prefix: str = "VIST"          # fixed-asset tags: VIST-IT-0001 (set before the first asset is added)
 
     # File storage
     storage_backend: str = "local"
@@ -151,6 +174,8 @@ class Settings(BaseSettings):
     # (i.e. final). An ADMIN can override one sheet with a written reason.
     purchase_over_estimate_percent: float = 10.0    # goods costing more than this % over the approved estimate need the price approved before payment
     fee_late_fee_cap: float = 0.0                   # most late fee one instalment can build up (Rs.); 0 = no cap
+    fee_late_fee_grace_days: int = 0                # no late fee for this many days after an instalment's due date
+    purchase_second_approval_above: float = 50000.0  # purchase orders / payments above this need a second administrator (0 = never)
     require_attendance_lock_before_publish: bool = True
     # End Semester only after every course with students has locked attendance and a published result
     # (otherwise students are closed out with no result at all). An administrator can still override with a reason.
@@ -216,6 +241,7 @@ class Settings(BaseSettings):
     payroll_casual_leaves_teacher: int = 0          # teachers: no casual leave
     payroll_late_marks_per_day: int = 4             # this many late arrivals / early leavings = one day's pay
     payroll_missing_checkout_counts: int = 1        # 1 = a day with no leaving mark counts as leaving early
+    payroll_advance_max_salary_multiple: float = 1.0   # an employee may owe at most this many months' basic salary in advances
     payroll_security_percent: float = 0.0           # % of basic held back each month as a security deposit, until it equals one basic salary
     graduation_min_cgpa: float = 2.0                # degree audit: the lowest CGPA that can graduate
     certificate_signatory: str = "Principal"       # printed under the signature line on certificates

@@ -81,12 +81,16 @@ async def _decode_current_user(
         _session_ok[user_id] = cached
     _, _, must_change, roles, perms = cached
 
+    viewer = payload.get("va")
     return CurrentUser(
         id=payload["sub"],
         username=payload.get("username", ""),
         roles=roles,
         permissions=perms,
-        must_change_password=must_change,
+        # An administrator viewing someone's screens is never sent to that person's change-password form.
+        must_change_password=False if viewer else must_change,
+        viewing_as_by=payload.get("va_name") if viewer else None,
+        viewing_as_by_id=viewer,
     )
 
 

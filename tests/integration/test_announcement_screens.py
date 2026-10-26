@@ -49,7 +49,8 @@ async def test_the_admin_screen_has_compose_attachments_and_officials(app_client
 async def test_student_and_teacher_home_show_the_latest_announcements(app_client):
     for portal in ("student", "faculty"):
         html = (await app_client.get(f"/dashboard/{portal}")).text
-        assert 'id="sh-news"' in html and "has-news" in html and f"/dashboard/{portal}/announcements" in html, portal
+        assert 'id="ann-list"' in html and f"/dashboard/{portal}/announcements" in html, portal
+        assert "announcements?limit=3" in (await app_client.get(f"/static/js/{portal}-home.js")).text, portal
     js = (await app_client.get("/static/js/portal-home.js")).text
     assert "loadNews(" in js and "announcements?limit=3" in js
     common = (await app_client.get("/static/js/admin-common.js")).text

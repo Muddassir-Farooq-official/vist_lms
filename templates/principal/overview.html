@@ -1,26 +1,155 @@
 {% extends "admin/_base.html" %}
+{% from "_icons.html" import nav_icon %}
 {% block allowed_roles %}ADMIN,PRINCIPAL{% endblock %}
 {% block title %}Institute Overview{% endblock %}
 {% block page_title %}Institute Overview{% endblock %}
-{% block page_subtitle %}<div class="content-subtitle">How the institute is doing right now, for the open terms: students, teaching, attendance, results and fees. Read-only.</div>{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">How {{ brand.short_name }} is doing right now. Read-only.</div>{% endblock %}
 
 {% block content %}
-<p class="content-subtitle" id="ov-terms"></p>
-<section class="stat-grid" aria-label="Key figures">
-  <div class="stat-card"><span class="stat-label">Active students</span><span class="stat-value" id="ov-active">&mdash;</span></div>
-  <div class="stat-card"><span class="stat-label">Average attendance</span><span class="stat-value" id="ov-att">&mdash;</span></div>
-  <div class="stat-card stat-card--red"><span class="stat-label">Student-courses below minimum attendance</span><span class="stat-value" id="ov-below">&mdash;</span></div>
-  <div class="stat-card stat-card--green"><span class="stat-label">Fee collection rate</span><span class="stat-value" id="ov-rate">&mdash;</span></div>
-</section>
+<div class="dash" id="principal-dash">
 
-<section class="panel"><h2>Teaching</h2><table class="dash-table no-stack"><tbody id="ov-teaching"></tbody></table></section>
-<section class="panel"><h2>Results (this term)</h2><table class="dash-table no-stack"><tbody id="ov-results"></tbody></table></section>
-<section class="panel"><h2>Fees (active)</h2><table class="dash-table no-stack"><tbody id="ov-fees"></tbody></table></section>
-<section class="panel"><h2>Students</h2><table class="dash-table no-stack"><thead><tr><th>Program</th><th class="num">Active students</th></tr></thead><tbody id="ov-programs"></tbody></table>
-  <p class="panel-hint" id="ov-status"></p></section>
-<p id="ov-error" class="dash-alert error" hidden></p>
+  <section class="dash-hero" aria-labelledby="pv-greet">
+    <div class="dash-hero-text">
+      <h2 id="pv-greet">Welcome</h2>
+      <p><span id="pv-date"></span><span class="dash-chip" id="pv-term" hidden></span></p>
+    </div>
+    <nav class="dash-actions" aria-label="Quick links">
+      <a href="/dashboard/principal/students" class="dash-action">{{ nav_icon("students") }}<span>Find a student</span></a>
+      <a href="/dashboard/principal/progress" class="dash-action">{{ nav_icon("exams") }}<span>Teacher progress</span></a>
+      <a href="/dashboard/principal/staff-attendance" class="dash-action">{{ nav_icon("clock") }}<span>Staff</span></a>
+      <a href="/dashboard/principal/calendar" class="dash-action">{{ nav_icon("attendance") }}<span>Calendar</span></a>
+      <a href="/dashboard/principal/reports" class="dash-action">{{ nav_icon("file") }}<span>Reports</span></a>
+    </nav>
+  </section>
+
+  <p class="dash-alert error" id="ov-error" hidden></p>
+
+  <section class="kpi-row" aria-label="Key numbers">
+    <a class="kpi" href="/dashboard/principal/students" data-tone="blue">
+      <span class="kpi-icon">{{ nav_icon("students") }}</span>
+      <span class="kpi-label">Active students</span>
+      <strong class="kpi-value" id="ov-active">&mdash;</strong>
+      <span class="kpi-sub" id="ov-active-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/principal/reports" data-tone="purple">
+      <span class="kpi-icon">{{ nav_icon("attendance") }}</span>
+      <span class="kpi-label">Class attendance</span>
+      <strong class="kpi-value" id="ov-att">&mdash;</strong>
+      <span class="kpi-sub" id="ov-att-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/principal/reports" data-tone="red">
+      <span class="kpi-icon">{{ nav_icon("ban") }}</span>
+      <span class="kpi-label">Below minimum attendance</span>
+      <strong class="kpi-value" id="ov-below">&mdash;</strong>
+      <span class="kpi-sub" id="ov-below-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/principal/progress" data-tone="orange">
+      <span class="kpi-icon">{{ nav_icon("exams") }}</span>
+      <span class="kpi-label">Courses behind schedule</span>
+      <strong class="kpi-value" id="ov-behind">&mdash;</strong>
+      <span class="kpi-sub" id="ov-behind-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/principal/reports" data-tone="green">
+      <span class="kpi-icon">{{ nav_icon("fees") }}</span>
+      <span class="kpi-label">Fee collection rate</span>
+      <strong class="kpi-value" id="ov-rate">&mdash;</strong>
+      <span class="kpi-sub" id="ov-rate-sub">&nbsp;</span>
+    </a>
+    <a class="kpi" href="/dashboard/principal/staff-attendance" data-tone="teal">
+      <span class="kpi-icon">{{ nav_icon("employees") }}</span>
+      <span class="kpi-label">Staff in today</span>
+      <strong class="kpi-value" id="ov-staff">&mdash;</strong>
+      <span class="kpi-sub" id="ov-staff-sub">&nbsp;</span>
+    </a>
+  </section>
+
+  <div class="dash-grid dash-grid--2-1">
+    <section class="panel dash-panel" aria-labelledby="pv-prog-h">
+      <div class="dash-panel-head">
+        <h2 id="pv-prog-h">Teaching progress</h2>
+        <a href="/dashboard/principal/progress" class="view-all-link">All courses {{ nav_icon("arrow-right") }}</a>
+      </div>
+      <div class="status-bar" id="pg-bar" aria-hidden="true"></div>
+      <ul class="status-legend status-legend--4" id="pg-legend"></ul>
+      <h3 class="dash-sub-h">Furthest behind</h3>
+      <ul class="prog-list" id="pg-list"></ul>
+      <p class="dash-empty" id="pg-empty" hidden>No classes have been scheduled yet, so there is no progress to show.</p>
+    </section>
+
+    <section class="panel dash-panel" id="dh-attention-panel" aria-labelledby="pv-att-h">
+      <div class="dash-panel-head"><h2 id="pv-att-h">Needs attention</h2></div>
+      <ul class="attn-list" id="attn-list"><li class="skeleton-line"></li><li class="skeleton-line short"></li></ul>
+      <p class="attn-clear" id="attn-clear" hidden>{{ nav_icon("check-circle") }} All clear. Nothing needs attention.</p>
+    </section>
+  </div>
+
+  <div class="dash-grid dash-grid--3">
+    <section class="panel dash-panel" aria-labelledby="pv-stu-h">
+      <div class="dash-panel-head">
+        <h2 id="pv-stu-h">Students</h2>
+        <a href="/dashboard/principal/students" class="view-all-link">Look up {{ nav_icon("arrow-right") }}</a>
+      </div>
+      <div class="status-bar" id="st-bar" aria-hidden="true"></div>
+      <ul class="status-legend" id="st-legend"></ul>
+      <h3 class="dash-sub-h">Active, by program</h3>
+      <div id="st-programs"></div>
+    </section>
+
+    <section class="panel dash-panel" aria-labelledby="pv-res-h">
+      <div class="dash-panel-head"><h2 id="pv-res-h">Results this term</h2></div>
+      <ol class="pipeline" id="res-pipeline"></ol>
+      <p class="panel-hint" id="res-note"></p>
+      <h3 class="dash-sub-h">Teaching</h3>
+      <ul class="fact-list" id="teach-list"></ul>
+    </section>
+
+    <section class="panel dash-panel" aria-labelledby="pv-fee-h">
+      <div class="dash-panel-head"><h2 id="pv-fee-h">Fees</h2></div>
+      <div class="ring-row">
+        <div class="ring" id="fee-ring" aria-hidden="true"><span id="fee-ring-val">&mdash;</span></div>
+        <p class="ring-text">of the fees charged this term have been paid.</p>
+      </div>
+      <ul class="fact-list" id="fee-list"></ul>
+    </section>
+  </div>
+
+  <div class="dash-grid dash-grid--3">
+    <section class="panel dash-panel" aria-labelledby="pv-cal-h">
+      <div class="dash-panel-head">
+        <h2 id="pv-cal-h">Coming up</h2>
+        <a href="/dashboard/principal/calendar" class="view-all-link">Calendar {{ nav_icon("arrow-right") }}</a>
+      </div>
+      <ul class="event-list" id="cal-list"></ul>
+      <p class="dash-empty" id="cal-empty" hidden>Nothing on the calendar for the next two weeks.</p>
+    </section>
+
+    <section class="panel dash-panel" aria-labelledby="pv-today-h">
+      <div class="dash-panel-head"><h2 id="pv-today-h">Campus today</h2></div>
+      <div class="today-block">
+        <div class="today-head"><span>{{ nav_icon("employees") }} Staff</span><a href="/dashboard/principal/staff-attendance">Open</a></div>
+        <div class="meter" id="t-staff-meter" aria-hidden="true"></div>
+        <ul class="mini-stats" id="t-staff"></ul>
+      </div>
+      <div class="today-block">
+        <div class="today-head"><span>{{ nav_icon("hostel") }} Hostel</span><a href="/dashboard/principal/hostel">Open</a></div>
+        <ul class="mini-stats" id="t-hostel"></ul>
+      </div>
+      <div class="today-block">
+        <div class="today-head"><span>{{ nav_icon("tasks") }} Assets and store</span><a href="/dashboard/principal/assets">Open</a></div>
+        <ul class="mini-stats" id="t-assets"></ul>
+      </div>
+    </section>
+
+    <section class="panel dash-panel" aria-labelledby="pv-ann-h">
+      <div class="dash-panel-head"><h2 id="pv-ann-h">Announcements</h2></div>
+      <ul class="note-list" id="ann-list"></ul>
+      <p class="dash-empty" id="ann-empty" hidden>No announcements yet.</p>
+    </section>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="/static/js/charts.js"></script>
 <script src="/static/js/principal-overview.js"></script>
 {% endblock %}

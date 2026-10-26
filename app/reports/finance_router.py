@@ -56,8 +56,8 @@ async def collection(from_date: date | None = None, to_date: date | None = None,
 async def collection_csv(from_date: date | None = None, to_date: date | None = None, current_user: CurrentUser = Depends(view), db=Depends(get_db)) -> Response:
     today = institute_today()
     r = await FinanceReportService(db).collection(from_date or today, to_date or from_date or today)
-    rows = [[g["day"], g["cashier"], g["count"], " | ".join(f"{k} {v}" for k, v in g["by_method"].items()), g["cash"], g["total"]] for g in r["rows"]]
-    return _csv(rows, ["Day", "Cashier", "Payments", "By method", "Cash", "Total"], f"collection-{r['from_date']}-{r['to_date']}.csv")
+    rows = [[g["day"], g["cashier"], g["count"], " | ".join(f"{k} {v}" for k, v in g["by_method"].items()), g["received"], g["taken_back"], g["cash"], g["total"]] for g in r["rows"]]
+    return _csv(rows, ["Day", "Cashier", "Payments", "By method", "Received", "Reversed or refunded", "Cash (net)", "Net total"], f"collection-{r['from_date']}-{r['to_date']}.csv")
 
 
 @router.get("/payables", summary="Received purchases not yet paid, by vendor")

@@ -1,6 +1,7 @@
 name: CI/CD
 
-# Every push / PR: run checks.  Push to main AND checks pass: deploy to the VPS.
+# Every push / PR: run checks. Push to main AND checks pass: a deploy to the VPS WAITS for a person to approve it
+# (GitHub Environment "production" with required reviewers - set up once in Settings -> Environments; audit OPS-01).
 on:
   push:
     branches: [main]
@@ -78,6 +79,16 @@ jobs:
       - name: Run tests
         run: pytest -q -p no:cacheprovider
 
+  secrets:
+    name: No secrets in the repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: python scripts/check_no_secrets.py
+
   lint:
     name: Lint (ruff)
     runs-on: ubuntu-latest
@@ -109,9 +120,13 @@ jobs:
 
   deploy:
     name: Deploy to VPS
-    needs: test                       # only runs if tests + migration checks passed
+    needs: [test, lint, secrets]      # only runs if tests, migration checks, lint and the secrets check passed
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    # The job pauses here until a required reviewer approves it in GitHub (Settings -> Environments -> production ->
+    # Required reviewers). Without that setting GitHub runs it straight away, so set it up before relying on this.
+    environment:
+      name: production
     concurrency:
       group: production-deploy        # never two deploys at once
       cancel-in-progress: false
@@ -142,4 +157,5 @@ jobs:
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
-        run: ssh "$VPS_USER@$VPS_HOST" "cd $APP_DIR && bash scripts/deploy.sh"
+          ALLOW_DESTRUCTIVE: ${{ vars.ALLOW_DESTRUCTIVE_MIGRATIONS }}
+        run: ssh "$VPS_USER@$VPS_HOST" "cd $APP_DIR && ALLOW_DESTRUCTIVE_MIGRATIONS='$ALLOW_DESTRUCTIVE' bash scripts/deploy.sh"

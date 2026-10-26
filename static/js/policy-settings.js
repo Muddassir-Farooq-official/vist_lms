@@ -1,76 +1,77 @@
 (function () {
   "use strict";
 
-  // Admin Settings > Institute Policy: GET/PUT /api/v1/policy.
+  // Settings > Rules: GET/PUT /api/v1/policy. Changes are collected here and saved by the page's save bar (settings.js).
   const VA = window.VistAdmin;
   const esc = VA.escapeHtml;
   const holder = document.getElementById("policy-groups");
   if (!holder) return;
-  const errBox = document.getElementById("policy-error");
-  const okBox = document.getElementById("policy-success");
-  const saveBtn = document.getElementById("policy-save-btn");
   let items = [];
 
-  function msg(body, fallback) {
-    return body && body.error && body.error.message ? body.error.message : fallback;
-  }
+  function fmt(v) { return Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 }); }
 
   function render() {
+    const q = (document.getElementById("policy-search").value || "").trim().toLowerCase();
     const groups = {};
-    items.forEach(function (p) { (groups[p.group] = groups[p.group] || []).push(p); });
-    holder.innerHTML = Object.keys(groups).map(function (g) {
-      return "<h3>" + esc(g) + "</h3>" + groups[g].map(function (p) {
-        const id = "policy-" + p.key;
-        return '<div class="form-field"><label for="' + id + '">' + esc(p.label) + "</label>" +
-          '<input id="' + id + '" data-key="' + esc(p.key) + '" class="text-input small-input" type="number" min="' + p.min + '" max="' + p.max + '" step="' + (p.type === "int" ? "1" : "0.01") + '"' +
-          (p.overridden ? ' value="' + esc(String(p.value)) + '"' : "") + ' placeholder="' + esc(String(p.default)) + ' (default)" />' +
-          '<small class="panel-hint">' + esc(p.help) + "</small></div>";
-      }).join("");
+    items.forEach(function (p) {
+      if (q && (p.label + " " + p.help + " " + p.group).toLowerCase().indexOf(q) === -1) return;
+      (groups[p.group] = groups[p.group] || []).push(p);
+    });
+    const names = Object.keys(groups);
+    document.getElementById("policy-none").hidden = names.length > 0;
+    holder.innerHTML = names.map(function (g) {
+      return '<details class="st-rules" open><summary><h3>' + esc(g) + "</h3><small>" + groups[g].length + " rule" + (groups[g].length === 1 ? "" : "s") + "</small></summary>" +
+        groups[g].map(function (p) {
+          const id = "policy-" + p.key;
+          return '<div class="st-rule"><div class="st-rule-text"><label for="' + id + '">' + esc(p.label) + (p.overridden ? ' <span class="status-pill pending">changed</span>' : "") + "</label>" +
+            "<small>" + esc(p.help) + "</small><small class=\"st-rule-default\">Default " + esc(fmt(p.default)) + " · allowed " + esc(fmt(p.min)) + " to " + esc(fmt(p.max)) + "</small></div>" +
+            '<div class="st-rule-input"><input id="' + id + '" data-key="' + esc(p.key) + '" class="text-input small-input" type="number" inputmode="decimal" min="' + p.min + '" max="' + p.max +
+            '" step="' + (p.type === "int" ? "1" : "0.01") + '" value="' + esc(String(p.value)) + '" />' +
+            (p.overridden ? '<button type="button" class="row-action" data-reset="' + esc(p.key) + '">Use default</button>' : "") + "</div></div>";
+        }).join("") + "</details>";
     }).join("");
   }
 
-  async function load() {
-    const r = await VA.fetchJson("/api/v1/policy");
-    if (!r.ok) {
-      document.getElementById("policy-panel").hidden = true;   // not an administrator
-      return;
-    }
-    items = r.body;
-    render();
-  }
-
-  saveBtn.addEventListener("click", async function () {
-    errBox.hidden = true;
-    okBox.hidden = true;
+  function changes() {
     const values = {};
     holder.querySelectorAll("input[data-key]").forEach(function (input) {
       const p = items.find(function (x) { return x.key === input.getAttribute("data-key"); });
+      if (input.dataset.reset === "1") { values[p.key] = null; return; }
       const raw = input.value.trim();
-      if (raw === "") {
-        if (p.overridden) values[p.key] = null;            // back to default
-      } else if (Number(raw) !== Number(p.value) || !p.overridden) {
-        values[p.key] = Number(raw);
-      }
+      if (raw === "") return;
+      if (Number(raw) !== Number(p.value)) values[p.key] = Number(raw);
     });
-    if (!Object.keys(values).length) {
-      okBox.textContent = "Nothing changed.";
-      okBox.hidden = false;
-      return;
-    }
-    if (!window.confirm("Save " + Object.keys(values).length + " policy change(s)? They apply to everyone straight away.")) return;
-    const r = await VA.fetchJson("/api/v1/policy", {
-      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: values }),
-    });
-    if (!r.ok) {
-      errBox.textContent = msg(r.body, "Could not save the policy.");
-      errBox.hidden = false;
-      return;
-    }
-    items = r.body;
-    render();
-    okBox.textContent = "Policy saved.";
-    okBox.hidden = false;
+    return values;
+  }
+
+  function changed() { document.dispatchEvent(new CustomEvent("settings:changed")); }
+  holder.addEventListener("input", changed);
+  holder.addEventListener("click", function (e) {
+    const b = e.target.closest("[data-reset]");
+    if (!b) return;
+    const input = document.getElementById("policy-" + b.getAttribute("data-reset"));
+    const p = items.find(function (x) { return x.key === b.getAttribute("data-reset"); });
+    input.value = p.default; input.dataset.reset = "1"; b.remove(); changed();
+  });
+  document.getElementById("policy-search").addEventListener("input", function () {
+    const pending = changes(); render();
+    Object.keys(pending).forEach(function (k) { const el = document.getElementById("policy-" + k); if (el && pending[k] !== null) el.value = pending[k]; });
   });
 
-  document.addEventListener("vistadmin:ready", load);
+  async function load() {
+    const r = await VA.fetchJson("/api/v1/policy", { quiet: true });
+    if (!r.ok) { document.getElementById("policy-panel").hidden = true; return false; }
+    items = r.body; render(); return true;
+  }
+
+  async function save() {
+    const values = changes();
+    if (!Object.keys(values).length) return { ok: true, count: 0 };
+    const r = await VA.fetchJson("/api/v1/policy", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: values }) });
+    if (!r.ok) return { ok: false, message: (r.body && r.body.error && r.body.error.message) || "Could not save the rules." };
+    items = r.body; render();
+    return { ok: true, count: Object.keys(values).length };
+  }
+
+  window.SettingsPolicy = { load: load, changes: changes, save: save, discard: render };
 })();

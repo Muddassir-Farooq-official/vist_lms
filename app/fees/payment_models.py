@@ -42,10 +42,10 @@ class PaymentChallan(UUIDPKMixin, TimestampMixin, Base):
     )
 
     fee_ledger_entry_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("fee_ledger_entries.id", ondelete="CASCADE"), nullable=False, unique=True
+        ForeignKey("fee_ledger_entries.id", ondelete="RESTRICT"), nullable=False, unique=True
     )
     fee_assignment_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("fee_assignments.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("fee_assignments.id", ondelete="RESTRICT"), nullable=False
     )
     consumer_number: Mapped[str] = mapped_column(String(30), nullable=False)
     amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
@@ -55,5 +55,10 @@ class PaymentChallan(UUIDPKMixin, TimestampMixin, Base):
     )
     provider: Mapped[str] = mapped_column(String(30), default="1LINK_SIMULATED", nullable=False)
     gateway_reference: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # The payment (CREDIT ledger row) that paid this challan, so reversing either side finds the other.
+    # Empty while unpaid, and for challans paid before this column existed.
+    paid_entry_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("fee_ledger_entries.id", ondelete="SET NULL"), nullable=True
+    )
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
