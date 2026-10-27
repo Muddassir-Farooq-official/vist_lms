@@ -3503,3 +3503,19 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 #vl-table .crs-actions { white-space: nowrap; }
 #sms-tbody td small { display: block; color: var(--text-secondary); font-size: 0.78rem; } #sms-tbody td { vertical-align: top; } #sms-tbody .sms-body { max-width: 460px; font-size: 0.86rem; color: var(--text-secondary); }
 #vl-table .vl-c { display: block; min-width: 0; } @media (max-width: 640px) { #vl-table .vl-c { text-align: right; } #vl-table .crs-actions { text-align: left; } }
+
+/* ---- Fines ---- */
+#fines-table td { vertical-align: middle; }
+#fines-table td strong { display: block; }
+#fines-table .fn-sub { display: block; margin-top: 2px; font-size: 0.78rem; color: var(--text-secondary); font-weight: 500; }
+#fines-table .fn-reason { max-width: 340px; }
+
+/* ---- Refunds ---- */
+.rf-fee-wrap:has(> select[hidden]) { display: none; }
+.panel-header .rf-filter { margin-left: auto; max-width: 240px; }
+#rf-table td { vertical-align: middle; }
+#rf-table td strong { display: block; }
+#rf-table td small { display: block; margin-top: 2px; font-size: 0.78rem; color: var(--text-secondary); }
+#rf-table .rf-reason { max-width: 320px; }
+.status-pill.waived { background: var(--surface-alt); color: var(--text-secondary); }
+.vl-c { display: block; min-width: 0; } @media (max-width: 640px) { #fines-table .vl-c, #rf-table .vl-c { text-align: right; } }

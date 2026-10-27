@@ -386,3 +386,18 @@ Tests: `tests/integration/test_pay_and_performance.py`.
   could not work).
 - **Principal → Staff attendance**: no In / Out / Undo buttons (the principal can view but not mark; the server refused
   those presses). The administrator and the gate keep them.
+
+# Accounts and Exam Controller portals: Fines and Refunds (no migration)
+
+The Exam Controller portal and most Accounts pages (home, Fees, Accounts, Payroll, Approvals) were already in the new
+style and are unchanged. Two Accounts screens were reworked; both are shared with the admin (and Fines with the library).
+
+- **Fines**: amounts as money ("Rs. 6,129" instead of "6129.00"); payer name with roll number / code and "Student" or
+  "Staff" underneath; source as a plain label (Hostel, Library, Store…); status shown as Unpaid / Paid / Waived;
+  a search box (name, roll no., reason or receipt number); a summary of how many fines, their total and how many
+  people; **Hostel charge** added to the source filter (hostel charges could not be filtered before); Waive as a quiet
+  red button next to Mark paid.
+- **Refunds**: labelled fields (roll number, fee, kind, refund, write-off, reason) instead of bare boxes; the list shows
+  the payer with roll number and request date, the refund in bold, write-off only when there is one, status as a
+  coloured badge, and Approve / Reject / Pay out as proper buttons. The status filter sits in the list header.
+  

@@ -6,20 +6,22 @@
 {% block page_subtitle %}<div class="content-subtitle">Fines against students and employees — any reason, any source, tracked in one place.</div>{% endblock %}
 
 {% block content %}
-<section class="panel">
-  <div class="toolbar">
-    <select id="filter-payer-type" class="select-input">
-      <option value="">All types</option>
+<div class="crs-chips tp-summary" id="fines-summary"></div>
+<section class="panel sd-panel">
+  <div class="sd-toolbar">
+    <label class="sd-search">{{ nav_icon("search") }}<input type="search" id="fines-q" placeholder="Search name, roll no. or reason" aria-label="Search fines" /></label>
+    <select id="filter-payer-type" class="select-input" aria-label="Payer">
+      <option value="">Students and staff</option>
       <option value="STUDENT">Students</option>
-      <option value="EMPLOYEE">Employees</option>
+      <option value="EMPLOYEE">Staff</option>
     </select>
-    <select id="filter-status" class="select-input">
+    <select id="filter-status" class="select-input" aria-label="Status">
       <option value="">All statuses</option>
-      <option value="PENDING" selected>Pending</option>
+      <option value="PENDING" selected>Unpaid</option>
       <option value="PAID">Paid</option>
       <option value="WAIVED">Waived</option>
     </select>
-    <select id="filter-source" class="select-input">
+    <select id="filter-source" class="select-input" aria-label="Source">
       <option value="">All sources</option>
       <option value="LIBRARY">Library</option>
       <option value="DISCIPLINARY">Disciplinary</option>
@@ -27,13 +29,14 @@
       <option value="FEE_LATE_PAYMENT">Late fee payment</option>
       <option value="GATE">Gate (late arrival)</option>
       <option value="INVENTORY">Store / inventory</option>
+      <option value="HOSTEL">Hostel charge</option>
       <option value="OTHER">Other</option>
     </select>
-    <button id="open-issue-fine" class="role-btn" type="button">+ Issue Fine</button>
+    <div class="sd-tools"><button id="open-issue-fine" class="role-btn" type="button">+ Issue a fine</button></div>
   </div>
 
   <table class="dash-table" id="fines-table">
-    <thead><tr><th>Payer</th><th>Amount</th><th>Reason</th><th>Source</th><th>Issued</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Payer</th><th class="num">Amount</th><th>Reason</th><th>Source</th><th>Issued</th><th>Status</th><th class="crs-actions"></th></tr></thead>
     <tbody id="fines-tbody"></tbody>
   </table>
   <p class="empty-state" id="fines-empty" hidden>No fines match this filter.</p>

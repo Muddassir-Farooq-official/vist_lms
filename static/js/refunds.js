@@ -88,13 +88,15 @@
     document.getElementById("rf-tbody").innerHTML = r.body.map(function (x) {
       const who = x.payer ? (x.payer.name || "") + (x.payer.identifier ? " (" + x.payer.identifier + ")" : "") : "";
       let act = "";
-      if (x.status === "REQUESTED") act = '<button type="button" class="row-action" data-ok="' + x.id + '">Approve</button> <button type="button" class="row-action" data-no="' + x.id + '">Reject</button>';
-      if (x.status === "APPROVED") act = '<button type="button" class="row-action" data-pay="' + x.id + '">Pay out</button> <button type="button" class="row-action" data-cancel="' + x.id + '">Cancel\u2026</button>';
+      if (x.status === "REQUESTED") act = '<button type="button" class="role-btn small-btn" data-ok="' + x.id + '">Approve</button><button type="button" class="sd-view tt-del" data-no="' + x.id + '">Reject</button>';
+      if (x.status === "APPROVED") act = '<button type="button" class="role-btn small-btn" data-pay="' + x.id + '">Pay out</button><button type="button" class="sd-view tt-del" data-cancel="' + x.id + '">Cancel\u2026</button>';
       if (x.status === "PAID") act = '<a href="/api/v1/fees/receipts/' + x.ledger_entry_id + '/pdf" target="_blank" rel="noopener">' + esc(x.voucher_number) + "</a>";
-      return "<tr><td>" + esc(String(x.requested_at).slice(0, 10)) + "</td><td>" + esc(who) + "</td><td>" + esc(x.fee) + '</td><td class="num">' + esc(money(x.amount)) +
-        '</td><td class="num">' + esc(money(x.write_off)) + "</td><td>" + esc(x.reason) + (x.decision_note ? "<br><small>" + esc(x.decision_note) + "</small>" : "") +
-        "</td><td>" + esc(STATUS[x.status] || x.status) + "</td><td>" + act + "</td></tr>";
-    }).join("") || '<tr><td colspan="8">Nothing here.</td></tr>';
+      const pill = { REQUESTED: "pending", APPROVED: "approved", PAID: "active", REJECTED: "rejected", CANCELLED: "cancelled" }[x.status] || "pending";
+      return '<tr><td><span class="vl-c"><strong>' + esc(x.payer ? x.payer.name || "" : "") + "</strong><small>" + esc([x.payer && x.payer.identifier, "requested " + VA.formatDateLong(String(x.requested_at).slice(0, 10))].filter(Boolean).join(" \u00b7 ")) + "</small></span></td><td>" + esc(x.fee) +
+        '</td><td class="num"><strong>' + esc(money(x.amount)) + '</strong></td><td class="num">' + (Number(x.write_off) ? esc(money(x.write_off)) : '<span class="sd-dim">\u2014</span>') +
+        '</td><td class="rf-reason">' + esc(x.reason) + (x.decision_note ? "<small>" + esc(x.decision_note) + "</small>" : "") +
+        '</td><td><span class="status-pill ' + pill + '">' + esc(STATUS[x.status] || x.status) + '</span></td><td class="crs-actions">' + act + "</td></tr>";
+    }).join("") || '<tr><td colspan="7" class="sd-dim">Nothing here.</td></tr>';
     document.querySelectorAll("[data-ok]").forEach(function (b) { b.addEventListener("click", function () { decide(b.dataset.ok, true); }); });
     document.querySelectorAll("[data-no]").forEach(function (b) { b.addEventListener("click", function () { decide(b.dataset.no, false); }); });
     document.querySelectorAll("[data-pay]").forEach(function (b) { b.addEventListener("click", function () { pay(b.dataset.pay); }); });

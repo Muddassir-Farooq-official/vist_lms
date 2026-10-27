@@ -1,210 +1,47 @@
 {% extends "admin/_base.html" %}
 {% from "_icons.html" import nav_icon %}
 {% block allowed_roles %}ADMIN,ACCOUNTS_OFFICER{% endblock %}
-{% block title %}Accounts{% endblock %}
-{% block page_title %}Accounts{% endblock %}
-{% block page_subtitle %}<div class="content-subtitle">Money in and money out: expenses, other income, vendors, and how the institute is doing.</div>{% endblock %}
+{% block title %}Refunds{% endblock %}
+{% block page_title %}Fee Refunds{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">The accounts office requests a refund, an administrator (not the same person) approves it, then the accounts office pays it out and prints the voucher. Nothing can be refunded beyond what was paid.</div>{% endblock %}
 
 {% block content %}
-<div class="portal-tabs" role="tablist" data-auto-tabs>
-  <button class="portal-tab active" data-tab="overview" role="tab" aria-selected="true"><span>Overview</span></button>
-  <button class="portal-tab" data-tab="book" role="tab" aria-selected="false"><span>Day book</span></button>
-  <button class="portal-tab" data-tab="expenses" role="tab" aria-selected="false"><span id="fn-tab-expenses">Expenses</span></button>
-  <button class="portal-tab" data-tab="purchasing" role="tab" aria-selected="false"><span id="fn-tab-purchasing">Purchasing</span></button>
-  <button class="portal-tab" data-tab="income" role="tab" aria-selected="false"><span>Other income</span></button>
-  <button class="portal-tab" data-tab="vendors" role="tab" aria-selected="false"><span>Vendors</span></button>
-  <button class="portal-tab" data-tab="categories" role="tab" aria-selected="false"><span>Categories</span></button>
-</div>
-
-<!-- ============ OVERVIEW ============ -->
-<div class="portal-tab-panel" data-tab-panel="overview">
-  <section class="sh-card">
-    <div class="rv-chips" id="ov-period">
-      <button type="button" class="chip active" data-p="month">This month</button><button type="button" class="chip" data-p="30">Last 30 days</button><button type="button" class="chip" data-p="90">Last 90 days</button>
-      <button type="button" class="chip" data-p="fy">This financial year</button><button type="button" class="chip" data-p="lastfy">Last financial year</button><button type="button" class="chip" data-p="all">All time</button>
+<section class="panel">
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("fees") }}</div><h2>Request a refund</h2></div></div>
+  <div class="ar-form">
+    <label>Roll number<input id="rf-roll" class="text-input" placeholder="e.g. 26001" /></label>
+    <div class="att-go"><button id="rf-find" class="role-btn secondary-btn" type="button">Find fees</button></div>
+    <label class="att-span2 rf-fee-wrap">Fee<select id="rf-fee" class="select-input" hidden></select></label>
+  </div>
+  <p id="rf-position" class="panel-hint" hidden></p>
+  <div id="rf-form" hidden>
+    <div class="ar-form">
+      <label class="att-span2">Kind<select id="rf-kind" class="select-input">
+        <option value="WITHDRAWAL">Withdrawal: write off unused fee and refund it</option>
+        <option value="OVERPAYMENT">Overpayment: refund the credit balance</option>
+        <option value="OTHER">Other</option>
+      </select></label>
+      <label>Refund (Rs.)<input id="rf-amount" type="number" min="0.01" step="0.01" class="text-input" /></label>
+      <label>Write off (Rs.)<input id="rf-writeoff" type="number" min="0" step="0.01" class="text-input" placeholder="0" /></label>
+      <label class="att-span3">Reason<input id="rf-reason" class="text-input" maxlength="500" placeholder="e.g. Withdrew in week 2; 50% tuition refundable as per policy" /></label>
+      <div class="att-go"><button id="rf-request" class="role-btn" type="button">Send for approval</button></div>
     </div>
-    <p class="cc-meta" id="ov-range"></p>
-    <p class="cc-meta" id="ov-close"></p>
-    <div id="ov-tiles"></div>
-    <div class="chart-grid">
-      <section class="sh-card flat chart-wide"><div class="sh-card-head"><h2>Income and expenses, month by month</h2></div><div id="ov-trend"></div></section>
-      <section class="sh-card flat"><div class="sh-card-head"><h2>Where the money went</h2></div><div id="ov-exp-cat"></div></section>
-      <section class="sh-card flat"><div class="sh-card-head"><h2>Where the money came from</h2></div><div id="ov-inc-cat"></div></section>
-    </div>
-    <h3 class="modal-subhead">Most spent with</h3><div id="ov-vendors" class="auth-list"></div>
-  </section>
-</div>
+  </div>
+  <p id="rf-msg" class="ss-result" role="status" hidden></p>
+</section>
 
-<!-- ============ DAY BOOK ============ -->
-<div class="portal-tab-panel" data-tab-panel="book" hidden>
-  <section class="sh-card">
-    <div class="ann-toolbar"><input id="bk-q" class="text-input" type="search" placeholder="Search description, name or reference&hellip;" aria-label="Search" /><input id="bk-from" class="text-input" type="date" aria-label="From" /><input id="bk-to" class="text-input" type="date" aria-label="To" /></div>
-    <div class="rv-chips" id="bk-kind"><button type="button" class="chip active" data-k="">All</button><button type="button" class="chip" data-k="INCOME">Money in</button><button type="button" class="chip" data-k="EXPENSE">Money out</button></div>
-    <p class="cc-meta" id="bk-totals"></p>
-    <div class="table-scroll"><table class="tk-table"><thead><tr><th>Date</th><th>Reference</th><th>Description</th><th>Category</th><th class="num">In</th><th class="num">Out</th></tr></thead><tbody id="bk-body"></tbody></table></div>
-    <p class="empty-state" id="bk-empty" hidden>Nothing recorded for these dates.</p>
-  </section>
-</div>
-
-<!-- ============ EXPENSES ============ -->
-<div class="portal-tab-panel" data-tab-panel="expenses" hidden>
-  <section class="sh-card">
-    <div class="ann-toolbar"><input id="ex-q" class="text-input" type="search" placeholder="Search title or reference&hellip;" aria-label="Search" /><button type="button" class="role-btn" id="ex-new">+ Record an expense</button></div>
-    <div class="rv-chips" id="ex-status"><button type="button" class="chip active" data-s="">All</button><button type="button" class="chip" data-s="PENDING_APPROVAL">Waiting for approval</button><button type="button" class="chip" data-s="APPROVED">Approved</button><button type="button" class="chip" data-s="REJECTED">Rejected</button><button type="button" class="chip" data-s="VOIDED">Voided</button></div>
-    <p class="panel-hint" id="ex-limit"></p>
-    <div class="table-scroll"><table class="tk-table"><thead><tr><th>Date</th><th>Reference</th><th>Expense</th><th>Category</th><th>Vendor</th><th class="num">Amount</th><th>Status</th></tr></thead><tbody id="ex-body"></tbody></table></div>
-    <p class="empty-state" id="ex-empty" hidden>No expenses here.</p>
-  </section>
-</div>
-
-
-<!-- ============ PURCHASING ============ -->
-<div class="portal-tab-panel" data-tab-panel="purchasing" hidden>
-  <section class="sh-card">
-    <div class="sh-card-head"><h2>Purchase requests</h2></div>
-    <div id="po-tiles"></div>
-    <div class="rv-chips" id="po-status"><button type="button" class="chip active" data-s="">All</button><button type="button" class="chip" data-s="REQUESTED">Waiting for approval</button><button type="button" class="chip" data-s="APPROVED">To order</button><button type="button" class="chip" data-s="ORDERED">On order</button><button type="button" class="chip" data-s="RECEIVED">To pay</button><button type="button" class="chip" data-s="PAID">Paid</button><button type="button" class="chip" data-s="REJECTED">Not approved</button><button type="button" class="chip" data-s="CANCELLED">Cancelled</button></div>
-    <div class="ann-toolbar"><input id="po-q" class="text-input" type="search" placeholder="Search title or invoice number&hellip;" aria-label="Search" /></div>
-    <div class="table-scroll"><table class="tk-table"><thead><tr><th>Request</th><th>Title</th><th>Asked by</th><th class="num">Amount</th><th>Status</th></tr></thead><tbody id="po-body"></tbody></table></div>
-    <p class="empty-state" id="po-empty" hidden>No purchase requests here.</p>
-  </section>
-  <section class="sh-card">
-    <div class="sh-card-head"><h2>My own requests</h2></div>
-    {% include "shared/purchases_content.html" %}
-  </section>
-</div>
-
-<!-- ============ OTHER INCOME ============ -->
-<div class="portal-tab-panel" data-tab-panel="income" hidden>
-  <section class="sh-card">
-    <div class="ann-toolbar"><input id="in-q" class="text-input" type="search" placeholder="Search name or reference&hellip;" aria-label="Search" /><button type="button" class="role-btn" id="in-new">+ Record income</button></div>
-    <p class="panel-hint">Money received other than student fees (those are recorded as students pay their challans): donations, the canteen, rent, hostel and so on.</p>
-    <div class="table-scroll"><table class="tk-table"><thead><tr><th>Date</th><th>Reference</th><th>Received from</th><th>Category</th><th class="num">Amount</th><th></th></tr></thead><tbody id="in-body"></tbody></table></div>
-    <p class="empty-state" id="in-empty" hidden>No income recorded yet.</p>
-  </section>
-</div>
-
-<!-- ============ VENDORS ============ -->
-<div class="portal-tab-panel" data-tab-panel="vendors" hidden>
-  <section class="sh-card">
-    <div class="ann-toolbar"><input id="vn-q" class="text-input" type="search" placeholder="Search vendors&hellip;" aria-label="Search" /><button type="button" class="role-btn" id="vn-new">+ Add a vendor</button></div>
-    <div id="vn-list" class="auth-list"></div><p class="empty-state" id="vn-empty" hidden>No vendors yet.</p>
-  </section>
-</div>
-
-<!-- ============ CATEGORIES ============ -->
-<div class="portal-tab-panel" data-tab-panel="categories" hidden>
-  <section class="sh-card">
-    <p class="panel-hint" id="ct-hint">Categories group expenses and income in the reports. &ldquo;System&rdquo; categories are used automatically (salaries, purchases) and cannot be changed.</p>
-    <div class="chart-grid">
-      <section class="sh-card flat"><div class="sh-card-head"><h2>Expense categories</h2></div><div id="ct-expense" class="auth-list"></div><div class="form-actions ct-add" hidden><input id="ct-new-expense" class="text-input" maxlength="100" placeholder="New expense category" /><button type="button" class="role-btn small-btn" data-add="EXPENSE">Add</button></div></section>
-      <section class="sh-card flat"><div class="sh-card-head"><h2>Income categories</h2></div><div id="ct-income" class="auth-list"></div><div class="form-actions ct-add" hidden><input id="ct-new-income" class="text-input" maxlength="100" placeholder="New income category" /><button type="button" class="role-btn small-btn" data-add="INCOME">Add</button></div></section>
-    </div>
-  </section>
-</div>
-
-<!-- ============ dialogs ============ -->
-<dialog id="ex-modal" class="modal" aria-labelledby="ex-title"><div class="modal-body">
-  <h2 id="ex-title">Record an expense</h2>
-  <form id="ex-form" class="form-grid two-col" novalidate>
-    <div class="form-field two-span"><label for="ex-title-in">What was it for?</label><input id="ex-title-in" class="text-input" maxlength="200" placeholder="e.g. Generator diesel for October" /></div>
-    <div class="form-field"><label for="ex-cat">Category</label><select id="ex-cat" class="select-input"></select></div>
-    <div class="form-field"><label for="ex-vendor">Vendor <small class="field-hint inline">(optional)</small></label><select id="ex-vendor" class="select-input"><option value="">No vendor</option></select></div>
-    <div class="form-field"><label for="ex-amount">Amount (Rs.)</label><input id="ex-amount" class="text-input" type="number" min="0.01" step="0.01" /></div>
-    <div class="form-field"><label for="ex-date">Date</label><input id="ex-date" class="text-input" type="date" /></div>
-    <div class="form-field"><label for="ex-method">Paid by</label><select id="ex-method" class="select-input"><option value="CASH">Cash</option><option value="BANK_TRANSFER">Bank transfer</option><option value="CHEQUE">Cheque</option><option value="ONLINE">Online</option></select></div>
-    <div class="form-field"><label for="ex-ref">Cheque no. / reference <small class="field-hint inline" id="ex-ref-hint">(optional)</small></label><input id="ex-ref" class="text-input" maxlength="80" /></div>
-    <div class="form-field two-span"><label for="ex-desc">Details <small class="field-hint inline">(optional)</small></label><textarea id="ex-desc" class="text-input" rows="2" maxlength="1000"></textarea></div>
-    <div class="form-field two-span"><label for="ex-files">Receipts <small class="field-hint inline">(photos or PDFs, up to 5)</small></label><input id="ex-files" class="text-input" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx" /></div>
-    <p id="ex-error" class="dash-alert error two-span" hidden></p>
-    <div class="form-actions two-span"><button type="button" class="role-btn" id="ex-save">Record the expense</button></div>
-  </form>
-  <button id="ex-close" class="back-link modal-close-btn" type="button">Cancel</button></div></dialog>
-
-<dialog id="ed-modal" class="modal" aria-labelledby="ed-title"><div class="modal-body">
-  <div class="ann-detail-badges" id="ed-badges"></div><h2 id="ed-title"></h2><p class="cc-meta" id="ed-meta"></p>
-  <div id="ed-body"></div><div id="ed-files" class="auth-list"></div>
-  <p id="ed-error" class="dash-alert error" hidden></p>
-  <div class="decision-bar" id="ed-actions"></div>
-  <button id="ed-close" class="back-link modal-close-btn" type="button">Close</button></div></dialog>
-
-<dialog id="in-modal" class="modal" aria-labelledby="in-title"><div class="modal-body">
-  <h2 id="in-title">Record income</h2>
-  <form id="in-form" class="form-grid two-col" novalidate>
-    <div class="form-field two-span"><label for="in-from">Received from</label><input id="in-from" class="text-input" maxlength="150" placeholder="e.g. Haji Bashir, Canteen contractor" /></div>
-    <div class="form-field"><label for="in-cat">Category</label><select id="in-cat" class="select-input"></select></div>
-    <div class="form-field"><label for="in-amount">Amount (Rs.)</label><input id="in-amount" class="text-input" type="number" min="0.01" step="0.01" /></div>
-    <div class="form-field"><label for="in-date">Date</label><input id="in-date" class="text-input" type="date" /></div>
-    <div class="form-field"><label for="in-method">Received by</label><select id="in-method" class="select-input"><option value="CASH">Cash</option><option value="BANK_TRANSFER">Bank transfer</option><option value="CHEQUE">Cheque</option><option value="ONLINE">Online</option></select></div>
-    <div class="form-field two-span"><label for="in-ref">Cheque no. / reference <small class="field-hint inline">(needed for cheques and bank transfers)</small></label><input id="in-ref" class="text-input" maxlength="80" /></div>
-    <div class="form-field two-span"><label for="in-desc">Details <small class="field-hint inline">(optional)</small></label><textarea id="in-desc" class="text-input" rows="2" maxlength="1000"></textarea></div>
-    <p id="in-error" class="dash-alert error two-span" hidden></p>
-    <div class="form-actions two-span"><button type="button" class="role-btn" id="in-save">Record the income</button></div>
-  </form>
-  <button id="in-close" class="back-link modal-close-btn" type="button">Cancel</button></div></dialog>
-
-<dialog id="vn-modal" class="modal" aria-labelledby="vn-title"><div class="modal-body">
-  <h2 id="vn-title">Vendor</h2>
-  <form id="vn-form" class="form-grid two-col" novalidate>
-    <div class="form-field two-span"><label for="vn-name">Name</label><input id="vn-name" class="text-input" maxlength="150" /></div>
-    <div class="form-field"><label for="vn-contact">Contact person</label><input id="vn-contact" class="text-input" maxlength="120" /></div>
-    <div class="form-field"><label for="vn-phone">Phone</label><input id="vn-phone" class="text-input" maxlength="30" /></div>
-    <div class="form-field"><label for="vn-email">Email</label><input id="vn-email" class="text-input" type="email" maxlength="150" /></div>
-    <div class="form-field"><label for="vn-tax">NTN / tax number</label><input id="vn-tax" class="text-input" maxlength="40" /></div>
-    <div class="form-field two-span"><label for="vn-address">Address</label><input id="vn-address" class="text-input" maxlength="300" /></div>
-    <p id="vn-error" class="dash-alert error two-span" hidden></p>
-    <div class="form-actions two-span"><button type="button" class="role-btn" id="vn-save">Save</button></div>
-  </form>
-  <button id="vn-close" class="back-link modal-close-btn" type="button">Cancel</button></div></dialog>
-
-
-<dialog id="po-modal" class="modal modal-wide" aria-labelledby="po-title"><div class="modal-body">
-  <div class="ann-detail-badges" id="po-badges"></div><h2 id="po-title"></h2><p class="cc-meta" id="po-meta"></p>
-  <div id="po-steps"></div><div id="po-text"></div>
-  <div class="table-scroll"><table class="tk-table"><thead><tr><th>Item</th><th>Qty</th><th>Estimated</th><th>Received</th><th>Actual</th></tr></thead><tbody id="po-items"></tbody></table></div>
-  <p id="po-error" class="dash-alert error" hidden></p>
-  <div class="decision-bar" id="po-actions"></div>
-  <button id="po-close" class="back-link modal-close-btn" type="button">Close</button></div></dialog>
-
-<dialog id="po-order" class="modal" aria-labelledby="po-order-title"><div class="modal-body">
-  <h2 id="po-order-title">Place the order</h2><p class="cc-meta" id="po-order-for"></p>
-  <div class="form-field"><label for="po-order-vendor">Vendor</label><select id="po-order-vendor" class="select-input"></select></div>
-  <div class="form-field"><label for="po-order-date">Expected delivery <small class="field-hint inline">(optional)</small></label><input id="po-order-date" class="text-input" type="date" /></div>
-  <div class="form-field"><label for="po-order-note">Note <small class="field-hint inline">(optional)</small></label><input id="po-order-note" class="text-input" maxlength="500" /></div>
-  <p id="po-order-error" class="dash-alert error" hidden></p>
-  <div class="form-actions"><button type="button" class="role-btn" id="po-order-ok">Mark as ordered</button></div>
-  <button id="po-order-cancel" class="back-link modal-close-btn" type="button">Cancel</button></div></dialog>
-
-<dialog id="po-recv" class="modal modal-wide" aria-labelledby="po-recv-title"><div class="modal-body">
-  <h2 id="po-recv-title">Goods received</h2><p class="cc-meta">Enter what actually arrived and the price actually charged. An item that did not come: put 0.</p>
-  <div class="form-field"><label for="po-recv-inv">Invoice / bill number</label><input id="po-recv-inv" class="text-input" maxlength="80" /></div>
-  <div class="table-scroll"><table class="tk-table pr-items"><thead><tr><th>Item</th><th>Ordered</th><th>Received</th><th>Price each (Rs.)</th><th>Total</th></tr></thead><tbody id="po-recv-body"></tbody></table></div>
-  <p class="cc-meta">Total to pay the vendor: <b id="po-recv-total">Rs. 0</b></p>
-  <p id="po-recv-error" class="dash-alert error" hidden></p>
-  <div class="form-actions"><button type="button" class="role-btn" id="po-recv-ok">Record what arrived</button></div>
-  <button id="po-recv-cancel" class="back-link modal-close-btn" type="button">Cancel</button></div></dialog>
-
-<dialog id="po-pay" class="modal" aria-labelledby="po-pay-title"><div class="modal-body">
-  <h2 id="po-pay-title">Pay the vendor</h2><p class="cc-meta" id="po-pay-for"></p>
-  <div class="form-field"><label for="po-pay-method">Paid by</label><select id="po-pay-method" class="select-input"><option value="CASH">Cash</option><option value="BANK_TRANSFER">Bank transfer</option><option value="CHEQUE">Cheque</option><option value="ONLINE">Online</option></select></div>
-  <div class="form-field"><label for="po-pay-ref">Cheque no. / reference <small class="field-hint inline">(needed for cheques and bank transfers)</small></label><input id="po-pay-ref" class="text-input" maxlength="80" /></div>
-  <div class="form-field"><label for="po-pay-date">Date paid</label><input id="po-pay-date" class="text-input" type="date" /></div>
-  <div class="form-field"><label for="po-pay-files">Invoice / receipt <small class="field-hint inline">(optional, up to 5)</small></label><input id="po-pay-files" class="text-input" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx" /></div>
-  <p class="panel-hint">Paying records this as an expense in the books.</p>
-  <p id="po-pay-error" class="dash-alert error" hidden></p>
-  <div class="form-actions"><button type="button" class="role-btn" id="po-pay-ok">Record the payment</button></div>
-  <button id="po-pay-cancel" class="back-link modal-close-btn" type="button">Cancel</button></div></dialog>
-
-<dialog id="fn-ask" class="modal" aria-labelledby="fn-ask-title"><div class="modal-body">
-  <h2 id="fn-ask-title"></h2><p class="cc-meta" id="fn-ask-intro"></p>
-  <div class="form-field"><label for="fn-ask-text">Reason (kept on record)</label><textarea id="fn-ask-text" class="text-input" rows="3" maxlength="500"></textarea></div>
-  <p id="fn-ask-error" class="dash-alert error" hidden></p>
-  <div class="form-actions"><button type="button" class="role-btn" id="fn-ask-ok">OK</button></div>
-  <button id="fn-ask-cancel" class="back-link modal-close-btn" type="button">Cancel</button></div></dialog>
+<section class="panel">
+  <div class="panel-header">
+    <div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("tasks") }}</div><h2>Refunds</h2></div>
+    <select id="rf-filter" class="select-input rf-filter" aria-label="Show">
+      <option value="">All</option><option value="REQUESTED" selected>Waiting for approval</option><option value="APPROVED">Approved, to pay out</option>
+      <option value="PAID">Paid</option><option value="REJECTED">Rejected</option>
+    </select>
+  </div>
+  <table class="dash-table" id="rf-table"><thead><tr><th>Payer</th><th>Fee</th><th class="num">Refund</th><th class="num">Write-off</th><th>Reason</th><th>Status</th><th class="crs-actions"></th></tr></thead><tbody id="rf-tbody"></tbody></table>
+</section>
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="/static/js/charts.js"></script>
-<script src="/static/js/finance.js"></script>
-<script src="/static/js/purchases-staff.js"></script>
+<script src="/static/js/refunds.js"></script>
 {% endblock %}

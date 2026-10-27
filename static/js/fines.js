@@ -40,8 +40,12 @@
   let pendingResolve = null; // { fineId, kind: "mark-paid" | "waive" }
 
   function money(n) {
-    return Number(n).toFixed(2);
+    return VA.formatMoney(n);
   }
+  const SOURCE = { LIBRARY: "Library", DISCIPLINARY: "Disciplinary", FEE_LATE_PAYMENT: "Late fee", ATTENDANCE: "Attendance",
+                   GATE: "Gate (late)", INVENTORY: "Store", HOSTEL: "Hostel", OTHER: "Other" };
+  const STATUS = { PENDING: "Unpaid", PAID: "Paid", WAIVED: "Waived" };
+  let allFines = [];
 
   function extractErrorMessage(body, fallback) {
     if (body && body.error && body.error.message) return body.error.message;
@@ -49,7 +53,7 @@
   }
 
   function statusPillHtml(status) {
-    return '<span class="status-pill ' + (status || "").toLowerCase() + '">' + VA.escapeHtml(status) + "</span>";
+    return '<span class="status-pill ' + (status || "").toLowerCase() + '">' + VA.escapeHtml(STATUS[status] || status) + "</span>";
   }
 
   async function loadFines() {
@@ -65,8 +69,24 @@
     }
     VA.clearError();
 
-    const items = result.body;
+    allFines = result.body;
+    renderFines();
+  }
+
+  // Search works on the loaded list (the filters above it ask the server).
+  function renderFines() {
+    const q = (document.getElementById("fines-q").value || "").trim().toLowerCase();
+    const items = allFines.filter(function (f) {
+      return !q || [f.payer_name, f.payer_identifier, f.reason, f.receipt_number].join(" ").toLowerCase().indexOf(q) !== -1;
+    });
+    const total = items.reduce(function (n, f) { return n + Number(f.amount || 0); }, 0);
+    const people = new Set(items.map(function (f) { return f.payer_type + ":" + (f.payer_identifier || f.payer_name); })).size;
+    document.getElementById("fines-summary").innerHTML = items.length
+      ? '<span class="crs-chip"><b>' + items.length + "</b> fine" + (items.length === 1 ? "" : "s") + "</span>" +
+        '<span class="crs-chip"><b>' + VA.escapeHtml(money(total)) + "</b> in total</span>" +
+        '<span class="crs-chip"><b>' + people + "</b> " + (people === 1 ? "person" : "people") + "</span>" : "";
     tbody.innerHTML = "";
+    document.getElementById("fines-table").hidden = items.length === 0;
     if (items.length === 0) {
       emptyState.hidden = false;
       return;
@@ -75,16 +95,16 @@
 
     items.forEach(function (f) {
       const tr = document.createElement("tr");
-      const payerLabel = f.payer_name + (f.payer_identifier ? " (" + f.payer_identifier + ")" : "") + " \u00b7 " + f.payer_type;
+      const payerLabel = f.payer_name + (f.payer_identifier ? " (" + f.payer_identifier + ")" : "");
       tr.innerHTML =
-        "<td>" + VA.escapeHtml(payerLabel) + "</td>" +
-        "<td>" + money(f.amount) + "</td>" +
-        "<td>" + VA.escapeHtml(f.reason) + "</td>" +
-        "<td>" + VA.escapeHtml(f.source) + "</td>" +
+        '<td><span class="vl-c"><strong>' + VA.escapeHtml(f.payer_name) + '</strong><small class="fn-sub">' + VA.escapeHtml([f.payer_identifier, f.payer_type === "STUDENT" ? "Student" : "Staff"].filter(Boolean).join(" \u00b7 ")) + "</small></span></td>" +
+        '<td class="num"><strong>' + VA.escapeHtml(money(f.amount)) + "</strong></td>" +
+        '<td class="fn-reason">' + VA.escapeHtml(f.reason) + "</td>" +
+        '<td><span class="crs-chip">' + VA.escapeHtml(SOURCE[f.source] || f.source) + "</span></td>" +
         "<td>" + VA.formatDateTime(f.issued_at) + "</td>" +
         "<td>" + statusPillHtml(f.status) +
-          (f.receipt_number ? '<br><a href="/api/v1/fines/' + encodeURIComponent(f.id) + '/receipt.pdf" target="_blank" rel="noopener">Receipt ' + VA.escapeHtml(f.receipt_number) + "</a>" : "") + "</td>" +
-        '<td class="row-actions"></td>';
+          (f.receipt_number ? '<small class="fn-sub"><a href="/api/v1/fines/' + encodeURIComponent(f.id) + '/receipt.pdf" target="_blank" rel="noopener">Receipt ' + VA.escapeHtml(f.receipt_number) + "</a></small>" : "") + "</td>" +
+        '<td class="row-actions crs-actions"></td>';
 
       if (f.status === "PENDING" && (canManage || canWaive)) {
         const actionsCell = tr.querySelector(".row-actions");
@@ -93,7 +113,7 @@
           const payBtn = document.createElement("button");
           payBtn.className = "role-btn small-btn";
           payBtn.type = "button";
-          payBtn.textContent = "Mark Paid";
+          payBtn.textContent = "Mark paid";
           payBtn.addEventListener("click", function () {
             openResolveModal(f.id, "mark-paid", payerLabel + " \u2014 " + money(f.amount) + " (" + f.reason + ")");
           });
@@ -102,7 +122,7 @@
 
         if (canWaive) {
           const waiveBtn = document.createElement("button");
-          waiveBtn.className = "danger-btn small-btn";
+          waiveBtn.className = "sd-view tt-del";
           waiveBtn.type = "button";
           waiveBtn.textContent = "Waive";
           waiveBtn.addEventListener("click", function () {
@@ -264,6 +284,7 @@
   filterPayerType.addEventListener("change", loadFines);
   filterStatus.addEventListener("change", loadFines);
   filterSource.addEventListener("change", loadFines);
+  document.getElementById("fines-q").addEventListener("input", renderFines);
 
   document.addEventListener("vistadmin:ready", function (event) {
     const me = event.detail && event.detail.me;
