@@ -41,6 +41,7 @@ class TestNoLedgerActivity:
             "total_payable": 0,
             "total_remaining": 0,
             "total_paid": 0,
+            "credit": 0,
             "overdue_principal": 0,
             "accrued_fine": 0,
             "total_due_now": 0,
