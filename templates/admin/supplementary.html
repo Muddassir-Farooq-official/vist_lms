@@ -6,23 +6,25 @@
 
 {% block content %}
 <section class="panel">
-  <div class="upload-row">
-    <select id="sp-term" class="select-input term-select" aria-label="Term"><option value="">Select a term&hellip;</option></select>
-    <button id="sp-load" class="role-btn" type="button">Show</button>
+  <div class="sp-bar">
+    <div class="ar-form"><label>Term<select id="sp-term" class="select-input term-select"><option value="">Select a term&hellip;</option></select></label></div>
+    <div class="crs-chips" id="sp-summary"></div>
   </div>
-  <p id="sp-msg" class="panel-hint" hidden></p>
+  <p id="sp-msg" class="ss-result" role="status" hidden></p>
 </section>
 
 <section class="panel" id="sp-eligible-panel" hidden>
-  <h2>Can sit a supplementary</h2>
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("exams") }}</div><h2>Can sit a supplementary</h2></div></div>
+  <p class="panel-hint">Failed on marks this term and not yet registered. Tick the students, then register them.</p>
   <table class="dash-table"><thead><tr><th><input type="checkbox" id="sp-all" aria-label="Select all" /></th><th>Roll no.</th><th>Student</th><th>Course</th><th class="num">Result</th></tr></thead><tbody id="sp-eligible"></tbody></table>
-  <div class="form-actions"><button id="sp-register" class="role-btn" type="button">Register selected</button></div>
+  <div class="sp-foot"><button id="sp-register" class="role-btn" type="button">Register selected</button><span class="sd-dim" id="sp-picked"></span></div>
 </section>
 
 <section class="panel" id="sp-attempts-panel" hidden>
-  <h2>Registered</h2>
-  <table class="dash-table"><thead><tr><th>Roll no.</th><th>Course</th><th>Paper</th><th>Marks</th><th>Absent</th><th>Status / result</th><th></th></tr></thead><tbody id="sp-attempts"></tbody></table>
-  <div class="form-actions"><button id="sp-publish" class="role-btn" type="button">Publish all marked results</button></div>
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("tasks") }}</div><h2>Registered</h2></div></div>
+  <p class="panel-hint">Enter each student's mark (or tick Absent) and Save. Nothing changes on their record until you publish.</p>
+  <table class="dash-table"><thead><tr><th>Roll no.</th><th>Course</th><th>Paper</th><th>Marks</th><th>Absent</th><th>Status / result</th><th class="crs-actions"></th></tr></thead><tbody id="sp-attempts"></tbody></table>
+  <div class="sp-foot"><button id="sp-publish" class="role-btn" type="button">Publish all marked results</button></div>
 </section>
 {% endblock %}
 

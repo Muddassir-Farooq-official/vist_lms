@@ -1,0 +1,174 @@
+{#- One employee's record in a dialog (admin Employees page). Filled by static/js/employees.js; styles shared with the student record (.ss). -#}
+{% from "_icons.html" import nav_icon %}
+<dialog id="employee-sheet" class="ss" aria-labelledby="es-name">
+  <div class="ss-shell">
+    <header class="ss-head">
+      <div class="ss-avatar-wrap">
+        <button type="button" class="ss-avatar is-editable" id="es-avatar" aria-label="Change photo" title="Click to upload or replace the photo">
+          <img id="es-photo" alt="" hidden /><span id="es-initials" aria-hidden="true"></span>
+          <span class="ss-avatar-cam" aria-hidden="true">{{ nav_icon("camera") }}</span>
+        </button>
+        <input type="file" id="es-photo-input" accept="image/jpeg,image/png,image/webp" hidden />
+        <div class="ss-avatar-tools">
+          <label for="es-photo-input" class="ss-mini-btn" title="Upload or replace photo" aria-label="Upload or replace photo">{{ nav_icon("camera") }}</label>
+          <a href="#" class="ss-mini-btn" id="es-photo-dl" data-download="photo.jpg" data-label="Photo" title="Download photo" aria-label="Download photo" hidden>{{ nav_icon("download") }}</a>
+          <button type="button" class="ss-mini-btn danger" id="es-photo-rm" title="Remove photo" aria-label="Remove photo" hidden>{{ nav_icon("trash") }}</button>
+        </div>
+      </div>
+      <div class="ss-title">
+        <h2 id="es-name">Loading&hellip;</h2>
+        <p class="ss-sub" id="es-sub"></p>
+        <div class="ss-chips" id="es-chips"></div>
+      </div>
+      <div class="ss-head-actions">
+        <button type="button" class="ss-icon-btn" id="records-btn" title="Documents, certificates &amp; clearance" aria-label="Documents, certificates and clearance">{{ nav_icon("folder") }}</button>
+        <button type="button" class="ss-icon-btn ss-close" id="es-close" title="Close" aria-label="Close">{{ nav_icon("close") }}</button>
+      </div>
+    </header>
+    <p class="ss-photo-msg" id="es-photo-msg" role="status" hidden></p>
+
+    <nav class="ss-tabs" role="tablist" aria-label="Employee record">
+      <button type="button" class="ss-tab active" role="tab" aria-selected="true" data-ss-tab="overview">Overview</button>
+      <button type="button" class="ss-tab" role="tab" aria-selected="false" data-ss-tab="pay">Pay &amp; bonuses</button>
+      <button type="button" class="ss-tab" role="tab" aria-selected="false" data-ss-tab="quals">Qualifications <span class="ss-count" id="es-qual-count"></span></button>
+      <button type="button" class="ss-tab" role="tab" aria-selected="false" data-ss-tab="edit">Edit details</button>
+      <button type="button" class="ss-tab" role="tab" aria-selected="false" data-ss-tab="account">Job, status &amp; access</button>
+    </nav>
+
+    <div class="ss-body">
+      <p class="dash-alert error" id="modal-error" hidden></p>
+      <p class="ss-result" id="modal-success" hidden></p>
+
+      <section class="ss-panel" data-ss-panel="overview">
+        <div class="ss-kpis" id="es-kpis"></div>
+        <div class="ss-groups">
+          <section class="ss-group"><h3>Employment</h3><dl id="es-employment"></dl></section>
+          <section class="ss-group"><h3>Personal</h3><dl id="es-personal"></dl></section>
+          <section class="ss-group ss-group--wide"><h3>Contact &amp; address</h3><dl id="es-contact"></dl></section>
+          <section class="ss-group ss-group--wide" id="es-teaching-box" hidden><h3>Teaching</h3><dl id="es-teaching"></dl></section>
+        </div>
+      </section>
+
+      <section class="ss-panel" data-ss-panel="pay" hidden>
+        <div class="ss-blocks">
+          <section class="ss-block">
+            <h3>Salary</h3>
+            <p class="ss-hint">Basic salary now, and every change with its date.</p>
+            <ul class="ss-timeline" id="salary-history-tbody"></ul>
+            <div class="ss-inline ss-gap">
+              <select id="increment-type" class="select-input" aria-label="Increase by">
+                <option value="FIXED_AMOUNT">Increase by amount</option>
+                <option value="PERCENTAGE">Increase by %</option>
+              </select>
+              <input type="number" id="increment-value" class="text-input" placeholder="Amount or %" step="0.01" min="0.01" aria-label="Increase" />
+              <input type="text" id="increment-reason" class="text-input" placeholder="Reason (optional)" aria-label="Reason" />
+              <button id="apply-increment-btn" class="role-btn" type="button">Apply</button>
+            </div>
+          </section>
+          <section class="ss-block">
+            <h3>Bonuses</h3>
+            <p class="ss-hint">Added to the next payroll automatically and shown on the payslip.</p>
+            <ul class="ss-timeline" id="bonuses-tbody"></ul>
+            <div class="ss-inline ss-gap">
+              <input type="number" id="bonus-amount" class="text-input" placeholder="Amount (Rs.)" step="0.01" min="0.01" aria-label="Bonus amount" />
+              <input type="text" id="bonus-reason" class="text-input" placeholder="Reason, e.g. Best results this term" aria-label="Bonus reason" />
+              <button id="award-bonus-btn" class="role-btn" type="button">Give bonus</button>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="ss-panel" data-ss-panel="quals" hidden>
+        <div class="ss-cards" id="es-quals"></div>
+      </section>
+
+      <section class="ss-panel" data-ss-panel="edit" hidden>
+        <form id="edit-employee-form" class="ss-form" novalidate>
+          <fieldset><legend>Personal</legend>
+            <div class="ss-fields">
+              <label>First name<input type="text" id="ee-first-name" class="text-input" maxlength="100" /></label>
+              <label>Last name<input type="text" id="ee-last-name" class="text-input" maxlength="100" /></label>
+              <label>Date of birth<input type="date" id="ee-dob" class="text-input" /></label>
+              <label>Gender<select id="ee-gender" class="select-input"><option>Male</option><option>Female</option><option>Other</option></select></label>
+              <label>Marital status<select id="ee-marital" class="select-input"><option value="">Not set</option><option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option></select></label>
+              <label>Religion<select id="ee-religion" class="select-input"></select></label>
+              <label>Blood group<select id="ee-blood-group" class="select-input"><option value="">Unknown</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></label>
+            </div>
+          </fieldset>
+          <fieldset><legend>Contact &amp; address</legend>
+            <div class="ss-fields">
+              <label>Mobile number<input type="tel" id="ee-contact" class="text-input" placeholder="03XXXXXXXXX" /></label>
+              <label>Email<input type="email" id="ee-email" class="text-input" maxlength="255" /></label>
+              <label>Emergency contact name<input type="text" id="ee-emergency-name" class="text-input" maxlength="150" /></label>
+              <label>Emergency contact phone<input type="tel" id="ee-emergency-no" class="text-input" placeholder="03XXXXXXXXX" /></label>
+              <label class="span-2">Address<input type="text" id="ee-address" class="text-input" maxlength="255" /></label>
+              <label>Province<select id="ee-province" class="select-input"></select></label>
+              <label>District<select id="ee-district" class="select-input"></select></label>
+              <label>City<select id="ee-city" class="select-input"></select></label>
+            </div>
+          </fieldset>
+          <fieldset><legend>Job &amp; salary account</legend>
+            <div class="ss-fields">
+              <label>Department<input type="text" id="ee-department" class="text-input" /></label>
+              <label>Hire date<input type="date" id="ee-hire-date" class="text-input" /></label>
+              <label>Employment type<select id="ee-employment-type" class="select-input"><option value="">Not set</option><option value="PERMANENT">Permanent</option><option value="CONTRACT">Contract</option><option value="VISITING">Visiting</option><option value="PART_TIME">Part time</option></select></label>
+              <label>Bank<input type="text" id="ee-bank" class="text-input" maxlength="100" /></label>
+              <label>Account title<input type="text" id="ee-bank-title" class="text-input" maxlength="150" /></label>
+              <label>IBAN / account number<input type="text" id="ee-iban" class="text-input" maxlength="40" /></label>
+            </div>
+          </fieldset>
+          <div class="ss-form-foot">
+            <span class="ss-saved" id="edit-employee-success" hidden></span>
+            <button type="submit" class="role-btn" id="edit-employee-submit">Save changes</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="ss-panel" data-ss-panel="account" hidden>
+        <div class="ss-blocks">
+          <section class="ss-block">
+            <h3>Job title</h3>
+            <p class="ss-hint">Promotion or transfer. Their portal and access change with it, and they sign in again.</p>
+            <div class="ss-inline">
+              <select id="change-job-role" class="select-input" aria-label="Job title"></select>
+              <input type="text" id="change-job-role-reason" class="text-input" placeholder="Reason (optional)" aria-label="Reason" />
+              <button id="change-job-role-btn" class="role-btn" type="button">Change</button>
+            </div>
+          </section>
+
+          <section class="ss-block">
+            <h3>Status</h3>
+            <p class="ss-hint">Leaving locks their login. Check clearance first: courses, library books, fines and fees.</p>
+            <div class="ss-inline">
+              <select id="new-status" class="select-input" aria-label="New status">
+                <option value="ACTIVE">Active</option><option value="ON_LEAVE">On leave</option><option value="TERMINATED">Left (terminated)</option>
+              </select>
+              <button id="save-status" class="role-btn" type="button">Update</button>
+              <button id="clearance-btn" class="role-btn secondary-btn" type="button">Check clearance</button>
+            </div>
+            <div id="clearance-result" class="ss-result ss-result--plain" hidden></div>
+          </section>
+
+          <section class="ss-block" id="access-roles-box" hidden>
+            <h3>Extra access</h3>
+            <p class="ss-hint">On top of the job title, for example a teacher who is also the Exam Controller. They are signed out and get it at their next sign-in.</p>
+            <div id="access-roles-list" class="ss-checks"></div>
+            <button id="access-roles-save" class="role-btn secondary-btn" type="button">Save access</button>
+            <p id="access-roles-msg" class="ss-hint" hidden></p>
+          </section>
+
+          <section class="ss-block">
+            <h3>Sign-in password</h3>
+            <p class="ss-hint">Set a new password; they must change it at the next sign-in.</p>
+            <div class="ss-inline">
+              <input type="password" id="new-employee-password" class="text-input" placeholder="New password (10+ characters)" autocomplete="new-password" aria-label="New password" />
+              <button id="reset-employee-password-btn" class="role-btn secondary-btn" type="button">Set password</button>
+            </div>
+            <p class="ss-result" id="reset-employee-password-confirm" hidden>Password updated.</p>
+            <p id="reset-employee-password-error" class="dash-alert error" hidden></p>
+          </section>
+        </div>
+      </section>
+    </div>
+  </div>
+</dialog>

@@ -33,6 +33,7 @@ from app.auth.router import router as auth_router
 from app.auth.view_as import READ_ONLY_ALLOWED, read_only_reason
 from app.auth.view_as import router as view_as_router
 from app.selfservice.router import router as profile_changes_router
+from app.performance.router import router as performance_router
 from app.announcements.router import router as announcements_router
 from app.applications.router import router as applications_router
 from app.tasks.router import router as tasks_router
@@ -537,6 +538,7 @@ app.include_router(branding_public_router)
 app.include_router(view_as_router, prefix=settings.api_v1_prefix)
 app.include_router(activity_router, prefix=settings.api_v1_prefix)
 app.include_router(profile_changes_router, prefix=settings.api_v1_prefix)
+app.include_router(performance_router, prefix=settings.api_v1_prefix)
 app.include_router(admissions_router, prefix=settings.api_v1_prefix)
 app.include_router(parents_router, prefix=settings.api_v1_prefix)
 app.include_router(audit_router, prefix=settings.api_v1_prefix)

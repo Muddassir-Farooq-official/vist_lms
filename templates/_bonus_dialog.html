@@ -1,0 +1,16 @@
+{#- "Give a bonus" from the performance scorecard (admin dashboard and Employees → Performance). Used by static/js/performance.js. -#}
+<dialog id="pf-bonus" class="modal" aria-labelledby="pf-bonus-h">
+  <form class="modal-body" id="pf-bonus-form" method="dialog" novalidate>
+    <h2 id="pf-bonus-h">Give a bonus</h2>
+    <p class="panel-hint" id="pf-bonus-who"></p>
+    <div class="form-field"><label for="pf-bonus-amount">Amount (Rs.)</label>
+      <input id="pf-bonus-amount" class="text-input" type="number" min="1" step="1" required /></div>
+    <div class="pf-quick" id="pf-bonus-quick"></div>
+    <div class="form-field"><label for="pf-bonus-reason">Reason (shown on the payslip)</label>
+      <input id="pf-bonus-reason" class="text-input" maxlength="255" required /></div>
+    <p class="panel-hint">It is added to the next payroll automatically.</p>
+    <p class="dash-alert error" id="pf-bonus-error" hidden></p>
+    <div class="form-actions"><button type="submit" class="role-btn" id="pf-bonus-go">Give bonus</button></div>
+    <button type="button" class="modal-close-btn" id="pf-bonus-close">Cancel</button>
+  </form>
+</dialog>

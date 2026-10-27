@@ -4,6 +4,16 @@
   <p class="empty-state" id="ps-empty" hidden>No payslips yet. They appear here after each month's salary is paid.</p>
 </section>
 
+<section class="sh-card sec-card" id="my-security" hidden aria-labelledby="sec-h">
+  <div class="sec-head">
+    <div><h2 class="panel-title" id="sec-h">My security deposit</h2>
+      <p class="panel-hint" id="sec-hint"></p></div>
+    <div class="ring" id="sec-ring" aria-hidden="true"><span id="sec-ring-val">&mdash;</span></div>
+  </div>
+  <div class="kpi-grid kpi-grid-4" id="sec-kpis"></div>
+  <details class="sec-more" id="sec-months-wrap" hidden><summary>Month by month</summary><ul class="sec-months" id="sec-months"></ul></details>
+</section>
+
 <dialog id="pv-modal" class="modal" aria-labelledby="pv-title"><div class="modal-body">
   <h2 id="pv-title"></h2><p class="cc-meta" id="pv-meta"></p>
   <div class="chart-grid">
@@ -27,4 +37,3 @@
   </div>
   <p class="empty-state" id="ma-empty" hidden>No attendance has been recorded for you this month.</p>
 </section>
-

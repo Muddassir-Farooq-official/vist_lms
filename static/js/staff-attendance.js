@@ -11,7 +11,7 @@
   const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const ymd = function (d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
   const human = function (m) { const h = Math.floor(m / 60); return h ? h + " h " + (m % 60) + " min" : m + " min"; };
-  let canManage = false, canView = false, today = null, timer = null, timingTarget = null, dayTarget = null, monthCache = null;
+  let canManage = false, canMark = false, canView = false, today = null, timer = null, timingTarget = null, dayTarget = null, monthCache = null;
 
   // ------------------------------------------------------------------ daily board
   function stateCell(p) {
@@ -45,7 +45,7 @@
         "<td><b>" + esc(d && d.check_in || "—") + "</b></td><td><b>" + esc(d && d.check_out || "—") + "</b></td><td>" + stateCell(x) + '</td><td class="row-actions"></td>';
       const cell = tr.querySelector(".row-actions");
       const add = function (label, cls, fn) { const b = document.createElement("button"); b.type = "button"; b.className = "role-btn small-btn " + (cls || ""); b.textContent = label; b.addEventListener("click", fn); cell.appendChild(b); };
-      if (isToday && !(d && d.excused)) {
+      if (canMark && isToday && !(d && d.excused)) {
         if (!d || !d.check_in) add("In", "", function () { mark(x, "IN"); });
         else if (!d.check_out) add("Out", "", function () { mark(x, "OUT"); });
         if (d && d.check_in) add("Undo", "secondary-btn", function () { undo(x); });
@@ -266,6 +266,7 @@
   document.addEventListener("vistadmin:ready", function (event) {
     const perms = (event.detail && event.detail.me && event.detail.me.permissions) || [];
     canManage = perms.indexOf("staff_attendance.manage") !== -1;
+    canMark = perms.indexOf("staff_attendance.mark") !== -1;      // the principal can look but not mark (the API would refuse)
     canView = perms.indexOf("staff_attendance.view") !== -1;
     document.querySelectorAll("[data-manage-only]").forEach(function (el) { el.hidden = !canManage; });
     if ($("sb-day") && canView) { $("sb-day").hidden = false; }

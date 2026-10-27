@@ -695,8 +695,11 @@
   moreMenu.addEventListener("click", function (e) { if (e.target.closest("[role=menuitem]")) moreMenu.open = false; });
   document.addEventListener("click", function (e) { if (moreMenu.open && !moreMenu.contains(e.target)) moreMenu.open = false; });
 
-  document.addEventListener("vistadmin:ready", function () {
-    ensureProgramsLoaded();
+  document.addEventListener("vistadmin:ready", async function () {
+    await ensureProgramsLoaded();
+    // Opened from Programs ("Students" on a program card): filter to that program.
+    const wanted = new URLSearchParams(location.search).get("program");
+    if (wanted && programsCache.some(function (p) { return p.id === wanted; })) { programFilter.value = wanted; syncExportLink(); }
     loadStudents();
   });
 })();

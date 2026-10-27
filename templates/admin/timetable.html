@@ -24,33 +24,27 @@
     </div>
   </div>
   <p class="panel-hint">Define the institute's fixed daily period structure once — e.g. Period 1: 08:00&ndash;08:50. Every timetable slot (manual or auto-assigned) picks from these instead of typing arbitrary times.</p>
-  <table class="dash-table" id="periods-table">
-    <thead><tr><th>Period</th><th>Time</th><th></th></tr></thead>
+  <table class="dash-table tt-periods" id="periods-table">
+    <thead><tr><th>Period</th><th>Time</th><th>Length</th><th class="crs-actions"></th></tr></thead>
     <tbody id="periods-tbody"></tbody>
   </table>
   <p class="empty-state" id="periods-empty" hidden>No periods defined yet.</p>
-  <form id="add-period-form" class="form-grid two-col">
-    <div class="form-field"><label for="period-number">Period Number</label><input type="number" id="period-number" class="text-input" min="1" required /></div>
-    <div class="form-field"></div>
-    <div class="form-field"><label for="period-start">Start Time</label><input type="time" id="period-start" class="text-input" required /></div>
-    <div class="form-field"><label for="period-end">End Time</label><input type="time" id="period-end" class="text-input" required /></div>
-    <div class="form-actions two-span"><button type="submit" class="role-btn" id="add-period-submit">Add Period</button></div>
+  <h3 class="tt-sub">Add a period</h3>
+  <form id="add-period-form" class="ar-form">
+    <label>Period number<input type="number" id="period-number" class="text-input" min="1" required /></label>
+    <label>Starts<input type="time" id="period-start" class="text-input" required /></label>
+    <label>Ends<input type="time" id="period-end" class="text-input" required /></label>
+    <div class="att-go"><button type="submit" class="role-btn" id="add-period-submit">Add period</button></div>
   </form>
   <p id="add-period-error" class="dash-alert error" hidden></p>
 </section>
 </div>
 
 <div class="portal-tab-panel" data-tab-panel="slots" hidden>
-<section class="panel">
-  <div class="panel-header">
-    <div class="panel-header-left">
-      <div class="panel-icon-badge">{{ nav_icon("dashboard") }}</div>
-      <h2>Institute Timetable</h2>
-    </div>
-  </div>
-  <p class="panel-hint">Every recurring weekly slot across every course offering, in one list — use this to spot a free room or a teacher's full week at a glance. To add or remove a slot, open that course from the Courses page.</p>
-  <div class="toolbar">
-    <select id="timetable-day-filter" class="select-input">
+<section class="panel sd-panel">
+  <div class="sd-toolbar">
+    <label class="sd-search">{{ nav_icon("search") }}<input type="search" id="timetable-room-filter" placeholder="Search room, course or teacher" aria-label="Search slots" /></label>
+    <select id="timetable-day-filter" class="select-input" aria-label="Day">
       <option value="">All days</option>
       <option value="MONDAY">Monday</option>
       <option value="TUESDAY">Tuesday</option>
@@ -60,13 +54,13 @@
       <option value="SATURDAY">Saturday</option>
       <option value="SUNDAY">Sunday</option>
     </select>
-    <input type="text" id="timetable-room-filter" class="text-input" placeholder="Filter by room..." />
+    <span class="sd-dim tt-count" id="institute-timetable-count"></span>
   </div>
   <table class="dash-table" id="institute-timetable-table">
     <thead><tr><th>Day</th><th>Time</th><th>Course</th><th>Term</th><th>Teacher</th><th>Room</th></tr></thead>
     <tbody id="institute-timetable-tbody"></tbody>
   </table>
-  <p class="empty-state" id="institute-timetable-empty" hidden>No timetable slots exist yet.</p>
+  <p class="empty-state" id="institute-timetable-empty" hidden>No slots match. To add a slot, open the course from the Courses page.</p>
 </section>
 </div>
 {% endblock %}

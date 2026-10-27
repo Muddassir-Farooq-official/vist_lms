@@ -608,6 +608,14 @@ window.VistAdmin = (function () {
     document.querySelectorAll("table.dash-table").forEach(function (table) {
       if (table.dataset.enhanced) return;
       table.dataset.enhanced = "1";
+      // A table fills its panel; when it is wider than the screen it scrolls inside this wrapper, not the whole page.
+      const holder = table.parentElement;
+      if (holder && !holder.matches(".dt-scroll, .table-scroll, .table-wrap, .sd-table-wrap, .stat-table-wrap")) {
+        const wrap = document.createElement("div");
+        wrap.className = "dt-scroll";
+        holder.insertBefore(wrap, table);
+        wrap.appendChild(table);
+      }
       const heads = Array.prototype.map.call(table.querySelectorAll("thead th"), function (th) { return th.textContent.trim(); });
       if (heads.length >= 4 && !table.classList.contains("no-stack")) table.classList.add("stackable");
       const label = function (row) {
@@ -1052,6 +1060,13 @@ window.VistAdmin = (function () {
     wireTaskBadge(me);
     wireAutoTabs();
     enhanceTables();
+    // Tables drawn later by a page's script (inside cards and dialogs) get the same treatment.
+    let tablesQueued = false;
+    new MutationObserver(function () {
+      if (tablesQueued) return;
+      tablesQueued = true;
+      requestAnimationFrame(function () { tablesQueued = false; enhanceTables(); });
+    }).observe(document.body, { childList: true, subtree: true });
     enhanceTabs();
     watchDialogMessages();
 

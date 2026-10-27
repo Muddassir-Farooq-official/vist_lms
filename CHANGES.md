@@ -270,3 +270,119 @@ restart. Tests: `tests/integration/test_staff_role.py`.
   CNIC, guardian or address); `GET /students/programs` feeds the program filter.
 
 Tests: `tests/integration/test_student_screens.py`.
+
+# Employees screen and the busy screens (no migration)
+
+- **Admin → Employees**: the same treatment as Students. A fuller table (photo or initials, name, code, job title,
+  department and type, mobile, joining date, status), search, status and job-title filters, "Add employee" and a "More"
+  menu (import, export). One record dialog with tabs: Overview (salary, bonuses this year, pass rate or library, complaints,
+  employment, personal, contact, teaching), Pay & bonuses (salary history and increases, bonuses), Qualifications, Edit
+  details, and Job, status & access (job title change, status with clearance, extra access, password). Click the photo to
+  upload; small download and remove icons.
+- **Job titles tab**: the "portal and access" list now offers every portal (exam, gate, general staff were missing) and no
+  longer offers Administrator, which the server always refused.
+- **Every screen**: tables fill their panel (many were squeezed to the left) and scroll sideways inside their own box on
+  small screens; space between tables and the forms next to them; amounts in the number tiles are no longer cut off
+  ("Rs. 270,..."); the finance chart is no longer oversized and its bars show rupees; finance lists show the title and the
+  detail on two lines; the admission round form is a tidy labelled grid; pages shared with the exam / accounts offices
+  show their own portal name under the logo.
+- API: the employee list returns the job title, department, mobile, joining date, type and whether there is a photo
+  (no CNIC, address or bank details).
+
+# Pay and performance (no migration)
+
+- **My security deposit** on every employee's "My pay & attendance" page: held now, the target (one month's basic
+  salary), still to collect, the % kept each month, any amount paid before this system, month-by-month cuts, and the
+  pay-back when they leave. Shown only to people who have a security deposit. API: `GET /payroll/me/security`.
+- **Absences after a paid payroll**: absences and late marks in a month that came after that month's payroll was worked
+  out were never deducted. The next month's payroll now compares last month's paid payslip with last month's full
+  attendance and takes only the extra days, once, at last month's day rate, as its own line ("September 2026, after that
+  payroll was paid: 2 days absent"). Nothing is carried when the administration overrode last month's attendance, and it
+  never refunds. It shows under "Absences carried from the month before" in the withholdings report.
+- **Staff scorecard**: one score out of 100 per employee per month from records already kept: attendance (40),
+  punctuality (25), tasks done on time (25) and complaints against them (10). A part with nothing to measure is left
+  out; people with no attendance recorded are not scored. Admin dashboard: "Top performers" of last month with a
+  one-click "Give bonus". Employees → Performance: everyone, any month, with each part and the reason behind it.
+  Scores never change pay; a bonus is always the administration's decision and goes on the next payroll.
+  API: `GET /performance?month=YYYY-MM-01` (administration only).
+
+Tests: `tests/integration/test_pay_and_performance.py`.
+
+# Courses page and editing academic terms (no migration)
+
+- **Academic terms are now editable**: a new "Academic terms" tab on the Courses page. Each term shows its dates and
+  length, a "Current" badge, what uses it (course offerings, fee structures, datesheets, admission rounds) and its status.
+  **Edit** changes the start and end dates, the status (open / closed) and the **name** at any time (see below).
+  Every change is in the activity log. API: `PATCH /academics/academic-terms/{id}` accepts `label`;
+  `GET /academics/academic-terms` returns `used_by`.
+- **Catalog**: search and active / inactive filter, course code badges, descriptions, one Edit button per row.
+- **Curriculum**: grouped by semester as cards with course and credit-hour totals; a one-line "add a course" bar.
+- **Offerings**: one tidy toolbar (term, "only without a teacher", Create offering, Open a semester, More: readiness,
+  auto-schedule, copy timetable, end semester); a summary (offerings, without a teacher, enrolments, open for enrolment);
+  each row shows course, section, credit hours, program, teacher, seats with a fill bar, enrolment status, a Manage button
+  and a small menu (open / close enrolment, enrol students, seats, delete).
+- **Teacher performance**: pass rate as a coloured bar; complaints highlighted.
+
+# Renaming a term everywhere, Programs page, Timetable and Attendance screens (no migration)
+
+- **Renaming a term now works even when it is in use.** The new name is written, in one step, on every course offering,
+  fee structure, datesheet and admission round that carries the old name, and the activity log records how many of each
+  were changed (`academic_term.renamed`). Refused if the new name is already a term, or if some records already use the
+  new name (so two terms never merge by accident). Challans, receipts and certificates already printed keep the old name
+  on paper; the Edit dialog says so and asks before renaming a term in use. Dropdowns on the Courses page refresh at once.
+- **Programs page**: one card per program with its code, status, years and semesters, active students, courses and credit
+  hours in the curriculum, and how many semesters are planned. Search, status filter and a summary. Each card opens the
+  program's curriculum (Courses page) or its students (Students page, already filtered). The Add and Edit forms now also
+  set the credit-hour cap per semester. New read-only endpoint: `GET /programs/overview`.
+- **Timetable**: All slots has a search (room, course or teacher), a day filter and a count; Daily periods shows each
+  period's length, suggests the next period number, adds in one row and asks before deleting in the app's own dialog.
+- **Attendance**: page description; counts on the Needs attention and Correction requests tabs; Mark attendance has
+  labelled Term / Course / Class pickers that load as you choose (no Refresh / Load buttons); **Mark now** opens the Mark
+  tab with the right term, course and class (before, it scrolled to a hidden tab and looked like it did nothing); the
+  Present / Absent toggle sits side by side again (a later style rule had stacked it, on the teacher's page too); Lock the
+  term shows the chosen course and its check as tiles (problems in red / amber) and explains what to do when no course is
+  chosen; Holidays and Approved leave have labelled fields.
+
+# Exam screens, teacher attendance, Teacher Progress, Hostel (no migration)
+
+- **Result Types**: a summary by category, categories as chips, max marks right-aligned, one-row "Add a type" form that
+  suggests the categories already in use, and the app's own confirm dialog before deleting.
+- **Datesheets & admit cards**: a labelled "create" form, a list with Published / Draft badges and the date published,
+  the open datesheet highlighted, a paper and exam-day count, a labelled "Add a paper" form, papers with full dates and
+  course code badges, clashes as a clear list, Publish disabled until there are papers and no clashes, and the admit card
+  search next to it. Papers can still be added or removed after publishing (the server re-checks clashes, as before).
+  Shared with the Exam Controller portal.
+- **Supplementary exams**: the list loads as soon as the term is chosen (no Show button); a summary (can sit, registered,
+  marked, published); fail results, marked and published states as coloured badges; a count of ticked students; the
+  Publish button only appears when something is marked.
+- **Teacher attendance**: a **Today's classes** card at the top shows each class today with its time, room and whether
+  the marking window is open (green, with the time it closes), not started yet, or closed (send to the office). One tap
+  opens that class's register. Term / Course / Class pickers are labelled; the Correction requests tab shows how many are
+  waiting.
+- **Teacher Progress**: courses most behind first; a coloured progress bar with "10 of 18 due so far"; search by teacher
+  or course, term and status filters, and clickable status counts (Behind, A little behind, On track, Not started).
+- **Hostel**: the room table's column headings now match the columns (they were shifted by one); beds used as a bar with
+  "n free" / "Full"; labelled, tidy Add-a-room and Monthly-charge forms; residents stack properly on phones.
+- **Institute Overview**: the "course(s) have no result sheet yet" line no longer overlaps the boxes above it.
+- **General staff and Hostel warden homes**: when the administrator opens them from the Panels menu without "View as",
+  the page no longer makes personal requests that can only fail (own attendance, pay, requests); it says so and links to
+  "View as a person".
+
+# Teacher grading, office screens, principal and HOD fixes (no migration)
+
+- **Teacher grading**: the course's result types as cards with a "Total 100 marks" badge (× to remove while editable);
+  a **Total** column that adds up each student's marks as you type, with a mark above that type's maximum outlined in
+  red; once the marks are submitted, approved or published they are shown as plain read-only numbers (before, the locked
+  boxes looked editable) and the hint says why; everyone's marks load at the same time instead of one student after
+  another (faster for big classes); the marks sheet download / check / upload sits in one tidy bar, and the upload part is
+  hidden while the marks are locked; the app's own dialogs for remove and submit.
+- **Gate visitor log** (admin and guard): 7 columns instead of 10: visitor (with reference and where from), when
+  (in → out or "inside", with the date written out), CNIC / phone, purpose / meeting, vehicle / people, entered by.
+  Lines stay together on phones.
+- **SMS log**: time and written-out date, recipient type under the number, status as a coloured badge
+  (Waiting / Sent / Failed / Logged).
+- **Inventory → Issue items**: the form uses two columns instead of one narrow column.
+- **Head of department → Attendance**: no "Mark Now" buttons any more (that page is read-only for them, so the buttons
+  could not work).
+- **Principal → Staff attendance**: no In / Out / Undo buttons (the principal can view but not mark; the server refused
+  those presses). The administrator and the gate keep them.

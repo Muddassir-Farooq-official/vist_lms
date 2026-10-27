@@ -20,7 +20,7 @@
     <aside id="drawer" class="drawer">
       <div class="drawer-brand">
         {%- set _seg = request.url.path.split("/")[2] if request.url.path.startswith("/dashboard/") and request.url.path.count("/") >= 2 else "admin" -%}
-        {{ brand_mark({"principal": "Principal", "hod": "Head of department"}.get(_seg, "Admin")) }}
+        {{ brand_mark({"principal": "Principal", "hod": "Head of department", "exam": "Exams", "accounts": "Accounts", "library": "Library", "warden": "Hostel", "gate": "Gate"}.get(_seg, "Admin")) }}
         <button id="drawer-close" class="drawer-close" type="button" aria-label="Close menu">{{ nav_icon("close") }}</button>
       </div>
 

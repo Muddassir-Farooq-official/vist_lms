@@ -37,7 +37,7 @@
     const result = await VA.fetchJson("/api/v1/academics/offerings/me");
     if (!result.ok) return;
 
-    offeringSelect.innerHTML = '<option value="">— Choose a course —</option>';
+    offeringSelect.innerHTML = '<option value="">Choose a course…</option>';
     if (result.body.length === 0) {
       noOfferings.hidden = false;
       return;
@@ -101,22 +101,26 @@
     componentsTbody.innerHTML = "";
     activeComponents = result.ok ? result.body : [];
 
+    const totalChip = document.getElementById("components-total");
+    const total = activeComponents.reduce(function (n, c) { return n + Number(c.max_marks || 0); }, 0);
+    if (totalChip) { totalChip.innerHTML = "Total <b>" + total + "</b> marks"; totalChip.hidden = !activeComponents.length; }
     if (activeComponents.length === 0) {
       componentsEmpty.hidden = false;
     } else {
       componentsEmpty.hidden = true;
       activeComponents.forEach(function (c) {
-        const tr = document.createElement("tr");
-        tr.innerHTML =
-          "<td>" + VA.escapeHtml(c.assessment_type_name) + "</td>" +
-          "<td>" + VA.escapeHtml(c.category || "\u2014") + "</td>" +
-          '<td class="num">' + c.max_marks + "</td>" +
-          '<td><button type="button" class="danger-btn small-btn component-delete" data-id="' + c.id + '">Remove</button></td>';
-        componentsTbody.appendChild(tr);
+        const el = document.createElement("div");
+        el.className = "gr-type";
+        el.innerHTML =
+          "<strong>" + VA.escapeHtml(c.assessment_type_name) + "</strong>" +
+          "<span>" + VA.escapeHtml(c.category || "No category") + "</span>" +
+          "<b>" + c.max_marks + "</b>" +
+          '<button type="button" class="gr-type-x component-delete" data-id="' + c.id + '" title="Remove from this course" aria-label="Remove ' + VA.escapeHtml(c.assessment_type_name) + '">\u00d7</button>';
+        componentsTbody.appendChild(el);
       });
       componentsTbody.querySelectorAll(".component-delete").forEach(function (btn) {
         btn.addEventListener("click", async function () {
-          if (!confirm("Remove this from the course? Only possible if no student has a mark recorded against it yet.")) return;
+          if (!(await VA.confirm("Remove this from the course? Only possible if no student has a mark recorded against it yet.", "Remove"))) return;
           const result = await VA.fetchJson("/api/v1/academics/offering-assessments/" + btn.getAttribute("data-id"), {
             method: "DELETE",
           });
@@ -196,6 +200,12 @@
     } else {
       tone = "published"; title = "Published"; text = "Students can see their results (published " + when(sheet.published_at) + "). Only the administration can correct a published mark, and every correction is recorded." + (sheet.correction_count ? " " + sheet.correction_count + " correction" + (sheet.correction_count > 1 ? "s" : "") + " so far." : "");
     }
+    const hint = document.getElementById("marks-hint");
+    const upload = document.getElementById("marks-sheet-upload-box");
+    if (hint) hint.innerHTML = sheet.can_edit
+      ? "Type a mark and click away (or press Tab / Enter) to save it. Enter 0 for a student who was absent. Students see nothing until the marks are submitted, approved and published."
+      : "These marks are locked (" + VA.escapeHtml(title.toLowerCase()) + "), so they are shown read-only.";
+    if (upload) upload.hidden = !sheet.can_edit;
     sheetBox.className = "sheet-status " + tone;
     sheetBox.innerHTML = '<div><strong>' + title + "</strong><span>" + text + "</span></div>" + action;
     sheetBox.hidden = false;
@@ -204,7 +214,7 @@
   }
 
   async function submitSheet() {
-    if (!window.confirm("Submit these marks for approval? They will be locked until they are approved or sent back to you.")) return;
+    if (!(await VA.confirm("Submit these marks for approval? They will be locked until they are approved or sent back to you.", "Submit"))) return;
     const r = await VA.fetchJson(API_RESULTS + activeOfferingId + "/submit", { method: "POST" });
     if (!r.ok) { marksError.textContent = extractErrorMessage(r.body, "Could not submit the marks."); marksError.hidden = false; return; }
     marksError.hidden = true;
@@ -228,16 +238,34 @@
   // ---------------------------------------------------------------------
   // Marks — one row per roster entry, one editable column per assessment
   // ---------------------------------------------------------------------
+  // Live total for one student's row; a mark above that type's maximum is flagged.
+  function rowTotal(tr) {
+    let sum = 0, any = false;
+    tr.querySelectorAll(".mark-input").forEach(function (inp) {
+      const v = parseFloat(inp.value);
+      inp.classList.toggle("is-over", !isNaN(v) && v > parseFloat(inp.max));
+      if (!isNaN(v)) { sum += v; any = true; }
+    });
+    const cell = tr.querySelector(".marks-total-cell");
+    if (cell) cell.innerHTML = any ? "<strong>" + (Math.round(sum * 100) / 100) + "</strong>" : '<span class="sd-dim">\u2014</span>';
+  }
+
   async function loadRosterAndMarks() {
     const rosterResult = await VA.fetchJson("/api/v1/academics/offerings/" + activeOfferingId + "/roster");
     activeRoster = rosterResult.ok ? rosterResult.body : [];
 
-    marksTheadRow.innerHTML = "<th>Student</th><th>Roll No.</th>";
+    marksTheadRow.innerHTML = "<th>Student</th><th>Roll no.</th>";
     activeComponents.forEach(function (c) {
       const th = document.createElement("th");
       th.textContent = c.assessment_type_name + " (/" + c.max_marks + ")";
+      th.className = "num";
       marksTheadRow.appendChild(th);
     });
+    const totalMax = activeComponents.reduce(function (n, c) { return n + Number(c.max_marks || 0); }, 0);
+    const totalTh = document.createElement("th");
+    totalTh.className = "num";
+    totalTh.textContent = "Total (/" + totalMax + ")";
+    if (activeComponents.length) marksTheadRow.appendChild(totalTh);
     const outcomeTh = document.createElement("th");
     outcomeTh.textContent = "Outcome";
     marksTheadRow.appendChild(outcomeTh);
@@ -251,10 +279,14 @@
     }
     marksEmpty.hidden = true;
 
-    for (const enrollment of activeRoster) {
-      if (enrollment.status === "WITHDRAWN") continue; // marks can't be recorded for a withdrawn enrollment
-
-      const marksResult = await VA.fetchJson("/api/v1/academics/enrollments/" + enrollment.id + "/marks");
+    // Everyone's marks are fetched at once (one request each, in parallel), then the rows are drawn in roster order.
+    const listed = activeRoster.filter(function (e) { return e.status !== "WITHDRAWN"; }); // marks can't be recorded for a withdrawn enrollment
+    const allMarks = await Promise.all(listed.map(function (e) { return VA.fetchJson("/api/v1/academics/enrollments/" + e.id + "/marks"); }));
+    const countEl = document.getElementById("marks-count");
+    if (countEl) countEl.textContent = listed.length + " student" + (listed.length === 1 ? "" : "s");
+    for (let i = 0; i < listed.length; i++) {
+      const enrollment = listed[i];
+      const marksResult = allMarks[i];
       const marksByAssessment = {};
       if (marksResult.ok) {
         marksResult.body.forEach(function (m) {
@@ -268,14 +300,23 @@
         "<td>" + VA.escapeHtml(enrollment.roll_number || "\u2014") + "</td>";
       activeComponents.forEach(function (c) {
         const existing = marksByAssessment[c.id];
-        cellsHtml += '<td><input type="number" class="text-input mark-input" style="width:80px" ' +
+        cellsHtml += '<td class="num"><input type="number" class="text-input mark-input" ' +
           'data-assessment-id="' + c.id + '" data-enrollment-id="' + enrollment.id + '" ' +
           'min="0" max="' + c.max_marks + '" step="0.01" value="' + (existing !== undefined ? existing : "") + '"' + (sheet && !sheet.can_edit ? " disabled" : "") + ' /></td>';
       });
       const outcomeCell = enrollment.outcome ? statusPillHtml(enrollment.outcome) : "\u2014";
+      cellsHtml += '<td class="num marks-total-cell"></td>';
       cellsHtml += '<td class="marks-outcome-cell">' + outcomeCell + "</td>";
       tr.innerHTML = cellsHtml;
       marksTbody.appendChild(tr);
+      rowTotal(tr);
+    }
+    if (!marksTbody.dataset.totals) {       // wired once; rows are redrawn on every load
+      marksTbody.dataset.totals = "1";
+      marksTbody.addEventListener("input", function (e) {
+        const tr = e.target.closest("tr");
+        if (tr) rowTotal(tr);
+      });
     }
 
     marksTbody.querySelectorAll(".mark-input").forEach(function (input) {

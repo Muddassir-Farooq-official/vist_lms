@@ -14,12 +14,17 @@
   const needsAttentionTbody = document.getElementById("needs-attention-tbody");
   const needsAttentionEmpty = document.getElementById("needs-attention-empty");
 
+  // Heads of department see this page read-only (no Mark attendance tab), so no "Mark Now" buttons for them.
+  const canMark = !!document.querySelector('[data-auto-tabs] [data-tab="mark"]');
+
   async function loadNeedsAttention() {
     const result = await VA.fetchJson("/api/v1/attendance/needs-attention");
     needsAttentionTbody.innerHTML = "";
     if (!result.ok) return;
 
     needsAttentionEmpty.hidden = result.body.length > 0;
+    document.getElementById("needs-attention-table").hidden = result.body.length === 0;
+    setCount("att-attn-count", parseInt((result.headers && result.headers.get("X-Total-Count")) || result.body.length, 10));
     const total = parseInt((result.headers && result.headers.get("X-Total-Count")) || "0", 10);
     const capNote = document.getElementById("needs-attention-cap");
     if (capNote) {
@@ -31,11 +36,12 @@
       tr.innerHTML =
         "<td>" + VA.formatDateLong(entry.session_date) + "</td>" +
         "<td>" + VA.formatTimeShort(entry.start_time) + "</td>" +
-        "<td>" + VA.escapeHtml(entry.course_code) + " \u2014 " + VA.escapeHtml(entry.course_title) + "</td>" +
+        '<td><span class="crs-code">' + VA.escapeHtml(entry.course_code) + "</span> " + VA.escapeHtml(entry.course_title) + "</td>" +
         "<td>" + VA.escapeHtml(entry.teacher_name || "\u2014 unassigned") + "</td>" +
         "<td>" + VA.escapeHtml(entry.room) + "</td>" +
-        '<td><button type="button" class="role-btn small-btn attend-now-btn" data-offering="' + entry.course_offering_id + '" data-session="' + entry.id + '">Mark Now</button></td>';
-      tr.querySelector(".attend-now-btn").addEventListener("click", async function () {
+        '<td>' + (canMark ? '<button type="button" class="role-btn small-btn attend-now-btn" data-offering="' + entry.course_offering_id + '" data-session="' + entry.id + '">Mark Now</button>' : "") + "</td>";
+      if (canMark) tr.querySelector(".attend-now-btn").addEventListener("click", async function () {
+        goTab("mark");
         await selectOfferingById(entry.course_offering_id);
         document.getElementById("session-select").value = entry.id;
         document.getElementById("session-select").dispatchEvent(new Event("change"));
@@ -70,10 +76,25 @@
   const rosterToolsEl = document.getElementById("roster-tools");
   const csvLink = document.getElementById("register-csv-link");
 
+  function setCount(id, n) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = n > 0 ? String(n) : "";
+  }
+  function goTab(name) {
+    const b = document.querySelector('[data-auto-tabs] [data-tab="' + name + '"]');
+    if (b) b.click();
+  }
+  document.addEventListener("click", function (e) {
+    const a = e.target.closest("[data-goto-tab]");
+    if (!a) return;
+    e.preventDefault();
+    goTab(a.getAttribute("data-goto-tab"));
+  });
+
   async function loadTermsDropdown() {
     const result = await VA.fetchJson("/api/v1/academics/terms");
     if (!result.ok) return;
-    termLabelInput.innerHTML = '<option value="">Select a term...</option>';
+    termLabelInput.innerHTML = '<option value="">Select a term…</option>';
     result.body.forEach(function (term) {
       const opt = document.createElement("option");
       opt.value = term;
@@ -82,13 +103,20 @@
     });
   }
 
-  document.getElementById("refresh-terms-btn").addEventListener("click", loadTermsDropdown);
+  termLabelInput.addEventListener("change", loadOfferingsForTerm);
 
   async function loadOfferingsForTerm() {
-    if (!termLabelInput.value) return;
+    sessionPickerArea.hidden = true;
+    if (!termLabelInput.value) {
+      offeringSelect.innerHTML = '<option value="">Choose a term first</option>';
+      offeringSelect.disabled = true;
+      return;
+    }
     const result = await VA.fetchJson("/api/v1/academics/offerings?term_label=" + encodeURIComponent(termLabelInput.value));
-    offeringSelect.innerHTML = '<option value="">— Choose a course offering —</option>';
+    offeringSelect.innerHTML = '<option value="">Choose a course…</option>';
+    offeringSelect.disabled = false;
     if (!result.ok) return;
+    if (!result.body.length) offeringSelect.innerHTML = '<option value="">No courses in this term</option>';
     offeringsCache = result.body;
     offeringsCache.forEach(function (o) {
       const opt = document.createElement("option");
@@ -96,11 +124,7 @@
       opt.textContent = o.course_code + " \u2014 " + o.course_title + (o.teacher_name ? " (" + o.teacher_name + ")" : " (unassigned)");
       offeringSelect.appendChild(opt);
     });
-    offeringSelect.hidden = false;
-    sessionPickerArea.hidden = true;
   }
-
-  document.getElementById("load-offerings-btn").addEventListener("click", loadOfferingsForTerm);
 
   async function selectOfferingById(offeringId) {
     // Used by the "Mark Now" shortcut from Needs Attention — the term
@@ -114,7 +138,9 @@
         opt.value = detailResult.body.id;
         opt.textContent = detailResult.body.course_code + " \u2014 " + detailResult.body.course_title;
         offeringSelect.appendChild(opt);
-        offeringSelect.hidden = false;
+        offeringSelect.disabled = false;
+        const term = detailResult.body.term_label;
+        if (term && Array.prototype.some.call(termLabelInput.options, function (x) { return x.value === term; })) termLabelInput.value = term;
       }
     }
     offeringSelect.value = offeringId;
@@ -252,6 +278,8 @@
     correctionsTbody.innerHTML = "";
     if (!result.ok) return;
     correctionsEmpty.hidden = result.body.length > 0;
+    correctionsTbody.closest("table").hidden = result.body.length === 0;
+    setCount("att-corr-count", result.body.length);
     result.body.forEach(function (r) {
       const tr = document.createElement("tr");
       tr.innerHTML =
@@ -304,23 +332,33 @@
     lockError.hidden = true;
     lockSuccess.hidden = true;
     const result = await VA.fetchJson("/api/v1/attendance/offerings/" + offeringId + "/lock-preview");
-    if (!result.ok) { lockPanel.hidden = true; return; }
-    const p = result.body;
-    lockPanel.hidden = false;
-    if (p.already_locked) {
-      lockPreviewBox.innerHTML = "<strong>This course's attendance is already locked.</strong>";
+    const o = offeringsCache.find(function (x) { return x.id === offeringId; });
+    const head = o ? '<p class="att-lock-course"><span class="crs-code">' + VA.escapeHtml(o.course_code) + "</span> " + VA.escapeHtml(o.course_title) + "</p>" : "";
+    lockBtn.hidden = false;
+    if (!result.ok) {
+      lockPreviewBox.innerHTML = head + '<p class="empty-state">' + VA.escapeHtml(extractErrorMessage(result.body, "Could not check this course.")) + "</p>";
       lockBtn.disabled = true;
       return;
     }
-    lockPreviewBox.innerHTML =
-      "<ul><li>Enrolled students: " + p.enrolled_count + "</li>" +
-      "<li>Classes held but not recorded: <strong>" + p.unmarked_overdue_sessions + "</strong>" +
-      (p.unmarked_overdue_sessions ? " (resolve in Needs Attention first)" : "") + "</li>" +
-      "<li>Classes still to come: " + p.future_sessions_remaining + (p.future_sessions_remaining ? " (they cannot be marked after locking)" : "") + "</li>" +
-      "<li>Below " + p.eligibility_threshold + "% (cannot pass): " + p.below_eligibility + "</li>" +
-      "<li>Would be fined Rs. " + p.fine_amount + " (\u2264 " + p.fine_threshold + "%; registration and result card held until paid): " + p.would_fine + "</li>" +
-      "<li>Would be dropped from the course (\u2264 " + p.drop_threshold + "%): " + p.would_drop + "</li></ul>" +
-      (p.early_reason ? "<p><strong>Not yet:</strong> " + VA.escapeHtml(p.early_reason) + ". Lock at the end of term (an administrator can lock early with a reason).</p>" : "");
+    const p = result.body;
+    if (p.already_locked) {
+      lockPreviewBox.innerHTML = head + '<p class="empty-state">This course\u2019s attendance is already locked.</p>';
+      lockBtn.disabled = true;
+      return;
+    }
+    function tile(n, label, tone) {
+      return '<div class="att-tile"' + (tone && n ? ' data-tone="' + tone + '"' : "") + "><b>" + n + "</b><span>" + label + "</span></div>";
+    }
+    lockPreviewBox.innerHTML = head +
+      '<div class="att-tiles">' +
+      tile(p.enrolled_count, "Enrolled students") +
+      tile(p.unmarked_overdue_sessions, "Held but not recorded" + (p.unmarked_overdue_sessions ? " \u2014 resolve in Needs attention" : ""), "bad") +
+      tile(p.future_sessions_remaining, "Classes still to come" + (p.future_sessions_remaining ? " \u2014 can\u2019t be marked after locking" : ""), "warn") +
+      tile(p.below_eligibility, "Below " + p.eligibility_threshold + "% (cannot pass)", "warn") +
+      tile(p.would_fine, "Fined Rs. " + VA.escapeHtml(String(p.fine_amount)) + " (\u2264 " + p.fine_threshold + "%)", "warn") +
+      tile(p.would_drop, "Dropped (\u2264 " + p.drop_threshold + "%)", "bad") +
+      "</div>" +
+      (p.early_reason ? '<p class="att-early"><strong>Not yet:</strong> ' + VA.escapeHtml(p.early_reason) + ". Lock at the end of term (an administrator can lock early with a reason).</p>" : "");
     lockBtn.disabled = p.unmarked_overdue_sessions > 0;   // early locks are allowed for admins with a reason (asked on click)
     lockBtn.setAttribute("data-summary", p.would_fine + " fined, " + p.would_drop + " dropped");
   }

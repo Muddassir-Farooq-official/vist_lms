@@ -55,6 +55,27 @@
   })();
   document.addEventListener("vistadmin:ready", loadAttendance);
 
+  // My security deposit: held now, the target (one basic salary), each month's cut, and any pay-back when leaving.
+  document.addEventListener("vistadmin:ready", async function () {
+    const r = await VA.fetchJson(API + "/me/security", { quiet: true });
+    if (!r.ok) return;
+    const s = r.body;
+    if (!s.held && !s.percent && !s.released) return;          // no security for this person
+    $("my-security").hidden = false;
+    const pct = s.target ? Math.min(100, Math.round(100 * (s.held + s.released) / s.target)) : 0;
+    $("sec-ring").style.setProperty("--p", s.released ? 100 : pct);
+    $("sec-ring-val").textContent = s.released ? "Paid" : pct + "%";
+    $("sec-hint").textContent = s.released
+      ? "Your security deposit of " + money(s.released) + " was paid back to you" + (s.released_on ? " on " + day(s.released_on) : "") + "."
+      : (s.percent ? s.percent + "% of your basic salary is kept each month until it reaches one month's basic salary. It is paid back when you leave, after clearance." :
+        "Nothing is being kept from your salary at the moment.");
+    const k = [["Held now", money(s.held)], ["Target", money(s.target)], ["Still to collect", money(s.remaining)], ["Kept each month", s.percent ? s.percent + "% of basic" : "None"]];
+    if (s.opening) k[3] = ["Paid before this system", money(s.opening)];
+    $("sec-kpis").innerHTML = k.map(function (x) { return '<div class="kpi"><span class="kpi-label">' + esc(x[0]) + '</span><strong class="kpi-value">' + esc(x[1]) + "</strong></div>"; }).join("");
+    $("sec-months-wrap").hidden = !s.months.length;
+    $("sec-months").innerHTML = s.months.map(function (m) { return "<li><span>" + esc(m.month_label) + "</span><b>" + money(m.amount) + "</b></li>"; }).join("");
+  });
+
   document.addEventListener("vistadmin:ready", async function () {
     const r = await VA.fetchJson(API + "/me");
     if (!r.ok) return;

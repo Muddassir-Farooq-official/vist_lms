@@ -1,41 +1,33 @@
 {% extends "faculty/_base.html" %}
+{% from "_icons.html" import nav_icon %}
 {% block title %}Grading{% endblock %}
 {% block page_title %}Grading{% endblock %}
 {% block page_subtitle %}<div class="content-subtitle">Pick which result types (from admin's institute-wide catalog) apply to your course, and enter marks. Marks stay a draft until you submit them for approval. They are published to students only after they are approved, and Pass/Fail is decided at that point (a student below the attendance threshold can only fail).</div>{% endblock %}
 
 {% block content %}
 <section class="panel">
-  <div class="form-field">
-    <label for="grading-offering-select">Select Course</label>
-    <select id="grading-offering-select" class="select-input">
-      <option value="">— Choose a course —</option>
-    </select>
+  <div class="ar-form att-pick">
+    <label class="att-span4">Course<select id="grading-offering-select" class="select-input"><option value="">Choose a course…</option></select></label>
   </div>
   <p class="empty-state" id="grading-no-offerings" hidden>You have no assigned courses yet.</p>
 </section>
 
 <section class="panel" id="grading-components-panel" hidden>
-  <h3 class="modal-subhead">Result Structure</h3>
-  <p class="panel-hint">Pick which types from admin's result catalog apply to this course (e.g. Quiz 1, Mid Term, Final). Each type's total marks are fixed institute-wide — ask admin to add a new type if you need one that isn't listed.</p>
-  <table class="dash-table" id="components-table">
-    <thead><tr><th>Type</th><th>Category</th><th>Max Marks</th><th></th></tr></thead>
-    <tbody id="components-tbody"></tbody>
-  </table>
-  <p class="empty-state" id="components-empty" hidden>No result types added to this course yet.</p>
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("exams") }}</div><h2>Result structure</h2></div><span class="crs-chip" id="components-total" hidden></span></div>
+  <p class="panel-hint">The result types that make up this course's marks (e.g. Mid Term, Final). Each type's total marks are fixed institute-wide; ask the office to add a new type if you need one that isn't listed.</p>
+  <div class="gr-types" id="components-tbody"></div>
+  <p class="empty-state" id="components-empty" hidden>No result types added to this course yet. Add the first one below.</p>
 
-  <form id="add-component-form" class="form-grid two-col">
-    <div class="form-field two-span">
-      <label for="comp-type-select">Add from Catalog</label>
-      <select id="comp-type-select" class="select-input" required></select>
-    </div>
-    <div class="form-actions two-span"><button type="submit" class="role-btn" id="add-component-submit">Add to Course</button></div>
+  <form id="add-component-form" class="ar-form gr-add">
+    <label class="att-span3">Add a result type<select id="comp-type-select" class="select-input" required></select></label>
+    <div class="att-go"><button type="submit" class="role-btn" id="add-component-submit">Add to course</button></div>
   </form>
   <p class="empty-state" id="no-more-types-empty" hidden>Every catalog type is already added to this course — ask admin to add a new type if you need another.</p>
   <p id="component-error" class="dash-alert error" hidden></p>
 </section>
 
 <section class="panel" id="grading-marks-panel" hidden>
-  <h3 class="modal-subhead">Marks</h3>
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("tasks") }}</div><h2>Marks</h2></div><span class="sd-dim" id="marks-count"></span></div>
   <div id="sheet-status" class="sheet-status" role="status" hidden></div>
   <p class="panel-hint" id="marks-hint">Enter a score and click away (or press Tab/Enter) to save. These marks are a <b>draft</b>: students cannot see them until you submit them and they are approved and published. Enter 0 for a student who was absent.</p>
   <table class="dash-table" id="marks-table">
@@ -44,11 +36,14 @@
   </table>
   <p class="empty-state" id="marks-empty" hidden>Add at least one result type above before entering marks.</p>
   <p id="marks-error" class="dash-alert error" hidden></p>
-  <div class="upload-row" id="marks-sheet-row">
-    <a id="marks-sheet-download" class="role-btn secondary-btn" href="#" download>Download marks sheet (.csv)</a>
-    <input type="file" id="marks-sheet-file" accept=".csv" aria-label="Filled marks sheet" />
-    <button type="button" class="role-btn secondary-btn" id="marks-sheet-check">Check sheet</button>
-    <button type="button" class="role-btn" id="marks-sheet-upload">Upload marks</button>
+  <div class="gr-sheet" id="marks-sheet-row">
+    <div class="gr-sheet-text"><strong>Marks sheet</strong><span>Download the sheet, fill it in Excel, then check and upload it.</span></div>
+    <a id="marks-sheet-download" class="role-btn secondary-btn" href="#" download>{{ nav_icon("download") }} Download (.csv)</a>
+    <span class="gr-upload" id="marks-sheet-upload-box">
+      <input type="file" id="marks-sheet-file" accept=".csv" aria-label="Filled marks sheet" />
+      <button type="button" class="role-btn secondary-btn" id="marks-sheet-check">Check sheet</button>
+      <button type="button" class="role-btn" id="marks-sheet-upload">Upload marks</button>
+    </span>
   </div>
   <p class="panel-hint" id="marks-sheet-msg" hidden></p>
 </section>

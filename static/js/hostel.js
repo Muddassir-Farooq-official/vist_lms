@@ -39,9 +39,10 @@
           (canManage ? '<span class="row-actions"><button type="button" class="role-btn small-btn secondary-btn" data-move="' + esc(p.stay_id) + '">Move</button><button type="button" class="role-btn small-btn secondary-btn" data-out="' + esc(p.stay_id) + '" data-name="' + esc(p.name) + '">Leaves</button></span>' : "") + "</div>";
       }).join("") || '<span class="cc-meta">Empty</span>';
       tr.innerHTML = "<td><strong>" + esc(r.code) + "</strong><small>" + esc([r.block, r.floor ? "floor " + r.floor : ""].filter(Boolean).join(" · ")) + "</small></td><td>" + esc(FOR[r.gender] || r.gender) +
-        '</td><td class="num">' + (r.capacity - r.free_beds) + " / " + r.capacity + '</td><td class="num">' + money(r.monthly_fee) + "</td><td>" + people + '</td><td class="row-actions"></td>';
+        '</td><td><div class="tp-cell"><div class="tp-bar hs-beds"><span class="tp-meter"><i style="width:' + Math.round(100 * (r.capacity - r.free_beds) / Math.max(1, r.capacity)) + "%;background:" + (r.free_beds ? "var(--blue-500)" : "#16a34a") + '"></i></span><b>' + (r.capacity - r.free_beds) + " / " + r.capacity + "</b></div>" +
+        '<small class="sd-dim">' + (r.free_beds ? r.free_beds + " free" : "Full") + '</small></div></td><td class="num">' + money(r.monthly_fee) + '</td><td class="hs-people" data-label="Residents">' + people + '</td><td class="crs-actions"></td>';
       if (canManage && r.free_beds > 0) {
-        const b = document.createElement("button"); b.type = "button"; b.className = "role-btn small-btn"; b.textContent = "Give a bed";
+        const b = document.createElement("button"); b.type = "button"; b.className = "sd-view"; b.textContent = "Give a bed";
         b.addEventListener("click", function () { checkIn(r); });
         tr.lastElementChild.appendChild(b);
       }

@@ -2,51 +2,42 @@
 {% block title %}Programs{% endblock %}
 {% block page_title %}Programs{% endblock %}
 
+{% block page_subtitle %}<div class="content-subtitle">Each program with its students and curriculum. Open a program's curriculum or students in one click.</div>{% endblock %}
+
 {% block content %}
+{% from "_icons.html" import nav_icon %}
 <div class="portal-tabs" role="tablist" data-auto-tabs>
   <button class="portal-tab active" data-tab="all" role="tab" aria-selected="true"><span>All programs</span></button>
   <button class="portal-tab" data-tab="add" role="tab" aria-selected="false"><span>Add a program</span></button>
 </div>
 
 <div class="portal-tab-panel" data-tab-panel="all">
-<section class="panel">
-  <h2>All Programs</h2>
-  <div id="programs-table-wrap">
-    <table class="dash-table" id="programs-list-table">
-      <thead><tr><th>Code</th><th>Name</th><th class="num">Duration</th><th class="num">Semesters</th><th>Status</th><th></th></tr></thead>
-      <tbody id="programs-list-tbody"></tbody>
-    </table>
-    <p class="empty-state" id="programs-list-empty" hidden>No programs yet — add one above.</p>
+<section class="panel sd-panel">
+  <div class="sd-toolbar">
+    <label class="sd-search">{{ nav_icon("search") }}<input type="search" id="prog-q" placeholder="Search code or name" aria-label="Search programs" /></label>
+    <select id="prog-status" class="select-input" aria-label="Status"><option value="">All programs</option><option value="active">Active</option><option value="inactive">Inactive</option></select>
+    <div class="crs-chips" id="prog-summary"></div>
   </div>
+  <div class="pg-grid" id="programs-grid"></div>
+  <table class="dash-table" id="programs-list-table" hidden><tbody id="programs-list-tbody"></tbody></table>
+  <p class="empty-state" id="programs-list-empty" hidden>No programs yet. Add one on the "Add a program" tab.</p>
 </section>
 </div>
 
 <div class="portal-tab-panel" data-tab-panel="add" hidden>
-<section class="panel">
-  <h2>Add Program</h2>
-  <form id="create-program-form" class="form-grid two-col">
-    <div class="form-field">
-      <label for="p-code">Code</label>
-      <input type="text" id="p-code" class="text-input" placeholder="BSN" required maxlength="20" />
-    </div>
-    <div class="form-field">
-      <label for="p-name">Name</label>
-      <input type="text" id="p-name" class="text-input" placeholder="BS Nursing" required maxlength="150" />
-    </div>
-    <div class="form-field">
-      <label for="p-years">Duration (years)</label>
-      <input type="number" id="p-years" class="text-input" min="1" max="10" required />
-    </div>
-    <div class="form-field">
-      <label for="p-semesters">Total Semesters</label>
-      <input type="number" id="p-semesters" class="text-input" min="1" max="20" required />
-    </div>
-    <div class="form-actions">
-      <button type="submit" class="role-btn" id="create-program-btn">Create Program</button>
-    </div>
+<section class="panel sd-panel">
+  <div class="jr-head"><h2>Add a program</h2>
+    <p class="panel-hint">The code is fixed once created (it appears on roll numbers and records). Courses are placed into the program on Courses &rarr; Curriculum.</p></div>
+  <form id="create-program-form" class="ar-form pg-form" novalidate>
+    <label>Code<input type="text" id="p-code" class="text-input" placeholder="BSN" required maxlength="20" /></label>
+    <label class="pg-span2">Name<input type="text" id="p-name" class="text-input" placeholder="BS Nursing" required maxlength="150" /></label>
+    <label>Duration (years)<input type="number" id="p-years" class="text-input" min="1" max="10" required /></label>
+    <label>Total semesters<input type="number" id="p-semesters" class="text-input" min="1" max="20" required /></label>
+    <label>Most credit hours a student may take in one semester<input type="number" id="p-maxch" class="text-input" min="1" max="60" value="18" /></label>
+    <div class="ar-go"><button type="submit" class="role-btn" id="create-program-btn">Create program</button></div>
   </form>
-  <p id="create-error" class="dash-alert error" hidden></p>
-  <p id="create-success" class="success-text" hidden></p>
+  <p id="create-error" class="dash-alert error crs-pad" hidden></p>
+  <p id="create-success" class="success-text crs-pad" hidden></p>
 </section>
 </div>
 
@@ -58,6 +49,7 @@
       <div class="form-field"><label for="ep-name">Name</label><input type="text" id="ep-name" class="text-input" required maxlength="150" /></div>
       <div class="form-field"><label for="ep-years">Duration (years)</label><input type="number" id="ep-years" class="text-input" min="1" max="10" required /></div>
       <div class="form-field"><label for="ep-semesters">Total Semesters</label><input type="number" id="ep-semesters" class="text-input" min="1" max="20" required /></div>
+      <div class="form-field"><label for="ep-maxch">Most credit hours per semester</label><input type="number" id="ep-maxch" class="text-input" min="1" max="60" required /></div>
       <div class="form-field">
         <label for="ep-active">Status</label>
         <select id="ep-active" class="select-input">

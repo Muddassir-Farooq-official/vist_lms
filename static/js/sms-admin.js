@@ -6,6 +6,7 @@
   const esc = VA.escapeHtml;
   const ABOUT = { ATTENDANCE_FINE: "Attendance fine", DATESHEET: "Datesheet", RESULTS: "Results", FEE_OVERDUE: "Overdue fee", TEST: "Test", BULK: "Group message", PASSWORD_RESET: "Password reset", ADMISSION: "Admission" };
   const STATUS = { QUEUED: "Waiting", SENT: "Sent", FAILED: "Failed", LOGGED: "Logged (not sent)", SKIPPED: "Skipped" };
+  const PILL = { QUEUED: "pending", SENT: "active", FAILED: "failed", LOGGED: "cancelled", SKIPPED: "cancelled" };
 
   function say(text) {
     const el = document.getElementById("sms-msg");
@@ -24,9 +25,10 @@
       document.getElementById("sms-" + k).textContent = String(d.last_7_days[k.toUpperCase()] || 0);
     });
     document.getElementById("sms-tbody").innerHTML = d.messages.map(function (m) {
-      return "<tr><td>" + esc(String(m.created_at).slice(0, 16).replace("T", " ")) + "</td><td>" + esc(m.to_number) +
-        " <small>(" + esc(m.recipient.toLowerCase()) + ")</small></td><td>" + esc(ABOUT[m.event] || m.event) + "</td><td>" +
-        esc(STATUS[m.status] || m.status) + (m.last_error ? "<br><small>" + esc(m.last_error) + "</small>" : "") + "</td><td>" + esc(m.body) + "</td></tr>";
+      const at = String(m.created_at);
+      return '<tr><td><strong>' + esc(at.slice(11, 16)) + "</strong><small>" + esc(window.VistAdmin.formatDateLong(at.slice(0, 10))) + "</small></td><td>" + esc(m.to_number) +
+        "<small>" + esc(m.recipient.charAt(0) + m.recipient.slice(1).toLowerCase()) + "</small></td><td>" + esc(ABOUT[m.event] || m.event) + "</td><td>" +
+        '<span class="status-pill ' + (PILL[m.status] || "pending") + '">' + esc(STATUS[m.status] || m.status) + "</span>" + (m.last_error ? "<small>" + esc(m.last_error) + "</small>" : "") + '</td><td class="sms-body">' + esc(m.body) + "</td></tr>";
     }).join("") || '<tr><td colspan="5">No messages yet.</td></tr>';
   }
 

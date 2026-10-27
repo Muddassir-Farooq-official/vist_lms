@@ -6,18 +6,17 @@
 {% block content %}
 <section class="panel">
   <h2>Admission rounds</h2>
-  <div class="upload-row">
-    <select id="ar-term" class="select-input term-select" aria-label="Term"><option value="">Term&hellip;</option></select>
-    <select id="ar-program" class="select-input" aria-label="Program"></select>
-    <input id="ar-seats" type="number" min="1" class="text-input small-input" placeholder="Seats" aria-label="Seats" />
-    <input id="ar-closes" type="date" class="text-input small-input" aria-label="Applications close on" title="Applications close on" />
-  </div>
-  <div class="upload-row">
-    <label>Merit: matric % <input id="ar-wm" type="number" value="10" min="0" max="100" class="text-input small-input" /></label>
-    <label>intermediate % <input id="ar-wi" type="number" value="40" min="0" max="100" class="text-input small-input" /></label>
-    <label>entry test % <input id="ar-wt" type="number" value="50" min="0" max="100" class="text-input small-input" /></label>
-    <label>minimum intermediate % <input id="ar-min" type="number" value="45" min="0" max="100" class="text-input small-input" /></label>
-    <button id="ar-create" class="role-btn" type="button">Open round</button>
+  <p class="panel-hint">Open one round per program and term. The merit weights must add up to 100.</p>
+  <div class="ar-form">
+    <label>Term<select id="ar-term" class="select-input term-select"><option value="">Term&hellip;</option></select></label>
+    <label>Program<select id="ar-program" class="select-input"></select></label>
+    <label>Seats<input id="ar-seats" type="number" min="1" class="text-input" placeholder="e.g. 50" /></label>
+    <label>Applications close on<input id="ar-closes" type="date" class="text-input" /></label>
+    <label>Matric weight %<input id="ar-wm" type="number" value="10" min="0" max="100" class="text-input" /></label>
+    <label>Intermediate weight %<input id="ar-wi" type="number" value="40" min="0" max="100" class="text-input" /></label>
+    <label>Entry test weight %<input id="ar-wt" type="number" value="50" min="0" max="100" class="text-input" /></label>
+    <label>Minimum intermediate %<input id="ar-min" type="number" value="45" min="0" max="100" class="text-input" /></label>
+    <div class="ar-go"><button id="ar-create" class="role-btn" type="button">Open round</button></div>
   </div>
   <table class="dash-table"><thead><tr><th>Term</th><th>Program</th><th class="num">Seats</th><th class="num">Free</th><th>Applications</th><th>Status</th><th></th></tr></thead><tbody id="ar-list"></tbody></table>
   <p id="ad-msg" class="panel-hint" hidden></p>

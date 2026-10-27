@@ -101,17 +101,33 @@
     }).join("");
   }
 
+  // The administrator can open this panel directly (Panels menu) without "View as": they have no staff record,
+  // so skip the personal lists (they would only fail) and say how to see a real person's page.
+  function adminLooking(me, box) {
+    const roles = (me && me.roles) || [];
+    if (!me || me.viewing_as_by || roles.indexOf("ADMIN") === -1) return false;
+    const e = $(box);
+    if (e) {
+      e.className = "dash-alert";
+      e.innerHTML = 'You are looking at this panel as the administrator, so personal items (own attendance, pay, requests) are empty. ' +
+        'To see one person\u2019s page, use <a href="/dashboard/admin/view-as">View as a person</a>.';
+      e.hidden = false;
+    }
+    return true;
+  }
+
   async function load(me) {
     D.greet("wd-greet", "wd-date", me);
-    const d = await D.getAll({
+    const urls = {
       summary: "/api/v1/hostel/summary",
       rooms: "/api/v1/hostel/rooms",
       history: "/api/v1/hostel/history",
       tasks: "/api/v1/tasks/summary",
-      applications: "/api/v1/applications/mine",
       calendar: D.upcoming(),
       announcements: "/api/v1/announcements?limit=1",
-    });
+    };
+    if (!adminLooking(me, "wd-note")) urls.applications = "/api/v1/applications/mine";
+    const d = await D.getAll(urls);
     if (!d.summary) { const e = $("wd-error"); e.textContent = "Could not load the hostel summary. Please refresh the page."; e.hidden = false; }
     D.run(function () { kpis(d); });
     D.run(function () { roomGrid(d.rooms); });

@@ -5,9 +5,22 @@
 {% block page_subtitle %}<div class="content-subtitle">How far each teacher actually is through their course versus where they should be by now, based on topics marked complete.</div>{% endblock %}
 
 {% block content %}
-<section class="panel">
+<div class="crs-chips tp-summary" id="progress-summary"></div>
+<section class="panel sd-panel">
+  <div class="sd-toolbar">
+    <label class="sd-search">{{ nav_icon("search") }}<input type="search" id="progress-q" placeholder="Search teacher or course" aria-label="Search teacher or course" /></label>
+    <select id="progress-term" class="select-input" aria-label="Term"><option value="">All terms</option></select>
+    <select id="progress-status" class="select-input" aria-label="Status">
+      <option value="">Every status</option>
+      <option value="DELAYED">Behind</option>
+      <option value="SLIGHTLY_DELAYED">A little behind</option>
+      <option value="ON_TRACK">On track</option>
+      <option value="NOT_STARTED">Not started</option>
+    </select>
+    <span class="sd-dim tt-count" id="progress-count"></span>
+  </div>
   <table class="dash-table" id="progress-table">
-    <thead><tr><th>Teacher</th><th>Course</th><th>Term</th><th>Sessions Due</th><th>Completed</th><th>Missing</th><th>%</th><th>Status</th></tr></thead>
+    <thead><tr><th>Course</th><th>Teacher</th><th>Term</th><th>Topics covered</th><th class="num">Behind by</th><th>Status</th></tr></thead>
     <tbody id="progress-tbody"></tbody>
   </table>
   <p class="empty-state" id="progress-empty" hidden>No teachers have any scheduled sessions yet.</p>

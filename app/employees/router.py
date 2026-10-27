@@ -135,8 +135,15 @@ async def list_employees(
     result = await EmployeeService(db).search_employees(
         page=page, query=q, status=status, job_role_id=job_role_id, role_code=role
     )
+    titles = {j.id: j.title for j in (await db.execute(select(JobRole).where(JobRole.id.in_({e.job_role_id for e in result.items})))).scalars()} if result.items else {}
+
+    def row(e) -> EmployeeListItem:
+        item = EmployeeListItem.model_validate(e)
+        item.job_title = titles.get(e.job_role_id)
+        return item
+
     return Page[EmployeeListItem](
-        items=[EmployeeListItem.model_validate(e) for e in result.items],
+        items=[row(e) for e in result.items],
         total=result.total,
         page=result.page,
         page_size=result.page_size,

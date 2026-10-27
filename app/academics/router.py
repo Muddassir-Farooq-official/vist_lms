@@ -1908,6 +1908,7 @@ class AcademicTermIn(BaseModel):
 
 
 class AcademicTermPatch(BaseModel):
+    label: str | None = Field(default=None, min_length=1, max_length=50)     # only while nothing uses the term
     start_date: date | None = None
     end_date: date | None = None
     status: TermStatus | None = None
@@ -1917,7 +1918,10 @@ class AcademicTermPatch(BaseModel):
 async def list_academic_terms(current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> list[dict]:
     # Term names and dates are not sensitive, and several screens need them (fee structures, datesheets, admissions)
     # for people without course permissions, e.g. the accounts office.
-    return [to_dict(t) for t in await AcademicTermService(db).all()]
+    service = AcademicTermService(db)
+    terms = await service.all()
+    used = await service.usage([t.label for t in terms]) if terms else {}
+    return [{**to_dict(t), "used_by": used.get(t.label, {})} for t in terms]
 
 
 @router.post("/academic-terms", status_code=201, summary="Add a term (administration)")
@@ -1927,11 +1931,11 @@ async def create_academic_term(payload: AcademicTermIn, current_user: CurrentUse
                                                         actor_id=current_user.id))
 
 
-@router.patch("/academic-terms/{term_id}", summary="Change a term's dates, or close/reopen it (administration). Labels cannot be renamed.")
+@router.patch("/academic-terms/{term_id}", summary="Change a term's dates, close / reopen it, or rename it while nothing uses it yet (administration)")
 async def update_academic_term(term_id: uuid.UUID, payload: AcademicTermPatch,
                                current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_OFFERING_MANAGE)), db=Depends(get_db)) -> dict:
     return to_dict(await AcademicTermService(db).update(term_id, start_date=payload.start_date, end_date=payload.end_date,
-                                                        status=payload.status, actor_id=current_user.id))
+                                                        status=payload.status, actor_id=current_user.id, label=payload.label))
 
 
 @router.get(

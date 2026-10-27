@@ -53,7 +53,7 @@
   function renderOfferingOptions() {
     const termFilter = termSelect.value;
     const filtered = offeringsCache.filter(function (o) { return !termFilter || o.term_label === termFilter; });
-    offeringSelect.innerHTML = '<option value="">— Choose a course —</option>';
+    offeringSelect.innerHTML = '<option value="">Choose a course…</option>';
     filtered.forEach(function (o) {
       const opt = document.createElement("option");
       opt.value = o.id;
@@ -79,7 +79,7 @@
     sessionsCache.sort(function (a, b) { return a.session_date.localeCompare(b.session_date); });
     enrolledStudents = rosterResult.ok ? rosterResult.body.filter(function (e) { return e.status === "ENROLLED"; }) : [];
 
-    sessionSelect.innerHTML = '<option value="">— Choose a session —</option>';
+    sessionSelect.innerHTML = '<option value="">Choose a class…</option>';
     sessionsCache.forEach(function (s) {
       const opt = document.createElement("option");
       opt.value = s.id;
@@ -228,6 +228,9 @@
     list.innerHTML = "";
     if (!result.ok) return;
     empty.hidden = result.body.length > 0;
+    const pending = result.body.filter(function (r) { return r.status === "PENDING"; }).length;
+    const countEl = document.getElementById("my-req-count");
+    if (countEl) countEl.textContent = pending ? String(pending) : "";
     result.body.forEach(function (r) {
       const status = String(r.status || "").toLowerCase();
       const card = document.createElement("article");
@@ -243,11 +246,8 @@
     });
   }
 
-  // "Take attendance" on the Home page links here with ?offering=...&session=... : open that class's register directly.
-  async function applyDeepLink() {
-    const params = new URLSearchParams(window.location.search);
-    const wantedOffering = params.get("offering"), wantedSession = params.get("session");
-    if (!wantedOffering) return;
+  // Open one class's register: used by the Today strip and by the Home page's ?offering=...&session=... link.
+  async function openSession(wantedOffering, wantedSession) {
     const hasOption = function (select, value) { return Array.prototype.some.call(select.options, function (o) { return o.value === value; }); };
     const waitFor = function (test) {
       return new Promise(function (resolve) {
@@ -264,9 +264,54 @@
     }
   }
 
+  async function applyDeepLink() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("offering")) await openSession(params.get("offering"), params.get("session"));
+  }
+
+  // ---- Today's classes ---------------------------------------------------------
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function hm(d) { return pad(d.getHours()) + ":" + pad(d.getMinutes()); }
+
+  async function loadToday() {
+    const panel = document.getElementById("today-panel");
+    const [clock, r] = await Promise.all([AU.loadClock(), VA.fetchJson("/api/v1/academics/offerings/me/schedule")]);
+    if (!r.ok) return;
+    const now = clock.now();
+    const today = now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate());
+    const mine = r.body.filter(function (s) { return s.session_date === today; });
+    panel.hidden = false;
+    document.getElementById("today-date").textContent = VA.formatDateLong(today);
+    const win = clock.config.marking_window_minutes;
+    const box = document.getElementById("today-classes");
+    if (!mine.length) { box.innerHTML = '<p class="empty-state">No classes today.</p>'; return; }
+    box.innerHTML = mine.map(function (s) {
+      const start = clock.start(s), until = new Date(start.getTime() + win * 60000);
+      let state, tone, btn;
+      if (now < start) { state = "Starts at " + hm(start); tone = "later"; btn = "Open register"; }
+      else if (now <= until) { state = "Open now \u2014 mark by " + hm(until); tone = "open"; btn = "Take attendance"; }
+      else { state = "Window closed \u2014 send to the office"; tone = "closed"; btn = "Open register"; }
+      return '<article class="att-today-card" data-tone="' + tone + '">' +
+        '<div class="att-today-time">' + VA.escapeHtml(VA.formatTimeShort(s.start_time)) + "<small>" + VA.escapeHtml(VA.formatTimeShort(s.end_time)) + "</small></div>" +
+        '<div class="att-today-main"><span class="crs-code">' + VA.escapeHtml(s.course_code) + "</span> <strong>" + VA.escapeHtml(s.course_title) + "</strong>" +
+        '<span class="att-today-meta">Room ' + VA.escapeHtml(s.room || "\u2014") + " \u00b7 " + VA.escapeHtml(state) + "</span></div>" +
+        '<button type="button" class="role-btn' + (tone === "open" ? "" : " secondary-btn") + '" data-today-offering="' + s.course_offering_id + '" data-today-session="' + s.id + '">' + btn + "</button></article>";
+    }).join("");
+  }
+
+  document.getElementById("today-classes").addEventListener("click", async function (e) {
+    const b = e.target.closest("[data-today-session]");
+    if (!b) return;
+    termSelect.value = "";
+    renderOfferingOptions();
+    await openSession(b.dataset.todayOffering, b.dataset.todaySession);
+    document.getElementById("register-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
   document.addEventListener("vistadmin:ready", function () {
     loadMyOfferings();
     loadMyRequests();
     applyDeepLink();
+    loadToday();
   });
 })();

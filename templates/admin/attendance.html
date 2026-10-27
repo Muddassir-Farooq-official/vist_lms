@@ -2,11 +2,12 @@
 {% block allowed_roles %}{{ allowed_roles|default("ADMIN") }}{% endblock %}
 {% block title %}Attendance{% endblock %}
 {% block page_title %}Attendance{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Classes nobody marked, teachers' correction requests, marking a register yourself, locking a course at the end of term, and holidays or approved leave.</div>{% endblock %}
 
 {% block content %}
 <div class="portal-tabs" role="tablist" data-auto-tabs>
-  <button class="portal-tab active" data-tab="attention" role="tab" aria-selected="true"><span>Needs attention</span></button>
-  <button class="portal-tab" data-tab="corrections" role="tab" aria-selected="false"><span>Correction requests</span></button>
+  <button class="portal-tab active" data-tab="attention" role="tab" aria-selected="true"><span>Needs attention</span> <span class="ss-count" id="att-attn-count"></span></button>
+  <button class="portal-tab" data-tab="corrections" role="tab" aria-selected="false"><span>Correction requests</span> <span class="ss-count" id="att-corr-count"></span></button>
   {% if not hod_view %}<button class="portal-tab" data-tab="mark" role="tab" aria-selected="false"><span>Mark attendance</span></button>{% endif %}
   {% if not hod_view %}<button class="portal-tab" data-tab="lock" role="tab" aria-selected="false"><span>Lock the term</span></button>{% endif %}
   {% if not hod_view %}<button class="portal-tab" data-tab="holiday" role="tab" aria-selected="false"><span>Holidays</span></button>{% endif %}
@@ -50,21 +51,15 @@
       <h2>Mark Attendance</h2>
     </div>
   </div>
-  <div class="toolbar">
-    <select id="term-label-input" class="select-input">
-      <option value="">Select a term...</option>
-    </select>
-    <button type="button" class="role-btn small-btn" id="refresh-terms-btn">Refresh</button>
-    <button type="button" class="role-btn" id="load-offerings-btn">Load</button>
+  <p class="panel-hint">Pick the term, then the course, then the class. Classes outside the normal marking window need a note.</p>
+  <div class="ar-form att-pick">
+    <label>Term<select id="term-label-input" class="select-input"><option value="">Select a term…</option></select></label>
+    <label class="att-span3">Course<select id="offering-select" class="select-input" disabled><option value="">Choose a term first</option></select></label>
   </div>
-  <select id="offering-select" class="select-input" style="margin-top:12px" hidden>
-    <option value="">— Choose a course offering —</option>
-  </select>
 
   <div id="session-picker-area" hidden>
-    <div class="form-field" style="margin-top:16px">
-      <label for="session-select">Select Class Session</label>
-      <select id="session-select" class="select-input"></select>
+    <div class="ar-form att-pick">
+      <label class="att-span4">Class<select id="session-select" class="select-input"></select></label>
     </div>
     <div id="session-details" class="panel-hint" hidden></div>
     <div id="window-notice" class="dash-alert" hidden></div>
@@ -97,8 +92,8 @@
 <section class="panel" id="lock-panel">
   <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("attendance") }}</div><h2>Lock Attendance (end of term)</h2></div></div>
   <p class="panel-hint">Locking freezes this course's attendance, then automatically drops or fines students below the thresholds. It cannot be undone. Every held class must first be marked (Needs Attention) or cancelled.</p>
-  <div id="lock-preview" class="panel-hint"></div>
-  <div class="form-actions"><button type="button" class="danger-btn" id="lock-attendance-btn" disabled>Lock Attendance</button></div>
+  <div id="lock-preview" class="att-lock-box"><p class="empty-state">Choose a term and course on the <a href="#mark" data-goto-tab="mark">Mark attendance</a> tab first; its lock check shows here.</p></div>
+  <div class="form-actions"><button type="button" class="danger-btn" id="lock-attendance-btn" disabled hidden>Lock Attendance</button></div>
   <p id="lock-error" class="dash-alert error" hidden></p>
   <p id="lock-success" class="success-text" hidden></p>
 </section>
@@ -108,10 +103,10 @@
 <section class="panel" id="holiday-panel">
   <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("attendance") }}</div><h2>Cancel a Whole Day (holiday / strike)</h2></div></div>
   <p class="panel-hint">Cancels every still-scheduled class on that date. Classes whose attendance was already taken are left alone.</p>
-  <div class="toolbar">
-    <input type="date" id="holiday-date" class="text-input" />
-    <input type="text" id="holiday-reason" class="text-input" placeholder="Reason, e.g. Independence Day" maxlength="255" />
-    <button type="button" class="danger-btn" id="holiday-btn">Cancel this day</button>
+  <div class="ar-form">
+    <label>Date<input type="date" id="holiday-date" class="text-input" /></label>
+    <label class="att-span2">Reason<input type="text" id="holiday-reason" class="text-input" placeholder="e.g. Independence Day" maxlength="255" /></label>
+    <div class="att-go"><button type="button" class="danger-btn" id="holiday-btn">Cancel this day</button></div>
   </div>
   <p id="holiday-error" class="dash-alert error" hidden></p>
   <p id="holiday-success" class="success-text" hidden></p>
@@ -119,12 +114,12 @@
 <section class="panel" id="leave-panel">
   <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("attendance") }}</div><h2>Approved Leave for One Student</h2></div></div>
   <p class="panel-hint">Medical or other approved leave: the student's classes on these days are marked Leave and are not counted for or against their attendance. Classes they attended stay Present.</p>
-  <div class="toolbar">
-    <input type="text" id="leave-roll" class="text-input" placeholder="Roll number" aria-label="Roll number" maxlength="30" />
-    <input type="date" id="leave-from" class="text-input" aria-label="First day of leave" />
-    <input type="date" id="leave-to" class="text-input" aria-label="Last day of leave" />
-    <input type="text" id="leave-reason" class="text-input" placeholder="Reason, e.g. medical certificate no." aria-label="Reason" maxlength="300" />
-    <button type="button" class="role-btn" id="leave-btn">Record leave</button>
+  <div class="ar-form">
+    <label>Roll number<input type="text" id="leave-roll" class="text-input" placeholder="e.g. 26001" maxlength="30" /></label>
+    <label>First day<input type="date" id="leave-from" class="text-input" /></label>
+    <label>Last day<input type="date" id="leave-to" class="text-input" /></label>
+    <label>Reason<input type="text" id="leave-reason" class="text-input" placeholder="e.g. medical certificate no." maxlength="300" /></label>
+    <div class="ar-go"><button type="button" class="role-btn" id="leave-btn">Record leave</button></div>
   </div>
   <p id="leave-error" class="dash-alert error" role="alert" hidden></p>
   <p id="leave-success" class="success-text" role="status" hidden></p>

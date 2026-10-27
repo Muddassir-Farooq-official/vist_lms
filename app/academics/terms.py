@@ -5,7 +5,8 @@ Typing labels by hand let "Fall 2026", "fall 2026" and "Fal 2026" exist side by
 side and silently split GPA terms, fee charges and End Semester. Now every place
 that INTRODUCES a term label (creating/generating offerings, creating/cloning a
 fee structure) must use a term registered here and not closed. Labels cannot be
-renamed (other records keep them as text); a wrong one is closed instead.
+renamed by hand on those records: renaming a term here writes the new name on every offering, fee structure,
+datesheet and admission round that carries it, in one step (all or nothing), and is recorded.
 """
 from __future__ import annotations
 
@@ -78,16 +79,72 @@ class AcademicTermService:
                                              entity_id=term.id, after={"label": label, "start": str(start_date), "end": str(end_date)})
         return term
 
+    async def usage(self, labels: list[str] | None = None) -> dict[str, dict[str, int]]:
+        """How many records refer to each term label (by its text): course offerings, fee structures, datesheets, admission rounds."""
+        from app.academics.models import CourseOffering
+        from app.admissions.models import AdmissionRound
+        from app.exams.models import ExamSchedule
+        from app.fees.models import FeeStructure
+
+        out: dict[str, dict[str, int]] = {}
+        for key, model in (("offerings", CourseOffering), ("fee_structures", FeeStructure), ("datesheets", ExamSchedule), ("admission_rounds", AdmissionRound)):
+            stmt = select(model.term_label, func.count()).group_by(model.term_label)
+            if labels is not None:
+                stmt = stmt.where(model.term_label.in_(labels))
+            for label, n in (await self.session.execute(stmt)).all():
+                out.setdefault(label, {})[key] = int(n)
+        return out
+
+    async def _rename_everywhere(self, old: str, new: str) -> dict[str, int]:
+        """Write the new name on every record that carries the old one, in this same transaction (all or nothing).
+        Issued documents (certificates, printed challans and receipts) keep what was printed on them."""
+        from sqlalchemy import update
+
+        from app.academics.models import CourseOffering
+        from app.admissions.models import AdmissionRound
+        from app.exams.models import ExamSchedule
+        from app.fees.models import FeeStructure
+
+        out: dict[str, int] = {}
+        for key, model in (("offerings", CourseOffering), ("fee_structures", FeeStructure), ("datesheets", ExamSchedule), ("admission_rounds", AdmissionRound)):
+            result = await self.session.execute(update(model).where(model.term_label == old).values(term_label=new).execution_options(synchronize_session="fetch"))
+            out[key] = int(result.rowcount or 0)
+        return out
+
     async def update(self, term_id: uuid.UUID, *, start_date: date | None, end_date: date | None, status: TermStatus | None,
-                     actor_id: uuid.UUID) -> AcademicTerm:
+                     actor_id: uuid.UUID, label: str | None = None) -> AcademicTerm:
         term = await self.session.get(AcademicTerm, term_id)
         if term is None:
             raise ResourceNotFoundError("Term not found.")
         before = to_dict(term)
-        term.start_date = start_date if start_date is not None else term.start_date
-        term.end_date = end_date if end_date is not None else term.end_date
-        if term.start_date and term.end_date and term.end_date <= term.start_date:
+        check_start = start_date if start_date is not None else term.start_date
+        check_end = end_date if end_date is not None else term.end_date
+        if check_start and check_end and check_end <= check_start:
             raise ValidationAppError("The term must end after it starts.")
+        if label is not None and " ".join(label.split()) != term.label:
+            new = " ".join(label.split())
+            if not new:
+                raise ValidationAppError("Give the term a name, for example Fall 2026.")
+            for t in await self.all():
+                if t.id != term.id and _norm(t.label) == _norm(new):
+                    raise DuplicateResourceError(f'The term "{t.label}" already exists.')
+            # Another term's records must never be merged in by renaming onto a name that is already written on them.
+            taken = (await self.usage([new])).get(new, {})
+            if any(taken.values()):
+                raise BusinessRuleViolationError(f'Records already use the name "{new}". Pick a different name.')
+            renamed = await self._rename_everywhere(term.label, new)
+            old_label = term.label
+            term.label = new
+            if any(renamed.values()):
+                from app.audit.service import AuditService
+
+                await AuditService(self.session).log(actor_user_id=actor_id, action="academic_term.renamed", entity_type="academic_term", entity_id=term.id,
+                                                     before={"label": old_label}, after={"label": new}, metadata={"records_updated": renamed})
+        new_start = start_date if start_date is not None else term.start_date
+        new_end = end_date if end_date is not None else term.end_date
+        if new_start and new_end and new_end <= new_start:           # checked before anything changes, so a refused edit saves nothing
+            raise ValidationAppError("The term must end after it starts.")
+        term.start_date, term.end_date = new_start, new_end
         if status is not None:
             term.status = status
         from app.audit.service import AuditService

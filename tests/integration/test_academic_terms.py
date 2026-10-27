@@ -55,3 +55,27 @@ async def test_only_administration_manages_terms(app_client, admin_user, db_sess
     user, pw = await _exam_user(app_client, db_session)
     await _login(app_client, user, pw)
     assert (await app_client.post(T, json={"label": "X 2030", "start_date": "2030-01-01", "end_date": "2030-05-01"})).status_code == 403
+
+async def test_a_term_can_be_edited_and_renamed_everywhere(app_client, admin_user):
+    await _login_admin(app_client)
+    t = (await app_client.post(T, json={"label": "Fal 2032", "start_date": "2032-09-01", "end_date": "2032-12-20"})).json()
+    fixed = await app_client.patch(f"{T}/{t['id']}", json={"label": "Fall 2032", "end_date": "2032-12-24"})
+    assert fixed.status_code == 200 and fixed.json()["label"] == "Fall 2032" and fixed.json()["end_date"] == "2032-12-24"
+    other = (await app_client.post(T, json={"label": "Spring 2033", "start_date": "2033-02-01", "end_date": "2033-06-01"})).json()
+    assert (await app_client.patch(f"{T}/{other['id']}", json={"label": "fall 2032"})).status_code == 409      # no duplicates
+    assert (await app_client.patch(f"{T}/{t['id']}", json={"start_date": "2033-01-01"})).status_code == 422    # must end after it starts
+    course = await _course(app_client, "TM103")
+    made = await app_client.post("/api/v1/academics/offerings", json={"course_id": course, "term_label": "Fall 2032"})
+    assert made.status_code == 201, made.text
+    listed = next(x for x in (await app_client.get(T)).json() if x["id"] == t["id"])
+    assert listed["used_by"] == {"offerings": 1}
+    renamed = await app_client.patch(f"{T}/{t['id']}", json={"label": "Autumn 2032"})        # used: renamed on every record too
+    assert renamed.status_code == 200 and renamed.json()["label"] == "Autumn 2032"
+    offs = (await app_client.get("/api/v1/academics/offerings", params={"term_label": "Autumn 2032"})).json()
+    assert len(offs) == 1 and not (await app_client.get("/api/v1/academics/offerings", params={"term_label": "Fall 2032"})).json()
+    log = (await app_client.get("/api/v1/audit/activity", params={"action": "academic_term.renamed"})).json()["items"]
+    detail = (await app_client.get(f"/api/v1/audit/activity/{log[0]['id']}")).json()
+    assert detail["metadata"]["records_updated"]["offerings"] == 1 and detail["before"]["label"] == "Fall 2032"
+    assert (await app_client.patch(f"{T}/{t['id']}", json={"start_date": "2032-08-25"})).json()["start_date"] == "2032-08-25"   # dates still can
+    page = (await app_client.get("/dashboard/admin/courses")).text
+    assert 'data-tab="terms"' in page and 'id="term-edit"' in page and 'id="term-add-form"' in page

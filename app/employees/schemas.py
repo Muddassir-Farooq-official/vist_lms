@@ -236,6 +236,14 @@ class EmployeeListItem(BaseModel):
     employee_code: str
     status: EmployeeStatus
     job_role_id: uuid.UUID
+    # For a readable staff table (no CNIC, address or bank details here).
+    job_title: str | None = None
+    department: str | None = None
+    contact_no: str | None = None
+    hire_date: date | None = None
+    employment_type: str | None = None
+    gender: str | None = None
+    has_photo: bool = False
 
 
 class EmployeeDetail(BaseModel):

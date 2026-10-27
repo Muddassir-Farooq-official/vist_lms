@@ -6,32 +6,43 @@
 
 {% block content %}
 <section class="panel">
-  <h2>Datesheets</h2>
-  <div class="upload-row">
-    <select id="ds-term" class="select-input term-select" aria-label="Term"><option value="">Select a term&hellip;</option></select>
-    <input id="ds-name" class="text-input small-input" maxlength="80" placeholder="Name, e.g. Midterm" aria-label="Datesheet name" />
-    <button id="ds-create" class="role-btn" type="button">Create datesheet</button>
+  <div class="panel-header">
+    <div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("clock") }}</div><h2>Datesheets</h2></div>
+    <div class="crs-chips" id="ds-summary"></div>
   </div>
-  <table class="dash-table"><thead><tr><th>Term</th><th>Exam</th><th>Status</th><th></th></tr></thead><tbody id="ds-list"></tbody></table>
+  <div class="ar-form">
+    <label>Term<select id="ds-term" class="select-input term-select"><option value="">Select a term&hellip;</option></select></label>
+    <label class="att-span2">Exam name<input id="ds-name" class="text-input" maxlength="80" placeholder="e.g. Mid-term exams" /></label>
+    <div class="att-go"><button id="ds-create" class="role-btn" type="button">Create datesheet</button></div>
+  </div>
   <p id="ds-error" class="dash-alert error" hidden></p>
+  <table class="dash-table ds-list"><thead><tr><th>Exam</th><th>Term</th><th>Status</th><th class="crs-actions"></th></tr></thead><tbody id="ds-list"></tbody></table>
 </section>
 
 <section class="panel" id="ds-detail" hidden>
-  <h2 id="ds-title"></h2>
-  <div class="upload-row">
-    <select id="pp-offering" class="select-input" aria-label="Course"></select>
-    <input id="pp-date" type="date" class="text-input small-input" aria-label="Date" />
-    <input id="pp-start" type="time" class="text-input small-input" value="09:00" aria-label="Start" />
-    <input id="pp-end" type="time" class="text-input small-input" value="12:00" aria-label="End" />
-    <input id="pp-room" class="text-input small-input" maxlength="50" placeholder="Room / hall" aria-label="Room" />
-    <button id="pp-add" class="role-btn" type="button">Add paper</button>
+  <div class="panel-header">
+    <div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("exams") }}</div><h2 id="ds-title"></h2> <span id="ds-status"></span></div>
+    <div class="crs-chips" id="ds-detail-summary"></div>
+  </div>
+  <div id="ds-add-box">
+    <h3 class="tt-sub">Add a paper</h3>
+    <div class="ar-form ds-paper-form">
+      <label class="att-span2">Course<select id="pp-offering" class="select-input"></select></label>
+      <label>Date<input id="pp-date" type="date" class="text-input" /></label>
+      <label>Room / hall<input id="pp-room" class="text-input" maxlength="50" placeholder="e.g. Hall A" /></label>
+      <label>Starts<input id="pp-start" type="time" class="text-input" value="09:00" /></label>
+      <label>Ends<input id="pp-end" type="time" class="text-input" value="12:00" /></label>
+      <div class="att-go att-span2"><button id="pp-add" class="role-btn" type="button">Add paper</button></div>
+    </div>
   </div>
   <div id="ds-clashes"></div>
-  <table class="dash-table"><thead><tr><th>Date</th><th>Time</th><th>Course</th><th>Room</th><th></th></tr></thead><tbody id="pp-list"></tbody></table>
-  <div class="form-actions"><button id="ds-publish" class="role-btn" type="button">Publish datesheet</button></div>
-  <div class="upload-row" id="ac-row" hidden>
-    <input id="ac-roll" class="text-input small-input" placeholder="Roll number" aria-label="Roll number" />
-    <button id="ac-print" class="role-btn secondary-btn" type="button">Print admit card</button>
+  <table class="dash-table"><thead><tr><th>Date</th><th>Time</th><th>Course</th><th>Room</th><th class="crs-actions"></th></tr></thead><tbody id="pp-list"></tbody></table>
+  <div class="ds-foot">
+    <button id="ds-publish" class="role-btn" type="button">Publish datesheet</button>
+    <div class="ds-admit" id="ac-row" hidden>
+      <label class="sd-search">{{ nav_icon("search") }}<input id="ac-roll" placeholder="Roll number for an admit card" aria-label="Roll number" /></label>
+      <button id="ac-print" class="role-btn secondary-btn" type="button">{{ nav_icon("download") }} Admit card</button>
+    </div>
   </div>
 </section>
 {% endblock %}

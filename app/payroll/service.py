@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -323,6 +323,44 @@ class PayrollService:
         allowed = Decimal(settings.payroll_casual_leaves_teacher if teacher else settings.payroll_casual_leaves_staff)
         slip.casual_leaves = min(Decimal(str(slip.absent_days)), allowed)
 
+    async def _late_absences(self, emp: Employee, run: PayrollRun, teacher: bool) -> tuple[str, Decimal, uuid.UUID] | None:
+        """Absences and late marks in LAST month that came after last month's payroll was worked out, so were never deducted.
+        Last month's payslip is compared with last month's full attendance now; only the extra days are taken, once, at last
+        month's day rate. Nothing is carried when the administration overrode last month's attendance, and never a refund."""
+        if not settings.payroll_attendance_deductions:
+            return None
+        prev_month = (rules.month_start(run.month) - timedelta(days=1)).replace(day=1)
+        row = (await self.session.execute(select(Payslip, PayrollRun).join(PayrollRun, PayrollRun.id == Payslip.run_id)
+                                          .where(Payslip.employee_id == emp.id, PayrollRun.month == prev_month, PayrollRun.status == S.PAID))).first()
+        if row is None or row[0].attendance_override:
+            return None
+        prev = row[0]
+        att = (await self._attendance(prev_month, [emp])).get(emp.id)
+        if not att or not att.get("recorded"):
+            return None
+        allowed = Decimal(settings.payroll_casual_leaves_teacher if teacher else settings.payroll_casual_leaves_staff)
+        absent_now = Decimal(att["absent"])
+        charged_now = absent_now - min(absent_now, allowed)
+        charged_then = max(Decimal(0), Decimal(str(prev.absent_days)) - Decimal(str(prev.casual_leaves)))
+        extra_absent = max(Decimal(0), charged_now - charged_then)
+        per_day = int(settings.payroll_late_marks_per_day)
+        marks_now = att["late"] + att["early"] + (att["missing_out"] if settings.payroll_missing_checkout_counts else 0)
+        extra_late = max(0, rules.marks_to_days(marks_now, per_day) - rules.marks_to_days(int(prev.late_marks or 0), per_day))
+        days = extra_absent + extra_late
+        if days <= 0:
+            return None
+        owed = rules.unpaid_deduction(prev.base_salary, int(prev.working_days or 26), days)
+        taken = (await self.session.execute(select(func.coalesce(func.sum(PayslipLine.amount), 0)).join(Payslip, Payslip.id == PayslipLine.payslip_id)
+                                            .join(PayrollRun, PayrollRun.id == Payslip.run_id)
+                                            .where(PayslipLine.source == "LATE_ABSENT", PayslipLine.ref_id == prev.id,
+                                                   PayrollRun.status != S.CANCELLED, PayrollRun.id != run.id))).scalar_one()
+        amount = rules.q2(owed - rules.q2(taken))
+        if amount <= 0:
+            return None
+        parts = ([f"{float(extra_absent):g} day{'s' if extra_absent != 1 else ''} absent"] if extra_absent else []) + \
+                ([f"{extra_late} day{'s' if extra_late != 1 else ''} for late marks"] if extra_late else [])
+        return (f"{prev_month:%B %Y}, after that payroll was paid: " + " and ".join(parts), amount, prev.id)
+
     async def _fill(self, slip: Payslip, emp: Employee, run: PayrollRun, base: Decimal, att: dict | None = None, teacher: bool | None = None) -> None:
         """(Re)build every line of one payslip: salary, pay items, bonuses, absences, late marks, unpaid days, adjustment, security and advances."""
         await self.session.execute(PayslipLine.__table__.delete().where(PayslipLine.payslip_id == slip.id))
@@ -361,6 +399,9 @@ class PayrollService:
         if late_days > 0:
             ded.append((LineKind.DEDUCTION, "LATE", f"{slip.late_marks} late arrivals / early leavings (every {per_day} = 1 day): {late_days} day{'s' if late_days != 1 else ''}",
                         rules.unpaid_deduction(base, wd, late_days), None))
+        carried = await self._late_absences(emp, run, teacher)
+        if carried is not None:
+            ded.append((LineKind.DEDUCTION, "LATE_ABSENT", carried[0], carried[1], carried[2]))
         if Decimal(str(slip.unpaid_days)) > 0:
             ded.append((LineKind.DEDUCTION, "UNPAID", f"Unpaid leave ({float(slip.unpaid_days):g} day{'s' if float(slip.unpaid_days) != 1 else ''})", rules.unpaid_deduction(base, wd, slip.unpaid_days), None))
         if adj < 0:
@@ -700,6 +741,27 @@ class PayrollService:
                                            .order_by(PayrollRun.month.desc()))).all()
         return [{"id": s.id, "month": r.month, "month_label": r.month.strftime("%B %Y"), "gross": _f(s.gross), "deductions": _f(s.deductions), "net": _f(s.net), "paid_date": r.paid_date} for s, r in rows]
     # ------------------------------------------------------------------ security deposits
+    async def my_security(self, user_id: uuid.UUID) -> dict | None:
+        """One person's own security deposit: what is held now, the target (one basic salary), each month's cut, and any pay-back."""
+        emp = (await self.session.execute(select(Employee).where(Employee.user_id == user_id))).scalars().first()
+        if emp is None:
+            return None
+        st = await self.session.get(EmployeePayrollSetting, emp.id)
+        pct = Decimal(str(st.security_percent)) if st is not None and st.security_percent is not None else Decimal(str(settings.payroll_security_percent))
+        base = (await self._salaries([emp.id], institute_today())).get(emp.id) or Decimal(0)
+        cuts = (await self.session.execute(select(PayrollRun.month, PayslipLine.amount).join(Payslip, Payslip.id == PayslipLine.payslip_id)
+                                           .join(PayrollRun, PayrollRun.id == Payslip.run_id)
+                                           .where(Payslip.employee_id == emp.id, PayslipLine.source == "SECURITY", PayrollRun.status == S.PAID, Payslip.held.is_(False))
+                                           .order_by(PayrollRun.month.desc()))).all()
+        opening = rules.q2(st.security_opening if st else 0)
+        released = rules.q2(st.security_released if st else 0)
+        collected = rules.q2(sum((Decimal(str(a)) for _, a in cuts), Decimal(0))) + opening
+        held = max(Decimal(0), collected - released)
+        return {"percent": _f(pct), "own_rate": st is not None and st.security_percent is not None, "held": _f(held), "target": _f(base),
+                "remaining": _f(max(Decimal(0), rules.q2(base) - collected)) if not released else 0.0, "opening": _f(opening),
+                "released": _f(released), "released_on": st.security_released_on if st else None,
+                "months": [{"month": m, "month_label": m.strftime("%B %Y"), "amount": _f(a)} for m, a in cuts]}
+
     async def security_report(self) -> dict:
         people = (await self.session.execute(select(Employee, JobRole.title).join(JobRole, JobRole.id == Employee.job_role_id).where(Employee.status.in_(ACTIVE))
                                              .order_by(Employee.first_name, Employee.last_name))).all()
@@ -814,6 +876,8 @@ class PayrollService:
                 return "Advance recovery"
             if source == "UNPAID":
                 return "Unpaid days"
+            if source == "LATE_ABSENT":
+                return "Absences carried from the month before"
             return label.split(":")[0].strip()[:60] or "Deduction"
 
         rows = (await self.session.execute(

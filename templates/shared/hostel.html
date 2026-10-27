@@ -1,4 +1,5 @@
 {% extends base_template %}
+{% from "_icons.html" import nav_icon %}
 {% block allowed_roles %}{{ allowed_roles|default("ADMIN") }}{% endblock %}
 {% block title %}Hostel{% endblock %}
 {% block page_title %}Hostel{% endblock %}
@@ -8,13 +9,13 @@
 <section class="stat-grid" id="h-kpis" aria-label="Hostel summary"></section>
 
 <section class="sh-card">
-  <div class="toolbar">
-    <input id="h-q" class="text-input" type="search" placeholder="Room, block or resident" aria-label="Search rooms" />
+  <div class="hs-bar">
+    <label class="sd-search">{{ nav_icon("search") }}<input id="h-q" type="search" placeholder="Room, block or resident" aria-label="Search rooms" /></label>
     <label class="check-row"><input type="checkbox" id="h-free" /> Rooms with a free bed only</label>
   </div>
   <div class="table-scroll">
     <table class="dash-table" id="h-rooms">
-      <thead><tr><th>Room</th><th>Block</th><th>For</th><th>Beds</th><th>Residents</th><th>Monthly fee</th></tr></thead>
+      <thead><tr><th>Room</th><th>For</th><th>Beds used</th><th class="num">Fee / bed</th><th>Residents</th><th class="crs-actions"></th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -23,32 +24,32 @@
 
 <section class="sh-card" data-manage hidden>
   <h2 class="panel-title">Add a room</h2>
-  <form id="h-room-form" class="form-grid" novalidate>
+  <form id="h-room-form" class="ar-form" novalidate>
     <label>Room name or number<input id="h-code" class="text-input" type="text" maxlength="30" required /></label>
     <label>Block (optional)<input id="h-block" class="text-input" type="text" maxlength="30" /></label>
     <label>Beds<input id="h-cap" class="text-input" type="number" min="1" max="30" required /></label>
     <label>For
-      <select id="h-gender" class="text-input"><option value="ANY">Anyone</option><option value="MALE">Male students</option><option value="FEMALE">Female students</option></select>
+      <select id="h-gender" class="select-input"><option value="ANY">Anyone</option><option value="MALE">Male students</option><option value="FEMALE">Female students</option></select>
     </label>
     <label>Monthly fee per bed (Rs.)<input id="h-fee" class="text-input" type="number" min="0" step="1" /></label>
-    <button type="submit" class="role-btn">Add room</button>
+    <div class="att-go att-span2"><button type="submit" class="role-btn">Add room</button></div>
   </form>
 </section>
 
 <section class="sh-card" data-manage hidden>
   <h2 class="panel-title">Monthly hostel charge</h2>
   <p class="cc-meta">Adds one month's room fee to the dues of every current resident. A month can be charged only once per resident.</p>
-  <div class="toolbar">
-    <input id="h-month" class="text-input" type="month" aria-label="Month to charge" />
-    <button type="button" class="role-btn secondary-btn" id="h-check">Check first</button>
-    <button type="button" class="role-btn" id="h-charge" disabled>Add the charge</button>
+  <div class="ar-form">
+    <label>Month<input id="h-month" class="text-input" type="month" /></label>
+    <div class="att-go"><button type="button" class="role-btn secondary-btn" id="h-check">Check first</button></div>
+    <div class="att-go"><button type="button" class="role-btn" id="h-charge" disabled>Add the charge</button></div>
   </div>
   <p class="cc-meta" id="h-charge-note"></p>
 </section>
 
 <section class="sh-card">
   <h2 class="panel-title">History of stays</h2>
-  <div class="toolbar"><input id="h-hq" class="text-input" type="search" placeholder="Student name or roll number" aria-label="Search history" /></div>
+  <div class="hs-bar"><label class="sd-search">{{ nav_icon("search") }}<input id="h-hq" type="search" placeholder="Student name or roll number" aria-label="Search history" /></label></div>
   <div class="table-scroll">
     <table class="dash-table" id="h-hist">
       <thead><tr><th>Student</th><th>Room</th><th>From</th><th>To</th><th>Note</th></tr></thead>

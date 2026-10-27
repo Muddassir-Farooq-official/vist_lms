@@ -98,20 +98,39 @@
     D.people("req-list", rows);
   }
 
+  // The administrator can open this panel directly (Panels menu) without "View as": they have no staff record,
+  // so skip the personal lists (they would only fail) and say how to see a real person's page.
+  function adminLooking(me, box) {
+    const roles = (me && me.roles) || [];
+    if (!me || me.viewing_as_by || roles.indexOf("ADMIN") === -1) return false;
+    const e = $(box);
+    if (e) {
+      e.className = "dash-alert";
+      e.innerHTML = 'You are looking at this panel as the administrator, so personal items (own attendance, pay, requests) are empty. ' +
+        'To see one person\u2019s page, use <a href="/dashboard/admin/view-as">View as a person</a>.';
+      e.hidden = false;
+    }
+    return true;
+  }
+
   async function load(me) {
     D.greet("st-greet", "st-date", me);
-    const d = await D.getAll({
-      attendance: "/api/v1/staff-attendance/me",
+    const admin = adminLooking(me, "st-error");
+    const urls = {
       tasks: "/api/v1/tasks/summary",
       inbox: "/api/v1/tasks/inbox",
+      calendar: D.upcoming(),
+      announcements: "/api/v1/announcements?limit=1",
+    };
+    if (!admin) Object.assign(urls, {
+      attendance: "/api/v1/staff-attendance/me",
       applications: "/api/v1/applications/mine",
       purchases: "/api/v1/purchases/mine?limit=20",
       payslips: "/api/v1/payroll/me",
       profile: "/api/v1/profile-changes/me",
-      calendar: D.upcoming(),
-      announcements: "/api/v1/announcements?limit=1",
     });
-    if (!d.tasks && !d.applications) { const e = $("st-error"); e.textContent = "Could not load your dashboard. Please refresh the page."; e.hidden = false; }
+    const d = await D.getAll(urls);
+    if (!admin && !d.tasks && !d.applications) { const e = $("st-error"); e.textContent = "Could not load your dashboard. Please refresh the page."; e.hidden = false; }
     D.run(function () { kpis(d); });
     D.run(function () { tasks(d.inbox); });
     D.run(function () { attention(d); });

@@ -6,24 +6,25 @@
 {% block content %}
 <div class="portal-tabs" role="tablist" data-auto-tabs>
   <button class="portal-tab active" data-tab="take" role="tab" aria-selected="true"><span>Take attendance</span></button>
-  <button class="portal-tab" data-tab="requests" role="tab" aria-selected="false"><span>My correction requests</span></button>
+  <button class="portal-tab" data-tab="requests" role="tab" aria-selected="false"><span>My correction requests</span> <span class="ss-count" id="my-req-count"></span></button>
 </div>
 
 <div class="portal-tab-panel" data-tab-panel="take">
-<section class="panel">
-  <div class="toolbar">
-    <select id="term-label-input" class="select-input">
-      <option value="">All terms</option>
-    </select>
+<section class="panel" id="today-panel" hidden>
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("clock") }}</div><h2>Today's classes</h2></div><span class="sd-dim" id="today-date"></span></div>
+  <div class="att-today" id="today-classes"></div>
+</section>
+
+<section class="panel" id="register-panel">
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("attendance") }}</div><h2>Register</h2></div></div>
+  <div class="ar-form att-pick">
+    <label>Term<select id="term-label-input" class="select-input"><option value="">All terms</option></select></label>
+    <label class="att-span3">Course<select id="offering-select" class="select-input"><option value="">Choose a course…</option></select></label>
   </div>
-  <select id="offering-select" class="select-input" style="margin-top:12px">
-    <option value="">— Choose a course —</option>
-  </select>
 
   <div id="session-picker-area" hidden>
-    <div class="form-field" style="margin-top:16px">
-      <label for="session-select">Select Class Session</label>
-      <select id="session-select" class="select-input"></select>
+    <div class="ar-form att-pick">
+      <label class="att-span4">Class<select id="session-select" class="select-input"></select></label>
     </div>
     <div id="session-details" class="panel-hint" hidden></div>
     <div id="window-notice" class="dash-alert" hidden></div>

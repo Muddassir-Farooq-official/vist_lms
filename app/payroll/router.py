@@ -14,6 +14,7 @@ from app.accounts.schemas import ReasonIn
 from app.auth.permissions import Permissions
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser, get_current_user, require_permission
+from app.core.exceptions import ResourceNotFoundError
 from app.payroll.models import AdvanceStatus, PayItemCalc, PayItemKind
 from app.payroll.payslip_pdf import render_payslip_pdf
 from app.payroll.service import PayrollService
@@ -221,6 +222,14 @@ async def reverse(run_id: uuid.UUID, payload: ReasonIn, current_user: CurrentUse
 
 
 # ============================================================ payslips
+@router.get("/me/security", summary="My own security deposit: held now, the target, each month's cut and any pay-back")
+async def my_security(current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    out = await PayrollService(db).my_security(current_user.id)
+    if out is None:
+        raise ResourceNotFoundError("You are not on the staff list, so there is no security deposit.")
+    return out
+
+
 @router.get("/me", summary="My own payslips (paid months only)")
 async def my_payslips(current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> list[dict]:
     return await PayrollService(db).my_payslips(current_user.id)

@@ -24,6 +24,27 @@ async def list_programs(
     return [ProgramOut.model_validate(p) for p in programs]
 
 
+@router.get("/overview", summary="Each program with its numbers: students by status, courses and credit hours in its curriculum")
+async def programs_overview(current_user: CurrentUser = Depends(require_permission(Permissions.PROGRAM_VIEW)), db=Depends(get_db)) -> list[dict]:
+    from sqlalchemy import func, select
+
+    from app.academics.models import Course, CourseProgram
+    from app.students.models import Student
+
+    programs = await ProgramService(db).list_programs(active_only=False)
+    students: dict = {}
+    for pid, status, n in (await db.execute(select(Student.program_id, Student.status, func.count()).where(Student.program_id.is_not(None))
+                                            .group_by(Student.program_id, Student.status))).all():
+        students.setdefault(pid, {})[status.value if hasattr(status, "value") else str(status)] = int(n)
+    curriculum: dict = {}
+    for pid, n, ch, sems in (await db.execute(select(CourseProgram.program_id, func.count(), func.coalesce(func.sum(Course.credit_hours), 0),
+                                                     func.count(func.distinct(CourseProgram.semester_number)))
+                                              .join(Course, Course.id == CourseProgram.course_id).group_by(CourseProgram.program_id))).all():
+        curriculum[pid] = {"courses": int(n), "credit_hours": int(ch), "semesters_planned": int(sems)}
+    return [{**ProgramOut.model_validate(p).model_dump(), "students": students.get(p.id, {}),
+             "curriculum": curriculum.get(p.id, {"courses": 0, "credit_hours": 0, "semesters_planned": 0})} for p in programs]
+
+
 @router.post("", response_model=ProgramOut, status_code=201, summary="Create a program")
 async def create_program(
     payload: ProgramCreate,

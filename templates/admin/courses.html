@@ -9,118 +9,151 @@
   <button class="portal-tab active" data-tab="catalog" role="tab">{{ nav_icon("graduation-cap") }}<span>Catalog</span></button>
   <button class="portal-tab" data-tab="curriculum" role="tab">{{ nav_icon("programs") }}<span>Curriculum</span></button>
   <button class="portal-tab" data-tab="offerings" role="tab">{{ nav_icon("issue-return") }}<span>Offerings</span></button>
-  <button class="portal-tab" data-tab="performance" role="tab">{{ nav_icon("payroll") }}<span>Performance</span></button>
+  <button class="portal-tab" data-tab="terms" role="tab">{{ nav_icon("clock") }}<span>Academic terms</span></button>
+  <button class="portal-tab" data-tab="performance" role="tab">{{ nav_icon("payroll") }}<span>Teacher performance</span></button>
 </div>
 
 <!-- ============ CATALOG ============ -->
 <div class="portal-tab-panel" data-tab-panel="catalog">
-  <section class="panel">
-    <div class="panel-header">
-      <div class="panel-header-left">
-        <div class="panel-icon-badge">{{ nav_icon("graduation-cap") }}</div>
-        <h2>Course Catalog</h2>
-      </div>
-      <button type="button" class="role-btn" id="open-add-course">+ Add Course</button>
+  <section class="panel sd-panel">
+    <div class="sd-toolbar">
+      <label class="sd-search">{{ nav_icon("search") }}<input type="search" id="course-q" placeholder="Search code or title" aria-label="Search courses" /></label>
+      <select id="course-status" class="select-input" aria-label="Status">
+        <option value="">All courses</option><option value="active">Active</option><option value="inactive">Inactive</option>
+      </select>
+      <div class="sd-tools"><button type="button" class="role-btn" id="open-add-course">{{ nav_icon("plus") }}<span>Add course</span></button></div>
     </div>
-    <p class="panel-hint">Every course an institute-wide catalog entry — link it into one or more programs' curricula in the Curriculum tab.</p>
-    <table class="dash-table" id="courses-table">
-      <thead><tr><th>Code</th><th>Title</th><th>Credit Hours</th><th>Status</th><th></th></tr></thead>
-      <tbody id="courses-tbody"></tbody>
-    </table>
+    <p class="crs-note">Each course is entered once for the whole institute, then placed into programs on the Curriculum tab. <span id="course-count"></span></p>
+    <div class="sd-table-wrap">
+      <table class="dash-table sd-table no-stack" id="courses-table">
+        <thead><tr><th>Course</th><th class="num">Credit hours</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead>
+        <tbody id="courses-tbody"></tbody>
+      </table>
+    </div>
+    <p class="empty-state" id="courses-empty" hidden>No course matches this search.</p>
   </section>
 </div>
 
 <!-- ============ CURRICULUM ============ -->
 <div class="portal-tab-panel" data-tab-panel="curriculum" hidden>
-  <section class="panel">
-    <div class="panel-header">
-      <div class="panel-header-left">
-        <div class="panel-icon-badge">{{ nav_icon("programs") }}</div>
-        <h2>Program Curriculum</h2>
-      </div>
+  <section class="panel sd-panel">
+    <div class="sd-toolbar">
+      <select id="curriculum-program-select" class="select-input crs-program" aria-label="Program"><option value="">Select a program&hellip;</option></select>
+      <div class="crs-chips" id="cur-summary"></div>
     </div>
-    <div class="toolbar">
-      <select id="curriculum-program-select" class="select-input"><option value="">Select a program&hellip;</option></select>
-    </div>
-    <table class="dash-table" id="curriculum-table">
-      <thead><tr><th>Semester</th><th>Course</th><th>Credit Hours</th></tr></thead>
-      <tbody id="curriculum-tbody"></tbody>
-    </table>
-    <p class="empty-state" id="curriculum-empty" hidden>Select a program to see its curriculum.</p>
-
-    <h3 class="modal-subhead">Add Course to Curriculum</h3>
-    <form id="link-course-form" class="form-grid two-col">
-      <div class="form-field">
-        <label for="lc-course">Course</label>
-        <select id="lc-course" class="select-input" required><option value="">Select&hellip;</option></select>
-      </div>
-      <div class="form-field">
-        <label for="lc-semester">Semester Number</label>
-        <select id="lc-semester" class="select-input" required>
-          <option value="">Select&hellip;</option>
-          <option value="1">1</option><option value="2">2</option><option value="3">3</option>
-          <option value="4">4</option><option value="5">5</option><option value="6">6</option>
-          <option value="7">7</option><option value="8">8</option><option value="9">9</option>
-          <option value="10">10</option>
-        </select>
-      </div>
-      <div class="form-actions two-span"><button type="submit" class="role-btn" id="link-course-submit">Add to Curriculum</button></div>
+    <form id="link-course-form" class="crs-add" novalidate>
+      <span class="crs-add-label">Add a course to this program</span>
+      <select id="lc-course" class="select-input" required aria-label="Course"><option value="">Course&hellip;</option></select>
+      <select id="lc-semester" class="select-input" required aria-label="Semester">
+        <option value="">Semester&hellip;</option>
+        <option value="1">Semester 1</option><option value="2">Semester 2</option><option value="3">Semester 3</option>
+        <option value="4">Semester 4</option><option value="5">Semester 5</option><option value="6">Semester 6</option>
+        <option value="7">Semester 7</option><option value="8">Semester 8</option><option value="9">Semester 9</option>
+        <option value="10">Semester 10</option>
+      </select>
+      <button type="submit" class="role-btn" id="link-course-submit">{{ nav_icon("plus") }}<span>Add</span></button>
     </form>
-    <p id="link-course-error" class="dash-alert error" hidden></p>
+    <p id="link-course-error" class="dash-alert error crs-pad" hidden></p>
+    <div class="crs-sems" id="curriculum-groups"></div>
+    <table class="dash-table" id="curriculum-table" hidden><tbody id="curriculum-tbody"></tbody></table>
+    <p class="empty-state" id="curriculum-empty" hidden>Select a program to see its curriculum.</p>
   </section>
 </div>
 
-<!-- ============ OFFERINGS & MATERIALS ============ -->
+<!-- ============ OFFERINGS ============ -->
 <div class="portal-tab-panel" data-tab-panel="offerings" hidden>
-  <section class="panel">
-    <div class="panel-header">
-      <div class="panel-header-left">
-        <div class="panel-icon-badge">{{ nav_icon("issue-return") }}</div>
-        <h2>Term Offerings</h2>
+  <section class="panel sd-panel">
+    <div class="sd-toolbar">
+      <select id="term-label-input" class="select-input crs-program" aria-label="Term"><option value="">Select a term&hellip;</option></select>
+      <button type="button" class="ss-icon-btn" id="refresh-terms-btn" title="Refresh the list of terms" aria-label="Refresh terms">&#8635;</button>
+      <button type="button" id="load-offerings-btn" hidden>Load</button>
+      <label class="crs-toggle"><input type="checkbox" id="only-unassigned" /> Only without a teacher <span id="unassigned-count"></span></label>
+      <div class="sd-tools">
+        <button type="button" class="role-btn" id="open-add-offering">{{ nav_icon("plus") }}<span>Create offering</span></button>
+        <button type="button" class="role-btn secondary-btn" id="open-generate-offerings">Open a semester</button>
+        <details class="sd-menu">
+          <summary class="role-btn secondary-btn" aria-label="More term actions">{{ nav_icon("more") }}<span>More</span></summary>
+          <div class="sd-menu-list" role="menu">
+            <button type="button" id="check-readiness-btn" role="menuitem">{{ nav_icon("check-circle") }}<span>Check term readiness</span></button>
+            <button type="button" id="open-auto-schedule" role="menuitem">{{ nav_icon("clock") }}<span>Auto-schedule the term&hellip;</span></button>
+            <button type="button" id="open-copy-timetable" role="menuitem">{{ nav_icon("file") }}<span>Copy last term&rsquo;s timetable&hellip;</span></button>
+            <button type="button" id="end-semester-btn" role="menuitem" class="danger">{{ nav_icon("ban") }}<span>End semester&hellip;</span></button>
+          </div>
+        </details>
       </div>
-      <button type="button" class="role-btn" id="open-add-offering">+ Create Offering</button>
     </div>
-    <p class="panel-hint">Click any row's <strong>Manage</strong> button to open its own page — syllabus, timetable, and class sessions.</p>
-    <div class="toolbar">
-      <select id="term-label-input" class="select-input"><option value="">Select a term&hellip;</option></select>
-      <button type="button" class="role-btn small-btn" id="refresh-terms-btn" title="Refresh the list of terms">&#8635;</button>
-      <button type="button" class="role-btn" id="load-offerings-btn">Load</button>
-      <button type="button" class="role-btn secondary-btn" id="check-readiness-btn">Check Term Readiness</button>
-      <button type="button" class="role-btn secondary-btn" id="open-generate-offerings">Open a Semester</button>
-      <button type="button" class="role-btn secondary-btn" id="open-auto-schedule">Auto-schedule Term</button>
-      <button type="button" class="role-btn secondary-btn" id="open-copy-timetable">Copy Timetable</button>
-      <button type="button" class="danger-btn" id="end-semester-btn">End Semester</button>
+    <div class="crs-chips crs-pad" id="off-summary"></div>
+    <div id="readiness-panel" class="panel-hint crs-pad" hidden></div>
+    <div class="sd-table-wrap">
+      <table class="dash-table sd-table no-stack crs-off" id="offerings-table">
+        <thead><tr><th>Course</th><th>Program &middot; semester</th><th>Teacher</th><th>Enrolled</th><th>Enrolment</th><th><span class="sr-only">Actions</span></th></tr></thead>
+        <tbody id="offerings-tbody"></tbody>
+      </table>
     </div>
-    <div id="readiness-panel" class="panel-hint" hidden></div>
-    <label class="check-row"><input type="checkbox" id="only-unassigned" /> Show only courses without a teacher <span id="unassigned-count" style="font-weight:400;color:var(--slate-500, #64748b)"></span></label>
-    <table class="dash-table" id="offerings-table">
-      <thead><tr><th>Course</th><th>Program &middot; Semester</th><th>Section</th><th>Credit Hours</th><th>Teacher</th><th>Enrolled / Seats</th><th>Open?</th><th></th></tr></thead>
-      <tbody id="offerings-tbody"></tbody>
-    </table>
     <p class="empty-state" id="offerings-empty" hidden>Select a term above to see its offerings, or create a new one.</p>
-    <p id="end-semester-error" class="dash-alert error" hidden></p>
-    <p id="end-semester-success" class="success-text" hidden></p>
+    <p id="end-semester-error" class="dash-alert error crs-pad" hidden></p>
+    <p id="end-semester-success" class="success-text crs-pad" hidden></p>
+  </section>
+</div>
+
+<!-- ============ ACADEMIC TERMS ============ -->
+<div class="portal-tab-panel" data-tab-panel="terms" hidden>
+  <section class="panel sd-panel" id="terms-panel" aria-labelledby="terms-h">
+    <div class="jr-head">
+      <h2 id="terms-h">Academic terms</h2>
+      <p class="panel-hint">Offerings, fee structures, datesheets and admissions pick their term from this list, so a term is never typed two ways.
+        Edit a term any time: a new name is written on every record that uses it. Close a term once it is over; it stays on records and result cards.</p>
+    </div>
+    <form class="jr-form crs-term-form" id="term-add-form" novalidate>
+      <label>Name<input type="text" id="term-new-label" class="text-input" maxlength="50" placeholder="e.g. Spring 2027" /></label>
+      <label>Starts<input type="date" id="term-new-start" class="text-input" /></label>
+      <label>Ends<input type="date" id="term-new-end" class="text-input" /></label>
+      <button type="submit" class="role-btn" id="term-add-btn">{{ nav_icon("plus") }}<span>Add term</span></button>
+    </form>
+    <p id="terms-error" class="dash-alert error crs-pad" hidden></p>
+    <div class="sd-table-wrap">
+      <table class="dash-table sd-table no-stack crs-terms" id="terms-table">
+        <thead><tr><th>Term</th><th>Dates</th><th>Used by</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead>
+        <tbody id="terms-tbody"></tbody>
+      </table>
+    </div>
   </section>
 </div>
 
 <!-- ============ TEACHER PERFORMANCE ============ -->
 <div class="portal-tab-panel" data-tab-panel="performance" hidden>
-  <section class="panel">
-    <div class="panel-header">
-      <div class="panel-header-left">
-        <div class="panel-icon-badge">{{ nav_icon("payroll") }}</div>
-        <h2>Teacher Performance</h2>
-      </div>
-      <button type="button" class="role-btn small-btn" id="refresh-performance-btn">Refresh</button>
+  <section class="panel sd-panel">
+    <div class="jr-head crs-head-row">
+      <div><h2>Teacher performance</h2>
+        <p class="panel-hint">Pass rate counts only enrolments with a recorded result; courses still running are not counted either way.</p></div>
+      <button type="button" class="role-btn secondary-btn small-btn" id="refresh-performance-btn">Refresh</button>
     </div>
-    <p class="panel-hint">Pass rate only counts enrollments with a recorded outcome — enrollments still in progress or awaiting grading aren't counted either way.</p>
-    <table class="dash-table" id="performance-table">
-      <thead><tr><th>Teacher</th><th>Courses Taught</th><th>Students Taught</th><th>Passed</th><th>Failed</th><th>Pass Rate</th><th>Complaints Against</th></tr></thead>
-      <tbody id="performance-tbody"></tbody>
-    </table>
+    <div class="sd-table-wrap">
+      <table class="dash-table sd-table no-stack" id="performance-table">
+        <thead><tr><th>Teacher</th><th class="num">Courses</th><th class="num">Students</th><th>Results</th><th>Pass rate</th><th class="num">Complaints</th></tr></thead>
+        <tbody id="performance-tbody"></tbody>
+      </table>
+    </div>
     <p class="empty-state" id="performance-empty" hidden>No teacher is currently assigned to any course offering.</p>
   </section>
 </div>
+
+<dialog id="term-edit" class="modal" aria-labelledby="term-edit-h">
+  <form class="modal-body" id="term-edit-form" novalidate>
+    <h2 id="term-edit-h">Edit term</h2>
+    <p class="panel-hint" id="term-edit-hint"></p>
+    <div class="form-field"><label for="te-label">Name</label><input id="te-label" class="text-input" maxlength="50" /></div>
+    <div class="form-grid two-col">
+      <div class="form-field"><label for="te-start">Starts</label><input id="te-start" type="date" class="text-input" /></div>
+      <div class="form-field"><label for="te-end">Ends</label><input id="te-end" type="date" class="text-input" /></div>
+    </div>
+    <div class="form-field"><label for="te-status">Status</label>
+      <select id="te-status" class="select-input"><option value="OPEN">Open: can be used for new offerings and fees</option><option value="CLOSED">Closed: kept for records only</option></select></div>
+    <p class="dash-alert error" id="term-edit-error" hidden></p>
+    <div class="form-actions"><button type="submit" class="role-btn" id="term-edit-save">Save term</button></div>
+    <button type="button" class="modal-close-btn" id="term-edit-close">Cancel</button>
+  </form>
+</dialog>
 
 <dialog id="add-course-modal" class="modal">
   <div class="modal-body">
@@ -250,19 +283,6 @@
     <button id="close-add-offering-modal" class="back-link modal-close-btn" type="button">Close</button>
   </div>
 </dialog>
-
-<section class="panel" id="terms-panel" aria-labelledby="terms-h">
-  <h2 id="terms-h">Academic Terms</h2>
-  <p class="panel-hint">New course offerings and fee structures can only use a term from this list, so a term is never typed two different ways. Close a term once it is over (it stays in records and result cards).</p>
-  <div class="upload-row">
-    <input type="text" id="term-new-label" class="text-input small-input" maxlength="50" placeholder="e.g. Spring 2027" aria-label="Term name" />
-    <input type="date" id="term-new-start" class="text-input small-input" aria-label="Start date" />
-    <input type="date" id="term-new-end" class="text-input small-input" aria-label="End date" />
-    <button type="button" class="role-btn" id="term-add-btn">Add term</button>
-  </div>
-  <p id="terms-error" class="dash-alert error" hidden></p>
-  <table class="dash-table"><thead><tr><th>Term</th><th>Starts</th><th>Ends</th><th>Status</th><th></th></tr></thead><tbody id="terms-tbody"></tbody></table>
-</section>
 
 {% endblock %}
 

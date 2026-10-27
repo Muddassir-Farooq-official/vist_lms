@@ -18,12 +18,22 @@
   async function loadList() {
     const r = await VA.fetchJson(API + "/schedules");
     if (!r.ok) return err(r.body);
+    const pub = r.body.filter(function (s) { return s.status === "PUBLISHED"; }).length;
+    document.getElementById("ds-summary").innerHTML = r.body.length
+      ? '<span class="crs-chip"><b>' + pub + "</b> published</span>" + '<span class="crs-chip"><b>' + (r.body.length - pub) + "</b> draft</span>" : "";
     document.getElementById("ds-list").innerHTML = r.body.map(function (s) {
-      return "<tr><td>" + esc(s.term_label) + "</td><td>" + esc(s.name) + "</td><td>" + (s.status === "PUBLISHED" ? "Published" : "Draft") +
-        '</td><td><button type="button" class="row-action" data-open="' + s.id + '">Open</button></td></tr>';
-    }).join("") || '<tr><td colspan="4">No datesheets yet.</td></tr>';
+      return '<tr data-row="' + s.id + '"' + (current && current.id === s.id ? ' class="is-open"' : "") + "><td><strong>" + esc(s.name) + "</strong>" +
+        (s.published_at ? '<small class="sd-dim ds-when">Published ' + esc(VA.formatDateLong(String(s.published_at).slice(0, 10))) + "</small>" : "") +
+        "</td><td>" + esc(s.term_label) + "</td><td>" + pill(s.status) +
+        '</td><td class="crs-actions"><button type="button" class="sd-view" data-open="' + s.id + '">Open</button></td></tr>';
+    }).join("") || '<tr><td colspan="4" class="sd-dim">No datesheets yet. Create one above.</td></tr>';
     document.querySelectorAll("[data-open]").forEach(function (b) { b.addEventListener("click", function () { open(b.dataset.open); }); });
   }
+
+  function pill(status) {
+    return status === "PUBLISHED" ? '<span class="status-pill active">Published</span>' : '<span class="status-pill pending">Draft</span>';
+  }
+  function hm(t) { return String(t || "").slice(0, 5); }
 
   async function loadOfferings(term) {
     const r = await VA.fetchJson("/api/v1/academics/offerings?term_label=" + encodeURIComponent(term));
@@ -36,24 +46,36 @@
   function render(d) {
     current = d;
     document.getElementById("ds-detail").hidden = false;
-    document.getElementById("ds-title").textContent = d.name + " \u2014 " + d.term_label + (d.status === "PUBLISHED" ? " (published)" : " (draft)");
+    const published = d.status === "PUBLISHED";
+    document.getElementById("ds-title").textContent = d.name + " \u00b7 " + d.term_label;
+    document.getElementById("ds-status").innerHTML = pill(d.status);
+    const days = {};
+    d.papers.forEach(function (p) { days[p.exam_date] = 1; });
+    document.getElementById("ds-detail-summary").innerHTML =
+      '<span class="crs-chip"><b>' + d.papers.length + "</b> paper" + (d.papers.length === 1 ? "" : "s") + "</span>" +
+      '<span class="crs-chip"><b>' + Object.keys(days).length + "</b> day" + (Object.keys(days).length === 1 ? "" : "s") + "</span>";
+    document.querySelectorAll("#ds-list tr[data-row]").forEach(function (tr) { tr.classList.toggle("is-open", tr.dataset.row === d.id); });
     document.getElementById("pp-list").innerHTML = d.papers.map(function (p) {
-      return "<tr><td>" + esc(p.exam_date) + "</td><td>" + esc(p.start_time + "\u2013" + p.end_time) + "</td><td>" + esc(p.course_code + " " + p.course_title) +
-        "</td><td>" + esc(p.room) + '</td><td><button type="button" class="row-action" data-del="' + p.id + '">Remove</button></td></tr>';
-    }).join("") || '<tr><td colspan="5">No papers yet.</td></tr>';
+      return "<tr><td><strong>" + esc(VA.formatDateLong(p.exam_date)) + "</strong></td><td>" + esc(hm(p.start_time) + "\u2013" + hm(p.end_time)) +
+        '</td><td><span class="crs-code">' + esc(p.course_code) + "</span> " + esc(p.course_title) +
+        "</td><td>" + esc(p.room) + '</td><td class="crs-actions">' +
+        '<button type="button" class="sd-view tt-del" data-del="' + p.id + '">Remove</button></td></tr>';
+    }).join("") || '<tr><td colspan="5" class="sd-dim">No papers yet. Add the first one above.</td></tr>';
     document.querySelectorAll("[data-del]").forEach(function (b) {
       b.addEventListener("click", async function () {
-        if (!window.confirm("Remove this paper?")) return;
+        if (!(await VA.confirm("Remove this paper?", "Remove"))) return;
         const r = await VA.fetchJson(API + "/papers/" + b.dataset.del, { method: "DELETE" });
         if (!r.ok) return err(r.body);
+        VA.toast("Paper removed.");
         open(current.id);
       });
     });
     document.getElementById("ds-clashes").innerHTML = d.clashes.length
-      ? '<p class="dash-alert error"><strong>' + d.clashes.length + " clash(es) to fix before publishing:</strong><br>" +
-        d.clashes.map(function (c) { return esc(c.date + ": " + c.papers.join(" / ") + " \u2014 " + c.detail); }).join("<br>") + "</p>"
-      : (d.papers.length ? '<p class="success-text">No clashes.</p>' : "");
-    document.getElementById("ds-publish").hidden = d.status === "PUBLISHED";
+      ? '<div class="dash-alert error ds-clash"><strong>' + d.clashes.length + " clash" + (d.clashes.length === 1 ? "" : "es") + " to fix before publishing</strong><ul>" +
+        d.clashes.map(function (c) { return "<li><b>" + esc(VA.formatDateLong(c.date)) + "</b>: " + esc(c.papers.join(" / ")) + " \u2014 " + esc(c.detail) + "</li>"; }).join("") + "</ul></div>"
+      : (d.papers.length ? '<p class="ds-ok">No clashes: every student, teacher and room has one paper at a time.</p>' : "");
+    document.getElementById("ds-publish").hidden = published;
+    document.getElementById("ds-publish").disabled = !d.papers.length || d.clashes.length > 0;
     document.getElementById("ac-row").hidden = d.status !== "PUBLISHED";
   }
 
@@ -72,8 +94,10 @@
     const r = await VA.fetchJson(API + "/schedules", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     if (!r.ok) return err(r.body);
     document.getElementById("ds-name").value = "";
+    VA.toast("Datesheet created.");
     await loadList();
-    open(r.body.id);
+    await open(r.body.id);
+    document.getElementById("ds-detail").scrollIntoView({ behavior: "smooth", block: "start" });
   });
 
   document.getElementById("pp-add").addEventListener("click", async function () {
@@ -84,12 +108,13 @@
     if (!body.course_offering_id || !body.exam_date || !body.room) return err(null, "Choose the course, date and room.");
     const r = await VA.fetchJson(API + "/schedules/" + current.id + "/papers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     if (!r.ok) return err(r.body);
+    VA.toast("Paper added.");
     render(r.body);
   });
 
   document.getElementById("ds-publish").addEventListener("click", async function () {
     clearErr();
-    if (!window.confirm("Publish this datesheet? Students are notified and can download admit cards.")) return;
+    if (!(await VA.confirm("Publish this datesheet? Students are notified and can download admit cards.", "Publish"))) return;
     const r = await VA.fetchJson(API + "/schedules/" + current.id + "/publish", { method: "POST" });
     if (!r.ok) return err(r.body);
     await loadList();
@@ -108,4 +133,4 @@
   });
 
   document.addEventListener("vistadmin:ready", loadList);
-})();   
+})();

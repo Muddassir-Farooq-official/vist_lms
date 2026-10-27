@@ -2,7 +2,9 @@
   "use strict";
 
   const VA = window.VistAdmin;
-  const PAGE_SIZE = 10;
+  const PAGE_SIZE = 15;
+  const esc = VA.escapeHtml;
+  const $ = function (id) { return document.getElementById(id); };
 
   let currentPage = 1;
   let currentTotalPages = 1;
@@ -30,6 +32,8 @@
       activateTab(btn.dataset.tab);
     });
   });
+  const startTab = (location.hash || "").replace("#", "");
+  if (startTab && document.querySelector('.portal-tab[data-tab="' + startTab + '"]')) activateTab(startTab);
 
   const searchInput = document.getElementById("search-input");
   const statusFilter = document.getElementById("status-filter");
@@ -53,9 +57,7 @@
   const closeEditJobRoleModalBtn = document.getElementById("close-edit-jobrole-modal");
   let activeJobRoleId = null;
 
-  const modal = document.getElementById("employee-modal");
-  const modalName = document.getElementById("modal-name");
-  const modalDetails = document.getElementById("modal-details");
+  const sheet = document.getElementById("employee-sheet");
   const modalError = document.getElementById("modal-error");
   const modalSuccess = document.getElementById("modal-success");
   const editEmployeeForm = document.getElementById("edit-employee-form");
@@ -63,7 +65,6 @@
   const editEmployeeSuccess = document.getElementById("edit-employee-success");
   const newStatusSelect = document.getElementById("new-status");
   const saveStatusBtn = document.getElementById("save-status");
-  const closeModalBtn = document.getElementById("close-modal");
 
   const newEmployeePassword = document.getElementById("new-employee-password");
   const resetEmployeePasswordBtn = document.getElementById("reset-employee-password-btn");
@@ -90,10 +91,6 @@
   const closeAddEmployeeModalBtn = document.getElementById("close-add-employee-modal");
   const jobRoleSelect = document.getElementById("ae-job-role");
 
-  function statusPillHtml(status) {
-    return '<span class="status-pill ' + (status || "").toLowerCase() + '">' + VA.escapeHtml(status) + "</span>";
-  }
-
   function extractErrorMessage(body, fallback) {
     if (body && body.error && body.error.message) return body.error.message;
     if (body && Array.isArray(body.detail)) {
@@ -103,89 +100,68 @@
   }
 
   // ---------------------------------------------------------------------
-  // Profile photo — display, upload, download, remove. Same pattern as
-  // static/js/students.js.
+  // The record dialog: header, tabs, photo (click the photo to upload; small download / remove icons)
   // ---------------------------------------------------------------------
-  const photoFrame = document.getElementById("modal-photo-frame");
-  const photoInput = document.getElementById("modal-photo-input");
-  const photoUploadBtn = document.getElementById("modal-photo-upload-btn");
-  const photoDownloadLink = document.getElementById("modal-photo-download-link");
-  const photoRemoveBtn = document.getElementById("modal-photo-remove-btn");
-  const photoError = document.getElementById("modal-photo-error");
-
-  function photoUrlFor(employeeId) {
-    return "/api/v1/employees/" + employeeId + "/photo";
+  const STATUS = { ACTIVE: "Active", ON_LEAVE: "On leave", TERMINATED: "Left" };
+  const TYPE = { PERMANENT: "Permanent", CONTRACT: "Contract", VISITING: "Visiting", PART_TIME: "Part time" };
+  const PALETTE = ["#2563eb", "#7c3aed", "#db2777", "#dc2626", "#d97706", "#059669", "#0891b2", "#4f46e5"];
+  const ICON_EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
+  function initials(n) { const w = String(n || "").trim().split(/\s+/).filter(Boolean); return ((w[0] || "?")[0] + (w.length > 1 ? w[w.length - 1][0] : "")).toUpperCase(); }
+  function tone(n) { let h = 0; const t = String(n || ""); for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) >>> 0; return h % PALETTE.length; }
+  function pill(st) { return '<span class="status-pill ' + esc(String(st || "").toLowerCase()) + '">' + esc(STATUS[st] || st || "") + "</span>"; }
+  function money(v) { return VA.formatMoney(v || 0); }
+  function fmtDate(d) { return d ? new Date(String(d).slice(0, 10) + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : ""; }
+  function dl(rows) {
+    return rows.filter(function (r) { return r[1] !== null && r[1] !== undefined && r[1] !== ""; })
+      .map(function (r) { return "<div><dt>" + esc(r[0]) + "</dt><dd>" + (r[2] ? r[1] : esc(r[1])) + "</dd></div>"; }).join("") || '<p class="ss-empty">Nothing on record.</p>';
   }
-
-  function initialsAvatarHtml(fullName) {
-    const parts = (fullName || "").trim().split(/\s+/).filter(Boolean);
-    const initials = ((parts[0] ? parts[0][0] : "") + (parts[1] ? parts[1][0] : "")).toUpperCase() || "?";
-    const palette = ["#2563eb", "#7c3aed", "#db2777", "#dc2626", "#d97706", "#059669", "#0891b2", "#4f46e5"];
-    let hash = 0;
-    for (let i = 0; i < (fullName || "").length; i++) hash = (hash * 31 + fullName.charCodeAt(i)) >>> 0;
-    const color = palette[hash % palette.length];
-    return '<div class="profile-photo-initials" style="background:' + color + '">' + VA.escapeHtml(initials) + "</div>";
+  function tab(name) {
+    sheet.querySelectorAll("[data-ss-tab]").forEach(function (b) { const on = b.getAttribute("data-ss-tab") === name; b.classList.toggle("active", on); b.setAttribute("aria-selected", on ? "true" : "false"); });
+    sheet.querySelectorAll("[data-ss-panel]").forEach(function (x) { x.hidden = x.getAttribute("data-ss-panel") !== name; });
+    sheet.querySelector(".ss-body").scrollTop = 0;
   }
+  sheet.querySelector(".ss-tabs").addEventListener("click", function (e) { const b = e.target.closest("[data-ss-tab]"); if (b) tab(b.getAttribute("data-ss-tab")); });
+  $("es-close").addEventListener("click", function () { sheet.close(); });
+  sheet.addEventListener("click", function (e) { if (e.target === sheet) sheet.close(); });
 
   let activeEmployeeName = "";
+  let activeEmployee = null;
   document.getElementById("records-btn").addEventListener("click", function () {
     if (activeEmployeeId) window.RecordsPanel.open({ type: "employees", id: activeEmployeeId, name: activeEmployeeName });
   });
 
-  function updatePhotoDisplay(employeeId, hasPhoto) {
-    photoError.hidden = true;
+  function photoMsg(text, bad) { const m = $("es-photo-msg"); m.textContent = text || ""; m.hidden = !text; m.classList.toggle("bad", !!bad); }
+  function updatePhotoDisplay(employeeId, hasPhoto, originalName) {
+    const img = $("es-photo"), ini = $("es-initials");
+    $("es-avatar").style.setProperty("--av", PALETTE[tone(activeEmployeeName)]);
+    ini.textContent = initials(activeEmployeeName);
     if (hasPhoto) {
-      photoFrame.innerHTML = '<img src="' + photoUrlFor(employeeId) + "?t=" + Date.now() + '" alt="" />';
-      photoDownloadLink.href = photoUrlFor(employeeId);
-      photoDownloadLink.setAttribute("download", "employee-photo.jpg");
-      photoDownloadLink.hidden = false;
-      photoRemoveBtn.hidden = false;
-    } else {
-      photoFrame.innerHTML = initialsAvatarHtml(activeEmployeeName);
-      photoDownloadLink.hidden = true;
-      photoRemoveBtn.hidden = true;
-    }
+      img.src = "/api/v1/employees/" + employeeId + "/photo?t=" + Date.now(); img.hidden = false; ini.hidden = true;
+      $("es-photo-dl").href = "/api/v1/employees/" + employeeId + "/photo";
+      const ext = ((originalName || "").split(".").pop() || "jpg").toLowerCase();
+      $("es-photo-dl").setAttribute("data-download", ((activeEmployee && activeEmployee.employee_code) || "employee") + "-photo." + ext);
+    } else { img.hidden = true; img.removeAttribute("src"); ini.hidden = false; }
+    $("es-photo-dl").hidden = !hasPhoto;
+    $("es-photo-rm").hidden = !hasPhoto;
   }
-
-  photoUploadBtn.addEventListener("click", async function () {
-    if (!activeEmployeeId) return;
-    photoError.hidden = true;
-    if (!photoInput.files.length) {
-      photoError.textContent = "Choose an image file first.";
-      photoError.hidden = false;
-      return;
-    }
-    photoUploadBtn.disabled = true;
-    const formData = new FormData();
-    formData.append("file", photoInput.files[0]);
-    const result = await VA.fetchJson("/api/v1/employees/" + activeEmployeeId + "/photo", {
-      method: "POST",
-      body: formData,
-    });
-    photoUploadBtn.disabled = false;
-
-    if (!result.ok) {
-      photoError.textContent = extractErrorMessage(result.body, "Could not upload photo.");
-      photoError.hidden = false;
-      return;
-    }
-    photoInput.value = "";
-    updatePhotoDisplay(activeEmployeeId, true);
+  $("es-avatar").addEventListener("click", function () { if (activeEmployeeId) $("es-photo-input").click(); });
+  $("es-photo-input").addEventListener("change", async function () {
+    const input = $("es-photo-input");
+    if (!activeEmployeeId || !input.files.length) return;
+    const file = input.files[0];
+    if (file.size > 5 * 1024 * 1024) { photoMsg("That image is larger than 5 MB. Choose a smaller one.", true); input.value = ""; return; }
+    const fd = new FormData(); fd.append("file", file);
+    $("es-avatar").classList.add("is-busy"); photoMsg("Uploading the photo…");
+    const result = await VA.fetchJson("/api/v1/employees/" + activeEmployeeId + "/photo", { method: "POST", body: fd });
+    $("es-avatar").classList.remove("is-busy"); input.value = "";
+    if (!result.ok) { photoMsg(extractErrorMessage(result.body, "Could not upload the photo."), true); return; }
+    photoMsg(""); updatePhotoDisplay(activeEmployeeId, true, file.name); VA.toast("Photo saved."); loadEmployees();
   });
-
-  photoRemoveBtn.addEventListener("click", async function () {
-    if (!activeEmployeeId) return;
-    photoError.hidden = true;
-    photoRemoveBtn.disabled = true;
+  $("es-photo-rm").addEventListener("click", async function () {
+    if (!activeEmployeeId || !(await VA.confirm("Remove " + activeEmployeeName + "'s photo?", "Remove"))) return;
     const result = await VA.fetchJson("/api/v1/employees/" + activeEmployeeId + "/photo", { method: "DELETE" });
-    photoRemoveBtn.disabled = false;
-
-    if (!result.ok && result.status !== 204) {
-      photoError.textContent = extractErrorMessage(result.body, "Could not remove photo.");
-      photoError.hidden = false;
-      return;
-    }
-    updatePhotoDisplay(activeEmployeeId, false);
+    if (!result.ok && result.status !== 204) { photoMsg(extractErrorMessage(result.body, "Could not remove the photo."), true); return; }
+    updatePhotoDisplay(activeEmployeeId, false); VA.toast("Photo removed."); loadEmployees();
   });
 
   // ---------------------------------------------------------------------
@@ -208,11 +184,11 @@
         : '<span class="status-pill dropped">Inactive</span>';
       const actionLabel = jr.is_active ? "Deactivate" : "Reactivate";
       tr.innerHTML =
-        "<td>" + VA.escapeHtml(jr.code) + "</td>" +
-        "<td>" + VA.escapeHtml(jr.title) + "</td>" +
-        "<td>" + VA.escapeHtml(jr.default_role_code) + "</td>" +
+        "<td><strong>" + VA.escapeHtml(jr.title) + "</strong></td>" +
+        '<td class="sd-session">' + VA.escapeHtml(jr.code) + "</td>" +
+        "<td>" + VA.escapeHtml(ROLE_NAMES[jr.default_role_code] || jr.default_role_code) + "</td>" +
         "<td>" + statusHtml + "</td>" +
-        '<td class="num">' +
+        '<td class="num jr-actions">' +
         '<button type="button" class="row-action jobrole-edit-btn" data-id="' + jr.id + '">Edit</button>' +
         " &middot; " +
         '<button type="button" class="row-action jobrole-toggle-btn" data-id="' + jr.id + '" data-active="' + jr.is_active + '">' + actionLabel + "</button>" +
@@ -281,6 +257,9 @@
       });
     });
 
+    const jf = $("jobrole-filter"), keep = jf.value;
+    jf.innerHTML = '<option value="">All job titles</option>' + jobRolesCache.map(function (jr) { return '<option value="' + esc(jr.id) + '">' + esc(jr.title) + "</option>"; }).join("");
+    jf.value = keep;
     jobRoleSelect.innerHTML = '<option value="">Select&hellip;</option>';
     jobRolesCache
       .filter(function (jr) {
@@ -451,6 +430,7 @@
     params.set("page_size", String(PAGE_SIZE));
     if (searchInput.value.trim()) params.set("q", searchInput.value.trim());
     if (statusFilter.value) params.set("status", statusFilter.value);
+    if ($("jobrole-filter").value) params.set("job_role_id", $("jobrole-filter").value);
 
     const result = await VA.fetchJson("/api/v1/employees?" + params.toString());
     if (!result.ok) {
@@ -467,25 +447,32 @@
       emptyState.hidden = false;
     } else {
       emptyState.hidden = true;
-      data.items.forEach(function (emp) {
-        const tr = document.createElement("tr");
-        tr.className = "clickable-row";
-        tr.innerHTML =
-          "<td>" + VA.escapeHtml(emp.employee_code) + "</td>" +
-          "<td>" + VA.escapeHtml(emp.first_name) + " " + VA.escapeHtml(emp.last_name) + "</td>" +
-          "<td>" + statusPillHtml(emp.status) + "</td>" +
-          '<td class="num"><span class="row-action">View &rarr;</span></td>';
-        tr.addEventListener("click", function () {
-          openEmployeeModal(emp.id);
-        });
-        tbody.appendChild(tr);
-      });
+      tbody.innerHTML = data.items.map(rowHtml).join("");
     }
 
-    pageInfo.textContent = "Page " + currentPage + " of " + currentTotalPages + " (" + data.total + " total)";
+    const from = data.total ? (currentPage - 1) * data.page_size + 1 : 0;
+    pageInfo.textContent = from + "–" + Math.min(data.total, currentPage * data.page_size) + " of " + data.total + " employees";
     prevBtn.disabled = currentPage <= 1;
     nextBtn.disabled = currentPage >= currentTotalPages;
   }
+
+  function rowHtml(e) {
+    const name = e.first_name + " " + e.last_name;
+    return '<tr data-open="' + esc(e.id) + '" tabindex="0" aria-label="Open ' + esc(name) + '">' +
+      '<td class="sd-who"><div><span class="sd-avatar" data-tone="' + tone(name) + '">' +
+        (e.has_photo ? '<img src="/api/v1/employees/' + esc(e.id) + '/photo" alt="" loading="lazy" />' : esc(initials(name))) + "</span>" +
+        '<span class="sd-name"><strong>' + esc(name) + "</strong><small>" + esc(e.employee_code) + (e.gender ? " · " + esc(e.gender) : "") + "</small></span></div></td>" +
+      '<td class="sd-prog"><div><strong>' + esc(e.job_title || "—") + "</strong><small>" + esc([e.department, TYPE[e.employment_type]].filter(Boolean).join(" · ") || "—") + "</small></div></td>" +
+      '<td class="sd-contact">' + (e.contact_no ? '<a href="tel:' + esc(e.contact_no) + '">' + esc(e.contact_no) + "</a>" : '<span class="sd-dim">—</span>') + "</td>" +
+      '<td class="sd-session">' + esc(fmtDate(e.hire_date) || "—") + "</td>" +
+      '<td class="sd-status">' + pill(e.status) + "</td>" +
+      '<td class="sd-act"><button type="button" class="sd-view" data-open="' + esc(e.id) + '">' + ICON_EYE + "<span>View</span></button></td></tr>";
+  }
+  tbody.addEventListener("click", function (ev) { const r = ev.target.closest("[data-open]"); if (r) openEmployeeModal(r.getAttribute("data-open")); });
+  tbody.addEventListener("keydown", function (ev) {
+    const r = ev.target.closest("tr[data-open]");
+    if (r && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); openEmployeeModal(r.getAttribute("data-open")); }
+  });
 
   // ---- extra access roles (teacher + exam controller, second administrator, ...)
   const ROLE_NAMES = { ADMIN: "Administrator", PRINCIPAL: "Principal / Director (view only)", HOD: "Head of Department / Coordinator", TEACHER: "Teacher", EXAM_CONTROLLER: "Exam Controller", ACCOUNTS_OFFICER: "Accounts Officer",
@@ -499,7 +486,7 @@
     if (!r.ok) return;                        // no login yet, or not allowed to manage roles
     const list = document.getElementById("access-roles-list");
     list.innerHTML = r.body.grantable.map(function (code) {
-      return '<label><input type="checkbox" value="' + code + '"' + (r.body.extra_roles.indexOf(code) !== -1 ? " checked" : "") + " /> " +
+      return '<label class="ss-check"><input type="checkbox" value="' + code + '"' + (r.body.extra_roles.indexOf(code) !== -1 ? " checked" : "") + " /> " +
         VA.escapeHtml(ROLE_NAMES[code] || code) + "</label>";
     }).join(" ");
     box.dataset.employeeId = employeeId;
@@ -518,40 +505,67 @@
     if (r.ok) loadAccessRoles(box.dataset.employeeId);
   });
 
-  async function openEmployeeModal(employeeId) {
+  async function openEmployeeModal(employeeId, startTab) {
     activeEmployeeId = employeeId;
     modalError.hidden = true;
     modalSuccess.hidden = true;
     newEmployeePassword.value = "";
     resetEmployeePasswordError.hidden = true;
     resetEmployeePasswordConfirm.hidden = true;
-    modalDetails.innerHTML = "<dt>Loading&hellip;</dt>";
-    modal.showModal();
+    photoMsg("");
+    $("es-name").textContent = "Loading…"; $("es-sub").textContent = ""; $("es-chips").innerHTML = "";
+    ["es-kpis", "es-employment", "es-personal", "es-contact", "es-quals", "salary-history-tbody", "bonuses-tbody"].forEach(function (k) { $(k).innerHTML = ""; });
+    tab(startTab || "overview");
+    if (!sheet.open) sheet.showModal();
 
-    const result = await VA.fetchJson("/api/v1/employees/" + employeeId);
+    const both = await Promise.all([VA.fetchJson("/api/v1/employees/" + employeeId), VA.fetchJson("/api/v1/employees/" + employeeId + "/full-profile")]);
+    const result = both[0], full = both[1];
     if (!result.ok) {
-      modalDetails.innerHTML = "";
+      $("es-name").textContent = "Could not open this record";
       modalError.textContent = extractErrorMessage(result.body, "Could not load employee detail.");
       modalError.hidden = false;
       return;
     }
 
-    const e = result.body;
+    const e = result.body, p = full.ok ? full.body : null;
+    activeEmployee = e;
     activeEmployeeName = e.first_name + " " + e.last_name;
-    updatePhotoDisplay(employeeId, e.has_photo);
-    modalName.textContent = e.first_name + " " + e.last_name;
-    modalDetails.innerHTML =
-      "<dt>Employee Code / Username</dt><dd><strong>" + VA.escapeHtml(e.employee_code) + "</strong></dd>" +
-      "<dt>CNIC</dt><dd>" + VA.escapeHtml(e.cnic) + "</dd>" +
-      "<dt>Contact</dt><dd>" + VA.escapeHtml(e.contact_no) + "</dd>" +
-      "<dt>Hire Date</dt><dd>" + VA.escapeHtml(e.hire_date) + "</dd>" +
-      "<dt>Department</dt><dd>" + VA.escapeHtml(e.department || "\u2014") + "</dd>" +
-      "<dt>Salary account</dt><dd>" + VA.escapeHtml(e.bank_iban ? (e.bank_name || "") + " " + e.bank_iban : "Not on record (paid by cash or cheque)") + "</dd>" +
-      "<dt>Employment Type</dt><dd>" + VA.escapeHtml(e.employment_type || "\u2014") + "</dd>" +
-      "<dt>Email</dt><dd>" + VA.escapeHtml(e.email || "\u2014") + "</dd>" +
-      "<dt>Blood Group</dt><dd>" + VA.escapeHtml(e.blood_group || "\u2014") + "</dd>" +
-      "<dt>Emergency Contact</dt><dd>" + VA.escapeHtml((e.emergency_contact_name || "") + " " + (e.emergency_contact_no || "") || "\u2014") + "</dd>" +
-      "<dt>Status</dt><dd>" + statusPillHtml(e.status) + "</dd>";
+    updatePhotoDisplay(employeeId, e.has_photo, e.photo_original_name);
+    const jr = jobRolesCache.find(function (j) { return j.id === e.job_role_id; });
+    $("es-name").textContent = activeEmployeeName;
+    $("es-sub").textContent = [e.employee_code, (p && p.job_role_title) || (jr && jr.title), e.department].filter(Boolean).join(" · ");
+    $("es-chips").innerHTML = pill(e.status) + [TYPE[e.employment_type], e.gender, e.hire_date ? "Joined " + fmtDate(e.hire_date) : ""]
+      .filter(Boolean).map(function (c) { return '<span class="ss-chip">' + esc(c) + "</span>"; }).join("");
+    if (p) {
+      const yr = new Date().getFullYear();
+      const bonusYear = (p.bonuses || []).filter(function (b) { return String(b.awarded_at).slice(0, 4) === String(yr); }).reduce(function (n, b) { return n + Number(b.amount || 0); }, 0);
+      const t = p.teaching;
+      $("es-kpis").innerHTML = [
+        ["Basic salary", p.current_salary !== null ? money(p.current_salary) : "—", false, (p.salary_history || []).length > 1 ? (p.salary_history.length - 1) + " change" + (p.salary_history.length > 2 ? "s" : "") : "No changes yet"],
+        ["Bonuses " + yr, money(bonusYear), false, (p.bonuses || []).length + " in total"],
+        t ? ["Pass rate", t.pass_rate === null ? "—" : Math.round(t.pass_rate * 100) + "%", false, t.offerings_count + " courses · " + t.total_students_taught + " students"]
+          : ["Library books", String(p.library.active_loans || 0), p.library.overdue_loans > 0, p.library.overdue_loans ? p.library.overdue_loans + " overdue" : "None overdue"],
+        ["Complaints", String(p.complaints.filed_against_them || 0), p.complaints.filed_against_them > 0, "against · " + (p.complaints.filed_by_them || 0) + " filed by them"],
+      ].map(function (k) { return '<div class="ss-kpi' + (k[2] ? " bad" : "") + '"><span>' + esc(k[0]) + "</span><strong>" + esc(k[1]) + "</strong><small>" + esc(k[3]) + "</small></div>"; }).join("");
+      $("es-qual-count").textContent = (p.qualifications || []).length ? String(p.qualifications.length) : "";
+      $("es-quals").innerHTML = (p.qualifications || []).map(function (q) {
+        return '<article class="ss-card"><span class="sd-avatar sm" aria-hidden="true">' + esc(initials(q.degree_title)) + "</span><div><strong>" + esc(q.degree_title) + "</strong><small>" +
+          esc(q.institution_name) + "</small><small>" + esc([q.year_completed, q.marks_or_grade].filter(Boolean).join(" · ")) + "</small></div></article>";
+      }).join("") || '<p class="ss-empty">No qualifications on record. The employee can add them from their own My Profile.</p>';
+      $("es-teaching-box").hidden = !t;
+      if (t) $("es-teaching").innerHTML = dl([["Courses taught", t.offerings_count], ["Students taught", t.total_students_taught], ["Passed", t.passed_count], ["Failed", t.failed_count],
+        ["Pass rate", t.pass_rate === null ? "—" : Math.round(t.pass_rate * 100) + "%"]]);
+    }
+    $("es-employment").innerHTML = dl([["Employee code", e.employee_code], ["Job title", (p && p.job_role_title) || (jr && jr.title)], ["Department", e.department],
+      ["Employment type", TYPE[e.employment_type] || e.employment_type], ["Joined", fmtDate(e.hire_date)],
+      ["Salary account", e.bank_iban ? [e.bank_name, e.bank_iban].filter(Boolean).join(" · ") : "Not on record (cash or cheque)"]]);
+    $("es-personal").innerHTML = dl([["CNIC", e.cnic], ["Date of birth", fmtDate(e.date_of_birth)], ["Gender", e.gender], ["Marital status", e.marital_status],
+      ["Religion", e.religion], ["Blood group", e.blood_group]]);
+    $("es-contact").innerHTML = dl([
+      ["Mobile", e.contact_no ? '<a href="tel:' + esc(e.contact_no) + '">' + esc(e.contact_no) + "</a>" : "", true],
+      ["Email", e.email ? '<a href="mailto:' + esc(e.email) + '">' + esc(e.email) + "</a>" : "", true],
+      ["Emergency contact", [e.emergency_contact_name, e.emergency_contact_no].filter(Boolean).join(" · ")],
+      ["Address", e.address_line], ["City", [e.city, e.district, e.province].filter(Boolean).join(", ")]]);
     newStatusSelect.value = e.status;
 
     await ensureReferenceDataLoaded();
@@ -596,29 +610,20 @@
     const result = await VA.fetchJson("/api/v1/employees/" + employeeId + "/salary-history");
     salaryHistoryTbody.innerHTML = "";
     if (!result.ok || !result.body) return;
-    result.body.forEach(function (row) {
-      const tr = document.createElement("tr");
-      tr.innerHTML =
-        "<td>" + VA.escapeHtml(row.base_salary) + "</td>" +
-        "<td>" + VA.escapeHtml(row.effective_from) + "</td>" +
-        "<td>" + VA.escapeHtml(row.effective_to || "current") + "</td>" +
-        "<td>" + VA.escapeHtml(row.change_type) + "</td>";
-      salaryHistoryTbody.appendChild(tr);
-    });
+    const KIND = { INITIAL: "Starting salary", FIXED_AMOUNT: "Increase", PERCENTAGE: "Increase (%)", MANUAL: "Changed" };
+    salaryHistoryTbody.innerHTML = result.body.slice().reverse().map(function (row) {
+      return '<li class="' + (row.effective_to ? "" : "is-now") + '"><b>' + esc(money(row.base_salary)) + "</b><span>" + esc(KIND[row.change_type] || row.change_type || "") +
+        (row.reason ? " · " + esc(row.reason) : "") + "</span><small>" + esc(fmtDate(row.effective_from)) + (row.effective_to ? " – " + esc(fmtDate(row.effective_to)) : " · now") + "</small></li>";
+    }).join("") || '<li class="ss-empty">No salary on record.</li>';
   }
 
   async function loadBonuses(employeeId) {
     const result = await VA.fetchJson("/api/v1/employees/" + employeeId + "/bonuses");
     bonusesTbody.innerHTML = "";
     if (!result.ok || !result.body) return;
-    result.body.forEach(function (row) {
-      const tr = document.createElement("tr");
-      tr.innerHTML =
-        "<td>" + VA.escapeHtml(row.amount) + "</td>" +
-        "<td>" + VA.escapeHtml(row.reason) + "</td>" +
-        "<td>" + VA.escapeHtml(row.awarded_at) + "</td>";
-      bonusesTbody.appendChild(tr);
-    });
+    bonusesTbody.innerHTML = result.body.slice().sort(function (a, b) { return String(b.awarded_at).localeCompare(String(a.awarded_at)); }).map(function (row) {
+      return "<li><b>" + esc(money(row.amount)) + "</b><span>" + esc(row.reason) + "</span><small>" + esc(fmtDate(row.awarded_at)) + "</small></li>";
+    }).join("") || '<li class="ss-empty">No bonuses yet.</li>';
   }
 
   editEmployeeForm.addEventListener("submit", async function (event) {
@@ -666,6 +671,8 @@
       return;
     }
 
+    loadEmployees();
+    await openEmployeeModal(activeEmployeeId, "edit");
     editEmployeeSuccess.textContent = "Saved.";
     editEmployeeSuccess.hidden = false;
   });
@@ -705,8 +712,9 @@
       return;
     }
 
-    modal.close();
+    VA.toast("Status updated.");
     loadEmployees();
+    openEmployeeModal(activeEmployeeId, "account");
   });
 
   // ---- Job role change + clearance -------------------------------------
@@ -731,9 +739,9 @@
       modalError.hidden = false;
       return;
     }
-    modalSuccess.textContent = "Job role changed.";
-    modalSuccess.hidden = false;
+    VA.toast("Job title changed.");
     loadEmployees();
+    openEmployeeModal(activeEmployeeId, "account");
   });
 
   document.getElementById("clearance-btn").addEventListener("click", async function () {
@@ -762,6 +770,7 @@
     const st = document.getElementById("status-filter").value;
     if (q) params.set("q", q);
     if (st) params.set("status", st);
+    if ($("jobrole-filter").value) params.set("job_role_id", $("jobrole-filter").value);
     link.href = "/api/v1/employees/export" + (params.toString() ? "?" + params.toString() : "");
   }
   document.getElementById("search-input").addEventListener("input", syncEmployeeExportLink);
@@ -924,9 +933,6 @@
     await loadBonuses(activeEmployeeId);
   });
 
-  closeModalBtn.addEventListener("click", function () {
-    modal.close();
-  });
 
   // ---------------------------------------------------------------------
   // Add Employee
@@ -1026,118 +1032,10 @@
     currentPage = 1;
     loadEmployees();
   });
-
-  // ---------------------------------------------------------------------
-  // Full Profile — "everything about this employee" aggregated view
-  // ---------------------------------------------------------------------
-  const fullProfileModal = document.getElementById("full-profile-modal");
-  const fpName = document.getElementById("fp-name");
-  const fpError = document.getElementById("fp-error");
-  const fpCore = document.getElementById("fp-core");
-  const fpQualificationsTbody = document.getElementById("fp-qualifications-tbody");
-  const fpQualificationsEmpty = document.getElementById("fp-qualifications-empty");
-  const fpSalaryTbody = document.getElementById("fp-salary-tbody");
-  const fpBonusesTbody = document.getElementById("fp-bonuses-tbody");
-  const fpBonusesEmpty = document.getElementById("fp-bonuses-empty");
-  const fpTeachingSection = document.getElementById("fp-teaching-section");
-  const fpTeaching = document.getElementById("fp-teaching");
-
-  function fpRow(label, value) {
-    if (value === null || value === undefined || value === "") return "";
-    return "<dt>" + label + "</dt><dd>" + VA.escapeHtml(value) + "</dd>";
-  }
-
-  document.getElementById("open-full-profile-btn").addEventListener("click", async function () {
-    if (!activeEmployeeId) return;
-    fpError.hidden = true;
-    fpName.textContent = "Loading\u2026";
-    fullProfileModal.showModal();
-
-    const result = await VA.fetchJson("/api/v1/employees/" + activeEmployeeId + "/full-profile");
-    if (!result.ok) {
-      fpName.textContent = "";
-      fpError.textContent = extractErrorMessage(result.body, "Could not load full profile.");
-      fpError.hidden = false;
-      return;
-    }
-
-    const p = result.body;
-    fpName.textContent = p.first_name + " " + p.last_name;
-
-    fpCore.innerHTML = [
-      fpRow("Employee Code", p.employee_code),
-      fpRow("CNIC", p.cnic),
-      fpRow("Contact No.", p.contact_no),
-      fpRow("Gender", p.gender),
-      fpRow("Hire Date", p.hire_date),
-      fpRow("Employment Type", p.employment_type),
-      fpRow("Email", p.email),
-      fpRow("Blood Group", p.blood_group),
-      fpRow("Marital Status", p.marital_status),
-      fpRow("Emergency Contact", ((p.emergency_contact_name || "") + " " + (p.emergency_contact_no || "")).trim() || null),
-      fpRow("Department", p.department),
-      fpRow("Job Role", p.job_role_title),
-      fpRow("Status", p.status),
-      fpRow("Religion", p.religion),
-      fpRow("Address", p.present_address),
-      fpRow("Province", p.province),
-      fpRow("District", p.district),
-      fpRow("City", p.city),
-      fpRow("Current Salary", p.current_salary !== null ? Number(p.current_salary).toFixed(2) : null),
-    ].join("");
-
-    fpQualificationsTbody.innerHTML = "";
-    if (p.qualifications.length === 0) {
-      fpQualificationsEmpty.hidden = false;
-    } else {
-      fpQualificationsEmpty.hidden = true;
-      fpQualificationsTbody.innerHTML = p.qualifications.map(function (q) {
-        return "<tr><td>" + VA.escapeHtml(q.degree_title) + "</td><td>" + VA.escapeHtml(q.institution_name) + "</td><td>" +
-          VA.escapeHtml(q.year_completed || "\u2014") + "</td><td>" + VA.escapeHtml(q.marks_or_grade || "\u2014") + "</td></tr>";
-      }).join("");
-    }
-
-    fpSalaryTbody.innerHTML = p.salary_history.map(function (s) {
-      return "<tr><td>" + Number(s.base_salary).toFixed(2) + "</td><td>" + VA.escapeHtml(s.effective_from) + "</td><td>" +
-        VA.escapeHtml(s.effective_to || "\u2014 (current)") + "</td><td>" + VA.escapeHtml(s.reason || "\u2014") + "</td></tr>";
-    }).join("");
-
-    fpBonusesTbody.innerHTML = "";
-    if (p.bonuses.length === 0) {
-      fpBonusesEmpty.hidden = false;
-    } else {
-      fpBonusesEmpty.hidden = true;
-      fpBonusesTbody.innerHTML = p.bonuses.map(function (b) {
-        return "<tr><td>" + Number(b.amount).toFixed(2) + "</td><td>" + VA.escapeHtml(b.reason) + "</td><td>" +
-          VA.escapeHtml(b.awarded_at) + "</td></tr>";
-      }).join("");
-    }
-
-    if (p.teaching) {
-      fpTeachingSection.hidden = false;
-      const passRateText = p.teaching.pass_rate === null ? "\u2014" : Math.round(p.teaching.pass_rate * 100) + "%";
-      fpTeaching.innerHTML = [
-        fpRow("Courses Taught", p.teaching.offerings_count),
-        fpRow("Students Taught", p.teaching.total_students_taught),
-        fpRow("Passed", p.teaching.passed_count),
-        fpRow("Failed", p.teaching.failed_count),
-        fpRow("Pass Rate", passRateText),
-      ].join("");
-    } else {
-      fpTeachingSection.hidden = true;
-    }
-
-    document.getElementById("fp-fee-outstanding").textContent = Number(p.fees.total_outstanding).toFixed(2);
-    document.getElementById("fp-library-active").textContent = p.library.active_loans;
-    document.getElementById("fp-library-overdue").textContent = p.library.overdue_loans;
-    document.getElementById("fp-fine-pending").textContent = Number(p.fines.total_pending).toFixed(2);
-    document.getElementById("fp-complaints-filed").textContent = p.complaints.filed_by_them;
-    document.getElementById("fp-complaints-against").textContent = p.complaints.filed_against_them;
-  });
-
-  document.getElementById("close-full-profile-modal").addEventListener("click", function () {
-    fullProfileModal.close();
-  });
+  $("jobrole-filter").addEventListener("change", function () { currentPage = 1; loadEmployees(); syncEmployeeExportLink(); });
+  const moreMenu = document.querySelector(".sd-menu");
+  moreMenu.addEventListener("click", function (ev) { if (ev.target.closest("[role=menuitem]")) moreMenu.open = false; });
+  document.addEventListener("click", function (ev) { if (moreMenu.open && !moreMenu.contains(ev.target)) moreMenu.open = false; });
 
   document.addEventListener("vistadmin:ready", function () {
     loadJobRoles();

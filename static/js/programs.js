@@ -34,39 +34,54 @@
     return fallback;
   }
 
-  async function loadPrograms() {
-    const result = await VA.fetchJson("/api/v1/programs");
+  const esc = VA.escapeHtml;
+  const $ = function (id) { return document.getElementById(id); };
+  let programs = [];
 
+  function n(v) { return Number(v || 0).toLocaleString("en-PK"); }
+  function card(p) {
+    const st = p.students || {}, c = p.curriculum || {};
+    const active = st.ACTIVE || 0, others = (st.GRADUATED || 0) + (st.SUSPENDED || 0) + (st.DROPPED || 0);
+    const planned = c.semesters_planned || 0, pct = p.total_semesters ? Math.min(100, Math.round(100 * planned / p.total_semesters)) : 0;
+    return '<article class="pg-card' + (p.is_active ? "" : " is-off") + '">' +
+      '<header><span class="crs-code">' + esc(p.code) + "</span>" + statusPillHtml(p.is_active) + "</header>" +
+      "<h3>" + esc(p.name) + "</h3>" +
+      '<p class="pg-meta">' + esc(p.duration_years) + " year" + (p.duration_years === 1 ? "" : "s") + " · " + esc(p.total_semesters) + " semesters · up to " + esc(p.max_credit_hours_per_semester) + " credit hours a semester</p>" +
+      '<div class="pg-stats"><div><b>' + n(active) + "</b><span>active students</span></div><div><b>" + n(c.courses) + "</b><span>courses</span></div><div><b>" + n(c.credit_hours) +
+      "</b><span>credit hours</span></div></div>" +
+      '<div class="pg-plan"><span>Curriculum planned for ' + planned + " of " + esc(p.total_semesters) + ' semesters</span><span class="crs-meter"><i style="width:' + pct + '%"></i></span></div>' +
+      (others ? '<p class="pg-meta">' + [st.GRADUATED ? n(st.GRADUATED) + " graduated" : "", st.SUSPENDED ? n(st.SUSPENDED) + " suspended" : "", st.DROPPED ? n(st.DROPPED) + " left" : ""].filter(Boolean).join(" · ") + "</p>" : "") +
+      '<footer><a class="sd-view" href="/dashboard/admin/courses?program=' + esc(p.id) + '#curriculum">Curriculum</a><a class="sd-view" href="/dashboard/admin/students?program=' + esc(p.id) + '">Students</a>' +
+      '<button type="button" class="role-btn small-btn secondary-btn" data-edit="' + esc(p.id) + '">Edit</button></footer></article>';
+  }
+  function render() {
+    const q = ($("prog-q").value || "").trim().toLowerCase(), st = $("prog-status").value;
+    const rows = programs.filter(function (p) { return (!q || (p.code + " " + p.name).toLowerCase().indexOf(q) !== -1) && (!st || (st === "active") === !!p.is_active); });
+    $("programs-grid").innerHTML = rows.map(card).join("");
+    emptyState.hidden = rows.length > 0;
+    if (programs.length && !rows.length) emptyState.textContent = "No program matches this search.";
+    const students = programs.reduce(function (t, p) { return t + ((p.students || {}).ACTIVE || 0); }, 0);
+    $("prog-summary").innerHTML = programs.length ? ['<span class="crs-chip"><b>' + programs.length + "</b> programs</span>",
+      '<span class="crs-chip"><b>' + programs.filter(function (p) { return p.is_active; }).length + "</b> active</span>", '<span class="crs-chip"><b>' + n(students) + "</b> active students</span>"].join("") : "";
+  }
+  $("prog-q").addEventListener("input", render);
+  $("prog-status").addEventListener("change", render);
+  $("programs-grid").addEventListener("click", function (e) {
+    const b = e.target.closest("[data-edit]"); if (!b) return;
+    const p = programs.find(function (x) { return x.id === b.getAttribute("data-edit"); });
+    if (p) openEditModal(p);
+  });
+
+  async function loadPrograms() {
+    const result = await VA.fetchJson("/api/v1/programs/overview");
     if (!result.ok) {
       VA.showError(extractErrorMessage(result.body, "Could not load programs."));
       return;
     }
     VA.clearError();
-
-    const programs = result.body || [];
+    programs = result.body || [];
     tbody.innerHTML = "";
-
-    if (programs.length === 0) {
-      emptyState.hidden = false;
-      return;
-    }
-    emptyState.hidden = true;
-
-    programs.forEach(function (p) {
-      const tr = document.createElement("tr");
-      tr.className = "clickable-row";
-      tr.innerHTML =
-        "<td>" + VA.escapeHtml(p.code) + "</td>" +
-        "<td>" + VA.escapeHtml(p.name) + "</td>" +
-        '<td class="num">' + VA.escapeHtml(p.duration_years) + " yrs</td>" +
-        '<td class="num">' + VA.escapeHtml(p.total_semesters) + "</td>" +
-        "<td>" + statusPillHtml(p.is_active) + "</td>" +
-        '<td class="num"><span class="row-action">Edit &rarr;</span></td>';
-      tr.addEventListener("click", function () {
-        openEditModal(p);
-      });
-      tbody.appendChild(tr);
-    });
+    render();
   }
 
   function openEditModal(program) {
@@ -78,6 +93,7 @@
     document.getElementById("ep-years").value = program.duration_years;
     document.getElementById("ep-semesters").value = program.total_semesters;
     document.getElementById("ep-active").value = String(program.is_active);
+    document.getElementById("ep-maxch").value = program.max_credit_hours_per_semester || 18;
     editModal.showModal();
   }
 
@@ -97,6 +113,7 @@
       duration_years: parseInt(document.getElementById("ep-years").value, 10),
       total_semesters: parseInt(document.getElementById("ep-semesters").value, 10),
       is_active: document.getElementById("ep-active").value === "true",
+      max_credit_hours_per_semester: parseInt(document.getElementById("ep-maxch").value, 10) || undefined,
     };
 
     const result = await VA.fetchJson("/api/v1/programs/" + activeProgramId, {
@@ -129,6 +146,7 @@
       name: document.getElementById("p-name").value.trim(),
       duration_years: parseInt(document.getElementById("p-years").value, 10),
       total_semesters: parseInt(document.getElementById("p-semesters").value, 10),
+      max_credit_hours_per_semester: parseInt(document.getElementById("p-maxch").value, 10) || 18,
     };
 
     const result = await VA.fetchJson("/api/v1/programs", {

@@ -23,14 +23,21 @@
 
     periodsTbody.innerHTML = "";
     periodsEmpty.hidden = result.body.length > 0;
+    const numInput = document.getElementById("period-number");
+    if (numInput && !numInput.value) {
+      numInput.value = result.body.reduce(function (m, p) { return Math.max(m, p.period_number); }, 0) + 1;
+    }
     result.body.forEach(function (period) {
       const tr = document.createElement("tr");
+      const mins = function (t) { return parseInt(t.slice(0, 2), 10) * 60 + parseInt(t.slice(3, 5), 10); };
+      const len = mins(period.end_time) - mins(period.start_time);
       tr.innerHTML =
-        "<td>Period " + period.period_number + "</td>" +
+        "<td><strong>Period " + period.period_number + "</strong></td>" +
         "<td>" + period.start_time.slice(0, 5) + "\u2013" + period.end_time.slice(0, 5) + "</td>" +
-        '<td><button type="button" class="danger-btn small-btn period-delete" data-id="' + period.id + '">Delete</button></td>';
+        '<td class="sd-dim">' + (len > 0 ? len + " min" : "\u2014") + "</td>" +
+        '<td class="crs-actions"><button type="button" class="sd-view tt-del period-delete" data-id="' + period.id + '">Delete</button></td>';
       tr.querySelector(".period-delete").addEventListener("click", async function () {
-        if (!confirm("Delete Period " + period.period_number + "? Slots already created from it keep their times, but it will no longer show as an option.")) return;
+        if (!(await VA.confirm("Delete Period " + period.period_number + "? Slots already created from it keep their times, but it will no longer show as an option.", "Delete"))) return;
         const result = await VA.fetchJson("/api/v1/academics/periods/" + period.id, { method: "DELETE" });
         if (!result.ok && result.status !== 204) {
           addPeriodError.textContent = extractErrorMessage(result.body, "Could not delete this period.");
@@ -67,6 +74,7 @@
     }
 
     addPeriodForm.reset();
+    VA.toast("Period added.");
     loadPeriods();
   });
 
@@ -90,21 +98,25 @@
 
     const filtered = instituteTimetableCache.filter(function (slot) {
       if (dayValue && slot.day_of_week !== dayValue) return false;
-      if (roomValue && slot.room.toLowerCase().indexOf(roomValue) === -1) return false;
+      const hay = [slot.room, slot.course_code, slot.course_title, slot.teacher_name].join(" ").toLowerCase();
+      if (roomValue && hay.indexOf(roomValue) === -1) return false;
       return true;
     });
 
     instituteTimetableTbody.innerHTML = "";
     instituteTimetableEmpty.hidden = filtered.length > 0;
+    instituteTimetableTbody.closest("table").hidden = filtered.length === 0;
+    const countEl = document.getElementById("institute-timetable-count");
+    if (countEl) countEl.textContent = filtered.length + " of " + instituteTimetableCache.length + " slot" + (instituteTimetableCache.length === 1 ? "" : "s");
 
     filtered.forEach(function (slot) {
       const tr = document.createElement("tr");
       tr.innerHTML =
         "<td>" + dayLabelForFilter(slot.day_of_week) + "</td>" +
         "<td>" + slot.start_time.slice(0, 5) + "\u2013" + slot.end_time.slice(0, 5) + "</td>" +
-        "<td>" + VA.escapeHtml(slot.course_code) + " \u2014 " + VA.escapeHtml(slot.course_title) + "</td>" +
+        '<td><span class="crs-code">' + VA.escapeHtml(slot.course_code) + "</span> " + VA.escapeHtml(slot.course_title) + "</td>" +
         "<td>" + VA.escapeHtml(slot.term_label) + "</td>" +
-        "<td>" + VA.escapeHtml(slot.teacher_name || "\u2014 unassigned") + "</td>" +
+        "<td>" + (slot.teacher_name ? VA.escapeHtml(slot.teacher_name) : '<span class="sd-dim">Unassigned</span>') + "</td>" +
         "<td>" + VA.escapeHtml(slot.room) + "</td>";
       instituteTimetableTbody.appendChild(tr);
     });

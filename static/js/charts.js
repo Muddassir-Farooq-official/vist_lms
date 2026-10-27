@@ -51,7 +51,7 @@ window.Charts = (function () {
     el.innerHTML = items.map(function (i) {
       const pct = Math.max(3, Math.round((i.count / max) * 100));
       return '<div class="hbar"><span class="hbar-label">' + esc(i.label) + '</span><span class="hbar-track"><span class="hbar-fill" style="width:' + pct +
-        "%;background:" + (i.color || opts.color || palette().blue) + '"></span></span><strong class="hbar-val">' + i.count + "</strong></div>";
+        "%;background:" + (i.color || opts.color || palette().blue) + '"></span></span><strong class="hbar-val">' + esc(opts.format ? opts.format(i.count) : i.count) + "</strong></div>";
     }).join("");
   }
 

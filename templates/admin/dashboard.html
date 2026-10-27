@@ -157,6 +157,16 @@
     </section>
   </div>
 
+  <!-- Top performers (staff scorecard, last month) -->
+  <section class="panel dash-panel" id="top-perf-panel" aria-labelledby="dh-perf-h">
+    <div class="dash-panel-head">
+      <h2 id="dh-perf-h">Top performers <small class="pf-month" id="top-perf-month"></small></h2>
+      <a href="/dashboard/admin/employees#performance" class="view-all-link">Full scorecard {{ nav_icon("arrow-right") }}</a>
+    </div>
+    <ol class="pf-top" id="top-perf"></ol>
+    <p class="dash-empty" id="top-perf-empty" hidden>No scores yet. Scores come from staff attendance, tasks and complaints.</p>
+  </section>
+
   <!-- Imports (kept from the old dashboard, shown only when there are any) -->
   <section class="panel dash-panel" id="imports-panel" hidden aria-labelledby="dh-imp-h">
     <div class="dash-panel-head">
@@ -171,9 +181,11 @@
     </div>
   </section>
 </div>
+{% include "_bonus_dialog.html" %}
 {% endblock %}
 
 {% block extra_scripts %}
 <script src="/static/js/charts.js"></script>
 <script src="/static/js/dashboard.js"></script>
+<script src="/static/js/performance.js"></script>
 {% endblock %}

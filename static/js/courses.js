@@ -2,6 +2,9 @@
   "use strict";
 
   const VA = window.VistAdmin;
+  const esc = VA.escapeHtml;
+  const $ = function (id) { return document.getElementById(id); };
+  const MORE_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
 
   // =========================================================================
   // Tabs — same pattern as the student/faculty portal pages
@@ -21,6 +24,29 @@
   tabButtons.forEach(function (btn) {
     btn.addEventListener("click", function () {
       activateTab(btn.dataset.tab);
+      try { history.replaceState(null, "", "#" + btn.dataset.tab); } catch (e) { /* ignore */ }
+    });
+  });
+  const startTab = (location.hash || "").replace("#", "");
+  if (startTab && document.querySelector('.portal-tab[data-tab="' + startTab + '"]')) activateTab(startTab);
+
+  // A row's "more" menu floats above the table (so the table's scroll box never cuts it off).
+  document.addEventListener("toggle", function (e) {
+    const d = e.target;
+    if (!d.classList || !d.classList.contains("crs-menu") || !d.open) return;
+    const list = d.querySelector(".sd-menu-list"), r = d.querySelector("summary").getBoundingClientRect();
+    list.style.position = "fixed";
+    list.style.right = Math.max(8, window.innerWidth - r.right) + "px";
+    list.style.left = "auto";
+    const below = window.innerHeight - r.bottom > 200;
+    list.style.top = below ? (r.bottom + 6) + "px" : "auto";
+    list.style.bottom = below ? "auto" : (window.innerHeight - r.top + 6) + "px";
+  }, true);
+  window.addEventListener("scroll", function () { document.querySelectorAll("details.crs-menu[open]").forEach(function (d) { d.open = false; }); }, true);
+  // Every "More" menu closes after a choice or a click elsewhere.
+  document.addEventListener("click", function (e) {
+    document.querySelectorAll("details.sd-menu[open], details.crs-menu[open]").forEach(function (d) {
+      if (!d.contains(e.target) || e.target.closest("[role=menuitem]")) d.open = false;
     });
   });
 
@@ -41,6 +67,30 @@
   const lcCourseSelect = document.getElementById("lc-course");
   const aoCourseSelect = document.getElementById("ao-course");
 
+  function renderCourses() {
+    const q = ($("course-q").value || "").trim().toLowerCase(), st = $("course-status").value;
+    const rows = coursesCache.filter(function (c) {
+      return (!q || (c.code + " " + c.title).toLowerCase().indexOf(q) !== -1) && (!st || (st === "active") === !!c.is_active);
+    }).sort(function (a, b) { return String(a.code).localeCompare(String(b.code), undefined, { numeric: true }); });
+    const active = coursesCache.filter(function (c) { return c.is_active; }).length;
+    $("course-count").textContent = coursesCache.length + " courses · " + active + " active.";
+    $("courses-empty").hidden = rows.length > 0;
+    coursesTbody.innerHTML = rows.map(function (c) {
+      return '<tr data-course="' + esc(c.id) + '"><td class="crs-course"><span class="crs-code">' + esc(c.code) + '</span><span class="crs-title"><strong>' + esc(c.title) + "</strong>" +
+        (c.description ? "<small>" + esc(c.description) + "</small>" : "") + '</span></td><td class="num"><b class="crs-ch">' + esc(c.credit_hours) + "</b></td><td>" +
+        (c.is_active ? '<span class="status-pill active">Active</span>' : '<span class="status-pill dropped">Inactive</span>') +
+        '</td><td class="sd-act"><button type="button" class="sd-view" data-edit-course="' + esc(c.id) + '">Edit</button></td></tr>';
+    }).join("");
+  }
+  coursesTbody.addEventListener("click", function (e) {
+    const b = e.target.closest("[data-edit-course]"); if (!b) return;
+    const c = coursesCache.find(function (x) { return x.id === b.getAttribute("data-edit-course"); });
+    if (c) openEditCourseModal(c);
+  });
+  let courseTimer = null;
+  $("course-q").addEventListener("input", function () { clearTimeout(courseTimer); courseTimer = setTimeout(renderCourses, 150); });
+  $("course-status").addEventListener("change", renderCourses);
+
   async function loadCourses() {
     const result = await VA.fetchJson("/api/v1/academics/courses");
     if (!result.ok) {
@@ -50,27 +100,7 @@
     VA.clearError();
     coursesCache = result.body;
 
-    coursesTbody.innerHTML = "";
-    coursesCache.forEach(function (c) {
-      const tr = document.createElement("tr");
-      tr.innerHTML =
-        "<td>" + VA.escapeHtml(c.code) + "</td>" +
-        "<td>" + VA.escapeHtml(c.title) + "</td>" +
-        '<td class="num">' + c.credit_hours + "</td>" +
-        "<td>" + (c.is_active ? '<span class="status-pill active">Active</span>' : '<span class="status-pill dropped">Inactive</span>') + "</td>" +
-        '<td class="row-actions"></td>';
-
-      const editBtn = document.createElement("button");
-      editBtn.className = "role-btn small-btn";
-      editBtn.type = "button";
-      editBtn.textContent = "Edit";
-      editBtn.addEventListener("click", function () {
-        openEditCourseModal(c);
-      });
-      tr.querySelector(".row-actions").appendChild(editBtn);
-
-      coursesTbody.appendChild(tr);
-    });
+    renderCourses();
 
     [lcCourseSelect, aoCourseSelect].forEach(function (select) {
       const currentValue = select.value;
@@ -203,11 +233,21 @@
       opt.textContent = p.code + " \u2014 " + p.name;
       curriculumProgramSelect.appendChild(opt);
     });
+    // Opened from Programs ("Curriculum" on a program card): show that program straight away.
+    const wanted = new URLSearchParams(location.search).get("program");
+    if (wanted && programsCache.some(function (p) { return p.id === wanted; })) {
+      curriculumProgramSelect.value = wanted;
+      selectedProgramId = wanted;
+      loadCurriculum(wanted);
+    }
   }
 
   async function loadCurriculum(programId) {
+    const box = $("curriculum-groups");
+    $("cur-summary").innerHTML = "";
     if (!programId) {
-      curriculumTbody.innerHTML = "";
+      box.innerHTML = "";
+      curriculumEmpty.textContent = "Select a program to see its curriculum.";
       curriculumEmpty.hidden = false;
       return;
     }
@@ -217,24 +257,21 @@
       return;
     }
     VA.clearError();
-
-    curriculumTbody.innerHTML = "";
-    if (result.body.length === 0) {
-      curriculumEmpty.hidden = false;
-      return;
-    }
-    curriculumEmpty.hidden = true;
-
-    result.body
-      .sort(function (a, b) { return a.semester_number - b.semester_number; })
-      .forEach(function (link) {
-        const tr = document.createElement("tr");
-        tr.innerHTML =
-          '<td class="num">' + link.semester_number + "</td>" +
-          "<td>" + VA.escapeHtml(link.course_code) + " \u2014 " + VA.escapeHtml(link.course_title) + "</td>" +
-          '<td class="num">' + link.credit_hours + "</td>";
-        curriculumTbody.appendChild(tr);
-      });
+    const links = result.body.slice().sort(function (a, b) { return a.semester_number - b.semester_number || String(a.course_code).localeCompare(String(b.course_code)); });
+    curriculumEmpty.hidden = links.length > 0;
+    curriculumEmpty.textContent = "No courses in this program yet. Add the first one above.";
+    const sems = {};
+    links.forEach(function (l) { (sems[l.semester_number] = sems[l.semester_number] || []).push(l); });
+    const keys = Object.keys(sems).map(Number).sort(function (a, b) { return a - b; });
+    const total = links.reduce(function (n, l) { return n + (l.credit_hours || 0); }, 0);
+    $("cur-summary").innerHTML = links.length ? ['<span class="crs-chip"><b>' + links.length + "</b> courses</span>", '<span class="crs-chip"><b>' + total + "</b> credit hours</span>",
+      '<span class="crs-chip"><b>' + keys.length + "</b> semesters</span>"].join("") : "";
+    box.innerHTML = keys.map(function (k) {
+      const list = sems[k], ch = list.reduce(function (n, l) { return n + (l.credit_hours || 0); }, 0);
+      return '<section class="crs-sem"><header><strong>Semester ' + k + "</strong><small>" + list.length + " course" + (list.length === 1 ? "" : "s") + " · " + ch + " credit hours</small></header><ul>" +
+        list.map(function (l) { return '<li><span class="crs-code">' + esc(l.course_code) + "</span><span>" + esc(l.course_title) + '</span><b class="crs-ch">' + esc(l.credit_hours) + "</b></li>"; }).join("") +
+        "</ul></section>";
+    }).join("");
   }
 
   curriculumProgramSelect.addEventListener("change", function () {
@@ -295,7 +332,12 @@
 
     offeringsTbody.innerHTML = "";
     const unassigned = result.body.filter(function (o) { return !o.assigned_teacher_id; }).length;
-    unassignedCount.textContent = unassigned ? "(" + unassigned + " without a teacher)" : "(every course has a teacher)";
+    unassignedCount.textContent = unassigned ? "(" + unassigned + ")" : "";
+    const enrolled = result.body.reduce(function (n, o) { return n + (o.enrolled_count || 0); }, 0);
+    const openN = result.body.filter(function (o) { return o.is_open_for_enrollment; }).length;
+    $("off-summary").innerHTML = result.body.length ? ['<span class="crs-chip"><b>' + result.body.length + "</b> offerings</span>",
+      '<span class="crs-chip' + (unassigned ? " warn" : "") + '"><b>' + unassigned + "</b> without a teacher</span>",
+      '<span class="crs-chip"><b>' + enrolled + "</b> enrolments</span>", '<span class="crs-chip"><b>' + openN + "</b> open for enrolment</span>"].join("") : "";
     const rows = onlyUnassigned.checked ? result.body.filter(function (o) { return !o.assigned_teacher_id; }) : result.body;
     if (rows.length === 0) {
       offeringsEmpty.textContent = result.body.length ? "Every course in this term has a teacher." : "Select a term above to see its offerings, or create a new one.";
@@ -306,17 +348,19 @@
 
     rows.forEach(function (o) {
       const tr = document.createElement("tr");
+      const cap = o.capacity == null ? null : o.capacity;
+      const pct = cap ? Math.min(100, Math.round(100 * o.enrolled_count / cap)) : 0;
       tr.innerHTML =
-        "<td>" + VA.escapeHtml(o.course_code) + " \u2014 " + VA.escapeHtml(o.course_title) + "</td>" +
-        "<td>" + VA.escapeHtml((o.curriculum && o.curriculum.length) ? o.curriculum.join(", ") : "\u2014 not in a curriculum") + "</td>" +
-        "<td>" + VA.escapeHtml(o.section_label || "A") + "</td>" +
-        '<td class="num">' + o.credit_hours + "</td>" +
-        '<td class="teacher-cell">' + (o.teacher_name ? VA.escapeHtml(o.teacher_name) : '<span class="status-pill dropped">Unassigned</span>') + " </td>" +
-        '<td class="num">' + o.enrolled_count + " / " + (o.capacity == null ? "\u221e" : o.capacity) + "</td>" +
+        '<td class="crs-course"><span class="crs-code">' + esc(o.course_code) + '</span><span class="crs-title"><strong>' + esc(o.course_title) + "</strong><small>Section " +
+          esc(o.section_label || "A") + " · " + esc(o.credit_hours) + " credit hours</small></span></td>" +
+        '<td class="crs-cur">' + esc((o.curriculum && o.curriculum.length) ? o.curriculum.join(", ") : "Not in a curriculum") + "</td>" +
+        '<td class="teacher-cell">' + (o.teacher_name ? '<span class="crs-teacher">' + esc(o.teacher_name) + "</span>" : '<span class="status-pill dropped">No teacher</span>') + " </td>" +
+        '<td class="crs-seats"><b>' + o.enrolled_count + "</b>" + (cap ? " / " + cap + '<span class="crs-meter"><i style="width:' + pct + '%"></i></span>' : "<small>no seat limit</small>") + "</td>" +
         "<td>" + (o.is_open_for_enrollment ? '<span class="status-pill active">Open</span>' : '<span class="status-pill dropped">Closed</span>') + "</td>" +
-        '<td class="row-actions"></td>';
+        '<td class="row-actions crs-actions"><a class="role-btn small-btn" href="/dashboard/admin/courses/offering/' + esc(o.id) + '">Manage</a>' +
+        '<details class="crs-menu"><summary class="ss-icon-btn" aria-label="More for ' + esc(o.course_code) + '" title="More">' + MORE_ICON + '</summary><div class="sd-menu-list" role="menu"></div></details></td>';
 
-      const actionsCell = tr.querySelector(".row-actions");
+      const actionsCell = tr.querySelector(".crs-menu .sd-menu-list");
 
       const teacherBtn = document.createElement("button");
       teacherBtn.className = "role-btn small-btn" + (o.teacher_name ? " secondary-btn" : "");
@@ -329,9 +373,10 @@
 
       if (!o.enrolled_count) {
         const delBtn = document.createElement("button");
-        delBtn.className = "role-btn small-btn danger-btn";
+        delBtn.className = "danger";
         delBtn.type = "button";
-        delBtn.textContent = "Delete\u2026";
+        delBtn.setAttribute("role", "menuitem");
+        delBtn.textContent = "Delete (created by mistake)\u2026";
         delBtn.addEventListener("click", async function () {
           if (!(await VA.confirm("Delete " + o.course_code + " section " + (o.section_label || "A") + "? It was created by mistake and nobody has enrolled. Its timetable slots go with it.", "Delete"))) return;
           const r = await VA.fetchJson("/api/v1/academics/offerings/" + o.id, { method: "DELETE" });
@@ -342,9 +387,9 @@
       }
 
       const toggleBtn = document.createElement("button");
-      toggleBtn.className = "role-btn small-btn";
       toggleBtn.type = "button";
-      toggleBtn.textContent = o.is_open_for_enrollment ? "Close Enrollment" : "Open Enrollment";
+      toggleBtn.setAttribute("role", "menuitem");
+      toggleBtn.textContent = o.is_open_for_enrollment ? "Close enrolment" : "Open enrolment";
       toggleBtn.addEventListener("click", async function () {
         toggleBtn.disabled = true;
         const result = await VA.fetchJson("/api/v1/academics/offerings/" + o.id, {
@@ -362,16 +407,16 @@
       actionsCell.appendChild(toggleBtn);
 
       const enrollBtn = document.createElement("button");
-      enrollBtn.className = "role-btn small-btn";
       enrollBtn.type = "button";
-      enrollBtn.textContent = "Enroll Students";
+      enrollBtn.setAttribute("role", "menuitem");
+      enrollBtn.textContent = "Enrol students\u2026";
       enrollBtn.addEventListener("click", function () { openBatchEnroll(o); });
       actionsCell.appendChild(enrollBtn);
 
       const seatsBtn = document.createElement("button");
-      seatsBtn.className = "role-btn small-btn";
       seatsBtn.type = "button";
-      seatsBtn.textContent = "Seats";
+      seatsBtn.setAttribute("role", "menuitem");
+      seatsBtn.textContent = "Change seats\u2026";
       seatsBtn.addEventListener("click", async function () {
         const answer = (await window.VistAdmin.promptText("Seats for " + o.course_code + " section " + o.section_label + " (empty = unlimited):", o.capacity == null ? "" : o.capacity));
         if (answer === null) return;
@@ -385,14 +430,6 @@
       });
       actionsCell.appendChild(seatsBtn);
 
-      const materialsBtn = document.createElement("button");
-      materialsBtn.className = "role-btn small-btn";
-      materialsBtn.type = "button";
-      materialsBtn.textContent = "Manage";
-      materialsBtn.addEventListener("click", function () {
-        window.location.href = "/dashboard/admin/courses/offering/" + o.id;
-      });
-      actionsCell.appendChild(materialsBtn);
 
       offeringsTbody.appendChild(tr);
     });
@@ -413,6 +450,8 @@
     });
     if (previous) termLabelInput.value = previous;
   }
+
+  document.addEventListener("terms:changed", function () { loadTermsDropdown(false); });
 
   termLabelInput.addEventListener("change", function () {
     if (termLabelInput.value) loadOfferings();
@@ -841,15 +880,15 @@
 
     result.body.forEach(function (t) {
       const tr = document.createElement("tr");
-      const passRateText = t.pass_rate === null ? "\u2014" : Math.round(t.pass_rate * 100) + "%";
+      const rate = t.pass_rate === null ? null : Math.round(t.pass_rate * 100);
+      const lvl = rate === null ? "none" : rate >= 90 ? "great" : rate >= 75 ? "good" : rate >= 60 ? "fair" : "low";
       tr.innerHTML =
-        "<td>" + VA.escapeHtml(t.teacher_name) + " (" + VA.escapeHtml(t.employee_code) + ")</td>" +
+        '<td><span class="crs-title"><strong>' + esc(t.teacher_name) + "</strong><small>" + esc(t.employee_code) + "</small></span></td>" +
         '<td class="num">' + t.offerings_count + "</td>" +
         '<td class="num">' + t.total_enrollments + "</td>" +
-        '<td class="num">' + t.passed_count + "</td>" +
-        '<td class="num">' + t.failed_count + "</td>" +
-        '<td class="num">' + passRateText + "</td>" +
-        '<td class="num">' + t.complaints_against + "</td>";
+        "<td><small class=\"crs-res\">" + t.passed_count + " passed · " + t.failed_count + " failed</small></td>" +
+        "<td>" + (rate === null ? '<span class="pf-na">No results yet</span>' : '<span class="pf-meter pf-' + lvl + '"><span class="pf-track"><i style="width:' + rate + '%"></i></span><b>' + rate + "%</b></span>") + "</td>" +
+        '<td class="num">' + (t.complaints_against ? '<span class="status-pill dropped">' + t.complaints_against + "</span>" : "0") + "</td>";
       performanceTbody.appendChild(tr);
     });
   }

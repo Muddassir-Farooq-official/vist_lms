@@ -37,3 +37,28 @@ async def test_exam_office_can_open_a_record_read_only(app_client, admin_user, d
     assert (await app_client.patch(f"/api/v1/students/{sid}", json={"section_label": "Z"})).status_code == 403
     page = (await app_client.get("/dashboard/exam/students")).text
     assert 'data-editable="false"' in page and 'id="ss-photo-input"' not in page and 'id="edit-student-form"' not in page
+
+
+async def test_staff_directory_rows_show_the_job_title_but_no_cnic_or_bank(app_client, admin_user, db_session):
+    job = JobRole(code="SCR_T", title="Driver", default_role_code="STAFF")
+    db_session.add(job)
+    await db_session.commit()
+    await _login_admin(app_client)
+    assert (await app_client.post("/api/v1/employees", json=_employee_payload(job.id, cnic="84003-0000001-1"))).status_code == 201
+    row = next(r for r in (await app_client.get("/api/v1/employees")).json()["items"] if r["job_role_id"] == str(job.id))
+    assert row["job_title"] == "Driver" and "contact_no" in row and "has_photo" in row
+    assert not {"cnic", "bank_iban", "address_line"} & set(row)
+    page = (await app_client.get("/dashboard/admin/employees")).text
+    assert 'id="employee-sheet"' in page and 'id="es-photo-input"' in page and "Upload / Replace" not in page
+    assert 'value="STAFF"' in page and 'value="ADMIN"' not in page.split('id="jr-default-role"')[1].split("</select>")[0]
+
+
+async def test_programs_overview_counts_students_and_curriculum(app_client, admin_user, db_session):
+    await _login_admin(app_client)
+    made = await app_client.post("/api/v1/programs", json={"code": "PGX", "name": "Program X", "duration_years": 2, "total_semesters": 4})
+    assert made.status_code == 201, made.text
+    rows = (await app_client.get("/api/v1/programs/overview")).json()
+    assert rows and all({"students", "curriculum", "code", "total_semesters"} <= set(r) for r in rows)
+    assert all({"courses", "credit_hours", "semesters_planned"} <= set(r["curriculum"]) for r in rows)
+    page = (await app_client.get("/dashboard/admin/programs")).text
+    assert 'id="programs-grid"' in page and 'id="p-maxch"' in page and 'id="ep-maxch"' in page
