@@ -75,8 +75,9 @@ POLICY: tuple[Policy, ...] = (
            "A purchase above this amount needs approval from an administrator other than the one who asked for it or recorded it."),
     Policy("fee_payment_max_backdate_days", "Payments may be dated back at most (days)", "Fees", int, 1, 365,
            "Staff cannot record a payment dated earlier than this."),
-    Policy("payroll_default_working_days", "Working days in a month (suggested for each payroll; 0 = calendar days)", "Payroll", int, 0, 31,
-           "A day's pay = basic salary / working days. Usually 26 (six-day week) or 22 (five-day week); can be changed per month and per person."),
+    Policy("payroll_default_working_days", "Working days in a month (0 = each person's own working days)", "Payroll", int, 0, 31,
+           "A day's pay = basic salary / working days. 0: each person's own working days in the month, from their timing in Staff attendance "
+           "(someone who works 8 days a month earns basic / 8 a day). Or one number for everyone, e.g. 26. Can also be changed per payroll and per person."),
     Policy("payroll_attendance_deductions", "Deduct absences and late arrivals from pay (1 = yes, 0 = no)", "Payroll", int, 0, 1,
            "Uses Staff attendance. Someone with no attendance recorded in a month is never treated as absent."),
     Policy("payroll_casual_leaves_staff", "Casual leaves per month: non-teaching staff", "Payroll", int, 0, 10,

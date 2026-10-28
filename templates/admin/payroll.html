@@ -16,7 +16,7 @@
 <div class="portal-tab-panel" data-tab-panel="runs">
   <section class="sh-card">
     <div class="ann-toolbar"><p class="panel-hint" style="margin:0;flex:1">The accounts office prepares a month, adjusts anything that needs it (unpaid days, extras) and sends it for approval. The administration approves it (or sends it back with a note), then the accounts office pays the salaries and marks it paid. Everyone gets their payslip when it is paid.</p>
-      <input id="pr-month" class="text-input" type="month" aria-label="Month" /><input id="pr-wd" class="text-input small-input" type="number" min="1" max="31" placeholder="Working days" aria-label="Working days in the month" title="A day's pay = basic / working days (e.g. 26 or 22). Empty = the default in Settings." /><button type="button" class="role-btn" id="pr-prepare">Prepare payroll</button></div>
+      <input id="pr-month" class="text-input" type="month" aria-label="Month" /><input id="pr-wd" class="text-input small-input" type="number" min="1" max="31" placeholder="Working days" aria-label="Working days in the month" title="A day's pay = basic / working days. Empty = each person's own working days (or the number in Settings). Type a number to use it for everyone." /><button type="button" class="role-btn" id="pr-prepare">Prepare payroll</button></div>
     <p class="panel-hint">Absences and late arrivals / early leavings come from staff attendance. The rules (casual leaves, how many late marks make a day, security %) are in Settings &rarr; Payroll and can be changed any time; press Recalculate on a draft to apply them.</p>
     <p id="pr-prep-error" class="dash-alert error" hidden></p>
     <div class="table-scroll"><table class="tk-table"><thead><tr><th>Month</th><th>Status</th><th class="num">Employees</th><th class="num">Gross</th><th class="num">Deductions</th><th class="num">Net pay</th></tr></thead><tbody id="rn-body"></tbody></table></div>
@@ -81,7 +81,7 @@
 <dialog id="rd-modal" class="modal modal-wide" aria-labelledby="rd-title"><div class="modal-body">
   <div class="ann-detail-badges" id="rd-badges"></div><h2 id="rd-title"></h2><p class="cc-meta" id="rd-meta"></p>
   <div id="rd-tiles"></div><div id="rd-problems"></div>
-  <div class="table-scroll"><table class="tk-table"><thead><tr><th>Employee</th><th class="num">Basic</th><th class="num">Days</th><th class="num">Absent</th><th class="num">Late / early</th><th class="num">Gross</th><th class="num">Deductions</th><th class="num">Net</th><th>Notes</th><th></th></tr></thead><tbody id="rd-body"></tbody></table></div>
+  <div class="table-scroll"><table class="tk-table"><thead><tr><th>Employee</th><th class="num">Basic</th><th class="num">Day rate</th><th class="num">Absent</th><th class="num">Late / early</th><th class="num">Gross</th><th class="num">Deductions</th><th class="num">Net</th><th>Notes</th><th></th></tr></thead><tbody id="rd-body"></tbody></table></div>
   <p id="rd-error" class="dash-alert error" hidden></p>
   <div class="decision-bar" id="rd-actions"></div>
   <button id="rd-close" class="back-link modal-close-btn" type="button">Close</button></div></dialog>

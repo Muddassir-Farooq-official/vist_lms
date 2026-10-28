@@ -144,6 +144,7 @@ class ScholarshipIn(BaseModel):
     kind: ScholarshipKind
     value: float = Field(gt=0)
     fee_structure_id: uuid.UUID | None = None       # a single fee only (a discount); empty = every fee, now and in future (a scholarship)
+    fee_type_id: uuid.UUID | None = None            # or one kind of fee (e.g. Tuition) in every semester; not together with fee_structure_id
     auto_apply: bool = True
     valid_from: date | None = None
     valid_until: date | None = None
@@ -164,7 +165,7 @@ async def grant_scholarship(payload: ScholarshipIn, current_user: CurrentUser = 
     from app.approvals.service import pending_response
 
     s, applied = await ScholarshipService(db).grant(student_id=payload.student_id, name=payload.name.strip(), kind=payload.kind, value=payload.value, fee_structure_id=payload.fee_structure_id,
-                                                    auto_apply=payload.auto_apply, valid_from=payload.valid_from, valid_until=payload.valid_until, reason=payload.reason.strip(), actor_id=current_user.id)
+                                                    fee_type_id=payload.fee_type_id, auto_apply=payload.auto_apply, valid_from=payload.valid_from, valid_until=payload.valid_until, reason=payload.reason.strip(), actor_id=current_user.id)
     if isinstance(s, ApprovalRequest):
         return JSONResponse(status_code=202, content=pending_response(s))
     return {"id": s.id, "status": s.status, "applied": applied}

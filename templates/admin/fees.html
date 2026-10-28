@@ -74,7 +74,7 @@
     <div class="form-field"><label for="sc-name">Name</label><input id="sc-name" class="text-input" maxlength="120" placeholder="e.g. Merit scholarship, Sibling discount" /></div>
     <div class="form-field"><label for="sc-kind">Type</label><select id="sc-kind" class="select-input"><option value="PERCENT">A percentage of each installment</option><option value="FIXED">A fixed amount (spread over the installments)</option></select></div>
     <div class="form-field"><label for="sc-value" id="sc-value-label">Percentage (%)</label><input id="sc-value" class="text-input" type="number" min="0.01" step="0.01" /></div>
-    <div class="form-field"><label for="sc-structure">Applies to</label><select id="sc-structure" class="select-input"><option value="">Every fee of this student</option></select></div>
+    <div class="form-field"><label for="sc-structure">Applies to</label><select id="sc-structure" class="select-input"><option value="">Every fee of this student</option></select><small class="field-hint">For a tuition discount that continues every semester, choose "Tuition &hellip; only (every semester)": exam, library and other fees are left alone.</small></div>
     <div class="form-field"><label for="sc-from">Covers installments due from</label><input id="sc-from" class="text-input" type="date" /><small class="field-hint">Empty = from the start of the current term, so this term's installments already due are included. Earlier terms' dues are never touched.</small></div>
     <div class="form-field"><label for="sc-until">Until <small class="field-hint inline">(optional)</small></label><input id="sc-until" class="text-input" type="date" /></div>
     <div class="form-field two-span"><label class="check-row"><input type="checkbox" id="sc-auto" checked /> <span>Also take it off fees charged later (while it runs)</span></label></div>
@@ -209,18 +209,25 @@
 
 <!-- ============ ASSIGNMENTS ============ -->
 <div class="portal-tab-panel" data-tab-panel="assignments" hidden>
-<section class="panel">
-  <div class="panel-header">
-    <div class="panel-header-left">
-      <div class="panel-icon-badge">{{ nav_icon("check-circle") }}</div>
-      <h2>Fee Assignments</h2>
-    </div>
+<section class="panel sd-panel">
+  <div class="sd-toolbar">
+    <label class="sd-search">{{ nav_icon("search") }}<input type="search" id="as-q" placeholder="Name, roll no., employee code or fee" aria-label="Search fee assignments" /></label>
+    <select id="as-term" class="select-input" aria-label="Term"><option value="">All terms</option></select>
+    <select id="as-program" class="select-input" aria-label="Program"><option value="">All programs</option></select>
+    <select id="as-payer" class="select-input" aria-label="Payer"><option value="">Students and staff</option><option value="STUDENT">Students</option><option value="EMPLOYEE">Staff</option></select>
+    <select id="as-owing" class="select-input" aria-label="Standing"><option value="">Any balance</option><option value="true">Owes now</option><option value="false">Nothing due now</option></select>
+    <select id="as-status" class="select-input" aria-label="Status"><option value="ACTIVE">Active</option><option value="">Any status</option><option value="WAIVED">Waived</option><option value="CANCELLED">Cancelled</option></select>
   </div>
   <table class="dash-table" id="assignments-table">
-    <thead><tr><th>Payer</th><th>Fee</th><th class="num">Payable</th><th class="num">Paid</th><th class="num">Still owed</th><th class="num">Due Now</th><th>Standing</th><th></th></tr></thead>
+    <thead><tr><th>Payer</th><th>Fee</th><th class="num">Payable</th><th class="num">Paid</th><th class="num">Still owed</th><th class="num">Due Now</th><th>Standing</th><th class="crs-actions"></th></tr></thead>
     <tbody id="assignments-tbody"></tbody>
   </table>
-  <p class="empty-state" id="assignments-empty" hidden>No fee assignments yet.</p>
+  <p class="empty-state" id="assignments-empty" hidden>No fee assignments match.</p>
+  <div class="pager" id="as-pager">
+    <button id="as-prev" class="page-btn" type="button">&larr; Prev</button>
+    <span id="as-info" class="page-info"></span>
+    <button id="as-next" class="page-btn" type="button">Next &rarr;</button>
+  </div>
 </section>
 </div>
 

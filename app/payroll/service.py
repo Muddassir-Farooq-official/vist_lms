@@ -439,10 +439,17 @@ class PayrollService:
         return [(e, t) for e, t in rows], await self._salaries([e.id for e, _ in rows], month)
 
     # ------------------------------------------------------------------ the run
+    async def _schedule_days(self, month: date, employees: list[Employee]) -> dict[uuid.UUID, int]:
+        from app.timekeeping.service import TimekeepingService
+        return await TimekeepingService(self.session).scheduled_days(month, employees)
+
     async def prepare(self, month: date, *, actor_id: uuid.UUID, working_days: int | None = None) -> tuple[PayrollRun, list[str]]:
+        """A day's pay = basic / working days. The working days are: the number typed for this payroll (same for everyone),
+        else the institute's fixed number from Settings, else (Settings = 0, the default) EACH PERSON'S OWN working days in the
+        month from their timing, so someone who works 8 days a month earns basic / 8 a day. The run then stores 0."""
         month = rules.month_start(month)
-        working_days = int(working_days or settings.payroll_default_working_days or rules.days_in(month))
-        if not 1 <= working_days <= rules.days_in(month):
+        working_days = int(working_days or settings.payroll_default_working_days or 0)
+        if working_days and not 1 <= working_days <= rules.days_in(month):
             raise BusinessRuleViolationError(f"Working days must be between 1 and {rules.days_in(month)}.")
         today = institute_today()
         if month > rules.month_start(today).replace(day=1) and (month.year, month.month) > ((today.year, today.month + 1) if today.month < 12 else (today.year + 1, 1)):
@@ -459,13 +466,15 @@ class PayrollService:
         skipped = []
         att = await self._attendance(month, [e for e, _ in people])
         teachers = await self._teachers([e for e, _ in people])
+        own = {} if working_days else await self._schedule_days(month, [e for e, _ in people])
         for emp, title in people:
             base = salaries.get(emp.id)
             if base is None or base <= 0:
                 skipped.append(f"{emp.first_name} {emp.last_name} (no salary on record)")
                 continue
             slip = Payslip(run_id=run.id, employee_id=emp.id, employee_name=f"{emp.first_name} {emp.last_name}", employee_code=emp.employee_code, job_title=title, department=emp.department,
-                           base_salary=base, days_in_month=rules.days_in(month), days_payable=rules.payable_days(emp.hire_date, month), working_days=working_days, gross=0, deductions=0, net=0)
+                           base_salary=base, days_in_month=rules.days_in(month), days_payable=rules.payable_days(emp.hire_date, month),
+                           working_days=working_days or own.get(emp.id) or rules.days_in(month), gross=0, deductions=0, net=0)
             self.session.add(slip)
             await self.session.flush()
             await self._fill(slip, emp, run, base, att.get(emp.id), emp.id in teachers)
@@ -483,6 +492,9 @@ class PayrollService:
         have = {s.employee_id: s for s in await self._payslips(run.id)}
         att = await self._attendance(run.month, [e for e, _ in people])
         teachers = await self._teachers([e for e, _ in people])
+        # Someone added since the payroll was prepared gets their own working days too. Existing payslips keep theirs
+        # (set when prepared, or changed by hand with Adjust), so a recalculation never undoes a person's decision.
+        own = {} if run.working_days else await self._schedule_days(run.month, [e for e, _ in people if e.id not in have])
         for emp, title in people:
             base = salaries.get(emp.id)
             if base is None or base <= 0:
@@ -490,7 +502,8 @@ class PayrollService:
             slip = have.get(emp.id)
             if slip is None:
                 slip = Payslip(run_id=run.id, employee_id=emp.id, employee_name=f"{emp.first_name} {emp.last_name}", employee_code=emp.employee_code, job_title=title, department=emp.department,
-                               base_salary=base, days_in_month=rules.days_in(run.month), days_payable=rules.payable_days(emp.hire_date, run.month), working_days=run.working_days,
+                               base_salary=base, days_in_month=rules.days_in(run.month), days_payable=rules.payable_days(emp.hire_date, run.month),
+                               working_days=run.working_days or own.get(emp.id) or rules.days_in(run.month),
                                gross=0, deductions=0, net=0)
                 self.session.add(slip)
                 await self.session.flush()

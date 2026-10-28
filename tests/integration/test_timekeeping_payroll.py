@@ -209,3 +209,25 @@ async def test_only_the_right_people_see_staff_attendance(app_client, admin_user
     await _first_login(app_client, t["username"], t["pw"])
     assert (await app_client.get(f"{SA}/board")).status_code == 403
     assert (await app_client.get(f"{PR}/security")).status_code == 403
+
+async def test_a_day_is_paid_at_basic_over_that_persons_own_working_days(app_client, admin_user, db_session):
+    """Someone due only on Saturdays earns basic / (Saturdays in the month) a day, so missing all but one costs most of the pay;
+    everyone else keeps their own count (here the whole week). Typing a number when preparing still uses it for everyone."""
+    t, s, n, codes = await _setup(app_client, db_session)
+    sat_only = dict(ALL_WEEK, working_days=[5])
+    assert (await app_client.put(f"{SA}/timings/employees/{t['id']}", json=sat_only)).status_code == 204
+    saturdays = [d for d in range(1, LAST_DAYS + 1) if LAST.replace(day=d).weekday() == 5]
+    await _import(app_client, [(codes["TCH"], LAST.replace(day=saturdays[0]).isoformat(), "08:55", "17:05")])   # came once
+
+    run = (await app_client.post(f"{PR}/runs", json={"month": LAST.isoformat()})).json()
+    slips = {x["employee_code"]: x for x in (await app_client.get(f"{PR}/runs/{run['id']}")).json()["payslips"]}
+    tch = slips[codes["TCH"]]
+    assert tch["working_days"] == len(saturdays) and tch["absent_days"] == len(saturdays) - 1      # teachers: no casual leave
+    lines = (await app_client.get(f"{PR}/payslips/{tch['id']}")).json()["deduction_lines"]
+    absent = next(ln for ln in lines if ln["source"] == "ABSENT")
+    assert absent["amount"] == pytest.approx(float(pay_rules.unpaid_deduction(60000, len(saturdays), len(saturdays) - 1)), abs=0.01)
+    assert slips[codes["STF"]]["working_days"] == LAST_DAYS                                        # the whole week, every day of the month
+
+    assert (await app_client.post(f"{PR}/runs/{run['id']}/cancel", json={"reason": "Trying a fixed number"})).status_code == 200
+    fixed = (await app_client.post(f"{PR}/runs", json={"month": LAST.isoformat(), "working_days": 26})).json()
+    assert {x["working_days"] for x in (await app_client.get(f"{PR}/runs/{fixed['id']}")).json()["payslips"]} == {26}

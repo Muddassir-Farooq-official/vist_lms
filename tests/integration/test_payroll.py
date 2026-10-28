@@ -26,6 +26,8 @@ TODAY = institute_today()
 THIS = TODAY.replace(day=1)
 NEXT = (THIS + timedelta(days=32)).replace(day=1)
 DIM = rules.days_in(THIS)
+# A day's pay = basic / that person's own working days in the month; the default timing is Monday to Saturday.
+WORK = sum(1 for d in range(1, DIM + 1) if THIS.replace(day=d).weekday() != 6)
 _cache: dict = {}
 
 async def _advance(client, team, payload):
@@ -180,7 +182,7 @@ async def test_unpaid_days_adjustments_and_holding_a_payslip(app_client, admin_u
     a, b = _slip(run, team, "a"), _slip(run, team, "b")
     edit = lambda slip, **kw: app_client.patch(f"{PR}/runs/{run['id']}/payslips/{slip['id']}", json=kw)                                    # noqa: E731
     r = (await edit(a, unpaid_days=2)).json()
-    assert _slip(r, team, "a")["net"] == approx(60000 - rules.unpaid_deduction(60000, DIM, 2)) and r["total_net"] == approx(60000 - rules.unpaid_deduction(60000, DIM, 2) + 30000 + 60000)
+    assert _slip(r, team, "a")["net"] == approx(60000 - rules.unpaid_deduction(60000, WORK, 2)) and r["total_net"] == approx(60000 - rules.unpaid_deduction(60000, WORK, 2) + 30000 + 60000)
     assert (await edit(a, unpaid_days=1.5)).status_code == 200 and (await edit(a, unpaid_days=1.3)).status_code == 422 and (await edit(a, unpaid_days=DIM + 1)).status_code == 422       # whole or half days only
     r = await edit(a, unpaid_days=0, adjustment=2500, adjustment_note="Overtime in October")
     assert r.status_code == 200 and _slip(r.json(), team, "a")["gross"] == 62500.0
@@ -209,7 +211,7 @@ async def test_recalculating_picks_up_new_pay_items_but_keeps_what_you_entered(a
     await app_client.post(f"{PR}/items", json={"employee_id": team["a"]["id"], "kind": "ALLOWANCE", "name": "Medical", "calc": "FIXED", "value": 2000})
     r = (await app_client.post(f"{PR}/runs/{run['id']}/recalculate")).json()
     s = _slip(r, team, "a")
-    assert s["unpaid_days"] == 1.0 and s["gross"] == 62000.0 and s["net"] == approx(62000 - rules.unpaid_deduction(60000, DIM, 1))
+    assert s["unpaid_days"] == 1.0 and s["gross"] == 62000.0 and s["net"] == approx(62000 - rules.unpaid_deduction(60000, WORK, 1))
 
 
 # ====================================================================== approving and paying

@@ -235,7 +235,7 @@ class Settings(BaseSettings):
     attendance_marking_window_minutes: int = 15
 
     # Payroll from staff attendance (editable in Settings). A day's pay = basic salary / working days of the run.
-    payroll_default_working_days: int = 0           # 0 = the calendar days of the month (salary / 30 or 31); or fix it, e.g. 26, or 22 for a five-day week
+    payroll_default_working_days: int = 0           # 0 = each person's own working days in the month (from their timing); or one number for everyone, e.g. 26
     payroll_attendance_deductions: int = 1          # 1 = deduct absences and late / early marks from pay
     payroll_casual_leaves_staff: int = 2            # absences forgiven per month for non-teaching staff
     payroll_casual_leaves_teacher: int = 0          # teachers: no casual leave

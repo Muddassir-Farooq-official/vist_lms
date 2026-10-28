@@ -419,16 +419,59 @@
     });
   }
 
+  // Fee assignments: one page at a time, searched and filtered on the server (it used to load every assignment at once).
+  const asState = { page: 1, size: 25, total: 0, timer: null };
+  function asFilters() {
+    const p = new URLSearchParams({ page: String(asState.page), page_size: String(asState.size) });
+    [["q", "as-q"], ["term_label", "as-term"], ["program_id", "as-program"], ["payer_type", "as-payer"], ["owing", "as-owing"], ["status", "as-status"]].forEach(function (pair) {
+      const el = document.getElementById(pair[1]);
+      if (el && el.value.trim()) p.set(pair[0], el.value.trim());
+    });
+    return p;
+  }
+  async function loadAssignmentFilters() {
+    const [s, pr] = await Promise.all([VA.fetchJson("/api/v1/fees/structures", { quiet: true }), VA.fetchJson("/api/v1/programs", { quiet: true })]);
+    const termSel = document.getElementById("as-term"), progSel = document.getElementById("as-program");
+    if (termSel && s.ok) {
+      const terms = Array.from(new Set(s.body.map(function (x) { return x.term_label; }).filter(Boolean)));
+      termSel.innerHTML = '<option value="">All terms</option>' + terms.map(function (t) { return '<option value="' + VA.escapeHtml(t) + '">' + VA.escapeHtml(t) + "</option>"; }).join("");
+    }
+    if (progSel && pr.ok) {
+      progSel.innerHTML = '<option value="">All programs</option>' + pr.body.map(function (p) { return '<option value="' + p.id + '">' + VA.escapeHtml(p.code + " \u2014 " + p.name) + "</option>"; }).join("");
+    }
+  }
+  ["as-term", "as-program", "as-payer", "as-owing", "as-status"].forEach(function (id) {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("change", function () { asState.page = 1; loadAssignments(); });
+  });
+  if (document.getElementById("as-q")) document.getElementById("as-q").addEventListener("input", function () {
+    clearTimeout(asState.timer);
+    asState.timer = setTimeout(function () { asState.page = 1; loadAssignments(); }, 300);
+  });
+  if (document.getElementById("as-prev")) {
+    document.getElementById("as-prev").addEventListener("click", function () { if (asState.page > 1) { asState.page -= 1; loadAssignments(); } });
+    document.getElementById("as-next").addEventListener("click", function () { if (asState.page * asState.size < asState.total) { asState.page += 1; loadAssignments(); } });
+  }
+
   async function loadAssignments() {
-    const result = await VA.fetchJson("/api/v1/fees/assignments");
+    const result = await VA.fetchJson("/api/v1/fees/assignments?" + asFilters().toString());
     if (!result.ok) {
       VA.showError(extractErrorMessage(result.body, "Could not load fee assignments."));
       return;
     }
     VA.clearError();
     const assignments = result.body || [];
+    asState.total = parseInt((result.headers && result.headers.get("X-Total-Count")) || String(assignments.length), 10);
+    const info = document.getElementById("as-info");
+    if (info) {
+      const from = asState.total ? (asState.page - 1) * asState.size + 1 : 0;
+      info.textContent = from + "\u2013" + Math.min(asState.page * asState.size, asState.total) + " of " + asState.total;
+      document.getElementById("as-prev").disabled = asState.page <= 1;
+      document.getElementById("as-next").disabled = asState.page * asState.size >= asState.total;
+    }
 
     assignmentsTbody.innerHTML = "";
+    document.getElementById("assignments-table").hidden = assignments.length === 0;
     if (assignments.length === 0) {
       assignmentsEmpty.hidden = false;
       return;
@@ -438,14 +481,14 @@
     assignments.forEach(function (a) {
       const tr = document.createElement("tr");
       tr.innerHTML =
-        "<td>" + VA.escapeHtml(a.payer_name) + " (" + VA.escapeHtml(a.payer_type) + ")</td>" +
-        "<td>" + VA.escapeHtml(a.fee_structure_name) + "</td>" +
+        "<td><strong>" + VA.escapeHtml(a.payer_name) + '</strong><small class="fn-sub">' + VA.escapeHtml([a.payer_identifier, a.payer_type === "STUDENT" ? "Student" : "Staff"].filter(Boolean).join(" \u00b7 ")) + "</small></td>" +
+        "<td>" + VA.escapeHtml(a.fee_structure_name) + (a.term_label ? '<small class="fn-sub">' + VA.escapeHtml(a.term_label) + "</small>" : "") + "</td>" +
         '<td class="num">' + money(a.total_payable) + "</td>" +
         '<td class="num">' + money(a.total_paid) + "</td>" +
         '<td class="num">' + money(a.total_remaining) + "</td>" +
         '<td class="num">' + money(a.total_due_now) + "</td>" +
         "<td>" + standingPillHtml(a.is_in_good_standing) + "</td>" +
-        '<td class="num"><button type="button" class="row-action manage-assignment-btn" data-id="' + a.id + '">Manage</button></td>';
+        '<td class="crs-actions"><button type="button" class="sd-view manage-assignment-btn" data-id="' + a.id + '">Manage</button></td>';
       assignmentsTbody.appendChild(tr);
     });
 
@@ -694,6 +737,7 @@
     }
 
     loadDashboard();
+    loadAssignmentFilters();
     loadAssignments();
   });
 })();

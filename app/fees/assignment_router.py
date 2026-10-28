@@ -3,7 +3,8 @@ from __future__ import annotations
 import uuid
 
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query, Response
+from sqlalchemy import and_, func, or_, select
 
 from app.auth.permissions import Permissions, Roles
 from app.auth.schemas import CurrentUser
@@ -12,7 +13,7 @@ from app.core.dependencies import require_any_role, require_permission
 from app.core.exceptions import AuthorizationError, ResourceNotFoundError
 from app.employees.repository import EmployeeRepository
 from app.fees.assignment_service import ChallanService, FeeAssignmentService
-from app.fees.models import FeeStructure, PayerType
+from app.fees.models import AssignmentStatus, FeeAssignment, FeeStructure, PayerType
 from app.fees.repository import FeeAssignmentRepository
 from app.fees.schemas import (
     AssignmentStatusUpdateRequest,
@@ -22,6 +23,8 @@ from app.fees.schemas import (
     RecordPaymentRequest,
 )
 from app.students.repository import StudentRepository
+from app.students.models import Student
+from app.employees.models import Employee
 
 router = APIRouter(prefix="/fees/assignments", tags=["fees"])
 
@@ -43,6 +46,12 @@ async def _to_assignment_out(db, assignment) -> FeeAssignmentOut:
     structure = await db.get(FeeStructure, assignment.fee_structure_id)
     payer_name = await service.resolve_payer_name(assignment.payer_type, assignment.payer_id)
     status_data = await service.get_status(assignment)
+    if assignment.payer_type == PayerType.STUDENT:
+        who = await db.get(Student, assignment.payer_id)
+        identifier = who.roll_number if who else None
+    else:
+        who = await db.get(Employee, assignment.payer_id)
+        identifier = who.employee_code if who else None
 
     return FeeAssignmentOut(
         id=assignment.id,
@@ -53,6 +62,8 @@ async def _to_assignment_out(db, assignment) -> FeeAssignmentOut:
         payer_name=payer_name,
         status=assignment.status,
         is_in_good_standing=status_data["total_due_now"] <= 0 and assignment.status.value == "ACTIVE",
+        payer_identifier=identifier,
+        term_label=structure.term_label if structure else None,
         **status_data,
     )
 
@@ -70,14 +81,55 @@ async def _resolve_own_payer(db, current_user: CurrentUser) -> tuple[PayerType, 
     return None
 
 
-@router.get("", response_model=list[FeeAssignmentOut], summary="List all fee assignments (Admin/Accounts Officer only)")
+@router.get("", response_model=list[FeeAssignmentOut], summary="Fee assignments, with optional search, filters and pages (Admin/Accounts Officer only)")
 async def list_assignments(
+    response: Response,
+    q: str | None = Query(None, max_length=100, description="Name, roll number or employee code"),
+    payer_type: PayerType | None = None,
+    status: AssignmentStatus | None = None,
+    term_label: str | None = Query(None, max_length=60),
+    fee_structure_id: uuid.UUID | None = None,
+    program_id: uuid.UUID | None = None,
+    owing: bool | None = Query(None, description="true: something is due now; false: nothing due now"),
+    page: int | None = Query(None, ge=1),
+    page_size: int = Query(25, ge=1, le=200),
     current_user: CurrentUser = Depends(_STAFF_ONLY),
     db=Depends(get_db),
 ) -> list[FeeAssignmentOut]:
-    service = FeeAssignmentService(db)
-    assignments = await service.list_all()
-    return [await _to_assignment_out(db, a) for a in assignments]
+    """With no parameters: every assignment, newest first (as before). With `page`: one page of the matches, and the
+    number of matches in the X-Total-Count header. `owing` needs each fee's balance, so it is worked out after the
+    other filters."""
+    stmt = (select(FeeAssignment).join(FeeStructure, FeeStructure.id == FeeAssignment.fee_structure_id)
+            .outerjoin(Student, and_(FeeAssignment.payer_type == PayerType.STUDENT, Student.id == FeeAssignment.payer_id))
+            .outerjoin(Employee, and_(FeeAssignment.payer_type == PayerType.EMPLOYEE, Employee.id == FeeAssignment.payer_id)))
+    if q and q.strip():
+        like = f"%{q.strip().lower()}%"
+        stmt = stmt.where(or_(func.lower(func.concat(Student.first_name, " ", Student.last_name)).like(like), func.lower(Student.roll_number).like(like),
+                              func.lower(func.concat(Employee.first_name, " ", Employee.last_name)).like(like), func.lower(Employee.employee_code).like(like),
+                              func.lower(FeeStructure.name).like(like)))
+    if payer_type is not None:
+        stmt = stmt.where(FeeAssignment.payer_type == payer_type)
+    if status is not None:
+        stmt = stmt.where(FeeAssignment.status == status)
+    if term_label:
+        stmt = stmt.where(FeeStructure.term_label == term_label)
+    if fee_structure_id is not None:
+        stmt = stmt.where(FeeAssignment.fee_structure_id == fee_structure_id)
+    if program_id is not None:
+        stmt = stmt.where(Student.program_id == program_id)
+    assignments = list((await db.execute(stmt.order_by(FeeAssignment.created_at.desc()))).scalars())
+    if owing is None:
+        total = len(assignments)
+        if page is not None:
+            assignments = assignments[(page - 1) * page_size: page * page_size]
+        rows = [await _to_assignment_out(db, a) for a in assignments]
+    else:
+        rows = [r for r in [await _to_assignment_out(db, a) for a in assignments] if (r.total_due_now > 0) == owing]
+        total = len(rows)
+        if page is not None:
+            rows = rows[(page - 1) * page_size: page * page_size]
+    response.headers["X-Total-Count"] = str(total)
+    return rows
 
 
 @router.get("/me", response_model=list[FeeAssignmentOut], summary="List the current user's own fee assignments")

@@ -226,7 +226,7 @@ async def _scholarship(session: AsyncSession, r: ApprovalRequest, actor_id) -> d
     p = dict(r.payload)
     for k in ("valid_from", "valid_until"):
         p[k] = date.fromisoformat(p[k]) if p.get(k) else None
-    for k in ("student_id", "fee_structure_id"):
+    for k in ("student_id", "fee_structure_id", "fee_type_id"):
         p[k] = uuid.UUID(p[k]) if p.get(k) else None
     p["kind"] = ScholarshipKind(p["kind"])
     s, summary = await ScholarshipService(session).grant(**p, actor_id=r.requested_by or actor_id, approved=True)

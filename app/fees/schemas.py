@@ -127,6 +127,8 @@ class FeeAssignmentOut(BaseModel):
     accrued_fine: float
     total_due_now: float
     is_in_good_standing: bool
+    payer_identifier: str | None = None     # roll number or employee code
+    term_label: str | None = None
 
 
 class LedgerEntryOut(BaseModel):

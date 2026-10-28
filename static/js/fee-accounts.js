@@ -134,7 +134,7 @@
     }).join("") : '<tr><td colspan="5" class="cc-meta">No payments yet.</td></tr>';
 
     $("sa-scholarships").innerHTML = a.scholarships.length ? a.scholarships.map(function (sc) {
-      return "<tr><td><strong>" + esc(sc.name) + "</strong><br><small>" + (sc.kind === "PERCENT" ? sc.value + "%" : money(sc.value)) + "</small></td><td>" + esc(day(sc.valid_from)) + (sc.valid_until ? " – " + esc(day(sc.valid_until)) : " onwards") +
+      return "<tr><td><strong>" + esc(sc.name) + "</strong><br><small>" + (sc.kind === "PERCENT" ? sc.value + "%" : money(sc.value)) + " \u00b7 " + esc(appliesTo(sc)) + "</small></td><td>" + esc(day(sc.valid_from)) + (sc.valid_until ? " – " + esc(day(sc.valid_until)) : " onwards") +
         '</td><td class="num">' + money(sc.given_so_far) + '</td><td><span class="status-pill ' + (sc.status === "ACTIVE" ? "active" : "") + '">' + (sc.status === "ACTIVE" ? "Running" : "Ended") + "</span></td></tr>";
     }).join("") : '<tr><td colspan="4" class="cc-meta">None.</td></tr>';
   }
@@ -185,13 +185,26 @@
   studentPicker($("sc-student"), $("sc-student-list"), function (s) { scStudent = s; });
   $("sc-kind").addEventListener("change", function () { $("sc-value-label").textContent = $("sc-kind").value === "PERCENT" ? "Percentage (%)" : "Amount (Rs.)"; });
 
+  // "Applies to": every fee; one kind of fee (e.g. Tuition) in every semester; or one fee only.
+  let feeTypeNames = {};
   async function loadStructuresForScholarship() {
-    const r = await VA.fetchJson("/api/v1/fees/structures", { quiet: true });
+    const [r, t] = await Promise.all([VA.fetchJson("/api/v1/fees/structures", { quiet: true }), VA.fetchJson("/api/v1/fees/types", { quiet: true })]);
     if (!r.ok) return;
+    const types = t.ok ? t.body.filter(function (x) { return x.is_active !== false && x.code !== "OPENING"; }) : [];
+    feeTypeNames = {};
+    types.forEach(function (x) { feeTypeNames[x.id] = x.name; });
     const sel = $("sc-structure");
-    sel.innerHTML = '<option value="">Every fee of this student</option>' + r.body.filter(function (s) { return s.status !== "DRAFT"; }).map(function (s) {
-      return '<option value="' + s.id + '">Only: ' + esc(s.name) + " (" + esc(s.term_label) + ")</option>";
-    }).join("");
+    sel.innerHTML = '<option value="">Every fee of this student</option>' +
+      (types.length ? '<optgroup label="One kind of fee, every semester">' + types.map(function (x) {
+        return '<option value="type:' + x.id + '">' + esc(x.name) + " only (every semester)</option>";
+      }).join("") + "</optgroup>" : "") +
+      '<optgroup label="One fee only">' + r.body.filter(function (s) { return s.status !== "DRAFT"; }).map(function (s) {
+        return '<option value="fee:' + s.id + '">Only: ' + esc(s.name) + " (" + esc(s.term_label) + ")</option>";
+      }).join("") + "</optgroup>";
+  }
+  function appliesTo(s) {
+    if (s.fee_type_id) return (feeTypeNames[s.fee_type_id] || "One kind of fee") + " only, every semester";
+    return s.fee_structure_id ? "one fee only" : "every fee";
   }
   function defaultFrom() {
     const terms = window.VistTerms ? window.VistTerms.open().filter(function (t) { return t.start_date && t.start_date <= today; }) : [];
@@ -207,7 +220,9 @@
     $("sc-save").disabled = true;
     const r = await VA.fetchJson("/api/v1/fees/scholarships", json("POST", {
       student_id: scStudent.id, name: $("sc-name").value.trim(), kind: $("sc-kind").value, value: parseFloat($("sc-value").value),
-      fee_structure_id: $("sc-structure").value || null, auto_apply: $("sc-auto").checked, valid_from: $("sc-from").value || null,
+      fee_structure_id: $("sc-structure").value.indexOf("fee:") === 0 ? $("sc-structure").value.slice(4) : null,
+      fee_type_id: $("sc-structure").value.indexOf("type:") === 0 ? $("sc-structure").value.slice(5) : null,
+      auto_apply: $("sc-auto").checked, valid_from: $("sc-from").value || null,
       valid_until: $("sc-until").value || null, reason: $("sc-reason").value.trim() }));
     $("sc-save").disabled = false;
     if (!r.ok) return fail("sc-error", msg(r.body, "Could not save it."));
@@ -224,7 +239,7 @@
     if (!r.ok) return;
     $("sc-body").innerHTML = r.body.map(function (s) {
       return "<tr><td><strong>" + esc(s.student_name) + "</strong><br><small>" + esc(s.roll_number || "") + "</small></td><td>" + esc(s.name) + "<br><small>" + esc(s.reason || "") + "</small></td><td>" +
-        (s.kind === "PERCENT" ? s.value + "%" : money(s.value)) + (s.fee_structure_id ? "<br><small>one fee only</small>" : "") + "</td><td>" + esc(day(s.valid_from)) + (s.valid_until ? " – " + esc(day(s.valid_until)) : " onwards") +
+        (s.kind === "PERCENT" ? s.value + "%" : money(s.value)) + "<br><small>" + esc(appliesTo(s)) + "</small>" + "</td><td>" + esc(day(s.valid_from)) + (s.valid_until ? " – " + esc(day(s.valid_until)) : " onwards") +
         '</td><td class="num">' + money(s.given_so_far) + '</td><td><span class="status-pill ' + (s.status === "ACTIVE" ? "active" : "") + '">' + (s.status === "ACTIVE" ? "Running" : "Ended") + "</span></td><td>" +
         (isAdmin && s.status === "ACTIVE" ? '<button type="button" class="row-action" data-end="' + s.id + '">End…</button>' : "") + "</td></tr>";
     }).join("");

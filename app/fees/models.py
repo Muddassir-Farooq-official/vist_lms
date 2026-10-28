@@ -318,6 +318,7 @@ class Scholarship(UUIDPKMixin, TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint("value > 0", name="positive_scholarship_value"),
         Index("ix_scholarships_student", "student_id"),
+        Index("ix_scholarships_fee_type", "fee_type_id"),
     )
 
     student_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
@@ -327,6 +328,9 @@ class Scholarship(UUIDPKMixin, TimestampMixin, Base):
     fee_structure_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("fee_structures.id", ondelete="SET NULL"), nullable=True
     )  # None = applies to every fee
+    fee_type_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("fee_types.id", ondelete="SET NULL"), nullable=True
+    )  # e.g. Tuition: only fees of this type, in every semester (None = any type)
     auto_apply: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
     valid_from: Mapped[date] = mapped_column(Date, nullable=False)
     valid_until: Mapped[date | None] = mapped_column(Date, nullable=True)

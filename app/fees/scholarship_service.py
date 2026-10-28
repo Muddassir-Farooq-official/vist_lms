@@ -59,7 +59,8 @@ class ScholarshipService:
         return s
 
     async def grant(self, *, student_id: uuid.UUID, name: str, kind: ScholarshipKind, value: float, fee_structure_id: uuid.UUID | None, auto_apply: bool,
-                    valid_from: date | None, valid_until: date | None, reason: str, actor_id: uuid.UUID, approved: bool = False):
+                    valid_from: date | None, valid_until: date | None, reason: str, actor_id: uuid.UUID, approved: bool = False,
+                    fee_type_id: uuid.UUID | None = None):
         """Give a scholarship or discount. Unless `approved`, an administrator other than the person asking must approve it
         first (owner decision 2/10): then the approval request is returned and nothing is applied yet."""
         student = await self.session.get(Student, student_id)
@@ -74,6 +75,14 @@ class ScholarshipService:
             raise BusinessRuleViolationError("Give the reason for this scholarship (it is kept on record).")
         if fee_structure_id is not None and await self.session.get(FeeStructure, fee_structure_id) is None:
             raise BusinessRuleViolationError("That fee does not exist.")
+        if fee_structure_id is not None and fee_type_id is not None:
+            raise BusinessRuleViolationError("Choose either one fee, or one kind of fee for every semester, not both.")
+        if fee_type_id is not None:
+            ft = await self.session.get(FeeType, fee_type_id)
+            if ft is None:
+                raise BusinessRuleViolationError("That kind of fee does not exist.")
+            if ft.code == OPENING_CODE:
+                raise BusinessRuleViolationError("A scholarship never reduces previous dues.")
         start = valid_from or await self._default_start()
         if valid_until is not None and valid_until < start:
             raise BusinessRuleViolationError("The end date cannot be before the start date.")
@@ -84,11 +93,11 @@ class ScholarshipService:
             req = await gate(self.session, kind="SCHOLARSHIP", actor_id=actor_id, target_id=None, reason=reason,
                              amount=None if kind == ScholarshipKind.PERCENT else float(value),
                              payload={"student_id": student_id, "name": name, "kind": kind.value, "value": float(value), "fee_structure_id": fee_structure_id,
-                                      "auto_apply": auto_apply, "valid_from": valid_from, "valid_until": valid_until, "reason": reason},
+                                      "fee_type_id": fee_type_id, "auto_apply": auto_apply, "valid_from": valid_from, "valid_until": valid_until, "reason": reason},
                              summary=f"{name.strip()} ({what}) for {student.first_name} {student.last_name} ({student.roll_number or 'no roll no.'})")
             if req is not None:
                 return req, None
-        s = Scholarship(student_id=student_id, name=name.strip(), kind=kind, value=float(value), fee_structure_id=fee_structure_id, auto_apply=auto_apply, valid_from=start,
+        s = Scholarship(student_id=student_id, name=name.strip(), kind=kind, value=float(value), fee_structure_id=fee_structure_id, fee_type_id=fee_type_id, auto_apply=auto_apply, valid_from=start,
                         valid_until=valid_until, status=ScholarshipStatus.ACTIVE, reason=reason.strip(), granted_by=actor_id)
         self.session.add(s)
         await self.session.flush()
@@ -138,7 +147,7 @@ class ScholarshipService:
             )).all():
                 given[sid] = given.get(sid, 0.0) + float(total)
         return [{"id": s.id, "student_id": s.student_id, "student_name": f"{st.first_name} {st.last_name}", "roll_number": st.roll_number, "name": s.name, "kind": s.kind, "value": float(s.value),
-                 "fee_structure_id": s.fee_structure_id, "auto_apply": s.auto_apply, "valid_from": s.valid_from, "valid_until": s.valid_until, "status": s.status, "reason": s.reason,
+                 "fee_structure_id": s.fee_structure_id, "fee_type_id": s.fee_type_id, "auto_apply": s.auto_apply, "valid_from": s.valid_from, "valid_until": s.valid_until, "status": s.status, "reason": s.reason,
                  "given_so_far": round(given.get(s.id, 0.0), 2), "created_at": s.created_at} for s, st in rows]
 
     # ------------------------------------------------------------------ applying it to fees
@@ -153,6 +162,8 @@ class ScholarshipService:
         fee_type = await self.session.get(FeeType, structure.fee_type_id)
         if fee_type is not None and fee_type.code == OPENING_CODE:
             return Decimal(0)
+        if s.fee_type_id is not None and structure.fee_type_id != s.fee_type_id:
+            return Decimal(0)                                                    # e.g. a tuition-only discount leaves exam and library fees alone
         entries = await self.repo.get_ledger(assignment.id)
         if any(e.entry_type == LedgerEntryType.CONCESSION and e.scholarship_id == s.id for e in entries):
             return Decimal(0)                                                    # already applied to this fee

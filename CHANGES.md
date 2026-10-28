@@ -400,4 +400,20 @@ style and are unchanged. Two Accounts screens were reworked; both are shared wit
 - **Refunds**: labelled fields (roll number, fee, kind, refund, write-off, reason) instead of bare boxes; the list shows
   the payer with roll number and request date, the refund in bold, write-off only when there is one, status as a
   coloured badge, and Approve / Reject / Pay out as proper buttons. The status filter sits in the list header.
-  
+
+# Payroll: a day's pay from each person's own working days (no migration)
+
+- **A day's pay = basic salary ÷ that person's own working days in the month**, taken from their timing in
+  Staff attendance (their working weekdays). Someone due 8 days a month earns basic ÷ 8 a day, so missing 7 of them
+  costs 7/8 of the basic (less any casual leave); someone on Monday–Saturday is paid basic ÷ 27 a day in October 2026.
+  Before, everyone was divided by the calendar days (30 / 31), which made a missed day too cheap.
+- This is what "Working days in a month" = **0** now means (the default). A number there (e.g. 26) is still used for
+  everyone, and a number typed when preparing a payroll is used for that payroll. A payslip's working days can still be
+  changed by hand with Adjust, and Recalculate keeps what was set; only people added later get their own count.
+- Holidays excused for everyone still count as working (paid) days. Paid payrolls are not changed; a draft prepared
+  before this update keeps its numbers. **Cancel and prepare it again** to use the new rule.
+- **Before preparing**: give anyone who works only some days their own timing (Staff attendance → Timings → their days),
+  otherwise they are expected every Monday–Saturday and counted absent on the other days. If their days are not fixed
+  weekdays, set Working days on their payslip with Adjust.
+- Payroll run window: the Absent column shows "7 / 2 forgiven (casual leave) / 5 charged" on separate lines (it looked
+  like "72 casual"), and the Days column is now **Day rate** ("÷ 27" and the rupees per day).

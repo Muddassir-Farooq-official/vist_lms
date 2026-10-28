@@ -394,6 +394,27 @@ class TimekeepingService:
                         "timing": t.out(), "working_today": day.weekday() in t.days, "state": st, "day": self._row_out(row)})
         return out
 
+    async def scheduled_days(self, month: date, employees: list[Employee]) -> dict[uuid.UUID, int]:
+        """How many days in the WHOLE month each person is due to work, from their own timing (their weekdays), or from a day
+        already marked as a working / non-working day for them. Used for a day's pay: someone who works 8 days a month
+        earns basic / 8 a day. Holidays excused for everyone still count (they are paid days)."""
+        first, last = month_bounds(month)
+        timing = await self.timings_for(employees)
+        marked: dict[uuid.UUID, dict[date, bool]] = {}
+        if employees:
+            for r in (await self.session.execute(select(StaffAttendance).where(StaffAttendance.employee_id.in_([e.id for e in employees]),
+                                                                                StaffAttendance.work_date >= first, StaffAttendance.work_date <= last))).scalars():
+                marked.setdefault(r.employee_id, {})[r.work_date] = bool(r.is_working_day)
+        out = {}
+        for e in employees:
+            t, mine, n, d = timing[e.id], marked.get(e.id, {}), 0, first
+            while d <= last:
+                if mine.get(d, d.weekday() in t.days):
+                    n += 1
+                d += timedelta(days=1)
+            out[e.id] = n
+        return out
+
     async def summary(self, month: date, employees: list[Employee], *, through: date | None = None) -> dict[uuid.UUID, dict]:
         """Per employee, for the month: scheduled working days, present, absent (dates), late, early, missing leaving marks.
         Today is only counted once someone has been marked; days before they joined, and days before the institute

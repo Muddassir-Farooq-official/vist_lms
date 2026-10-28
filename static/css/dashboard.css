@@ -3519,3 +3519,10 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 #rf-table .rf-reason { max-width: 320px; }
 .status-pill.waived { background: var(--surface-alt); color: var(--text-secondary); }
 .vl-c { display: block; min-width: 0; } @media (max-width: 640px) { #fines-table .vl-c, #rf-table .vl-c { text-align: right; } }
+/* Payroll run: each figure's explanation on its own line (an older "#rd-body td small:last-child { inline }" rule for another page also matched here). */
+.tk-table #rd-body td small, .tk-table #rd-body td small:last-child { display: block; margin-top: 2px; font-size: 0.76rem; color: var(--text-secondary); font-weight: 500; white-space: nowrap; }
+
+/* ---- Fee assignments ---- */
+#assignments-table td { vertical-align: middle; }
+#assignments-table td strong { display: block; }
+#assignments-table .fn-sub { display: block; margin-top: 2px; font-size: 0.78rem; color: var(--text-secondary); font-weight: 500; }
