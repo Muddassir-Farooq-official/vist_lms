@@ -89,7 +89,61 @@
   <div class="table-scroll"><table class="dash-table"><thead><tr><th>Student</th><th>Name</th><th>Amount</th><th>Covers</th><th class="num">Given so far</th><th>Status</th><th></th></tr></thead><tbody id="sc-body"></tbody></table></div>
   <p class="empty-state" id="sc-empty" hidden>No scholarships or discounts yet.</p>
 </section>
+<section class="panel admin-only" id="sc-reset-panel">
+  <div class="panel-header"><div class="panel-header-left"><h2>Start again: remove all discounts</h2></div></div>
+  <p class="panel-hint">Ends every scholarship and discount at once, so you can give them again (for example on tuition only). Installments not yet paid in full go back to the full amount; installments already paid keep the discount they were paid at. Nothing is deleted, and you see exactly what will change before anything is saved.</p>
+  <div class="form-actions"><button type="button" class="role-btn danger-btn" id="sc-reset-open">Remove all discounts&hellip;</button></div>
+</section>
 </div>
+
+<dialog id="sc-reset-modal" class="modal modal-wide" aria-labelledby="sc-reset-h">
+  <form class="modal-body" id="sc-reset-form" novalidate>
+    <h2 id="sc-reset-h">Remove all discounts</h2>
+    <p class="panel-hint" id="sc-reset-summary">Working out what would change&hellip;</p>
+    <div class="table-scroll" style="max-height: 300px"><table class="dash-table"><thead><tr><th>Student</th><th>Scholarship</th><th class="num">Comes off unpaid</th><th class="num">Stays on paid</th></tr></thead><tbody id="sc-reset-body"></tbody></table></div>
+    <p class="panel-hint">Nothing has changed yet. Students are not notified. Afterwards, give the new discounts with &ldquo;Applies to: Tuition Fee only (every semester)&rdquo;.</p>
+    <div class="form-field"><label for="sc-reset-note">Why (kept on record)</label><input id="sc-reset-note" class="text-input" maxlength="500" value="Clean start: discounts to be given again on tuition only" /></div>
+    <div class="form-field"><label for="sc-reset-confirm">Type RESET to confirm</label><input id="sc-reset-confirm" class="text-input" maxlength="10" autocomplete="off" /></div>
+    <p class="dash-alert error" id="sc-reset-error" hidden></p>
+    <div class="form-actions"><button type="submit" class="role-btn danger-btn" id="sc-reset-save" disabled>Remove all discounts</button></div>
+    <button type="button" class="modal-close-btn" id="sc-reset-close">Cancel</button>
+  </form>
+</dialog>
+
+<dialog id="sc-end-modal" class="modal" aria-labelledby="sc-end-h">
+  <form class="modal-body" id="sc-end-form" novalidate>
+    <h2 id="sc-end-h">End scholarship</h2>
+    <p class="panel-hint" id="sc-end-who"></p>
+    <div class="form-field"><label for="sc-end-date">Last day it covers</label><input id="sc-end-date" type="date" class="text-input" />
+      <small class="field-hint">Installments due up to this day keep the discount. Installments due after it lose the discount and are owed in full, unless they were already paid in full.</small></div>
+    <div class="form-field"><label for="sc-end-reason">Reason <small class="field-hint inline">(optional, kept on record)</small></label><input id="sc-end-reason" class="text-input" maxlength="500" placeholder="e.g. Grade fell below the merit requirement" /></div>
+    <p class="dash-alert error" id="sc-end-error" hidden></p>
+    <div class="form-actions"><button type="submit" class="role-btn danger-btn" id="sc-end-save">End it</button></div>
+    <button type="button" class="modal-close-btn" id="sc-end-close">Cancel</button>
+  </form>
+</dialog>
+
+<dialog id="sc-edit-modal" class="modal modal-wide" aria-labelledby="sc-edit-h">
+  <form class="modal-body" id="sc-edit-form" novalidate>
+    <h2 id="sc-edit-h">Change scholarship</h2>
+    <p class="panel-hint" id="sc-edit-who"></p>
+    <div class="form-grid two-col">
+      <div class="form-field"><label for="se-name">Name</label><input id="se-name" class="text-input" maxlength="120" /></div>
+      <div class="form-field"><label for="se-kind">Type</label><select id="se-kind" class="select-input"><option value="PERCENT">A percentage of each installment</option><option value="FIXED">A fixed amount (spread over the installments)</option></select></div>
+      <div class="form-field"><label for="se-value" id="se-value-label">Percentage (%)</label><input id="se-value" class="text-input" type="number" min="0.01" step="0.01" /></div>
+      <div class="form-field"><label for="se-structure">Applies to</label><select id="se-structure" class="select-input"></select></div>
+      <div class="form-field"><label for="se-from">Covers installments due from</label><input id="se-from" class="text-input" type="date" /></div>
+      <div class="form-field"><label for="se-until">Until <small class="field-hint inline">(empty = no end)</small></label><input id="se-until" class="text-input" type="date" /></div>
+      <div class="form-field two-span"><label class="check-row"><input type="checkbox" id="se-auto" /> <span>Also take it off fees charged later (while it runs)</span></label></div>
+      <div class="form-field two-span"><label for="se-reason">Reason for the scholarship</label><input id="se-reason" class="text-input" maxlength="500" /></div>
+      <div class="form-field two-span"><label for="se-note">Why are you changing it? <small class="field-hint inline">(kept on record)</small></label><input id="se-note" class="text-input" maxlength="500" placeholder="e.g. Merit position improved to 1st" /></div>
+    </div>
+    <p class="panel-hint">The new terms apply to installments not yet paid in full. Installments already paid keep the discount they were paid with. A change that gives the student more waits for another administrator&rsquo;s approval.</p>
+    <p class="dash-alert error" id="sc-edit-error" hidden></p>
+    <div class="form-actions"><button type="submit" class="role-btn" id="sc-edit-save">Save changes</button></div>
+    <button type="button" class="modal-close-btn" id="sc-edit-close">Cancel</button>
+  </form>
+</dialog>
 
 <!-- ============ PREVIOUS DUES ============ -->
 <div class="portal-tab-panel" data-tab-panel="previous-dues" hidden>

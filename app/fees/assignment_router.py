@@ -210,12 +210,15 @@ async def get_statement(
     sign = {LedgerEntryType.DEBIT: 1, LedgerEntryType.CONCESSION: -1, LedgerEntryType.CREDIT: -1, LedgerEntryType.REFUND: 1}
     names = {LedgerEntryType.DEBIT: "Charge", LedgerEntryType.CONCESSION: "Discount", LedgerEntryType.CREDIT: "Payment", LedgerEntryType.REFUND: "Refund paid back"}
     ordered = sorted(entries, key=lambda e: (e.created_at, 0 if e.entry_type == LedgerEntryType.DEBIT else 1))
+    conc_ids = {e.id for e in entries if e.entry_type == LedgerEntryType.CONCESSION}
     balance, lines = 0.0, []
     for e in ordered:
         balance += sign.get(e.entry_type, 0) * float(e.amount)
         what = names.get(e.entry_type, e.entry_type.value)
         if FeeStatusCalculator._is_reversal(e):
             what = "Payment reversed"
+        elif FeeStatusCalculator._is_concession_reversal(e, conc_ids):
+            what = "Discount withdrawn"
         elif e.entry_type == LedgerEntryType.DEBIT:
             what = label.get(e.id, "Charge")
         lines.append({"id": e.id, "type": e.entry_type.value, "what": what, "amount": float(e.amount), "due_date": e.due_date,

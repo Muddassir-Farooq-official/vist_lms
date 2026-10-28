@@ -171,10 +171,97 @@ async def grant_scholarship(payload: ScholarshipIn, current_user: CurrentUser = 
     return {"id": s.id, "status": s.status, "applied": applied}
 
 
-@router.post("/scholarships/{scholarship_id}/end", summary="Stop a scholarship or discount (it stops applying to NEW charges; what was already given stays)")
-async def end_scholarship(scholarship_id: uuid.UUID, current_user: CurrentUser = Depends(require_permission(Permissions.SCHOLARSHIP_MANAGE)), db=Depends(get_db)) -> dict:
-    s = await ScholarshipService(db).end(scholarship_id, actor_id=current_user.id)
-    return {"id": s.id, "status": s.status}
+class ScholarshipEndIn(BaseModel):
+    end_date: date | None = None                     # last day it covers (default today); later installments lose the discount
+    reason: str | None = Field(default=None, max_length=500)
+
+
+@router.post("/scholarships/{scholarship_id}/end", summary="End a scholarship or discount: installments due after the end date lose the discount unless already paid in full")
+async def end_scholarship(scholarship_id: uuid.UUID, payload: ScholarshipEndIn | None = None,
+                          current_user: CurrentUser = Depends(require_permission(Permissions.SCHOLARSHIP_MANAGE)), db=Depends(get_db)) -> dict:
+    payload = payload or ScholarshipEndIn()
+    return await ScholarshipService(db).end(scholarship_id, actor_id=current_user.id, end_date=payload.end_date, reason=payload.reason)
+
+
+class ScholarshipEditIn(BaseModel):
+    """Only the fields sent are changed. `note` says why (kept on record)."""
+    name: str | None = Field(default=None, min_length=3, max_length=120)
+    kind: ScholarshipKind | None = None
+    value: float | None = Field(default=None, gt=0)
+    fee_structure_id: uuid.UUID | None = None
+    fee_type_id: uuid.UUID | None = None
+    auto_apply: bool | None = None
+    valid_from: date | None = None
+    valid_until: date | None = None
+    reason: str | None = Field(default=None, min_length=5, max_length=500)
+    note: str = Field(min_length=5, max_length=500)
+
+
+@router.patch("/scholarships/{scholarship_id}", summary="Change a running scholarship (a change that gives more needs another administrator's approval)")
+async def edit_scholarship(scholarship_id: uuid.UUID, payload: ScholarshipEditIn,
+                           current_user: CurrentUser = Depends(require_any_permission(Permissions.SCHOLARSHIP_MANAGE, Permissions.SCHOLARSHIP_PROPOSE)),
+                           db=Depends(get_db)) -> dict:
+    from fastapi.responses import JSONResponse
+
+    from app.approvals.models import ApprovalRequest
+    from app.approvals.service import pending_response
+
+    sent = payload.model_fields_set - {"note"}
+    changes = {k: getattr(payload, k) for k in sent}
+    for k in ("name", "kind", "value", "auto_apply", "valid_from", "reason"):     # these cannot be emptied
+        if k in changes and changes[k] is None:
+            changes.pop(k)
+    # The accounts office only proposes: every change it makes waits for an administrator.
+    s, summary = await ScholarshipService(db).update(scholarship_id, changes, actor_id=current_user.id, note=payload.note,
+                                                     always_ask=Permissions.SCHOLARSHIP_MANAGE not in current_user.permissions)
+    if isinstance(s, ApprovalRequest):
+        return JSONResponse(status_code=202, content=pending_response(s))
+    return {"id": s.id, "status": s.status, **summary}
+
+
+@router.get("/scholarships/reset-preview", summary="What 'remove all discounts' would do (nothing is saved)")
+async def reset_scholarships_preview(current_user: CurrentUser = Depends(require_permission(Permissions.SCHOLARSHIP_MANAGE)), db=Depends(get_db)) -> dict:
+    sp = await db.begin_nested()                     # worked out for real inside a savepoint, then thrown away
+    try:
+        rows = await ScholarshipService(db).reset_all(actor_id=current_user.id, note="preview")
+    finally:
+        await sp.rollback()
+    return _reset_summary(rows) | {"waiting_requests": await _waiting_scholarship_requests(db)}
+
+
+class ScholarshipResetIn(BaseModel):
+    confirm: str                                     # must be RESET
+    note: str = Field(min_length=5, max_length=500)
+
+
+@router.post("/scholarships/reset", summary="Remove all discounts: every scholarship ends; unpaid installments go back to the full amount; paid ones keep theirs")
+async def reset_scholarships(payload: ScholarshipResetIn, current_user: CurrentUser = Depends(require_permission(Permissions.SCHOLARSHIP_MANAGE)),
+                             db=Depends(get_db)) -> dict:
+    from app.core.exceptions import BusinessRuleViolationError
+
+    if payload.confirm.strip().upper() != "RESET":
+        raise BusinessRuleViolationError("Type RESET to confirm.")
+    if await _waiting_scholarship_requests(db):
+        raise BusinessRuleViolationError("Some scholarship requests still wait on the Approvals page. Approve or reject them first.")
+    rows = await ScholarshipService(db).reset_all(actor_id=current_user.id, note=payload.note.strip())
+    return _reset_summary(rows)
+
+
+async def _waiting_scholarship_requests(db) -> int:
+    from sqlalchemy import func, select
+
+    from app.approvals.models import ApprovalRequest
+
+    return (await db.execute(select(func.count()).select_from(ApprovalRequest).where(
+        ApprovalRequest.kind.in_(["SCHOLARSHIP", "SCHOLARSHIP_EDIT"]), ApprovalRequest.status == "REQUESTED"))).scalar_one()
+
+
+def _reset_summary(rows: list[dict]) -> dict:
+    return {"scholarships": len(rows), "running": sum(1 for r in rows if r["status_before"] == "ACTIVE"),
+            "removed_from_unpaid": round(sum(r["removed_from_unpaid"] for r in rows), 2),
+            "kept_on_paid": round(sum(r["kept_on_paid_installments"] for r in rows), 2),
+            "students": len({r["roll_number"] + r["student"] for r in rows if r["removed_from_unpaid"] > 0}),
+            "rows": [r for r in rows if r["removed_from_unpaid"] > 0 or r["status_before"] == "ACTIVE"]}
 
 
 # ============================================================ previous dues (opening balances)

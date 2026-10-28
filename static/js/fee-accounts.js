@@ -233,26 +233,135 @@
     ["sc-student", "sc-name", "sc-value", "sc-reason", "sc-until"].forEach(function (id) { $(id).value = ""; }); scStudent = null;
     loadScholarships(); refresh();
   });
+  let scRows = {}, canProposeSc = false;
   async function loadScholarships() {
     const st = $("sc-filter").value;
     const r = await VA.fetchJson("/api/v1/fees/scholarships" + (st ? "?status=" + st : ""));
     if (!r.ok) return;
+    scRows = {};
+    r.body.forEach(function (s) { scRows[s.id] = s; });
     $("sc-body").innerHTML = r.body.map(function (s) {
+      const running = s.status === "ACTIVE";
       return "<tr><td><strong>" + esc(s.student_name) + "</strong><br><small>" + esc(s.roll_number || "") + "</small></td><td>" + esc(s.name) + "<br><small>" + esc(s.reason || "") + "</small></td><td>" +
         (s.kind === "PERCENT" ? s.value + "%" : money(s.value)) + "<br><small>" + esc(appliesTo(s)) + "</small>" + "</td><td>" + esc(day(s.valid_from)) + (s.valid_until ? " – " + esc(day(s.valid_until)) : " onwards") +
-        '</td><td class="num">' + money(s.given_so_far) + '</td><td><span class="status-pill ' + (s.status === "ACTIVE" ? "active" : "") + '">' + (s.status === "ACTIVE" ? "Running" : "Ended") + "</span></td><td>" +
-        (isAdmin && s.status === "ACTIVE" ? '<button type="button" class="row-action" data-end="' + s.id + '">End…</button>' : "") + "</td></tr>";
+        '</td><td class="num">' + money(s.given_so_far) + '</td><td><span class="status-pill ' + (running ? "active" : "") + '">' + (running ? "Running" : "Ended") + "</span></td><td class=\"row-actions\">" +
+        (running && canProposeSc ? '<button type="button" class="row-action" data-edit="' + s.id + '">Edit…</button> ' : "") +
+        (isAdmin && running ? '<button type="button" class="row-action" data-end="' + s.id + '">End…</button>' : "") +
+        (isAdmin && !running ? '<button type="button" class="row-action" data-end="' + s.id + '" title="For a scholarship ended before ending removed the discount from later installments">Finish ending…</button>' : "") + "</td></tr>";
     }).join("");
     $("sc-empty").hidden = r.body.length > 0;
-    $("sc-body").querySelectorAll("[data-end]").forEach(function (b) {
-      b.addEventListener("click", async function () {
-        if (!(await VA.confirm("End this scholarship? It stops applying to fees charged from now on. What was already taken off stays.", "End it"))) return;
-        const x = await VA.fetchJson("/api/v1/fees/scholarships/" + b.getAttribute("data-end") + "/end", { method: "POST" });
-        if (!x.ok) return VA.toast(msg(x.body, "Could not end it."), "error");
-        loadScholarships();
-      });
-    });
+    $("sc-body").querySelectorAll("[data-end]").forEach(function (b) { b.addEventListener("click", function () { openEnd(scRows[b.getAttribute("data-end")]); }); });
+    $("sc-body").querySelectorAll("[data-edit]").forEach(function (b) { b.addEventListener("click", function () { openEdit(scRows[b.getAttribute("data-edit")]); }); });
   }
+
+  // ---- remove all discounts (clean start): preview first, then type RESET
+  $("sc-reset-open").addEventListener("click", async function () {
+    $("sc-reset-error").hidden = true; $("sc-reset-confirm").value = ""; $("sc-reset-save").disabled = true;
+    $("sc-reset-summary").textContent = "Working out what would change…"; $("sc-reset-body").innerHTML = "";
+    $("sc-reset-modal").showModal();
+    const r = await VA.fetchJson("/api/v1/fees/scholarships/reset-preview");
+    if (!r.ok) return fail("sc-reset-error", msg(r.body, "Could not work it out."));
+    const p = r.body;
+    $("sc-reset-summary").innerHTML = p.scholarships ? "<strong>" + p.running + "</strong> running scholarship(s) will end. <strong>" + money(p.removed_from_unpaid) +
+      "</strong> of discount comes off the unpaid installments of <strong>" + p.students + "</strong> student(s). " + money(p.kept_on_paid) + " stays on installments already paid."
+      : "There are no scholarships or discounts.";
+    $("sc-reset-body").innerHTML = p.rows.map(function (x) {
+      return "<tr><td><strong>" + esc(x.student) + "</strong><br><small>" + esc(x.roll_number) + "</small></td><td>" + esc(x.scholarship) + "<br><small>" + esc(x.amount) +
+        "</small></td><td class=\"num\">" + money(x.removed_from_unpaid) + '</td><td class="num">' + money(x.kept_on_paid_installments) + "</td></tr>";
+    }).join("");
+    if (p.waiting_requests) fail("sc-reset-error", p.waiting_requests + " scholarship request(s) still wait on the Approvals page. Approve or reject them first.");
+    $("sc-reset-save").dataset.ready = p.waiting_requests ? "" : "1";
+  });
+  $("sc-reset-confirm").addEventListener("input", function () {
+    $("sc-reset-save").disabled = !($("sc-reset-save").dataset.ready && $("sc-reset-confirm").value.trim().toUpperCase() === "RESET");
+  });
+  $("sc-reset-close").addEventListener("click", function () { $("sc-reset-modal").close(); });
+  $("sc-reset-form").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    if ($("sc-reset-save").disabled) return;
+    $("sc-reset-error").hidden = true;
+    if ($("sc-reset-note").value.trim().length < 5) return fail("sc-reset-error", "Say why (kept on record).");
+    $("sc-reset-save").disabled = true;
+    const x = await VA.fetchJson("/api/v1/fees/scholarships/reset", json("POST", { confirm: $("sc-reset-confirm").value.trim(), note: $("sc-reset-note").value.trim() }));
+    if (!x.ok) { $("sc-reset-save").disabled = false; return fail("sc-reset-error", msg(x.body, "Could not remove them.")); }
+    $("sc-reset-modal").close();
+    VA.toast("Done: " + x.body.running + " scholarship(s) ended, " + money(x.body.removed_from_unpaid) + " of discount removed from unpaid installments.");
+    loadScholarships(); refresh();
+  });
+
+  // ---- end: from a chosen day, later unpaid installments lose the discount
+  let scEnding = null;
+  function openEnd(s) {
+    scEnding = s;
+    $("sc-end-who").textContent = s.name + " · " + s.student_name + (s.roll_number ? " (" + s.roll_number + ")" : "") + " · " + (s.kind === "PERCENT" ? s.value + "%" : money(s.value));
+    const ended = s.status !== "ACTIVE";
+    $("sc-end-h").textContent = ended ? "Finish ending this scholarship" : "End scholarship";
+    $("sc-end-save").textContent = ended ? "Remove the leftover discount" : "End it";
+    $("sc-end-date").value = ended ? String(s.valid_until || s.ended_at || today).slice(0, 10) : today; $("sc-end-date").max = today;
+    $("sc-end-reason").value = ""; $("sc-end-error").hidden = true;
+    $("sc-end-modal").showModal();
+  }
+  $("sc-end-close").addEventListener("click", function () { $("sc-end-modal").close(); });
+  $("sc-end-form").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    if (!scEnding) return;
+    $("sc-end-error").hidden = true;
+    if (!$("sc-end-date").value) return fail("sc-end-error", "Choose the last day it covers.");
+    $("sc-end-save").disabled = true;
+    const x = await VA.fetchJson("/api/v1/fees/scholarships/" + scEnding.id + "/end", json("POST", { end_date: $("sc-end-date").value, reason: $("sc-end-reason").value.trim() || null }));
+    $("sc-end-save").disabled = false;
+    if (!x.ok) return fail("sc-end-error", msg(x.body, "Could not end it."));
+    $("sc-end-modal").close();
+    VA.toast(x.body.withdrawn > 0 ? "Ended. " + money(x.body.withdrawn) + " added back to unpaid installments due after " + day(x.body.valid_until) + "."
+      : "Ended. No unpaid installment after " + day(x.body.valid_until) + " had this discount.");
+    loadScholarships(); refresh();
+  });
+
+  // ---- edit
+  let scEditing = null;
+  $("se-kind").addEventListener("change", function () { $("se-value-label").textContent = $("se-kind").value === "PERCENT" ? "Percentage (%)" : "Amount (Rs.)"; });
+  function scopeOf(s) { return s.fee_type_id ? "type:" + s.fee_type_id : s.fee_structure_id ? "fee:" + s.fee_structure_id : ""; }
+  function openEdit(s) {
+    scEditing = s;
+    $("sc-edit-who").textContent = s.student_name + (s.roll_number ? " (" + s.roll_number + ")" : "") + " · given so far " + money(s.given_so_far);
+    $("se-structure").innerHTML = $("sc-structure").innerHTML;
+    $("se-name").value = s.name; $("se-kind").value = s.kind; $("se-kind").dispatchEvent(new Event("change"));
+    $("se-value").value = s.value; $("se-structure").value = scopeOf(s);
+    $("se-from").value = String(s.valid_from || "").slice(0, 10); $("se-until").value = s.valid_until ? String(s.valid_until).slice(0, 10) : "";
+    $("se-auto").checked = !!s.auto_apply; $("se-reason").value = s.reason || ""; $("se-note").value = "";
+    $("sc-edit-error").hidden = true;
+    $("sc-edit-modal").showModal();
+  }
+  $("sc-edit-close").addEventListener("click", function () { $("sc-edit-modal").close(); });
+  $("sc-edit-form").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const s = scEditing;
+    if (!s) return;
+    $("sc-edit-error").hidden = true;
+    if ($("se-note").value.trim().length < 5) return fail("sc-edit-error", "Say why you are changing it (kept on record).");
+    if (!($("se-value").value > 0)) return fail("sc-edit-error", "Enter the percentage or amount.");
+    const body = { note: $("se-note").value.trim() };
+    const scope = $("se-structure").value;
+    if ($("se-name").value.trim() !== s.name) body.name = $("se-name").value.trim();
+    if ($("se-kind").value !== s.kind) body.kind = $("se-kind").value;
+    if (parseFloat($("se-value").value) !== Number(s.value)) body.value = parseFloat($("se-value").value);
+    if (scope !== scopeOf(s)) {
+      body.fee_type_id = scope.indexOf("type:") === 0 ? scope.slice(5) : null;
+      body.fee_structure_id = scope.indexOf("fee:") === 0 ? scope.slice(4) : null;
+    }
+    if ($("se-from").value && $("se-from").value !== String(s.valid_from).slice(0, 10)) body.valid_from = $("se-from").value;
+    if (($("se-until").value || null) !== (s.valid_until ? String(s.valid_until).slice(0, 10) : null)) body.valid_until = $("se-until").value || null;
+    if ($("se-auto").checked !== !!s.auto_apply) body.auto_apply = $("se-auto").checked;
+    if ($("se-reason").value.trim() !== (s.reason || "")) body.reason = $("se-reason").value.trim();
+    if (Object.keys(body).length === 1) return fail("sc-edit-error", "Nothing was changed.");
+    $("sc-edit-save").disabled = true;
+    const x = await VA.fetchJson("/api/v1/fees/scholarships/" + s.id, json("PATCH", body));
+    $("sc-edit-save").disabled = false;
+    if (!x.ok) return fail("sc-edit-error", msg(x.body, "Could not save the changes."));
+    $("sc-edit-modal").close();
+    VA.toast(x.body.pending_approval ? x.body.message : "Saved. Unpaid installments now carry " + money(x.body.applied) + " off.");
+    loadScholarships(); refresh();
+  });
   $("sc-filter").addEventListener("change", loadScholarships);
   $("sa-grant").addEventListener("click", function () {
     if (!current) return;
@@ -347,6 +456,7 @@
     const perms = (event.detail && event.detail.me && event.detail.me.permissions) || [];
     const canPropose = perms.indexOf("scholarship.manage") !== -1 || perms.indexOf("scholarship.propose") !== -1;
     document.querySelectorAll(".can-propose").forEach(function (el) { el.hidden = !canPropose; });
+    canProposeSc = canPropose;
     $("sc-from").value = defaultFrom();
     setTimeout(function () { if (!$("sc-from").dataset.touched) $("sc-from").value = defaultFrom(); }, 1500);   // once the terms have loaded
     $("sc-from").addEventListener("change", function () { $("sc-from").dataset.touched = "1"; });

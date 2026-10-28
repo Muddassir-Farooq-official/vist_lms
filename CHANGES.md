@@ -417,3 +417,63 @@ style and are unchanged. Two Accounts screens were reworked; both are shared wit
   weekdays, set Working days on their payslip with Adjust.
 - Payroll run window: the Absent column shows "7 / 2 forgiven (casual leave) / 5 charged" on separate lines (it looked
   like "72 casual"), and the Days column is now **Day rate** ("÷ 27" and the rupees per day).
+
+# Fee assignments search / filters / pages; discounts for one kind of fee every semester (migration `b4c5d6e7f8a9`)
+
+- **Fee assignments** (Fees → Assignments): search by name, roll number, employee code or fee; filters for term,
+  program, students / staff, balance (owes now / nothing due) and status (Active by default); 25 a page with Prev / Next
+  and "1–25 of N". Each row shows the roll number or employee code and the term. The list used to load every assignment
+  at once. API: `GET /fees/assignments` takes `q, term_label, program_id, payer_type, owing, status, fee_structure_id,
+  page, page_size` and returns the number of matches in `X-Total-Count`; with no parameters it returns everything, as before.
+- **Discount on one kind of fee, every semester**: "Applies to" now offers "<Fee type> only (every semester)", e.g.
+  "Tuition Fee only". It is taken off that kind of fee in the current semester and, while it runs, off the same kind of
+  fee in every later semester; exam, library and other fees are left alone. The other two choices are unchanged (every
+  fee; one single fee). One fee and one kind of fee cannot be chosen together. Lists show what each discount applies to.
+- **Migration `b4c5d6e7f8a9`**: adds one empty, optional column `scholarships.fee_type_id` (+ index and link to
+  fee_types). Existing scholarships keep it empty and apply exactly as before. Instant on PostgreSQL; safe while the
+  site is up. Downgrade drops the column.
+
+# Scholarships: ending really stops the discount; scholarships can be edited (no migration)
+
+- **End now takes the discount off later installments.** When a scholarship was granted, its discount was put on
+  every installment inside its dates at once, including months still to come. "End" only changed the status, so those
+  future installments kept the discount. Now End asks for the **last day it covers** (default today; not a future day,
+  for that edit "Until"). For installments due **after** that day that are **not yet paid in full**, the discount is
+  withdrawn and the full amount is owed again; their challans update. Installments due on or before that day keep the
+  discount. Installments already paid in full keep the discount they were paid at, so no extra dues are created after
+  money was accepted. The ledger stays append-only: each withdrawal is a new row linked to the discount it undoes (the same
+  mechanism used when a write-off is cancelled). Statements show it as "Discount withdrawn"; "Given so far" counts only what
+  is still given. The student gets a notification. An optional reason is kept in the activity log.
+- **Edit a running scholarship** (Edit… on the Scholarships list): name, type, percentage or amount, what it applies to,
+  from / until, "also take it off later fees", and the reason, plus a required "why are you changing it" note. The new
+  terms apply to installments not yet paid in full (their discount is withdrawn and worked out again). Fully paid
+  installments are not touched. A change that gives the student **more** (higher value, another type or scope, earlier
+  start, later or no end, applying to later fees again) waits for another administrator on the Approvals page ("Change a
+  scholarship or discount"), like granting. Lowering, shortening or renaming applies at once. Anything the accounts office
+  changes always waits for an administrator. Ending stays administrator-only. API: `PATCH /fees/scholarships/{id}` (only the
+  fields sent change) and `POST /fees/scholarships/{id}/end` with optional `{"end_date", "reason"}` (no body works as before).
+- **Scholarships ended before this release**: nothing changes by itself. On the Scholarships list (show "Ended" or "All"),
+  each ended one now has **Finish ending…**: it removes the leftover discount from installments due after its end date that
+  are not yet paid in full (same rules as above). If nothing is left to remove it says so and changes nothing.
+- No migration. Tests: `tests/integration/test_scholarship_end_and_edit.py`.
+
+# Remove all discounts (clean start) — on the page, or `scripts/reset_scholarships.py` (no migration)
+
+**On the page** (administrators): Fees → Scholarships & discounts → "Start again: remove all discounts" → the dialog
+shows exactly what would change per student (worked out and thrown away; nothing is saved), then type RESET to do it.
+It refuses while scholarship requests still wait on the Approvals page. API: `GET /fees/scholarships/reset-preview`,
+`POST /fees/scholarships/reset {"confirm": "RESET", "note"}`. The script below does the same from the server.
+
+For a clean start before giving discounts again on tuition only. For every scholarship / discount (running or ended):
+its discount comes off every installment **not yet paid in full** (full amount owed again; challans update); installments
+**already paid in full keep** the discount they were paid at; running ones are marked ended. Nothing is deleted: each
+removal is a new ledger row linked to the discount it undoes, plus an activity-log entry ("scholarship.reset"). Payments,
+charges, fines, write-offs and cancelled previous dues are not touched. No notifications are sent. Running it twice
+changes nothing the second time.
+
+    pg_dump -Fc -f before_reset.dump <database>                                       # backup first
+    python scripts/reset_scholarships.py --csv reset_report.csv                         # report only, nothing saved
+    python scripts/reset_scholarships.py --apply --by <admin username> --csv reset_applied.csv
+
+Then give the new discounts with "Applies to: Tuition Fee only (every semester)". Reject any scholarship requests still
+waiting on the Approvals page first (the script lists how many).
