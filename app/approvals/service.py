@@ -24,6 +24,7 @@ LABELS = {
     "BOOKS_REOPEN": "Reopen closed books",
     "PREVIOUS_DUES_CANCEL": "Write off previous dues",
     "SCHOLARSHIP": "Scholarship or discount",
+    "SCHOLARSHIP_EDIT": "Change a scholarship or discount",
 }
 EXECUTORS: dict[str, Callable[[AsyncSession, ApprovalRequest, uuid.UUID], Awaitable[dict]]] = {}
 
@@ -230,4 +231,23 @@ async def _scholarship(session: AsyncSession, r: ApprovalRequest, actor_id) -> d
         p[k] = uuid.UUID(p[k]) if p.get(k) else None
     p["kind"] = ScholarshipKind(p["kind"])
     s, summary = await ScholarshipService(session).grant(**p, actor_id=r.requested_by or actor_id, approved=True)
+    return {"scholarship_id": s.id, **summary}
+
+
+@executor("SCHOLARSHIP_EDIT")
+async def _scholarship_edit(session: AsyncSession, r: ApprovalRequest, actor_id) -> dict:
+    from app.fees.models import ScholarshipKind
+    from app.fees.scholarship_service import ScholarshipService
+
+    c = dict(r.payload["changes"])
+    for k in ("valid_from", "valid_until"):
+        if k in c:
+            c[k] = date.fromisoformat(c[k]) if c[k] else None
+    for k in ("fee_structure_id", "fee_type_id"):
+        if k in c:
+            c[k] = uuid.UUID(c[k]) if c[k] else None
+    if "kind" in c:
+        c["kind"] = ScholarshipKind(c["kind"])
+    s, summary = await ScholarshipService(session).update(uuid.UUID(r.payload["scholarship_id"]), c, actor_id=r.requested_by or actor_id,
+                                                          note=r.payload.get("note") or "Approved change", approved=True)
     return {"scholarship_id": s.id, **summary}

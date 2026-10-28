@@ -1,253 +1,612 @@
-"""Second-person approval: ask, then another administrator approves (which carries the action out) or rejects.
-
-Each kind of action registers how to carry it out (EXECUTORS). The services that own those actions call `gate()` before
-doing anything: it returns None when the action may go ahead now (nobody else can approve), or the stored request.
-"""
 from __future__ import annotations
 
+import calendar
 import uuid
 from datetime import date, datetime, timezone
-from decimal import Decimal
-from typing import Any, Awaitable, Callable
+from decimal import ROUND_DOWN, Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.approvals.models import ApprovalRequest
 from app.audit.service import AuditService
-from app.auth.permissions import Permissions
-from app.core.exceptions import BusinessRuleViolationError, ResourceNotFoundError
-
-LABELS = {
-    "FEE_STATUS": "Waive or cancel a fee",
-    "FINE_WAIVE": "Waive a fine",
-    "BOOKS_REOPEN": "Reopen closed books",
-    "PREVIOUS_DUES_CANCEL": "Write off previous dues",
-    "SCHOLARSHIP": "Scholarship or discount",
-    "SCHOLARSHIP_EDIT": "Change a scholarship or discount",
-}
-EXECUTORS: dict[str, Callable[[AsyncSession, ApprovalRequest, uuid.UUID], Awaitable[dict]]] = {}
-
-
-def executor(kind: str):
-    def wrap(fn):
-        EXECUTORS[kind] = fn
-        return fn
-    return wrap
-
-
-def _jsonable(v: Any) -> Any:
-    if isinstance(v, (uuid.UUID, date, datetime)):
-        return v.isoformat() if not isinstance(v, uuid.UUID) else str(v)
-    if isinstance(v, Decimal):
-        return float(v)
-    if isinstance(v, dict):
-        return {k: _jsonable(x) for k, x in v.items()}
-    if isinstance(v, (list, tuple)):
-        return [_jsonable(x) for x in v]
-    if hasattr(v, "value") and not isinstance(v, (str, int, float)):
-        return v.value
-    return v
+from app.core.exceptions import BusinessRuleViolationError, DuplicateResourceError, ResourceNotFoundError
+from app.employees.models import Employee, EmployeeStatus
+from app.fees.models import (
+    FeeAssignment,
+    FeeLedgerEntry,
+    FeeStructure,
+    FeeStructureProgram,
+    FeeStructureSemester,
+    FeeStructureStatus,
+    FeeType,
+    LedgerEntryType,
+    PayerType,
+)
+from app.fees.payment_gateway import get_payment_gateway
+from app.fees.payment_models import ChallanStatus, PaymentChallan
+from app.fees.repository import FeeAssignmentRepository, FeeStructureRepository, FeeTypeRepository
+from app.fees.schemas import CloneStructureRequest, FeeStructureCreateRequest, FeeTypeCreateRequest, FeeTypeUpdateRequest
+from app.notifications.models import NotificationCategory
+from app.notifications.service import create_notification
+from app.programs.models import Program
+from app.students.models import Student, StudentStatus
 
 
-async def other_approvers(session: AsyncSession, actor_id) -> int:
-    from app.auth.models import Permission, RolePermission, User, UserRole
-
-    return (await session.execute(
-        select(func.count(func.distinct(User.id))).join(UserRole, UserRole.user_id == User.id)
-        .join(RolePermission, RolePermission.role_id == UserRole.role_id).join(Permission, Permission.id == RolePermission.permission_id)
-        .where(Permission.code == Permissions.APPROVALS_DECIDE, User.is_active.is_(True), User.id != actor_id))).scalar_one()
-
-
-async def gate(session: AsyncSession, *, kind: str, actor_id, target_id=None, payload: dict, summary: str, amount=None,
-               reason: str | None = None) -> ApprovalRequest | None:
-    """None = go ahead now (nobody else can approve; logged as a sole-approver decision). Otherwise the stored request."""
-    if await other_approvers(session, actor_id) == 0:
-        await AuditService(session).log(actor_user_id=actor_id, action="approval.sole_approver", entity_type="approval", entity_id=target_id,
-                                        metadata={"kind": kind, "summary": summary[:300]})
-        return None
-    if target_id is not None:
-        open_ = (await session.execute(select(ApprovalRequest).where(ApprovalRequest.kind == kind, ApprovalRequest.target_id == target_id,
-                                                                     ApprovalRequest.status == "REQUESTED"))).scalars().first()
-        if open_ is not None:
-            raise BusinessRuleViolationError("This is already waiting for approval (Approvals page).")
-    r = ApprovalRequest(kind=kind, target_id=target_id, summary=summary[:300], amount=amount, payload=_jsonable(payload),
-                        reason=(reason or "").strip() or None, status="REQUESTED", requested_by=actor_id)
-    session.add(r)
-    await session.flush()
-    await AuditService(session).log(actor_user_id=actor_id, action="approval.requested", entity_type="approval_request", entity_id=r.id,
-                                    metadata={"kind": kind, "summary": r.summary, "amount": str(amount) if amount is not None else None})
-    await _notify_approvers(session, r, actor_id)
-    return r
+async def _resolve_payer_user_id(session: AsyncSession, payer_type: PayerType, payer_id: uuid.UUID) -> uuid.UUID | None:
+    """Same one-line lookup as app/fines/service.py's _resolve_user_id —
+    notifications are keyed on users.id, not the student/employee
+    record. Kept local rather than imported: fees shouldn't depend on
+    fines just because they share this shape."""
+    if payer_type == PayerType.STUDENT:
+        student = await session.get(Student, payer_id)
+        return student.user_id if student else None
+    employee = await session.get(Employee, payer_id)
+    return employee.user_id if employee else None
 
 
-async def _notify_approvers(session: AsyncSession, r: ApprovalRequest, actor_id) -> None:
-    from app.auth.models import Permission, RolePermission, User, UserRole
-    from app.notifications.models import NotificationCategory
-    from app.notifications.service import create_notification
-
-    ids = (await session.execute(
-        select(User.id).distinct().join(UserRole, UserRole.user_id == User.id).join(RolePermission, RolePermission.role_id == UserRole.role_id)
-        .join(Permission, Permission.id == RolePermission.permission_id)
-        .where(Permission.code == Permissions.APPROVALS_DECIDE, User.is_active.is_(True), User.id != actor_id))).scalars().all()
-    category = getattr(NotificationCategory, "TASK", None) or list(NotificationCategory)[0]
-    for uid in ids:
-        await create_notification(session, user_id=uid, category=category, title=f"Approval needed: {LABELS.get(r.kind, r.kind)}",
-                                  message=r.summary, link="/dashboard/admin/approvals")
+def _add_months(d: date, months: int) -> date:
+    total = d.month - 1 + months
+    year = d.year + total // 12
+    month = total % 12 + 1
+    day = min(d.day, calendar.monthrange(year, month)[1])
+    return date(year, month, day)
 
 
-def pending_response(r: ApprovalRequest) -> dict:
-    return {"pending_approval": True, "approval_request_id": str(r.id), "kind": r.kind,
-            "message": f"Sent for approval: {r.summary}. Another administrator approves it on the Approvals page; nothing has changed yet."}
-
-
-class ApprovalService:
+class FeeTypeService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+        self.repo = FeeTypeRepository(session)
         self.audit = AuditService(session)
 
-    async def _get(self, request_id, *, lock: bool = False) -> ApprovalRequest:
-        stmt = select(ApprovalRequest).where(ApprovalRequest.id == request_id)
-        if lock:
-            stmt = stmt.with_for_update()
-        r = (await self.session.execute(stmt)).scalar_one_or_none()
-        if r is None:
-            raise ResourceNotFoundError("Approval request not found.")
-        return r
+    async def create(self, data: FeeTypeCreateRequest, *, actor_id: uuid.UUID) -> FeeType:
+        if await self.repo.get_by_code(data.code):
+            raise DuplicateResourceError(f"Fee type code '{data.code}' already exists.")
+        fee_type = FeeType(code=data.code.strip().upper(), name=data.name.strip(), description=data.description)
+        await self.repo.create(fee_type)
+        await self.audit.log(
+            actor_user_id=actor_id,
+            action="fee_type.created",
+            entity_type="fee_type",
+            entity_id=fee_type.id,
+            after={"code": fee_type.code, "name": fee_type.name},
+        )
+        return fee_type
 
-    async def decide(self, request_id, *, approve: bool, note: str | None, actor_id) -> ApprovalRequest:
-        from app.core.controls import four_eyes
+    async def list_all(self, *, active_only: bool = False) -> list[FeeType]:
+        return await self.repo.list_all(active_only=active_only)
 
-        r = await self._get(request_id, lock=True)
-        if r.status != "REQUESTED":
-            raise BusinessRuleViolationError(f"This request is already {r.status.lower()}.")
-        sole = await four_eyes(self.session, actor_id, [r.requested_by], Permissions.APPROVALS_DECIDE,
-                               "You asked for this; another administrator must approve or reject it.")
-        note = (note or "").strip() or None
-        if not approve:
-            if not note or len(note) < 3:
-                raise BusinessRuleViolationError("Say why it is rejected.")
-            r.status = "REJECTED"
-        else:
-            run = EXECUTORS.get(r.kind)
-            if run is None:
-                raise BusinessRuleViolationError("This kind of request cannot be carried out by this version.")
-            r.result = _jsonable(await run(self.session, r, actor_id))
-            r.status = "APPROVED"
-        r.decided_by, r.decided_at, r.decision_note = actor_id, datetime.now(timezone.utc), note
+    async def update(self, fee_type_id: uuid.UUID, data: FeeTypeUpdateRequest, *, actor_id: uuid.UUID) -> FeeType:
+        fee_type = await self.repo.get_by_id(fee_type_id)
+        if fee_type is None:
+            raise ResourceNotFoundError("Fee type not found.")
+        before = {"name": fee_type.name, "is_active": fee_type.is_active}
+        if data.name is not None:
+            fee_type.name = data.name.strip()
+        if data.description is not None:
+            fee_type.description = data.description or None
+        if data.is_active is not None:
+            fee_type.is_active = data.is_active
+        await self.audit.log(
+            actor_user_id=actor_id,
+            action="fee_type.updated",
+            entity_type="fee_type",
+            entity_id=fee_type.id,
+            before=before,
+            after={"name": fee_type.name, "is_active": fee_type.is_active},
+        )
+        return fee_type
+
+
+class FeeStructureService:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+        self.repo = FeeStructureRepository(session)
+        self.fee_type_repo = FeeTypeRepository(session)
+        self.assignment_repo = FeeAssignmentRepository(session)
+        self.audit = AuditService(session)
+
+    async def create(self, data: FeeStructureCreateRequest, *, actor_id: uuid.UUID) -> FeeStructure:
+        from app.academics.terms import AcademicTermService
+
+        await AcademicTermService(self.session).require_usable(data.term_label)
+        fee_type = await self.fee_type_repo.get_by_id(data.fee_type_id)
+        if fee_type is None:
+            raise ResourceNotFoundError("Fee type not found.")
+        if not data.applies_to_students and not data.applies_to_employees:
+            raise BusinessRuleViolationError("A fee structure must apply to students, employees, or both.")
+
+        for program_id in data.program_ids:
+            program = await self.session.get(Program, program_id)
+            if program is None:
+                raise ResourceNotFoundError(f"Program {program_id} does not exist.")
+
+        if data.course_id is not None:
+            from app.academics.models import Course
+
+            course = await self.session.get(Course, data.course_id)
+            if course is None:
+                raise ResourceNotFoundError("Course not found.")
+            if not data.applies_to_students:
+                raise BusinessRuleViolationError("A course-scoped fee must apply to students — employees don't enroll in courses.")
+            # Fixes a gap: FeeStructure.course_id's own docstring in
+            # app/fees/models.py documents course-scoping and
+            # program/semester-scoping as mutually exclusive ("see
+            # FeeStructureService validation" — that validation never
+            # actually existed). Without this check, a course-scoped fee
+            # with program_ids/semester_numbers also set would silently
+            # store both, leaving it ambiguous which matching semantics
+            # actually apply (assigned once at activation, per the
+            # program/semester path, or fresh per enrollment including
+            # retakes, per the course path) — see the two code paths in
+            # FeeStructureService.activate().
+            if data.program_ids or data.semester_numbers:
+                raise BusinessRuleViolationError(
+                    "A fee structure cannot be both course-scoped and program/semester-scoped. "
+                    "Choose one: set course_id, or set program_ids/semester_numbers, not both."
+                )
+
+        structure = FeeStructure(
+            fee_type_id=fee_type.id,
+            name=data.name.strip(),
+            term_label=data.term_label.strip(),
+            total_amount=data.total_amount,
+            installment_count=data.installment_count,
+            installment_interval_months=data.installment_interval_months,
+            effective_from=data.effective_from,
+            late_fee_per_day=data.late_fee_per_day,
+            applies_to_students=data.applies_to_students,
+            applies_to_employees=data.applies_to_employees,
+            course_id=data.course_id,
+            status=FeeStructureStatus.DRAFT,
+            created_by=actor_id,
+        )
+        await self.repo.create(structure)
+
+        for program_id in data.program_ids:
+            await self.repo.add_program_link(
+                FeeStructureProgram(fee_structure_id=structure.id, program_id=program_id)
+            )
+        for semester_number in data.semester_numbers:
+            await self.repo.add_semester_link(
+                FeeStructureSemester(fee_structure_id=structure.id, semester_number=semester_number)
+            )
         await self.session.flush()
-        await self.audit.log(actor_user_id=actor_id, action=f"approval.{r.status.lower()}", entity_type="approval_request", entity_id=r.id,
-                             metadata={"kind": r.kind, "summary": r.summary, "note": note, "sole_approver": sole})
-        await self._tell_requester(r)
-        return r
 
-    async def cancel(self, request_id, *, actor_id) -> ApprovalRequest:
-        r = await self._get(request_id, lock=True)
-        if r.status != "REQUESTED":
-            raise BusinessRuleViolationError(f"This request is already {r.status.lower()}.")
-        if str(r.requested_by) != str(actor_id):
-            raise BusinessRuleViolationError("Only the person who asked can withdraw the request.")
-        r.status, r.decided_by, r.decided_at = "CANCELLED", actor_id, datetime.now(timezone.utc)
-        await self.audit.log(actor_user_id=actor_id, action="approval.cancelled", entity_type="approval_request", entity_id=r.id, metadata={"kind": r.kind})
-        return r
+        await self.audit.log(
+            actor_user_id=actor_id,
+            action="fee_structure.created",
+            entity_type="fee_structure",
+            entity_id=structure.id,
+            after={
+                "name": structure.name,
+                "total_amount": data.total_amount,
+                "program_count": len(data.program_ids),
+                "semester_numbers": data.semester_numbers,
+            },
+        )
+        return structure
 
-    async def _tell_requester(self, r: ApprovalRequest) -> None:
-        if r.requested_by is None:
-            return
-        from app.notifications.models import NotificationCategory
-        from app.notifications.service import create_notification
+    async def get(self, structure_id: uuid.UUID) -> FeeStructure:
+        structure = await self.repo.get_by_id(structure_id)
+        if structure is None:
+            raise ResourceNotFoundError("Fee structure not found.")
+        return structure
 
-        category = getattr(NotificationCategory, "TASK", None) or list(NotificationCategory)[0]
-        await create_notification(self.session, user_id=r.requested_by, category=category,
-                                  title=f"{LABELS.get(r.kind, r.kind)}: {'approved' if r.status == 'APPROVED' else 'rejected'}",
-                                  message=r.summary + (f" — {r.decision_note}" if r.decision_note else ""))
+    async def list_all(self) -> list[FeeStructure]:
+        return await self.repo.list_all()
 
-    async def listing(self, *, status: str | None, mine_for=None) -> list[dict]:
-        from app.accounts.service import AccountsService
+    async def clone(self, structure_id: uuid.UUID, data: CloneStructureRequest, *, actor_id: uuid.UUID) -> FeeStructure:
+        """Creates a new DRAFT structure for a new term, with the amount
+        scaled by percentage_change — the answer to 'how do I raise this
+        fee 10% next term': clone each fee type's current structure
+        forward rather than editing history. The source structure and
+        every existing assignment/ledger entry under it are completely
+        untouched."""
+        from app.academics.terms import AcademicTermService
 
-        stmt = select(ApprovalRequest).order_by(ApprovalRequest.created_at.desc()).limit(300)
-        if status:
-            stmt = stmt.where(ApprovalRequest.status == status)
-        if mine_for is not None:
-            stmt = stmt.where(ApprovalRequest.requested_by == mine_for)
-        rows = (await self.session.execute(stmt)).scalars().all()
-        names = await AccountsService(self.session)._names({r.requested_by for r in rows} | {r.decided_by for r in rows})
-        return [{"id": r.id, "kind": r.kind, "label": LABELS.get(r.kind, r.kind), "summary": r.summary, "amount": float(r.amount) if r.amount is not None else None,
-                 "reason": r.reason, "status": r.status, "requested_by": names.get(r.requested_by), "requested_by_id": r.requested_by, "requested_at": r.created_at,
-                 "decided_by": names.get(r.decided_by), "decided_at": r.decided_at, "decision_note": r.decision_note} for r in rows]
+        await AcademicTermService(self.session).require_usable(data.new_term_label)
+        source = await self.get(structure_id)
 
-    async def pending_count(self) -> int:
-        return (await self.session.execute(select(func.count()).select_from(ApprovalRequest).where(ApprovalRequest.status == "REQUESTED"))).scalar_one()
+        new_amount = round(float(source.total_amount) * (1 + data.percentage_change / 100), 2)
+        if new_amount <= 0:
+            raise BusinessRuleViolationError("The adjusted amount must be greater than zero.")
 
+        # NOTE: fetched explicitly rather than via source.fee_type — that
+        # relationship attribute isn't eagerly loaded, and touching it here
+        # would trigger an async lazy-load error (MissingGreenlet).
+        fee_type = await self.fee_type_repo.get_by_id(source.fee_type_id)
+        new_name = data.new_name or f"{fee_type.name if fee_type else 'Fee'} \u2014 {data.new_term_label}"
 
-# ====================================================================== how each kind is carried out
-@executor("FEE_STATUS")
-async def _fee_status(session: AsyncSession, r: ApprovalRequest, actor_id) -> dict:
-    from app.fees.assignment_service import FeeAssignmentService
-    from app.fees.models import AssignmentStatus
+        clone = FeeStructure(
+            fee_type_id=source.fee_type_id,
+            name=new_name,
+            term_label=data.new_term_label,
+            total_amount=new_amount,
+            installment_count=source.installment_count,
+            installment_interval_months=source.installment_interval_months,
+            effective_from=data.effective_from,
+            late_fee_per_day=source.late_fee_per_day,
+            applies_to_students=source.applies_to_students,
+            applies_to_employees=source.applies_to_employees,
+            course_id=source.course_id,  # was previously dropped — cloning a
+            # course-scoped fee silently produced a non-course-scoped clone
+            status=FeeStructureStatus.DRAFT,
+            created_by=actor_id,
+        )
+        await self.repo.create(clone)
 
-    p = r.payload
-    a = await FeeAssignmentService(session).change_status(uuid.UUID(p["assignment_id"]), status=AssignmentStatus(p["status"]),
-                                                          actor_id=r.requested_by or actor_id, reason=p.get("reason"), approved=True)
-    return {"assignment_id": a.id, "status": a.status.value}
+        # Only copy program/semester links for a non-course-scoped source —
+        # a course-scoped structure has neither (see the mutual-exclusivity
+        # check in create() above), so this is a no-op for it anyway, but
+        # being explicit avoids relying on that invariant silently holding.
+        source_links = await self.repo.get_program_links(source.id)
+        for link in source_links:
+            await self.repo.add_program_link(FeeStructureProgram(fee_structure_id=clone.id, program_id=link.program_id))
+        source_semester_links = await self.repo.get_semester_links(source.id)
+        for link in source_semester_links:
+            await self.repo.add_semester_link(
+                FeeStructureSemester(fee_structure_id=clone.id, semester_number=link.semester_number)
+            )
+        await self.session.flush()
 
+        await self.audit.log(
+            actor_user_id=actor_id,
+            action="fee_structure.cloned",
+            entity_type="fee_structure",
+            entity_id=clone.id,
+            after={
+                "source_structure_id": str(source.id),
+                "percentage_change": data.percentage_change,
+                "old_amount": float(source.total_amount),
+                "new_amount": new_amount,
+            },
+        )
+        return clone
 
-@executor("FINE_WAIVE")
-async def _fine_waive(session: AsyncSession, r: ApprovalRequest, actor_id) -> dict:
-    from app.fines.service import FineService
+    async def _generate_installments(
+        self, assignment: FeeAssignment, structure: FeeStructure, *, actor_id: uuid.UUID
+    ) -> None:
+        total = Decimal(str(structure.total_amount))
+        count = structure.installment_count
+        base = (total / count).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+        allocated = Decimal("0.00")
+        now = datetime.now(timezone.utc)
+        gateway = get_payment_gateway()
 
-    f = await FineService(session).waive(uuid.UUID(r.payload["fine_id"]), actor_id=r.requested_by or actor_id, note=r.payload.get("note"))
-    return {"fine_id": f.id, "status": f.status.value}
+        for i in range(1, count + 1):
+            amount = total - allocated if i == count else base
+            allocated += amount
+            due_date = _add_months(structure.effective_from, (i - 1) * structure.installment_interval_months)
 
+            ledger_entry = FeeLedgerEntry(
+                fee_assignment_id=assignment.id,
+                entry_type=LedgerEntryType.DEBIT,
+                amount=float(amount),
+                installment_number=i,
+                due_date=due_date,
+                description=f"Installment {i} of {count} \u2014 {structure.name}",
+                created_by=actor_id,
+                created_at=now,
+            )
+            self.session.add(ledger_entry)
+            await self.session.flush()  # need ledger_entry.id before creating the linked challan
 
-@executor("BOOKS_REOPEN")
-async def _books_reopen(session: AsyncSession, r: ApprovalRequest, actor_id) -> dict:
-    from app.accounts.period import set_closed_through
+            # Auto-generate the payable challan the instant the charge
+            # exists — this is what replaces the accountant manually
+            # entering payments: the student can pay this consumer_number
+            # at any bank/ATM/mobile app the moment the fee is set.
+            # Collision probability is astronomically low (see
+            # SimulatedOneLinkProvider's docstring) but there IS a real
+            # DB unique constraint on consumer_number, and nothing was
+            # checking for one before generating — an unhandled
+            # IntegrityError would have failed the whole activation.
+            # Belt-and-suspenders: check before inserting, retry a
+            # handful of times, then fail with a clear message rather
+            # than a raw DB error if something is very wrong.
+            consumer_number = None
+            for _attempt in range(5):
+                candidate = await gateway.generate_consumer_number(
+                    reference=f"{assignment.payer_type.value}-{assignment.payer_id.hex[:8]}-{i}",
+                    amount=float(amount),
+                    due_date=due_date,
+                )
+                exists = (
+                    await self.session.execute(select(PaymentChallan).where(PaymentChallan.consumer_number == candidate))
+                ).scalar_one_or_none()
+                if exists is None:
+                    consumer_number = candidate
+                    break
+            if consumer_number is None:
+                raise BusinessRuleViolationError(
+                    "Could not generate a unique consumer number after several attempts — try activating again."
+                )
+            self.session.add(
+                PaymentChallan(
+                    fee_ledger_entry_id=ledger_entry.id,
+                    fee_assignment_id=assignment.id,
+                    consumer_number=consumer_number,
+                    amount=float(amount),
+                    due_date=due_date,
+                    status=ChallanStatus.PENDING,
+                    provider="1LINK_SIMULATED",
+                    generated_at=now,
+                )
+            )
 
-    day = date.fromisoformat(r.payload["closed_through"]) if r.payload.get("closed_through") else None
-    done = await set_closed_through(session, day, actor_id=r.requested_by or actor_id, reason=r.payload.get("reason"), approved=True)
-    return {"closed_through": done}
+        # Real gap fix: NotificationCategory.FEE has existed since the
+        # notifications module was built — nothing in this module ever
+        # actually used it. A new charge landing on someone's account
+        # was completely silent, in every one of this method's 5 call
+        # sites (structure activation for students/employees,
+        # course-enrollment auto-charge, semester-advance auto-charge).
+        # One notification per assignment here, not per installment —
+        # a 3-installment fee shouldn't fire 3 messages.
+        payer_user_id = await _resolve_payer_user_id(self.session, assignment.payer_type, assignment.payer_id)
+        if payer_user_id is not None:
+            await create_notification(
+                self.session, user_id=payer_user_id, category=NotificationCategory.FEE,
+                title="A new fee has been charged to your account",
+                message=f"Rs. {float(total):.2f} — {structure.name}",
+                link="/dashboard/student/fees" if assignment.payer_type == PayerType.STUDENT else "/dashboard/faculty",
+            )
 
+        # A scholarship that is still running takes its share off this new fee straight away (and off the challans just created).
+        from app.fees.scholarship_service import ScholarshipService
 
-@executor("PREVIOUS_DUES_CANCEL")
-async def _dues_cancel(session: AsyncSession, r: ApprovalRequest, actor_id) -> dict:
-    from app.fees.opening_balance_service import OpeningBalanceService
+        await ScholarshipService(self.session).apply_active_to_assignment(assignment, actor_id=actor_id)
 
-    out = await OpeningBalanceService(session).cancel_entry(uuid.UUID(r.payload["ledger_entry_id"]), reason=r.payload.get("reason"),
-                                                            actor_id=r.requested_by or actor_id)
-    return out if isinstance(out, dict) else {"done": True}
+    async def undo_activation(self, structure_id: uuid.UUID, *, reason: str, actor_id: uuid.UUID) -> dict:
+        """Take back a mistaken activation (wrong amount, wrong programs): the generated charges are removed and the fee is a draft
+        again. Only possible while nobody has paid, been given a discount or been refunded on it; after that, correct it with
+        a reversal instead."""
+        from sqlalchemy import delete, func
 
+        from app.fees.models import FeeAssignment, FeeLedgerEntry
+        from app.fees.refund_models import FeeRefund
 
-@executor("SCHOLARSHIP")
-async def _scholarship(session: AsyncSession, r: ApprovalRequest, actor_id) -> dict:
-    from app.fees.scholarship_service import ScholarshipService
+        structure = await self.get(structure_id)
+        if structure.status != FeeStructureStatus.ACTIVE:
+            raise BusinessRuleViolationError("Only an active fee structure has an activation to undo.")
+        fee_type = await self.session.get(FeeType, structure.fee_type_id)
+        if fee_type is not None and fee_type.code == "OPENING":
+            raise BusinessRuleViolationError("Previous dues cannot be undone in bulk. Cancel a wrong entry on its own in Fees \u2192 Previous dues.")
+        if len((reason or "").strip()) < 5:
+            raise BusinessRuleViolationError("Say why the activation is being undone.")
+        ids = list((await self.session.execute(select(FeeAssignment.id).where(FeeAssignment.fee_structure_id == structure_id))).scalars())
+        if ids:
+            touched = (await self.session.execute(select(func.count(func.distinct(FeeLedgerEntry.fee_assignment_id))).where(
+                FeeLedgerEntry.fee_assignment_id.in_(ids), FeeLedgerEntry.entry_type != LedgerEntryType.DEBIT))).scalar_one()
+            refunds = (await self.session.execute(select(func.count()).select_from(FeeRefund).where(FeeRefund.fee_assignment_id.in_(ids)))).scalar_one()
+            if touched or refunds:
+                raise BusinessRuleViolationError(
+                    f"This activation cannot be undone: payments, discounts or refunds already exist on {max(touched, refunds)} fee(s). Reverse those first, or close this fee instead.")
+            # Only unused charges reach this point (no payment, discount or refund). Financial rows are protected from
+            # cascading deletes (audit DB-03), so the challans, charges and fees are removed explicitly, in order.
+            from app.fees.payment_models import PaymentChallan
 
-    from app.fees.models import ScholarshipKind
+            await self.session.execute(delete(PaymentChallan).where(PaymentChallan.fee_assignment_id.in_(ids)))
+            await self.session.execute(delete(FeeLedgerEntry).where(FeeLedgerEntry.fee_assignment_id.in_(ids), FeeLedgerEntry.related_entry_id.is_not(None)))
+            await self.session.execute(delete(FeeLedgerEntry).where(FeeLedgerEntry.fee_assignment_id.in_(ids)))
+            await self.session.execute(delete(FeeAssignment).where(FeeAssignment.id.in_(ids)))
+        structure.status = FeeStructureStatus.DRAFT
+        structure.activated_at = None
+        await self.session.flush()
+        await AuditService(self.session).log(actor_user_id=actor_id, action="fee_structure.activation_undone", entity_type="fee_structure", entity_id=structure.id,
+                                             metadata={"reason": reason.strip(), "removed_charges": len(ids)})
+        return {"removed_charges": len(ids), "status": "DRAFT"}
 
-    p = dict(r.payload)
-    for k in ("valid_from", "valid_until"):
-        p[k] = date.fromisoformat(p[k]) if p.get(k) else None
-    for k in ("student_id", "fee_structure_id", "fee_type_id"):
-        p[k] = uuid.UUID(p[k]) if p.get(k) else None
-    p["kind"] = ScholarshipKind(p["kind"])
-    s, summary = await ScholarshipService(session).grant(**p, actor_id=r.requested_by or actor_id, approved=True)
-    return {"scholarship_id": s.id, **summary}
+    async def activate(self, structure_id: uuid.UUID, *, actor_id: uuid.UUID) -> dict:
+        structure = await self.get(structure_id)
+        if structure.status == FeeStructureStatus.CLOSED:
+            raise BusinessRuleViolationError("This fee structure is closed and cannot accept new assignments.")
 
+        newly_assigned = 0
 
-@executor("SCHOLARSHIP_EDIT")
-async def _scholarship_edit(session: AsyncSession, r: ApprovalRequest, actor_id) -> dict:
-    from app.fees.models import ScholarshipKind
-    from app.fees.scholarship_service import ScholarshipService
+        if structure.applies_to_students and structure.course_id is not None:
+            # Course-scoped: backfill everyone CURRENTLY enrolled in this
+            # specific course (any offering, any term) who hasn't already
+            # been charged for their specific enrollment — this is the
+            # "already enrolled when the fee was created" case. Every
+            # enrollment AFTER this point is handled by
+            # assign_course_fee_for_enrollment, called directly from
+            # EnrollmentService.enroll() at enrollment time instead of
+            # waiting for a bulk pass like this one.
+            from app.academics.models import CourseOffering, Enrollment, EnrollmentStatus
 
-    c = dict(r.payload["changes"])
-    for k in ("valid_from", "valid_until"):
-        if k in c:
-            c[k] = date.fromisoformat(c[k]) if c[k] else None
-    for k in ("fee_structure_id", "fee_type_id"):
-        if k in c:
-            c[k] = uuid.UUID(c[k]) if c[k] else None
-    if "kind" in c:
-        c["kind"] = ScholarshipKind(c["kind"])
-    s, summary = await ScholarshipService(session).update(uuid.UUID(r.payload["scholarship_id"]), c, actor_id=r.requested_by or actor_id,
-                                                          note=r.payload.get("note") or "Approved change", approved=True)
-    return {"scholarship_id": s.id, **summary}
+            stmt = (
+                select(Enrollment)
+                .join(CourseOffering, Enrollment.course_offering_id == CourseOffering.id)
+                .where(CourseOffering.course_id == structure.course_id, Enrollment.status == EnrollmentStatus.ENROLLED)
+            )
+            enrollments = (await self.session.execute(stmt)).scalars().all()
+
+            for enrollment in enrollments:
+                existing = await self.assignment_repo.get_existing_for_enrollment(structure.id, enrollment.id)
+                if existing is not None:
+                    continue
+                assignment = await self.assignment_repo.create(
+                    FeeAssignment(
+                        fee_structure_id=structure.id, payer_type=PayerType.STUDENT, payer_id=enrollment.student_id,
+                        enrollment_id=enrollment.id,
+                    )
+                )
+                await self._generate_installments(assignment, structure, actor_id=actor_id)
+                newly_assigned += 1
+
+        elif structure.applies_to_students:
+            program_links = await self.repo.get_program_links(structure.id)
+            program_ids = [link.program_id for link in program_links]
+            semester_links = await self.repo.get_semester_links(structure.id)
+            semester_numbers = [link.semester_number for link in semester_links]
+
+            stmt = select(Student).where(Student.status == StudentStatus.ACTIVE)
+            if program_ids:
+                stmt = stmt.where(Student.program_id.in_(program_ids))
+            if semester_numbers:
+                stmt = stmt.where(Student.current_semester.in_(semester_numbers))
+            students = (await self.session.execute(stmt)).scalars().all()
+
+            for student in students:
+                existing = await self.assignment_repo.get_existing(structure.id, PayerType.STUDENT, student.id)
+                if existing is not None:
+                    continue
+                assignment = await self.assignment_repo.create(
+                    FeeAssignment(fee_structure_id=structure.id, payer_type=PayerType.STUDENT, payer_id=student.id)
+                )
+                await self._generate_installments(assignment, structure, actor_id=actor_id)
+                newly_assigned += 1
+
+        if structure.applies_to_employees:
+            stmt = select(Employee).where(Employee.status == EmployeeStatus.ACTIVE)
+            employees = (await self.session.execute(stmt)).scalars().all()
+
+            for employee in employees:
+                existing = await self.assignment_repo.get_existing(structure.id, PayerType.EMPLOYEE, employee.id)
+                if existing is not None:
+                    continue
+                assignment = await self.assignment_repo.create(
+                    FeeAssignment(fee_structure_id=structure.id, payer_type=PayerType.EMPLOYEE, payer_id=employee.id)
+                )
+                await self._generate_installments(assignment, structure, actor_id=actor_id)
+                newly_assigned += 1
+
+        if structure.status == FeeStructureStatus.DRAFT:
+            structure.status = FeeStructureStatus.ACTIVE
+            structure.activated_at = datetime.now(timezone.utc)
+
+        await self.audit.log(
+            actor_user_id=actor_id,
+            action="fee_structure.activated",
+            entity_type="fee_structure",
+            entity_id=structure.id,
+            metadata={"newly_assigned": newly_assigned},
+        )
+        return {"newly_assigned": newly_assigned, "status": structure.status.value}
+
+    async def close(self, structure_id: uuid.UUID, *, actor_id: uuid.UUID) -> FeeStructure:
+        """The missing other half of the lifecycle — DRAFT -> ACTIVE
+        (activate, above) had no way to ever reach CLOSED, even though
+        the status existed and was already checked defensively. Closing
+        stops new assignments/enrollment-triggered charges (course-
+        scoped fees stop firing on new enrollments; matches
+        activate()'s own re-activation guard) but deliberately does NOT
+        touch existing assignments or their ledgers — dues already owed
+        remain fully payable and visible after the term is over, same
+        as Academics' End Semester leaving enrollment history intact."""
+        structure = await self.get(structure_id)
+        if structure.status == FeeStructureStatus.DRAFT:
+            raise BusinessRuleViolationError("A draft fee structure has no active charges to close — activate it first, or just leave it as a draft.")
+        if structure.status == FeeStructureStatus.CLOSED:
+            raise BusinessRuleViolationError("This fee structure is already closed.")
+
+        structure.status = FeeStructureStatus.CLOSED
+        await self.audit.log(
+            actor_user_id=actor_id, action="fee_structure.closed", entity_type="fee_structure", entity_id=structure.id,
+            before={"status": "ACTIVE"}, after={"status": "CLOSED"},
+        )
+        return structure
+
+    async def assign_course_fee_for_enrollment(self, *, student_id: uuid.UUID, course_id: uuid.UUID, enrollment_id: uuid.UUID, actor_id: uuid.UUID) -> int:
+        """Called directly from EnrollmentService.enroll() right after a
+        successful enrollment (first attempt OR retake — both call this
+        the same way). Finds every ACTIVE fee structure scoped to this
+        specific course and charges this specific enrollment for it,
+        skipping any that this enrollment has already been charged for
+        (relevant if enroll() is re-activating a previously-withdrawn
+        row rather than creating a brand new one). Returns how many new
+        assignments were created."""
+        stmt = select(FeeStructure).where(
+            FeeStructure.status == FeeStructureStatus.ACTIVE,
+            FeeStructure.applies_to_students.is_(True),
+            FeeStructure.course_id == course_id,
+        )
+        structures = (await self.session.execute(stmt)).scalars().all()
+
+        newly_assigned = 0
+        for structure in structures:
+            existing = await self.assignment_repo.get_existing_for_enrollment(structure.id, enrollment_id)
+            if existing is not None:
+                continue
+            assignment = await self.assignment_repo.create(
+                FeeAssignment(
+                    fee_structure_id=structure.id, payer_type=PayerType.STUDENT, payer_id=student_id,
+                    enrollment_id=enrollment_id,
+                )
+            )
+            await self._generate_installments(assignment, structure, actor_id=actor_id)
+            newly_assigned += 1
+
+            await self.audit.log(
+                actor_user_id=actor_id,
+                action="fee_structure.auto_assigned_on_enrollment",
+                entity_type="fee_structure",
+                entity_id=structure.id,
+                metadata={"student_id": str(student_id), "enrollment_id": str(enrollment_id)},
+            )
+
+        return newly_assigned
+
+    async def _still_current(self, structure: FeeStructure) -> bool:
+        """Whether a still-ACTIVE fee belongs to a term that is running now, so a student admitted, moved or promoted
+        today should be charged it. A fee whose academic term is closed, or whose term's end date has passed, is not.
+        (Every fee structure names its term; on the live system terms must be registered, so this is always known.)"""
+        from app.academics.terms import AcademicTermService, TermStatus
+        from app.core.clock import institute_today
+
+        term = await AcademicTermService(self.session).by_label(structure.term_label)
+        if term is None:
+            return True
+        return not (term.status == TermStatus.CLOSED or (term.end_date is not None and term.end_date < institute_today()))
+
+    async def assign_matching_active_structures_to_student(self, student: Student, *, actor_id: uuid.UUID) -> int:
+        """Closes a real gap: activating a fee structure only ever
+        charged students who were ALREADY at the matching semester at
+        that moment — a student later advanced INTO that semester never
+        got auto-charged. Called from
+        StudentService.advance_semester_bulk right after a student's
+        current_semester is bumped, so any fee structure scoped to
+        their new semester picks them up immediately, the same way
+        activation would have. Returns how many new assignments were
+        created (0 or 1 per matching structure)."""
+        # Course-scoped structures (course_id set, e.g. a lab fee) are
+        # charged ONLY when the student enrolls in that course -- never
+        # by program/semester. They carry no program/semester links, so
+        # without this filter they looked "institute-wide" and every
+        # admitted/advanced student got billed for every course fee.
+        stmt = select(FeeStructure).where(
+            FeeStructure.status == FeeStructureStatus.ACTIVE,
+            FeeStructure.applies_to_students.is_(True),
+            FeeStructure.course_id.is_(None),
+        )
+        active_structures = (await self.session.execute(stmt)).scalars().all()
+
+        newly_assigned = 0
+        for structure in active_structures:
+            if not await self._still_current(structure):
+                continue                                   # an earlier term's fee: never charged to someone joining or moving now
+            program_links = await self.repo.get_program_links(structure.id)
+            if program_links and student.program_id not in [link.program_id for link in program_links]:
+                continue
+            semester_links = await self.repo.get_semester_links(structure.id)
+            if semester_links and student.current_semester not in [link.semester_number for link in semester_links]:
+                continue
+
+            existing = await self.assignment_repo.get_existing(structure.id, PayerType.STUDENT, student.id)
+            if existing is not None:
+                continue
+
+            assignment = await self.assignment_repo.create(
+                FeeAssignment(fee_structure_id=structure.id, payer_type=PayerType.STUDENT, payer_id=student.id)
+            )
+            await self._generate_installments(assignment, structure, actor_id=actor_id)
+            newly_assigned += 1
+
+            await self.audit.log(
+                actor_user_id=actor_id,
+                action="fee_structure.auto_assigned_on_advancement",
+                entity_type="fee_structure",
+                entity_id=structure.id,
+                metadata={"student_id": str(student.id), "new_semester": student.current_semester},
+            )
+
+        return newly_assigned
