@@ -2944,6 +2944,10 @@ body.is-viewing-as #back-to-admin, body.is-viewing-as #portal-switch { display: 
 .pc-fields label, .pc-note { display: flex; flex-direction: column; gap: 6px; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); min-width: 0; }
 .pc-fields .text-input, .pc-note .text-input { width: 100%; min-width: 0; font-weight: 400; color: var(--text-primary); }
 .pc-fields .span-2 { grid-column: 1 / -1; }
+.pc-fields > label { align-self: start; }
+.pc-fields .pc-group { margin: 8px 0 -2px; font-size: 0.78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-secondary); }
+.pc-fields .pc-group:first-child { margin-top: 0; }
+.pc-fields .select-input { width: 100%; min-width: 0; font-weight: 400; color: var(--text-primary); }
 .pc-wait { color: var(--yellow-600); font-weight: 700; font-size: 0.72rem; }
 .pc-form .role-btn { justify-self: start; }
 .pc-photo-rules ul { margin: 0 0 6px; padding-left: 18px; font-size: 0.86rem; color: var(--text-secondary); }
@@ -3526,3 +3530,22 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 #assignments-table td { vertical-align: middle; }
 #assignments-table td strong { display: block; }
 #assignments-table .fn-sub { display: block; margin-top: 2px; font-size: 0.78rem; color: var(--text-secondary); font-weight: 500; }
+
+/* Records > Documents: what is on their profile + one-PDF download */
+.rp-docs-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 4px 0 10px; }
+.rp-docs-head a:not(.role-btn) { font-weight: 600; }
+
+/* Profile completion */
+.pc-meter { display: inline-block; width: 64px; height: 6px; border-radius: 3px; background: var(--gray-200, #e5e7eb); overflow: hidden; vertical-align: middle; }
+.pc-meter i { display: block; height: 100%; border-radius: 3px; background: var(--red-500, #ef4444); }
+.pc-meter.mid i { background: var(--yellow-500, #eab308); }
+.pc-meter.ok i { background: var(--green-600, #16a34a); }
+.pc-cell { display: flex; align-items: center; gap: 8px; white-space: nowrap; cursor: help; }
+.pc-cell b { font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+.pc-card { border: 1px solid var(--border, #e5e7eb); border-radius: 12px; padding: 12px 14px; background: var(--surface, #fff); }
+.pc-card .pc-meter { width: 100%; height: 8px; margin: 8px 0 6px; }
+.pc-card-top { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 0.9rem; }
+.pc-card-top span { color: var(--text-secondary); font-size: 0.82rem; }
+.pc-missing { margin: 0; font-size: 0.84rem; color: var(--text-secondary); }
+.my-pc { margin: 0 0 14px; }
+#rp-pc { margin: 6px 0 10px; }

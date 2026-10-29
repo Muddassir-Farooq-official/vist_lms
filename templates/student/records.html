@@ -19,7 +19,7 @@
 <section class="panel">
   <h2 class="panel-title">My documents</h2>
   <p class="cc-meta">Upload a clear photo or scan (PDF, JPG or PNG). The office checks each one against the original.</p>
-  <form id="md-form" class="form-grid" novalidate>
+  <form id="md-form" class="form-grid" data-blocked="CONTRACT,EXPERIENCE" novalidate>
     <label>Kind
       <select id="md-kind" class="text-input">
         <option value="CNIC">CNIC / B-Form</option><option value="PHOTO">Photograph</option><option value="MATRIC">Matric certificate</option>
@@ -44,4 +44,5 @@
 
 {% block extra_scripts %}
 <script src="/static/js/my-records.js"></script>
+<script src="/static/js/my-documents.js"></script>
 {% endblock %}

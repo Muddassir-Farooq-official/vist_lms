@@ -1,6 +1,6 @@
 (function () {
   "use strict";
-  // A student's own degree progress (degree audit) and documents on file.
+  // A student's own degree progress (degree audit). Their documents: my-documents.js.
   const VA = window.VistAdmin;
   const esc = VA.escapeHtml;
   const $ = function (id) { return document.getElementById(id); };
@@ -26,35 +26,5 @@
     }).join("") : '<tr><td colspan="4">Your program’s course list is not set up yet. Ask the office.</td></tr>';
   }
 
-  async function docs() {
-    const tb = $("md-table").tBodies[0];
-    const r = await VA.fetchJson("/api/v1/records/me/documents");
-    if (!r.ok) { tb.innerHTML = '<tr><td colspan="4">' + esc(err(r, "Could not load your documents.")) + "</td></tr>"; return; }
-    $("md-empty").hidden = r.body.length > 0;
-    tb.innerHTML = r.body.map(function (d) {
-      return "<tr><td><strong>" + esc(d.title) + "</strong><small>" + esc(d.kind_label + " · " + d.file) + "</small></td><td>" + esc(new Date(d.uploaded_at).toLocaleDateString("en-GB")) +
-        "</td><td>" + (d.verified ? '<span class="status-pill active">Checked</span>' : '<span class="status-pill pending">Waiting</span>') +
-        '</td><td><a class="role-btn small-btn secondary-btn" href="/api/v1/records/documents/' + esc(d.id) + '/file" data-download="' + esc(d.file) + '">Open</a></td></tr>';
-    }).join("");
-  }
-
-  $("md-form").addEventListener("submit", async function (e) {
-    e.preventDefault();
-    const er = $("md-error"); er.hidden = true;
-    const f = $("md-file").files[0];
-    if (!f) { er.textContent = "Choose the file to upload."; er.hidden = false; return; }
-    const fd = new FormData(); fd.append("file", f); fd.append("kind", $("md-kind").value); fd.append("title", $("md-title").value.trim());
-    const r = await VA.fetchJson("/api/v1/records/me/documents", { method: "POST", body: fd });
-    if (!r.ok) { er.textContent = err(r, "Could not upload it."); er.hidden = false; return; }
-    $("md-file").value = ""; $("md-title").value = "";
-    VA.toast("Uploaded. The office will check it."); docs();
-  });
-
-  document.addEventListener("vistadmin:ready", async function () {
-    const k = await VA.fetchJson("/api/v1/records/kinds", { quiet: true });
-    const kinds = k.ok ? k.body.documents : { OTHER: "Other" };
-    $("md-kind").innerHTML = Object.keys(kinds).filter(function (x) { return ["CONTRACT", "EXPERIENCE"].indexOf(x) === -1; })
-      .map(function (x) { return '<option value="' + x + '">' + esc(kinds[x]) + "</option>"; }).join("");
-    audit(); docs();
-  });
+  document.addEventListener("vistadmin:ready", audit);       // documents: my-documents.js
 })();

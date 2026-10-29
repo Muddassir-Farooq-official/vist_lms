@@ -1,5 +1,6 @@
 (function () {
   "use strict";
+  window.PROFILE_COMPLETION_COLUMN = true;      // the admin list shows the Profile column (student-sheet.js rowHtml)
 
   const VA = window.VistAdmin;
   const PAGE_SIZE = 15;
@@ -106,6 +107,7 @@
       emptyState.hidden = true;
       pageStudentIds = data.items.filter(function (s) { return s.status === "ACTIVE"; }).map(function (s) { return s.id; });
       tbody.innerHTML = data.items.map(Sheet.rowHtml).join("");
+      if (window.ProfileCompleteness) window.ProfileCompleteness.fill(tbody, "students");
     }
 
     const from = data.total ? (currentPage - 1) * data.page_size + 1 : 0;

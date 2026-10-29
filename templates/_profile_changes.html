@@ -4,7 +4,8 @@
     <div class="panel-header-left"><h2 id="pc-h">Update my details</h2></div>
     <span class="status-pill pending" id="pc-badge" hidden>Waiting for approval</span>
   </div>
-  <p class="panel-hint">Change your phone, email, address or emergency contact here. The office checks every change before it appears on your record.
+  <p class="panel-hint">Change your contact details, address, marital status, blood group{% if portal != "student" %} or the bank account your salary goes to{% endif %} here.
+    The office checks every change before it appears on your record.
     Your name, CNIC, date of birth{% if portal == "student" %}, roll number and program{% endif %} can only be corrected by the office.</p>
 
   <div class="pc-pending" id="pc-pending" hidden>

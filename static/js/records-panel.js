@@ -138,7 +138,11 @@
     p.innerHTML = '<form class="ann-toolbar" id="rp-up" novalidate><select class="select-input" id="rp-kind" aria-label="Kind of document">' +
       Object.keys(kinds).map(function (k) { return '<option value="' + k + '">' + esc(kinds[k]) + "</option>"; }).join("") + "</select>" +
       '<input class="text-input" id="rp-dtitle" maxlength="150" placeholder="Title (optional)" aria-label="Title"><input type="file" id="rp-file" class="text-input" aria-label="File" accept=".pdf,.jpg,.jpeg,.png,.docx">' +
-      '<button type="submit" class="role-btn">Add</button></form><div id="rp-docs"><p class="cc-meta">Loading…</p></div>';
+      '<button type="submit" class="role-btn">Add</button></form>' +
+      '<div id="rp-pc" hidden></div>' +
+      '<div class="rp-docs-head"><div id="rp-profile-files" class="cc-meta"></div>' +
+      '<a class="role-btn small-btn" id="rp-bundle" href="' + API + "/" + current.type + "/" + current.id + '/documents/all.pdf" data-download="documents.pdf">Download all as one PDF</a></div>' +
+      '<div id="rp-docs"><p class="cc-meta">Loading…</p></div>';
     p.querySelector("#rp-up").addEventListener("submit", async function (e) {
       e.preventDefault();
       const f = p.querySelector("#rp-file").files[0];
@@ -147,6 +151,18 @@
       const r = await VA.fetchJson(API + "/" + current.type + "/" + current.id + "/documents", { method: "POST", body: fd });
       if (!r.ok) return VA.toast(errText(r, "Could not add it."), "error");
       VA.toast("Added."); loadDocs();
+    });
+    if (window.ProfileCompleteness) {
+      VA.fetchJson(API + "/completeness", { method: "POST", quiet: true, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: current.type, ids: [current.id] }) })
+        .then(function (c) { if (c.ok) window.ProfileCompleteness.card(p.querySelector("#rp-pc"), c.body[current.id], false); });
+    }
+    VA.fetchJson(API + "/" + current.type + "/" + current.id + "/profile-files", { quiet: true }).then(function (pf) {
+      const el = p.querySelector("#rp-profile-files");
+      if (!el || !pf.ok) return;
+      const bits = [];
+      if (pf.body.certificate) bits.push('<a href="' + esc(pf.body.certificate.url) + '" data-download="' + esc(pf.body.certificate.name || "certificates.pdf") + '">Certificates PDF they uploaded</a>');
+      if (pf.body.photo) bits.push('<a href="' + esc(pf.body.photo.url) + '" data-download="' + esc(pf.body.photo.name || "photo.jpg") + '">Profile photo</a>');
+      el.innerHTML = bits.length ? "On their profile: " + bits.join(" · ") : "No certificates PDF or photo on their profile yet.";
     });
     const r = await VA.fetchJson(API + "/" + current.type + "/" + current.id + "/documents?include_archived=true");
     const box = p.querySelector("#rp-docs");

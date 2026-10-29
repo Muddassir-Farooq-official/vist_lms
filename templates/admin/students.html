@@ -32,7 +32,7 @@
 
   <div class="sd-table-wrap" id="students-table-wrap">
     <table class="dash-table sd-table no-stack" id="students-table">
-      <thead><tr><th>Student</th><th>Program</th><th>Mobile</th><th>Session</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead>
+      <thead><tr><th>Student</th><th>Program</th><th>Mobile</th><th>Session</th><th>Status</th><th>Profile</th><th><span class="sr-only">Actions</span></th></tr></thead>
       <tbody id="students-tbody"></tbody>
     </table>
     <p class="empty-state" id="students-empty" hidden>No students match this search.</p>
@@ -164,6 +164,7 @@
 
 {% block extra_scripts %}
 <script src="/static/js/records-panel.js"></script>
+<script src="/static/js/profile-completeness.js"></script>
 <script src="/static/js/student-sheet.js"></script>
 <script src="/static/js/students.js"></script>
 {% endblock %}

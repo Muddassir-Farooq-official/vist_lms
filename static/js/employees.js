@@ -448,6 +448,7 @@
     } else {
       emptyState.hidden = true;
       tbody.innerHTML = data.items.map(rowHtml).join("");
+      if (window.ProfileCompleteness) window.ProfileCompleteness.fill(tbody, "employees");
     }
 
     const from = data.total ? (currentPage - 1) * data.page_size + 1 : 0;
@@ -466,6 +467,7 @@
       '<td class="sd-contact">' + (e.contact_no ? '<a href="tel:' + esc(e.contact_no) + '">' + esc(e.contact_no) + "</a>" : '<span class="sd-dim">—</span>') + "</td>" +
       '<td class="sd-session">' + esc(fmtDate(e.hire_date) || "—") + "</td>" +
       '<td class="sd-status">' + pill(e.status) + "</td>" +
+      '<td class="sd-pc" data-pc="' + esc(e.id) + '"><span class="sd-dim">…</span></td>' +
       '<td class="sd-act"><button type="button" class="sd-view" data-open="' + esc(e.id) + '">' + ICON_EYE + "<span>View</span></button></td></tr>";
   }
   tbody.addEventListener("click", function (ev) { const r = ev.target.closest("[data-open]"); if (r) openEmployeeModal(r.getAttribute("data-open")); });

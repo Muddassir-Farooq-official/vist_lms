@@ -428,6 +428,9 @@ class EmployeeSelfDetail(BaseModel):
     employment_type: str | None = None
     emergency_contact_name: str | None = None
     emergency_contact_no: str | None = None
+    bank_name: str | None = None
+    bank_account_title: str | None = None
+    bank_iban: str | None = None
     photo_original_name: str | None = None
     has_photo: bool = False
     certificate_original_name: str | None = None

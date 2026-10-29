@@ -26,6 +26,7 @@
 </section>
 <p id="my-photo-error" class="dash-alert error" hidden></p>
 <p class="dash-alert ok" id="my-photo-sent" hidden>Your new photo passed the check and was sent to the office. It appears here once approved.</p>
+<div id="my-pc" class="my-pc" hidden></div>
 <div class="portal-tabs" role="tablist" data-auto-tabs>
   <button class="portal-tab active" data-tab="details" role="tab" aria-selected="true"><span>Personal details</span></button>
   <button class="portal-tab" data-tab="quals" role="tab" aria-selected="false"><span>Qualifications</span></button>
@@ -91,6 +92,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="/static/js/profile-completeness.js"></script>
 <script src="/static/js/my-profile.js"></script>
 <script src="/static/js/profile-changes.js"></script>
 {% endblock %}

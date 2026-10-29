@@ -41,6 +41,7 @@ from app.students.models import Student, StudentAddress, StudentEmergencyContact
 from app.students.repository import StudentRepository
 
 MAX_FILE_SIZE_BYTES = settings.import_max_file_size_mb * 1024 * 1024
+STUCK_AFTER_MINUTES = 2      # an upload not started by then is treated as lost (no worker picked it up) and may be retried
 
 
 class ImportService:
@@ -68,11 +69,14 @@ class ImportService:
         checksum = hashlib.sha256(file_bytes).hexdigest()
         existing = await self.repo.get_by_checksum(checksum)
         if existing is not None:
+            if await self._can_retry(existing):
+                return await self._reset_for_retry(existing, filename=filename, uploaded_by=uploaded_by)
+            if existing.status == ImportJobStatus.COMPLETED.value:
+                raise DuplicateResourceError(
+                    f"This exact file was already imported on {existing.created_at:%d %b %Y}. Nothing was imported again.")
             raise DuplicateResourceError(
-                "This exact file has already been uploaded "
-                f"(import job {existing.id}, status={existing.status}). "
-                "Re-upload only if the content has changed."
-            )
+                "This exact file was uploaded a moment ago and is still waiting to be processed. "
+                f"Check Import history; if it has not started after {STUCK_AFTER_MINUTES} minutes, upload it again to retry.")
 
         job = ImportJob(
             uploaded_by=uploaded_by,
@@ -90,15 +94,45 @@ class ImportService:
         )
         return job
 
+    async def _can_retry(self, job: ImportJob) -> bool:
+        """The same file may be uploaded again when its earlier attempt FAILED (e.g. fixed programs since) or never
+        started (still UPLOADED after STUCK_AFTER_MINUTES: the background worker was down). Never once COMPLETED."""
+        if job.status == ImportJobStatus.FAILED.value:
+            return True
+        if job.status == ImportJobStatus.UPLOADED.value and job.created_at is not None:
+            return (datetime.now(timezone.utc) - job.created_at).total_seconds() > STUCK_AFTER_MINUTES * 60
+        return False
+
+    async def _reset_for_retry(self, job: ImportJob, *, filename: str, uploaded_by: uuid.UUID) -> ImportJob:
+        """Re-use the earlier job row for the same file (the checksum is unique) and run it again from the start.
+        Its old row errors are replaced by the new attempt's."""
+        from sqlalchemy import delete
+
+        before = {"status": job.status, "failure_reason": job.failure_reason}
+        await self.session.execute(delete(ImportRowError).where(ImportRowError.import_job_id == job.id))
+        job.status = ImportJobStatus.UPLOADED.value
+        job.filename, job.uploaded_by = filename, uploaded_by
+        job.total_rows = job.valid_rows = job.invalid_rows = job.imported_rows = job.skipped_rows = job.failed_rows = 0
+        job.started_at = job.finished_at = job.processing_duration_ms = job.failure_reason = None
+        job.created_at = datetime.now(timezone.utc)
+        await self.session.flush()
+        await self.audit.log(actor_user_id=uploaded_by, action="import.retried", entity_type="import_job", entity_id=job.id,
+                             metadata={"filename": filename, "previous": before})
+        return job
+
     # ------------------------------------------------------------------
     # Processing (invoked as a background task by the router; the function
     # itself has no FastAPI dependency and can be lifted into an RQ worker
     # unchanged — it only needs an AsyncSession and the raw file bytes)
     # ------------------------------------------------------------------
     async def process_job(self, job_id: uuid.UUID, file_bytes: bytes) -> ImportJob:
-        job = await self.repo.get_by_id(job_id)
+        # Lock the job: if two runners ever get the same job (worker back up after a retry), the second waits for the
+        # first to finish and then skips it, so a file is never imported twice.
+        job = (await self.session.execute(select(ImportJob).where(ImportJob.id == job_id).with_for_update().execution_options(populate_existing=True))).scalar_one_or_none()
         if job is None:
             raise ValidationAppError("Import job not found.")
+        if job.status != ImportJobStatus.UPLOADED.value:
+            return job
 
         started = time.monotonic()
         job.status = ImportJobStatus.VALIDATING.value

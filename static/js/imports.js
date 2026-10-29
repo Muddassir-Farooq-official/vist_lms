@@ -20,19 +20,23 @@
     return '<span class="status-pill ' + (status || "").toLowerCase() + '">' + VA.escapeHtml(status) + "</span>";
   }
 
-  // NOTE: there is no "list all import jobs" endpoint in the API — the
-  // import history shown here reuses the same recent-imports data that
-  // powers the main dashboard (last 5 jobs), rather than inventing a new
-  // backend endpoint just for this page.
+  // Plain words for each state. An upload still "UPLOADED" after a couple of minutes was never picked up.
+  const STUCK_MS = 2 * 60 * 1000;
+  function stateOf(job) {
+    if (job.status === "UPLOADED" && Date.now() - new Date(job.created_at).getTime() > STUCK_MS) return ["dropped", "Not started"];
+    return ({ UPLOADED: ["pending", "Waiting"], VALIDATING: ["pending", "Checking"], VALIDATED: ["pending", "Checked"], IMPORTING: ["pending", "Importing"],
+              COMPLETED: ["active", "Imported"], FAILED: ["dropped", "Failed"] })[job.status] || ["", job.status];
+  }
+
   async function loadJobHistory() {
-    const result = await VA.fetchJson("/api/v1/reports/admin-dashboard");
+    const result = await VA.fetchJson("/api/v1/imports/students?limit=20");
     if (!result.ok) {
       VA.showError("Could not load import history.");
       return;
     }
     VA.clearError();
 
-    const jobs = (result.body && result.body.recent_imports) || [];
+    const jobs = result.body || [];
     jobsTbody.innerHTML = "";
 
     if (jobs.length === 0) {
@@ -41,15 +45,22 @@
     }
     jobsEmpty.hidden = true;
 
+    let waiting = false;
     jobs.forEach(function (job) {
       const tr = document.createElement("tr");
+      const st = stateOf(job);
+      if (["UPLOADED", "VALIDATING", "VALIDATED", "IMPORTING"].indexOf(job.status) !== -1 && st[1] !== "Not started") waiting = true;
+      let note = "";
+      if (st[1] === "Not started") note = "Was not picked up. Upload the same file again to retry.";
+      else if (job.status === "FAILED") note = (job.failure_reason || "") + " Fix the file (or the cause) and upload it again.";
+      else if (job.status === "COMPLETED") note = job.imported_rows + " student(s) added.";
       const viewErrorsHtml =
-        job.status === "FAILED"
-          ? '<button class="row-action view-errors-btn" type="button" data-job-id="' + job.id + '">View Errors</button>'
+        job.status === "FAILED" && job.invalid_rows > 0
+          ? '<button class="row-action view-errors-btn" type="button" data-job-id="' + job.id + '">View errors</button>'
           : "";
       tr.innerHTML =
-        "<td>" + VA.escapeHtml(job.filename) + "</td>" +
-        "<td>" + statusPillHtml(job.status) + "</td>" +
+        "<td>" + VA.escapeHtml(job.filename) + (note ? "<br><small>" + VA.escapeHtml(note) + "</small>" : "") + "</td>" +
+        '<td><span class="status-pill ' + st[0] + '">' + VA.escapeHtml(st[1]) + "</span></td>" +
         '<td class="num">' + VA.escapeHtml(job.imported_rows) + " / " + VA.escapeHtml(job.total_rows) + "</td>" +
         "<td>" + VA.escapeHtml(VA.formatDateTime(job.created_at)) + "</td>" +
         "<td>" + viewErrorsHtml + "</td>";
@@ -61,6 +72,7 @@
         openErrorsModal(btn.getAttribute("data-job-id"));
       });
     });
+    if (waiting) setTimeout(loadJobHistory, 3000);           // keep the list fresh while something is running
   }
 
   async function openErrorsModal(jobId) {
@@ -95,7 +107,8 @@
 
   async function pollJobStatus(jobId, attemptsLeft) {
     if (attemptsLeft <= 0) {
-      uploadStatus.textContent = "Still processing in the background — check Import History shortly.";
+      uploadStatus.textContent = "Still waiting to start. Check Import history in a minute; if it says \u201cNot started\u201d, upload the same file again.";
+      loadJobHistory();
       return;
     }
 
@@ -119,7 +132,7 @@
       return;
     }
 
-    uploadStatus.textContent = "Status: " + job.status + "\u2026";
+    uploadStatus.textContent = stateOf(job)[1] + "\u2026";
     setTimeout(function () {
       pollJobStatus(jobId, attemptsLeft - 1);
     }, 1200);
@@ -154,7 +167,8 @@
 
     uploadForm.reset();
     uploadStatus.textContent = "Accepted \u2014 processing\u2026";
-    pollJobStatus(result.body.import_job_id, 20);
+    pollJobStatus(result.body.import_job_id, 40);
+    loadJobHistory();
   });
 
   document.addEventListener("vistadmin:ready", function () {

@@ -1,7 +1,8 @@
 """Students and employees ask to change their own contact details and photo; an administrator approves or rejects.
 
-Editable by the person (everything else stays office-only): phone, email, address and city, emergency contact, and for
-students the primary guardian's phone; plus the photo. A photo must pass the automatic face check (face_check.py) before it
+Editable by the person (everything else stays office-only): phone, email, address, city, district, province, emergency
+contact, marital status, blood group, religion; for students the primary guardian's phone; for staff the bank details
+used for salary; plus the photo. Name, CNIC, date of birth and gender stay with the office (identity correction). A photo must pass the automatic face check (face_check.py) before it
 can even be sent for approval. Approving applies every change in one go and is kept in the activity log with before / after.
 """
 from __future__ import annotations
@@ -30,21 +31,34 @@ EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]+\.[A-Za-z]{2,}$")
 class Field:
     key: str
     label: str
-    kind: str          # phone | email | text
+    kind: str          # phone | email | text | choice | iban
     max_len: int
     required: bool = False
+    choices: tuple = ()
+    group: str = "Contact"
 
 
-STUDENT_FIELDS = [
+MARITAL = ("Single", "Married", "Divorced", "Widowed")
+BLOOD = ("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-")
+_CONTACT = [
     Field("contact_no", "Mobile number", "phone", 20, True), Field("email", "Email", "email", 255),
     Field("address_line", "Home address", "text", 255), Field("city", "City", "text", 100),
+    Field("district", "District", "text", 100, group="Contact"), Field("province", "Province", "text", 100, group="Contact"),
     Field("emergency_contact_name", "Emergency contact: name", "text", 150), Field("emergency_contact_no", "Emergency contact: phone", "phone", 20),
-    Field("guardian_contact_no", "Guardian's phone", "phone", 20),
 ]
-EMPLOYEE_FIELDS = [
-    Field("contact_no", "Mobile number", "phone", 20, True), Field("email", "Email", "email", 255),
-    Field("address_line", "Home address", "text", 255), Field("city", "City", "text", 100),
-    Field("emergency_contact_name", "Emergency contact: name", "text", 150), Field("emergency_contact_no", "Emergency contact: phone", "phone", 20),
+STUDENT_FIELDS = _CONTACT + [
+    Field("guardian_contact_no", "Guardian's phone", "phone", 20),
+    Field("marital_status", "Marital status", "choice", 20, True, MARITAL, "Personal"),
+    Field("blood_group", "Blood group", "choice", 5, False, BLOOD, "Personal"),
+    Field("religion", "Religion", "text", 50, True, group="Personal"),
+]
+EMPLOYEE_FIELDS = _CONTACT + [
+    Field("marital_status", "Marital status", "choice", 20, False, MARITAL, "Personal"),
+    Field("blood_group", "Blood group", "choice", 5, False, BLOOD, "Personal"),
+    Field("religion", "Religion", "text", 50, group="Personal"),
+    Field("bank_name", "Bank name", "text", 100, group="Bank (for salary)"),
+    Field("bank_account_title", "Account title", "text", 150, group="Bank (for salary)"),
+    Field("bank_iban", "IBAN or account number", "iban", 34, group="Bank (for salary)"),
 ]
 FIELDS = {"STUDENT": STUDENT_FIELDS, "EMPLOYEE": EMPLOYEE_FIELDS}
 
@@ -61,6 +75,18 @@ def _clean(f: Field, value: Any) -> str | None:
         raise ValidationAppError(f"{f.label}: enter a phone number such as 0300-1234567.")
     if f.kind == "email" and not EMAIL.match(v):
         raise ValidationAppError(f"{f.label}: enter a valid email address.")
+    if f.kind == "choice":
+        match = next((c for c in f.choices if c.lower() == v.lower().replace(" ", "")), None) or next((c for c in f.choices if c.lower() == v.lower()), None)
+        if match is None:
+            raise ValidationAppError(f"{f.label}: choose one of {', '.join(f.choices)}.")
+        return match
+    if f.kind == "iban":
+        v = "".join(v.split()).upper().replace("-", "")
+        if v.startswith("PK"):
+            if not re.fullmatch(r"PK\d{2}[A-Z]{4}\d{16}", v):
+                raise ValidationAppError("A Pakistani IBAN is PK, 2 digits, the 4-letter bank code and 16 digits (24 characters).")
+        elif not re.fullmatch(r"\d{6,20}", v):
+            raise ValidationAppError("Enter the IBAN (PK...) or the account number (digits only).")
     return v
 
 
@@ -93,22 +119,23 @@ class Subject:
     async def values(self) -> dict[str, str | None]:
         r = self.row
         if self.kind == "EMPLOYEE":
-            return {"contact_no": r.contact_no, "email": r.email, "address_line": r.address_line, "city": r.city,
-                    "emergency_contact_name": r.emergency_contact_name, "emergency_contact_no": r.emergency_contact_no}
+            return {f.key: getattr(r, f.key) for f in EMPLOYEE_FIELDS}
         addr, emer, guard = await self._student_parts()
         return {"contact_no": r.contact_no, "email": r.email, "address_line": addr.address_line if addr else None, "city": addr.city if addr else None,
+                "district": addr.district if addr else None, "province": addr.province if addr else None,
                 "emergency_contact_name": emer.name if emer else None, "emergency_contact_no": emer.contact_no if emer else None,
-                "guardian_contact_no": guard.contact_no if guard else None}
+                "guardian_contact_no": guard.contact_no if guard else None,
+                "marital_status": r.marital_status, "blood_group": r.blood_group, "religion": r.religion}
 
     async def apply(self, key: str, value: str | None) -> None:
         r = self.row
-        if self.kind == "EMPLOYEE" or key in ("contact_no", "email"):
+        if self.kind == "EMPLOYEE" or key in ("contact_no", "email", "marital_status", "blood_group", "religion"):
             setattr(r, key, value)
             return
         from app.students.models import StudentAddress, StudentEmergencyContact
 
         addr, emer, guard = await self._student_parts()
-        if key in ("address_line", "city"):
+        if key in ("address_line", "city", "district", "province"):
             if addr is None:
                 addr = StudentAddress(student_id=r.id, address_type="PRESENT", address_line="", province="", district="", city="")
                 self.session.add(addr)

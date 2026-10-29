@@ -1,14 +1,18 @@
-"""The actual job function RQ calls, in the separate `rq worker`
-process — never inside the web process. This module must be importable
-from that separate process too (it's given as `dotted.path.func_name`
-to RQ, which imports it fresh in the worker), so it deliberately has no
-FastAPI-specific imports, matching the seam `ImportService.process_job`
-already left for exactly this move.
+"""Running an import job, in its own database session.
+
+Two ways in, same code:
+  * `run_import_job` — what RQ calls in the separate `rq worker` process (docker-compose `worker` service). It must stay
+    importable without FastAPI (RQ imports it fresh in the worker).
+  * `run_in_app` — used by the upload endpoint when no worker is listening (worker container stopped or crashed), so an
+    upload is still processed instead of waiting as UPLOADED for ever.
+If processing raises, the job is marked FAILED with a plain reason, so it never hangs and the same file can be uploaded
+again to retry.
 """
 from __future__ import annotations
 
 import asyncio
 import uuid
+from datetime import datetime, timezone
 
 from app.core.database import AsyncSessionLocal
 from app.core.logging import get_logger
@@ -17,27 +21,39 @@ from app.imports.service import ImportService
 logger = get_logger(__name__)
 
 
+async def process_in_own_session(job_id: uuid.UUID, file_bytes: bytes) -> None:
+    async with AsyncSessionLocal() as session:
+        try:
+            await ImportService(session).process_job(job_id, file_bytes)
+            await session.commit()
+            return
+        except Exception as exc:
+            await session.rollback()
+            logger.error("import_job_failed", job_id=str(job_id), exc_info=exc)
+            error = exc
+    await _mark_failed(job_id, f"The import stopped because of a system error ({type(error).__name__}). Nothing was imported. "
+                               "Upload the same file again to retry.")
+    raise error
+
+
+async def _mark_failed(job_id: uuid.UUID, reason: str) -> None:
+    from app.imports.models import ImportJob, ImportJobStatus
+
+    async with AsyncSessionLocal() as session:
+        job = await session.get(ImportJob, job_id)
+        if job is not None and job.status not in (ImportJobStatus.COMPLETED.value, ImportJobStatus.FAILED.value):
+            job.status, job.failure_reason, job.finished_at = ImportJobStatus.FAILED.value, reason[:500], datetime.now(timezone.utc)
+            await session.commit()
+
+
 def run_import_job(job_id: str, file_bytes: bytes) -> None:
-    """Synchronous — this is what RQ actually calls in the worker
-    process, which has no running asyncio event loop of its own. Bridges
-    into the existing fully-async ImportService.process_job via
-    asyncio.run(), the standard pattern for running async code from a
-    sync entry point. Same commit/rollback discipline as the FastAPI
-    BackgroundTasks version this replaces: its own independent DB
-    session, not the one that created the job."""
+    """Synchronous entry point RQ calls in the worker process (no event loop of its own there)."""
+    asyncio.run(process_in_own_session(uuid.UUID(job_id), file_bytes))
 
-    async def _do() -> None:
-        async with AsyncSessionLocal() as session:
-            try:
-                service = ImportService(session)
-                await service.process_job(uuid.UUID(job_id), file_bytes)
-                await session.commit()
-            except Exception:
-                await session.rollback()
-                raise
 
+async def run_in_app(job_id: uuid.UUID, file_bytes: bytes) -> None:
+    """Background task inside the web process (after the response is sent). Errors are already recorded on the job."""
     try:
-        asyncio.run(_do())
-    except Exception as exc:
-        logger.error("import_job_failed", job_id=job_id, exc_info=exc)
-        raise
+        await process_in_own_session(job_id, file_bytes)
+    except Exception:
+        pass

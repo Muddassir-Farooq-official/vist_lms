@@ -48,7 +48,8 @@ async def mine(current_user: CurrentUser = Depends(get_current_user), db=Depends
         ProfileChangeRequest.subject_type == subj.kind, ProfileChangeRequest.subject_id == subj.row.id, ProfileChangeRequest.status != "PENDING")
         .order_by(ProfileChangeRequest.created_at.desc()).limit(10))).scalars().all()
     return {"kind": subj.kind, "values": await subj.values(),
-            "fields": [{"key": f.key, "label": f.label, "kind": f.kind, "max_len": f.max_len, "required": f.required} for f in FIELDS[subj.kind]],
+            "fields": [{"key": f.key, "label": f.label, "kind": f.kind, "max_len": f.max_len, "required": f.required, "choices": list(f.choices),
+                        "group": f.group} for f in FIELDS[subj.kind]],
             "pending": await request_out(db, pending) if pending else None,
             "history": [await request_out(db, r) for r in history]}
 

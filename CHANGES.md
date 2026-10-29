@@ -477,3 +477,20 @@ changes nothing the second time.
 
 Then give the new discounts with "Applies to: Tuition Fee only (every semester)". Reject any scholarship requests still
 waiting on the Approvals page first (the script lists how many).
+
+# CSV student imports no longer get stuck at "UPLOADED" (no migration)
+
+- **Cause**: an upload is only recorded by the web app; the work is done by the separate background **worker**
+  (`worker` service in docker-compose.prod.yml, `rq worker ... imports`). When that worker is not running, every upload
+  waits as UPLOADED, 0 / 0 rows, for ever. Uploading the same file again was then refused as a duplicate.
+- **Now**: when no worker is listening, the web app processes the file itself straight after answering (same code,
+  own database session). With the worker running, it is used exactly as before.
+- If processing crashes, the job is marked **FAILED** with a plain reason instead of staying UPLOADED.
+- **Retry with the same file**: allowed when the earlier attempt FAILED, or never started after 2 minutes; the same job is
+  run again from the start (its old row errors are replaced). A file that was imported (COMPLETED) is still refused.
+- A job is locked while it runs and skipped if it is no longer waiting, so a file is never imported twice even if a
+  worker that comes back later picks up an old copy.
+- Import history: its own list (last 20, `GET /imports/students`), plain states (Waiting / Checking / Imported / Failed /
+  Not started), the failure reason under each file, and it refreshes while something runs.
+- Your 5 stuck uploads: after deploying, upload the same files again; each is picked up and processed.
+- Tests: `tests/integration/test_import_processing.py`.

@@ -71,20 +71,44 @@ async def my_audit(current_user: CurrentUser = Depends(get_current_user), db=Dep
     return await RecordsService(db).degree_audit(s.id)
 
 
-@router.get("/me/documents", summary="Documents I have given the office")
+# Kinds of document the office issues itself: a person cannot add these to their own file.
+SELF_BLOCKED = {"STUDENT": {"CONTRACT", "EXPERIENCE"}, "EMPLOYEE": {"CONTRACT"}}
+
+
+@router.get("/me/documents", summary="Documents I have given the office (students and staff)")
 async def my_documents(current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> list[dict]:
-    s = await _me(current_user, db)
-    return await RecordsService(db).list_documents("STUDENT", s.id, include_archived=False)
+    owner_type, owner_id = await RecordsService(db).owner_of_user(current_user.id)
+    return await RecordsService(db).list_documents(owner_type, owner_id, include_archived=False)
 
 
-@router.post("/me/documents", status_code=201, summary="Upload a document for the office to check")
+@router.post("/me/documents", status_code=201, summary="Upload a document for the office to check (students and staff)")
 async def upload_my_document(kind: str = Form(...), title: str | None = Form(default=None), file: UploadFile = File(...),
                              current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
-    s = await _me(current_user, db)
-    if kind.upper() in ("CONTRACT", "EXPERIENCE"):
-        raise AuthorizationError("Students cannot add this kind of document.")
-    return await RecordsService(db).add_document("STUDENT", s.id, kind=kind, title=title, content=await file.read(MAX_ATTACHMENT_BYTES + 1), filename=file.filename or "file",
-                                                 content_type=file.content_type, actor_id=current_user.id)
+    owner_type, owner_id = await RecordsService(db).owner_of_user(current_user.id)
+    if kind.upper() in SELF_BLOCKED[owner_type]:
+        raise AuthorizationError("The office adds this kind of document; you cannot upload it yourself.")
+    return await RecordsService(db).add_document(owner_type, owner_id, kind=kind, title=title, content=await file.read(MAX_ATTACHMENT_BYTES + 1),
+                                                 filename=file.filename or "file", content_type=file.content_type, actor_id=current_user.id)
+
+
+@router.get("/me/completeness", summary="How complete my profile is, and what is still missing (students and staff)")
+async def my_completeness(current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    from app.records.completeness import completeness
+
+    owner_type, owner_id = await RecordsService(db).owner_of_user(current_user.id)
+    return (await completeness(db, owner_type, [owner_id]))[owner_id]
+
+
+class CompletenessIn(BaseModel):
+    type: OwnerKind
+    ids: list[uuid.UUID] = Field(default_factory=list, max_length=500)
+
+
+@router.post("/completeness", summary="Profile completion for many students or employees at once (for the lists)")
+async def completeness_many(payload: CompletenessIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    from app.records.completeness import completeness
+
+    return {str(k): v for k, v in (await completeness(db, OWNER[payload.type], payload.ids)).items()}
 
 
 # ------------------------------------------------------------------ office
@@ -129,6 +153,25 @@ async def documents(owner_kind: OwnerKind, owner_id: uuid.UUID, include_archived
     return await RecordsService(db).list_documents(OWNER[owner_kind], owner_id, include_archived=include_archived)
 
 
+@router.get("/{owner_kind}/{owner_id}/documents/all.pdf", summary="Everything on this person's file as one PDF (cover page + every document)")
+async def documents_bundle(owner_kind: OwnerKind, owner_id: uuid.UUID, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> Response:
+    from app.core.clock import institute_now
+    from app.records.bundle import build_bundle
+
+    svc = RecordsService(db)
+    person, parts = await svc.bundle_parts(OWNER[owner_kind], owner_id)
+    pdf = await run_in_threadpool(build_bundle, person, parts, institute_now())
+    await svc.audit.log(actor_user_id=current_user.id, action="records.documents_bundle", entity_type=OWNER[owner_kind].lower(), entity_id=owner_id,
+                        metadata={"files": len(parts)})
+    safe = "".join(ch if ch.isalnum() else "-" for ch in (person["code"] or person["name"]))[:40] or "person"
+    return _pdf(pdf, f"documents-{safe}.pdf")
+
+
+@router.get("/{owner_kind}/{owner_id}/profile-files", summary="The photo and combined certificate PDF on this person's profile")
+async def profile_files(owner_kind: OwnerKind, owner_id: uuid.UUID, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    return await RecordsService(db).profile_files(OWNER[owner_kind], owner_id)
+
+
 @router.post("/{owner_kind}/{owner_id}/documents", status_code=201, summary="Add a document to someone's file")
 async def add_document(owner_kind: OwnerKind, owner_id: uuid.UUID, kind: str = Form(...), title: str | None = Form(default=None), file: UploadFile = File(...),
                        current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
@@ -141,13 +184,11 @@ async def document_file(document_id: uuid.UUID, current_user: CurrentUser = Depe
     svc = RecordsService(db)
     d = await svc.document(document_id)
     if Permissions.RECORDS_DOCUMENTS not in current_user.permissions:
-        own = None
-        if Roles.STUDENT in current_user.roles:
-            try:
-                own = (await svc.student_of_user(current_user.id)).id
-            except ResourceNotFoundError:
-                own = None
-        if d.owner_type != "STUDENT" or own != d.owner_id:
+        try:
+            own = await svc.owner_of_user(current_user.id)
+        except ResourceNotFoundError:
+            own = None
+        if own != (d.owner_type, d.owner_id):
             raise AuthorizationError("This document is not yours.")
     path = get_file_path(d.storage_key)
     if path is None or not path.exists():

@@ -37,7 +37,7 @@
 
   <div class="sd-table-wrap" id="employees-table-wrap">
     <table class="dash-table sd-table no-stack" id="employees-table">
-      <thead><tr><th>Employee</th><th>Job title</th><th>Mobile</th><th>Joined</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead>
+      <thead><tr><th>Employee</th><th>Job title</th><th>Mobile</th><th>Joined</th><th>Status</th><th>Profile</th><th><span class="sr-only">Actions</span></th></tr></thead>
       <tbody id="employees-tbody"></tbody>
     </table>
     <p class="empty-state" id="employees-empty" hidden>No employees match this search.</p>
@@ -211,6 +211,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="/static/js/profile-completeness.js"></script>
 <script src="/static/js/records-panel.js"></script>
 <script src="/static/js/employees.js"></script>
 <script src="/static/js/performance.js"></script>

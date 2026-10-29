@@ -39,6 +39,7 @@
       '<td class="sd-contact">' + (s.contact_no ? '<a href="tel:' + esc(s.contact_no) + '">' + esc(s.contact_no) + "</a>" : '<span class="sd-dim">—</span>') + "</td>" +
       '<td class="sd-session">' + esc(s.admission_session || "—") + "</td>" +
       '<td class="sd-status">' + pill(s.status) + "</td>" +
+      (window.PROFILE_COMPLETION_COLUMN ? '<td class="sd-pc" data-pc="' + esc(s.id) + '"><span class="sd-dim">…</span></td>' : "") +
       '<td class="sd-act"><button type="button" class="sd-view" data-open="' + esc(s.id) + '">' + ICON_EYE + "<span>View</span></button></td></tr>";
   }
 

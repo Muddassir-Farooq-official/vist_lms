@@ -60,11 +60,19 @@
           fieldRow("Hire Date", p.hire_date),
           fieldRow("Department", p.department),
           fieldRow("Status", p.status),
+          fieldRow("Employment Type", p.employment_type ? String(p.employment_type).replace(/_/g, " ").toLowerCase().replace(/^./, function (m) { return m.toUpperCase(); }) : null),
+          fieldRow("Email", p.email),
+          fieldRow("Marital Status", p.marital_status),
+          fieldRow("Blood Group", p.blood_group),
           fieldRow("Religion", p.religion),
           fieldRow("Address", p.address_line),
           fieldRow("Province", p.province),
           fieldRow("District", p.district),
           fieldRow("City", p.city),
+          fieldRow("Emergency Contact", [p.emergency_contact_name, p.emergency_contact_no].filter(Boolean).join(" \u00b7 ") || null),
+          fieldRow("Bank", p.bank_name),
+          fieldRow("Account Title", p.bank_account_title),
+          fieldRow("IBAN / Account No.", p.bank_iban),
         ]
       : [
           fieldRow("Roll Number / Username", p.roll_number),
@@ -72,7 +80,9 @@
           fieldRow("Contact No.", p.contact_no),
           fieldRow("Date of Birth", p.date_of_birth),
           fieldRow("Gender", p.gender),
+          fieldRow("Email", p.email),
           fieldRow("Marital Status", p.marital_status),
+          fieldRow("Blood Group", p.blood_group),
           fieldRow("Religion", p.religion),
           fieldRow("Nationality", p.nationality),
           fieldRow("Current Semester", p.current_semester),
@@ -312,4 +322,15 @@
     await loadMyDetails();
     await loadQualifications();
   });
+
+  // How complete my profile is (what the office still needs). Refreshed after uploads and approved changes.
+  async function loadCompleteness() {
+    if (!window.ProfileCompleteness) return;
+    const r = await VA.fetchJson("/api/v1/records/me/completeness", { quiet: true });
+    if (r.ok) window.ProfileCompleteness.card(document.getElementById("my-pc"), r.body, true, isFaculty
+      ? "Add details under Update my details, and upload documents on the Documents tab."
+      : "Add details under Update my details, and upload documents on Degree progress & documents.");
+  }
+  document.addEventListener("vistadmin:ready", loadCompleteness);
+  document.addEventListener("my-documents:changed", loadCompleteness);
 })();

@@ -25,12 +25,21 @@
     // Each field shows what is on record, or what is already waiting for approval.
     const waiting = {};
     (p ? p.changes : []).forEach(function (c) { waiting[c.field] = c.new; });
+    let lastGroup = null;
     $("pc-fields").innerHTML = data.fields.map(function (f) {
       const val = f.key in waiting ? waiting[f.key] : data.values[f.key];
-      const type = f.kind === "email" ? "email" : f.kind === "phone" ? "tel" : "text";
-      return '<label class="' + (f.key === "address_line" ? "span-2" : "") + '">' + esc(f.label) + (f.required ? " *" : "") +
-        '<input class="text-input" data-key="' + esc(f.key) + '" type="' + type + '" maxlength="' + f.max_len + '" value="' + esc(val || "") + '"' +
-        (f.kind === "phone" ? ' inputmode="tel" placeholder="0300-1234567"' : "") + " />" +
+      const head = f.group && f.group !== lastGroup ? '<h3 class="pc-group span-2">' + esc(f.group) + "</h3>" : "";
+      lastGroup = f.group;
+      let input;
+      if (f.kind === "choice") {
+        input = '<select class="select-input" data-key="' + esc(f.key) + '">' + (f.required ? "" : '<option value="">Not set</option>') +
+          f.choices.map(function (c) { return "<option" + (c === val ? " selected" : "") + ">" + esc(c) + "</option>"; }).join("") + "</select>";
+      } else {
+        const type = f.kind === "email" ? "email" : f.kind === "phone" ? "tel" : "text";
+        input = '<input class="text-input" data-key="' + esc(f.key) + '" type="' + type + '" maxlength="' + f.max_len + '" value="' + esc(val || "") + '"' +
+          (f.kind === "phone" ? ' inputmode="tel" placeholder="0300-1234567"' : f.kind === "iban" ? ' placeholder="PK36SCBL0000001123456702"' : "") + " />";
+      }
+      return head + '<label class="' + (f.key === "address_line" ? "span-2" : "") + '">' + esc(f.label) + (f.required ? " *" : "") + input +
         (f.key in waiting ? '<small class="pc-wait">Waiting for approval</small>' : "") + "</label>";
     }).join("");
     $("pc-note").value = (p && p.note) || "";
@@ -54,7 +63,7 @@
     e.preventDefault();
     $("pc-error").hidden = true;
     const values = {};
-    $("pc-fields").querySelectorAll("input[data-key]").forEach(function (i) { values[i.getAttribute("data-key")] = i.value.trim(); });
+    $("pc-fields").querySelectorAll("[data-key]").forEach(function (i) { values[i.getAttribute("data-key")] = i.value.trim(); });
     const btn = $("pc-submit"); btn.disabled = true;
     const r = await VA.fetchJson(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: values, note: $("pc-note").value.trim() }) });
     btn.disabled = false;

@@ -54,6 +54,19 @@ class RecordsService:
             raise ResourceNotFoundError("Employee not found.")
         return e
 
+    async def owner_of_user(self, user_id: uuid.UUID) -> tuple[str, uuid.UUID]:
+        """The student or employee record of this login: ("STUDENT" | "EMPLOYEE", id)."""
+        from app.employees.models import Employee
+        from app.students.models import Student
+
+        sid = (await self.session.execute(select(Student.id).where(Student.user_id == user_id))).scalar_one_or_none()
+        if sid is not None:
+            return "STUDENT", sid
+        eid = (await self.session.execute(select(Employee.id).where(Employee.user_id == user_id))).scalar_one_or_none()
+        if eid is not None:
+            return "EMPLOYEE", eid
+        raise ResourceNotFoundError("There is no student or staff record for your account.")
+
     async def student_of_user(self, user_id: uuid.UUID):
         from app.students.models import Student
 
@@ -361,3 +374,45 @@ class RecordsService:
         d.archived_at, d.archive_reason = datetime.now(timezone.utc), reason.strip()[:300]
         await self.audit.log(actor_user_id=actor_id, action="records.document_archived", entity_type="person_document", entity_id=d.id, metadata={"reason": d.archive_reason})
         return self.doc_out(d)
+
+    # ------------------------------------------------------------------ everything on file, as one PDF
+    async def person(self, owner_type: str, owner_id: uuid.UUID):
+        return await (self._student(owner_id) if owner_type == "STUDENT" else self._employee(owner_id))
+
+    async def bundle_parts(self, owner_type: str, owner_id: uuid.UUID) -> tuple[dict, list]:
+        """What goes into the one-PDF download: photo, the combined certificate PDF the person uploaded, then every
+        current (not archived) document, in the order of the document kinds."""
+        from app.core.storage import get_file_path
+        from app.records.bundle import Part
+
+        p = await self.person(owner_type, owner_id)
+
+        def read(key: str | None) -> bytes | None:
+            path = get_file_path(key) if key else None
+            return path.read_bytes() if path is not None and path.exists() else None
+
+        parts = []
+        if p.photo_storage_key:
+            parts.append(Part("Photograph (profile photo)", "", read(p.photo_storage_key), "image/jpeg" if (p.photo_original_name or "").lower().endswith((".jpg", ".jpeg")) else
+                              "image/png" if (p.photo_original_name or "").lower().endswith(".png") else "image/webp", p.photo_original_name or "photo"))
+        if p.certificate_storage_key:
+            parts.append(Part("Certificates (combined PDF uploaded on their profile)", "", read(p.certificate_storage_key), "application/pdf",
+                              p.certificate_original_name or "certificates.pdf"))
+        order = {k: i for i, k in enumerate(DOCUMENTS)}
+        docs = (await self.session.execute(select(PersonDocument).where(PersonDocument.owner_type == owner_type, PersonDocument.owner_id == owner_id,
+                                                                        PersonDocument.archived_at.is_(None)))).scalars().all()
+        for d in sorted(docs, key=lambda d: (order.get(d.kind, 99), d.created_at)):
+            label = DOCUMENTS.get(d.kind, d.kind)
+            title = label if d.title == label else f"{label}: {d.title}"
+            note = f"uploaded {d.created_at:%d %b %Y} · " + ("checked against the original" if d.verified_at else "not checked yet")
+            parts.append(Part(title, note, read(d.storage_key), d.content_type, d.original_name))
+        person = {"name": f"{p.first_name} {p.last_name}".strip(), "code": (p.roll_number if owner_type == "STUDENT" else p.employee_code) or "",
+                  "kind": "Student" if owner_type == "STUDENT" else "Staff", "institute": settings.institute_name}
+        return person, parts
+
+    async def profile_files(self, owner_type: str, owner_id: uuid.UUID) -> dict:
+        """The photo and combined certificate PDF kept on the person's profile (not in the documents list)."""
+        p = await self.person(owner_type, owner_id)
+        base = f"/api/v1/{'students' if owner_type == 'STUDENT' else 'employees'}/{owner_id}"
+        return {"photo": {"name": p.photo_original_name, "url": base + "/photo"} if p.photo_storage_key else None,
+                "certificate": {"name": p.certificate_original_name, "url": base + "/certificate"} if p.certificate_storage_key else None}

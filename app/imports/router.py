@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, UploadFile
 from fastapi.responses import Response
 
 from app.auth.permissions import Permissions
@@ -11,14 +11,27 @@ from app.core.database import get_db
 from app.core.dependencies import require_permission
 from app.core.exceptions import ResourceNotFoundError
 from app.core.pagination import Page, page_params, PageParams
+from app.core.logging import get_logger
 from app.core.queue import get_imports_queue
 from app.imports.repository import ImportRepository
 from app.imports.schemas import ImportJobCreatedResponse, ImportJobOut, ImportRowErrorOut
 from app.imports.service import ImportService
-from app.imports.tasks import run_import_job
+from app.imports.tasks import run_import_job, run_in_app
 from app.imports.validators import generate_template_csv, generate_template_xlsx
 
 router = APIRouter(prefix="/imports/students", tags=["imports"])
+logger = get_logger(__name__)
+
+
+def _worker_listening() -> bool:
+    """Whether an `rq worker` for the imports queue is alive (workers re-register every few seconds; a stopped
+    container drops out of the list). Redis unreachable counts as no worker."""
+    try:
+        from rq import Worker
+
+        return Worker.count(queue=get_imports_queue()) > 0
+    except Exception:
+        return False
 
 
 @router.get("/template", summary="Download the student CSV import template (plain .csv)")
@@ -60,6 +73,7 @@ async def download_template_xlsx(
 @router.post("", response_model=ImportJobCreatedResponse, status_code=202, summary="Upload a student CSV for import")
 async def upload_students_csv(
     file: UploadFile,
+    background_tasks: BackgroundTasks,
     current_user: CurrentUser = Depends(require_permission(Permissions.STUDENT_IMPORT)),
     db=Depends(get_db),
 ) -> ImportJobCreatedResponse:
@@ -81,11 +95,31 @@ async def upload_students_csv(
     # could happen within milliseconds of the enqueue call.
     await db.commit()
 
-    get_imports_queue().enqueue(run_import_job, str(job_id), file_bytes)
+    # Hand it to the worker when one is listening; otherwise process it here, after the response is sent, so an
+    # upload never waits for ever because the worker service is down.
+    if _worker_listening():
+        get_imports_queue().enqueue(run_import_job, str(job_id), file_bytes)
+    else:
+        logger.warning("import_worker_missing_processing_in_app", job_id=str(job_id))
+        background_tasks.add_task(run_in_app, job_id, file_bytes)
 
     return ImportJobCreatedResponse(
         import_job_id=job_id, status=job.status, message="Import accepted and is processing. Poll for status."
     )
+
+
+@router.get("", response_model=list[ImportJobOut], summary="Recent import jobs (newest first)")
+async def list_import_jobs(
+    limit: int = 20,
+    current_user: CurrentUser = Depends(require_permission(Permissions.STUDENT_IMPORT)),
+    db=Depends(get_db),
+) -> list[ImportJobOut]:
+    from sqlalchemy import select
+
+    from app.imports.models import ImportJob
+
+    rows = (await db.execute(select(ImportJob).order_by(ImportJob.created_at.desc()).limit(max(1, min(limit, 100))))).scalars().all()
+    return [ImportJobOut.model_validate(j) for j in rows]
 
 
 @router.get("/{import_id}", response_model=ImportJobOut, summary="Get import job status")
