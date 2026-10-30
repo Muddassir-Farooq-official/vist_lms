@@ -5,8 +5,13 @@
 
 {% block content %}
 <section class="panel">
+  <div class="ann-toolbar">
+    <input id="overdue-q" class="text-input" type="search" placeholder="Search book, copy code or borrower" aria-label="Search" />
+    <button type="button" class="role-btn" id="overdue-remind-all">Remind all borrowers</button>
+  </div>
+  <p class="cc-meta" id="overdue-summary"></p>
   <table class="dash-table" id="overdue-table">
-    <thead><tr><th>Title</th><th>Accession Code</th><th>Borrower</th><th>Due Date</th><th>Days Overdue</th><th></th></tr></thead>
+    <thead><tr><th>Book</th><th>Borrower</th><th>Was due</th><th class="num">Late fee so far</th><th></th></tr></thead>
     <tbody id="overdue-tbody"></tbody>
   </table>
   <p class="empty-state" id="overdue-empty" hidden>Nothing overdue right now.</p>

@@ -46,7 +46,8 @@
     D.set("k-cgpa-sub", r.terms ? D.num(r.credits_earned) + " credit hours earned" : "No results published yet");
     const f = d.fees.summary;
     D.set("k-fees", D.money(f.total_to_pay || 0));
-    D.set("k-fees-sub", f.overdue > 0 ? D.money(f.overdue) + " overdue" : (f.total_to_pay ? "nothing overdue" : "All paid"));
+    D.set("k-fees-sub", (f.overdue > 0 ? D.money(f.overdue) + " overdue" : (f.total_to_pay ? "nothing overdue" : "All paid")) +
+      (f.fines_unpaid > 0 ? " · incl. " + D.money(f.fines_unpaid) + " fines" : ""));
     D.bad("k-fees-sub", f.overdue > 0);
     const next = nextInstallment(d);
     D.set("k-next", next ? shortDate(next.due_date).replace(/ \d{4}$/, "") : "—");
@@ -87,7 +88,7 @@
     });
     const f = d.fees.summary;
     if (f.overdue > 0) items.push({ count: "!", text: D.money(f.overdue) + " of fees is overdue" + (f.late_fee_accrued ? " (late fee so far " + D.money(f.late_fee_accrued) + ")" : "") + ". Pay with the challan at any bank.", href: "#pr-fee-h", tone: "red" });
-    if (f.fines_unpaid > 0) items.push({ count: D.num(f.fines_count), text: "unpaid fines: " + D.money(f.fines_unpaid), href: "#pr-fee-h" });
+    if (f.fines_unpaid > 0) items.push({ count: D.num(f.fines_count), text: (f.fines_count === 1 ? "unpaid fine: " : "unpaid fines: ") + D.money(f.fines_unpaid), href: "#pr-fee-h" });
     const next = nextInstallment(d);
     if (next && (new Date(next.due_date + "T00:00:00") - new Date(today + "T00:00:00")) / 864e5 <= 7) items.push({ count: "!", text: "Next instalment of " + D.money(next.remaining) + " is due on " + shortDate(next.due_date) + ".", href: "#pr-fee-h", tone: "blue" });
     if (papers.length) items.push({ count: papers.length, text: "exam papers coming up. Download the admit card below.", href: "#pr-exam-h", tone: "blue" });

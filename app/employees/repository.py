@@ -119,7 +119,7 @@ class EmployeeRepository:
         stmt = (
             select(EmployeeSalaryHistory)
             .where(EmployeeSalaryHistory.employee_id == employee_id)
-            .order_by(EmployeeSalaryHistory.effective_from.desc())
+            .order_by(EmployeeSalaryHistory.effective_from.desc(), EmployeeSalaryHistory.effective_to.is_(None).desc())
         )
         return list((await self.session.execute(stmt)).scalars())
 

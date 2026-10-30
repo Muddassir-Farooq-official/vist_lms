@@ -13,9 +13,59 @@ env:
   APP_DIR: /opt/vist-lms     # folder on the VPS
 
 jobs:
-  test:
-    name: Tests + migrations
+  # Migration checks run once, on their own (fast). The test suite runs as 4 parallel jobs, each with its own
+  # PostgreSQL + Redis, so a push is checked in about a quarter of the time. scripts/ci_shard.py splits the test
+  # files into 4 groups of about equal run time; every file is in exactly one group (checked in the first step).
+  migrations:
+    name: Migrations
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: vist_lms_migcheck
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/vist_lms_migcheck
+      DATABASE_URL_SYNC: postgresql+psycopg://postgres:postgres@localhost:5432/vist_lms_migcheck
+      REDIS_URL: redis://localhost:6379/0
+      JWT_SECRET: ci-test-secret-not-used-anywhere-real-32bytes-minimum
+      COOKIE_SECURE: "false"
+      APP_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+      # --- Migration safety net: these stop a broken migration BEFORE it can touch the real DB ---
+      - name: Exactly one migration head (no forked history)
+        run: |
+          alembic heads
+          test "$(alembic heads | grep -c '(head)')" -eq 1
+      - name: Migrations apply cleanly on a blank database
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d vist_lms_migcheck -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm;'
+          alembic upgrade head
+      - name: Models match migrations
+        run: alembic check
+
+  test:
+    name: Tests (group ${{ matrix.group }} of 4)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false            # let every group finish, so one push shows every failure
+      matrix:
+        group: [1, 2, 3, 4]
     services:
       postgres:
         image: postgres:16
@@ -57,27 +107,10 @@ jobs:
         run: |
           PGPASSWORD=postgres psql -h localhost -U postgres -d vist_lms_test \
             -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm;'
-
-      # --- Migration safety net: these stop a broken migration BEFORE it can touch the real DB ---
-      - name: Exactly one migration head (no forked history)
-        run: |
-          alembic heads
-          test "$(alembic heads | grep -c '(head)')" -eq 1
-      - name: Migrations apply cleanly on a blank database
-        env:
-          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/vist_lms_migcheck
-          DATABASE_URL_SYNC: postgresql+psycopg://postgres:postgres@localhost:5432/vist_lms_migcheck
-        run: |
-          PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -c 'CREATE DATABASE vist_lms_migcheck;'
-          alembic upgrade head
-      - name: Models match migrations
-        env:
-          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/vist_lms_migcheck
-          DATABASE_URL_SYNC: postgresql+psycopg://postgres:postgres@localhost:5432/vist_lms_migcheck
-        run: alembic check
-
-      - name: Run tests
-        run: pytest -q -p no:cacheprovider
+      - name: Every test file is in exactly one group
+        run: python scripts/ci_shard.py --check 4
+      - name: Run this group's tests
+        run: pytest -q -p no:cacheprovider $(python scripts/ci_shard.py ${{ matrix.group }} 4)
 
   secrets:
     name: No secrets in the repository
@@ -120,7 +153,7 @@ jobs:
 
   deploy:
     name: Deploy to VPS
-    needs: [test, lint, secrets]      # only runs if tests, migration checks, lint and the secrets check passed
+    needs: [migrations, test, lint, secrets]      # only runs if all 4 test groups, the migration checks, lint and the secrets check passed
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     # The job pauses here until a required reviewer approves it in GitHub (Settings -> Environments -> production ->

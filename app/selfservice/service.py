@@ -61,6 +61,7 @@ EMPLOYEE_FIELDS = _CONTACT + [
     Field("bank_iban", "IBAN or account number", "iban", 34, group="Bank (for salary)"),
 ]
 FIELDS = {"STUDENT": STUDENT_FIELDS, "EMPLOYEE": EMPLOYEE_FIELDS}
+BANK_KEYS = {"bank_name", "bank_account_title", "bank_iban"}
 
 
 def _clean(f: Field, value: Any) -> str | None:
@@ -274,7 +275,7 @@ class ProfileChangeService:
         await self.audit.log(actor_user_id=user_id, action="profile_change.withdrawn", entity_type="profile_change_request", entity_id=req.id)
         return req
 
-    async def decide(self, req_id: uuid.UUID, *, approve: bool, actor_id: uuid.UUID, reason: str | None) -> ProfileChangeRequest:
+    async def decide(self, req_id: uuid.UUID, *, approve: bool, actor_id: uuid.UUID, reason: str | None, confirm_bank: bool = False) -> ProfileChangeRequest:
         from app.notifications.models import NotificationCategory
         from app.notifications.service import create_notification
 
@@ -289,6 +290,14 @@ class ProfileChangeService:
         subj = await subject_of(self.session, req)
         before = await subj.values()
         after: dict[str, Any] = {}
+        bank = sorted(BANK_KEYS & set(req.changes or {}))
+        if approve and bank:
+            # Where salary is paid is the classic fraud target: never approve your own, and confirm it was checked.
+            if subj.row.user_id == actor_id:
+                raise BusinessRuleViolationError("Another administrator must approve a change to your own bank details.")
+            if not confirm_bank:
+                raise BusinessRuleViolationError("This changes the bank account the salary is paid into. Confirm you checked it with the employee "
+                                                 "(in person or on their known phone number) before approving.")
         if approve:
             for key, change in (req.changes or {}).items():
                 await subj.apply(key, change.get("new"))
@@ -306,6 +315,8 @@ class ProfileChangeService:
                              entity_type=subj.kind.lower(), entity_id=subj.row.id,
                              before={k: before.get(k) for k in (req.changes or {})} if approve else None, after=after or None,
                              metadata={"request_id": str(req.id), "username": subj.code, "reason": reason})
+        if approve and bank:
+            await self._bank_alert(subj, req, actor_id)
         if subj.row.user_id:
             what = ", ".join([f.label.lower() for f in FIELDS[subj.kind] if f.key in (req.changes or {})] + (["photo"] if after.get("photo") or (not approve and req.photo_original_name) else []))
             await create_notification(self.session, user_id=subj.row.user_id, category=NotificationCategory.APPLICATION,
@@ -313,6 +324,26 @@ class ProfileChangeService:
                                       message=(f"Approved: {what}." if approve else f"Reason: {reason}") if what else (reason or "Decided."),
                                       link="/dashboard/student/profile" if subj.kind == "STUDENT" else "/dashboard/my-profile")
         return req
+
+    async def _bank_alert(self, subj: "Subject", req: ProfileChangeRequest, actor_id: uuid.UUID) -> None:
+        """Tell payroll / the administration (and the employee, as a safety notice) that salary now goes elsewhere."""
+        from app.approvals.service import _users_with_permission
+        from app.auth.permissions import Permissions
+        from app.notifications.models import NotificationCategory
+        from app.notifications.service import create_notification
+
+        new = req.changes or {}
+        iban = (new.get("bank_iban") or {}).get("new") or subj.row.bank_iban or ""
+        masked = ("…" + iban[-4:]) if len(iban) > 4 else iban
+        bank_name = (new.get("bank_name") or {}).get("new") or subj.row.bank_name or "the bank"
+        for uid in await _users_with_permission(self.session, Permissions.PAYROLL_MANAGE, exclude=actor_id):
+            await create_notification(self.session, user_id=uid, category=NotificationCategory.PAYROLL, title=f"Bank details changed: {subj.name}",
+                                      message=f"{subj.name} ({subj.code}) will now be paid into {bank_name}, account {masked}. Approved today.",
+                                      link="/dashboard/admin/profile-changes")
+        if subj.row.user_id:
+            await create_notification(self.session, user_id=subj.row.user_id, category=NotificationCategory.PAYROLL, title="Your salary bank account was changed",
+                                      message=f"Your salary will now be paid into {bank_name}, account {masked}. If you did not ask for this, tell the office today.",
+                                      link="/dashboard/my-profile")
 
     async def count_pending(self) -> int:
         return (await self.session.execute(select(func.count()).select_from(ProfileChangeRequest).where(ProfileChangeRequest.status == "PENDING"))).scalar_one()
@@ -323,7 +354,8 @@ async def request_out(session: AsyncSession, req: ProfileChangeRequest, *, with_
     out = {"id": req.id, "status": req.status, "created_at": req.created_at, "updated_at": req.updated_at, "note": req.note,
            "changes": [{"field": k, "label": labels.get(k, k), "old": v.get("old"), "new": v.get("new")} for k, v in (req.changes or {}).items()],
            "has_photo": bool(req.photo_storage_key), "photo_check": req.photo_check,
-           "decided_at": req.decided_at, "decision_reason": req.decision_reason, "subject_type": req.subject_type}
+           "decided_at": req.decided_at, "decision_reason": req.decision_reason, "subject_type": req.subject_type,
+           "bank_change": bool(BANK_KEYS & set(req.changes or {}))}
     if with_subject:
         subj = await subject_of(session, req)
         out["subject"] = {"id": subj.row.id, "name": subj.name, "code": subj.code, "kind": subj.kind,

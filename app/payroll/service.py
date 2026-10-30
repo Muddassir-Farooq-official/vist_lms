@@ -86,7 +86,7 @@ class PayrollService:
             return out
         end, start = rules.month_end(month), rules.month_start(month)
         rows = (await self.session.execute(select(EmployeeSalaryHistory).where(EmployeeSalaryHistory.employee_id.in_(employee_ids), EmployeeSalaryHistory.effective_from <= end)
-                                           .order_by(EmployeeSalaryHistory.effective_from))).scalars()
+                                           .order_by(EmployeeSalaryHistory.effective_from, EmployeeSalaryHistory.effective_to.is_(None)))).scalars()  # same start: the open (corrected) row wins
         for r in rows:
             if r.effective_to is None or r.effective_to >= start:
                 out[r.employee_id] = Decimal(str(r.base_salary))

@@ -27,6 +27,9 @@ class User(UUIDPKMixin, TimestampMixin, Base):
     # The one-time password the office handed over; kept only until the person sets their own (then cleared).
     temp_password: Mapped[str | None] = mapped_column(String(64), nullable=True)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    email_notifications: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")   # also email my notifications
+    # When the person proved they own `email` with a one-time code (app/auth/email_verify.py). Cleared when the address changes.
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user_roles: Mapped[list["UserRole"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(

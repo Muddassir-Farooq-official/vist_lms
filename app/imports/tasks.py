@@ -22,6 +22,11 @@ logger = get_logger(__name__)
 
 
 async def process_in_own_session(job_id: uuid.UUID, file_bytes: bytes) -> None:
+    # The worker process starts with only the import code loaded; every table must be known before saving
+    # (otherwise: NoReferencedTableError, e.g. fee_assignments -> enrollments).
+    from app.core.model_registry import load_all_models
+
+    load_all_models()
     async with AsyncSessionLocal() as session:
         try:
             await ImportService(session).process_job(job_id, file_bytes)

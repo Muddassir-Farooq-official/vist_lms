@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#2454d6" />
+  <meta name="robots" content="noindex" />
+  <title>{% if status_code == 404 %}Page not found{% else %}Something went wrong{% endif %} &mdash; {{ brand.short_name }}</title>
+  <link rel="stylesheet" href="/static/css/theme.css" />
+  {% from "_brand.html" import brand_head %}{{ brand_head() }}
+</head>
+<body class="auth-body">
+  <main class="auth-shell">
+    <section class="auth-card err-card" aria-labelledby="err-title">
+      <div class="auth-brand">
+        <span class="auth-logo{% if brand.has_logo %} has-logo{% endif %}" aria-hidden="true">{% if brand.has_logo %}<img src="{{ brand.logo_url }}" alt="" />{% else %}{{ brand.initials }}{% endif %}</span>
+        <span class="auth-brand-text">
+          <strong>{{ brand.short_name }}</strong>
+          <small>{{ brand.name }}</small>
+        </span>
+      </div>
+
+      <div class="err-art" aria-hidden="true">
+        {% if status_code == 404 %}
+        <svg viewBox="0 0 120 90" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="14" y="10" width="72" height="62" rx="8" class="err-sheet" />
+          <path d="M28 28h44M28 40h30M28 52h20" opacity=".45" />
+          <circle cx="82" cy="58" r="17" class="err-lens" />
+          <path d="M94 70l14 14" />
+          <path d="M77 53l10 10M87 53l-10 10" />
+        </svg>
+        {% else %}
+        <svg viewBox="0 0 120 90" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M60 12 108 80H12z" class="err-sheet" />
+          <path d="M60 36v20" /><circle cx="60" cy="66" r="1.5" fill="currentColor" />
+        </svg>
+        {% endif %}
+      </div>
+
+      <p class="err-code">{{ status_code }}</p>
+      {% if status_code == 404 %}
+      <h1 id="err-title">Page not found</h1>
+      <p class="auth-sub">The page you opened does not exist, or it has moved. Check the address, or go back to your portal.</p>
+      {% else %}
+      <h1 id="err-title">Something went wrong</h1>
+      <p class="auth-sub">The system could not open this page just now. Please try again in a moment. If it keeps happening, tell the office and mention the reference below.</p>
+      {% endif %}
+
+      <div class="err-actions">
+        <a class="auth-submit err-btn" href="/">Go to my portal</a>
+        <button type="button" class="err-back" id="err-back">Go back</button>
+      </div>
+
+      <p class="auth-help err-meta">
+        {% if status_code == 404 %}Address: <code>{{ path }}</code>{% endif %}
+        {% if request_id and status_code != 404 %}Reference: <code>{{ request_id[:8] }}</code>{% endif %}
+      </p>
+    </section>
+    <p class="auth-foot">&copy; {{ brand.name }}</p>
+  </main>
+  <script src="/static/js/error-page.js"></script>
+</body>
+</html>

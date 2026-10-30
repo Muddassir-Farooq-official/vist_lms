@@ -25,7 +25,10 @@
       (r.decided_at ? " · " + esc(VA.formatDateTime(r.decided_at)) : "") + (r.decision_reason ? " · " + esc(r.decision_reason) : "") + "</p>";
     return '<article class="pcr-card"><header><span class="pl-avatar">' + esc(initials(s.name)) + '</span><div><strong>' + esc(s.name) + "</strong><small>" +
       esc(s.kind === "STUDENT" ? "Student · Roll " : "Staff · ") + esc(s.code) + " · sent " + esc(VA.formatDateTime(r.created_at)) + "</small></div></header>" +
-      (r.note ? '<p class="pcr-note">“' + esc(r.note) + "”</p>" : "") + photo + diff + actions + "</article>";
+      (r.note ? '<p class="pcr-note">“' + esc(r.note) + "”</p>" : "") +
+      (r.bank_change && r.status === "PENDING" ? '<p class="dash-alert error pcr-bank">Bank account change: the salary will be paid into the new account. ' +
+        "Check it with the employee in person or on their known phone number before approving. Payroll is told when it is approved.</p>" : "") +
+      photo + diff + actions + "</article>";
   }
 
   async function load() {
@@ -49,9 +52,17 @@
     const a = e.target.closest("[data-approve]"), j = e.target.closest("[data-reject]");
     if (a) {
       const row = rows.find(function (x) { return x.id === a.getAttribute("data-approve"); });
-      if (!(await VA.confirm("Approve these changes for " + row.subject.name + "? They go live at once.", "Approve"))) return;
+      let body = {};
+      if (row.bank_change) {
+        const ok = await VA.ask({ title: "Approve a bank account change?", danger: true, ok: "Approve",
+          intro: row.subject.name + "'s salary will go to the new account. Type CHECKED to confirm you checked it with them in person or on their known phone number.",
+          label: "Type CHECKED", min: 7 });
+        if (!ok) return;
+        if (String(ok).trim().toUpperCase() !== "CHECKED") return VA.toast("Type CHECKED to confirm.", "error");
+        body = { confirm_bank: true };
+      } else if (!(await VA.confirm("Approve these changes for " + row.subject.name + "? They go live at once.", "Approve"))) return;
       a.disabled = true;
-      const r = await VA.fetchJson(API + "/" + row.id + "/approve", { method: "POST" });
+      const r = await VA.fetchJson(API + "/" + row.id + "/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (!r.ok) { a.disabled = false; return VA.toast(msg(r, "Could not approve it."), "error"); }
       VA.toast("Approved. " + row.subject.name + " has been notified."); load();
     } else if (j) {

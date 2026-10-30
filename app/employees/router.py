@@ -55,6 +55,7 @@ from app.employees.schemas import (
     SalaryHistoryEntry,
     SalaryHistoryOut,
     SalaryIncrementRequest,
+    SalarySetRequest,
     TeachingSummary,
 )
 from app.employees.service import EmployeeService, JobRoleService
@@ -314,7 +315,7 @@ async def import_employees(
         if hire is None:
             row_errors.append("hire_date must be YYYY-MM-DD or DD/MM/YYYY")
         try:
-            salary = float(row.get("base_salary", ""))
+            salary = float(row.get("base_salary", "") or 0)        # empty = not decided yet
         except ValueError:
             salary = None
             row_errors.append("base_salary must be a number")
@@ -449,6 +450,18 @@ async def apply_salary_increment(
     db=Depends(get_db),
 ) -> SalaryHistoryOut:
     row = await EmployeeService(db).apply_salary_increment(employee_id, payload, actor_id=current_user.id)
+    return SalaryHistoryOut.model_validate(row)
+
+
+@router.post("/{employee_id}/salary", response_model=SalaryHistoryOut,
+             summary="Set or correct the basic salary to an exact amount from a date (up or down; reason kept on record)")
+async def set_salary(
+    employee_id: uuid.UUID,
+    payload: SalarySetRequest,
+    current_user: CurrentUser = Depends(require_permission(Permissions.SALARY_MANAGE)),
+    db=Depends(get_db),
+) -> SalaryHistoryOut:
+    row = await EmployeeService(db).set_salary(employee_id, payload, actor_id=current_user.id)
     return SalaryHistoryOut.model_validate(row)
 
 

@@ -28,6 +28,7 @@
       <details class="sd-menu">
         <summary class="role-btn secondary-btn" aria-label="More actions">{{ nav_icon("more") }}<span>More</span></summary>
         <div class="sd-menu-list" role="menu">
+          <button type="button" role="menuitem" data-incomplete="employees">{{ nav_icon("file") }}<span>Incomplete profiles &amp; reminders&hellip;</span></button>
           <button id="open-import-employees" type="button" role="menuitem">{{ nav_icon("cloud-upload") }}<span>Import from CSV&hellip;</span></button>
           <a id="export-employees-link" href="/api/v1/employees/export" download role="menuitem">{{ nav_icon("download") }}<span>Export list (CSV)</span></a>
         </div>
@@ -185,7 +186,7 @@
         <label for="ae-job-role">Job Role</label>
         <select id="ae-job-role" class="select-input" required><option value="">Select&hellip;</option></select>
       </div>
-      <div class="form-field"><label for="ae-base-salary">Base Salary</label><input type="number" id="ae-base-salary" class="text-input" step="0.01" min="0" required /></div>
+      <div class="form-field"><label for="ae-base-salary">Basic salary <small class="field-hint inline">(optional)</small></label><input type="number" id="ae-base-salary" class="text-input" step="0.01" min="0" placeholder="Leave empty if not decided yet" /><small class="field-hint">You can set or correct it later: open the employee, Pay tab.</small></div>
       <h3 class="form-section">Address</h3>
       <div class="form-field"><label for="ae-religion">Religion (optional)</label><select id="ae-religion" class="select-input"><option value="">Select&hellip;</option></select></div>
       <div class="form-field"><label for="ae-province">Province (optional)</label><select id="ae-province" class="select-input"><option value="">Select&hellip;</option></select></div>

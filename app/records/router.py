@@ -111,6 +111,27 @@ async def completeness_many(payload: CompletenessIn, current_user: CurrentUser =
     return {str(k): v for k, v in (await completeness(db, OWNER[payload.type], payload.ids)).items()}
 
 
+@router.get("/completeness/incomplete", summary="Active students or staff whose profile is not complete, least complete first")
+async def incomplete_profiles(type: OwnerKind, below: int = 100, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> list[dict]:
+    from app.records.completeness import incomplete
+
+    return await incomplete(db, OWNER[type], below=max(1, min(below, 100)))
+
+
+class RemindIn(BaseModel):
+    type: OwnerKind
+    ids: list[uuid.UUID] = Field(default_factory=list, max_length=5000)
+    below: int = Field(default=100, ge=1, le=100)      # with no ids: everyone active below this %
+
+
+@router.post("/completeness/remind", summary="Remind people what is missing from their profile (notification + email)")
+async def remind_incomplete(payload: RemindIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    from app.records.completeness import incomplete, remind
+
+    ids = payload.ids or [x["id"] for x in await incomplete(db, OWNER[payload.type], below=payload.below)]
+    return await remind(db, OWNER[payload.type], ids, actor_id=current_user.id)
+
+
 # ------------------------------------------------------------------ office
 @router.post("/id-cards", summary="ID cards for students and / or staff (a PDF, eight to a page)")
 async def id_cards(payload: IdCardsIn, current_user: CurrentUser = Depends(issue), db=Depends(get_db)) -> Response:

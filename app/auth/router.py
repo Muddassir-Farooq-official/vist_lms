@@ -60,6 +60,9 @@ async def login(
     )
     _set_auth_cookies(response, access_token=tokens.access_token, refresh_token=tokens.refresh_token)
     roles, perms = service._roles_and_permissions(user)
+    from app.core.dependencies import email_gate_on
+
+    must_verify = not (user.email and user.email_verified_at) and await email_gate_on(db)
     return TokenResponse(
         access_token=tokens.access_token,
         expires_in_minutes=tokens.expires_in_minutes,
@@ -68,7 +71,8 @@ async def login(
         roles=roles,
         permissions=list(perms),
         must_change_password=user.must_change_password,
-        redirect_to=home_for_roles(roles, user.must_change_password),
+        email_verification_required=must_verify,
+        redirect_to=home_for_roles(roles, user.must_change_password, must_verify),
     )
 
 
@@ -161,3 +165,45 @@ async def change_password(
         must_change_password=user.must_change_password,
     )
     _set_access_cookie(response, fresh)
+
+# ------------------------------------------------------------------ prove an email address (one-time code)
+class _EmailIn(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+
+
+class _CodeIn(BaseModel):
+    code: str = Field(min_length=4, max_length=12)
+
+
+@router.get("/email", summary="My email address, whether it is verified, and whether I must verify before using the portal")
+async def my_email_status(current_user: CurrentUser = Depends(get_current_user_allow_pending_password_change), db=Depends(get_db)) -> dict:
+    from app.auth.email_verify import EmailVerificationService
+
+    return await EmailVerificationService(db).status(current_user.id)
+
+
+@router.post("/email/send-code", summary="Email a 6-digit code to this address (works for 10 minutes)")
+async def send_email_code(payload: _EmailIn, request: Request,
+                          current_user: CurrentUser = Depends(get_current_user_allow_pending_password_change), db=Depends(get_db)) -> dict:
+    from app.auth.email_verify import EmailVerificationService
+
+    _no_viewer(current_user)
+    return await EmailVerificationService(db).send_code(current_user.id, payload.email, ip=client_ip(request))
+
+
+@router.post("/email/verify", summary="Confirm the address with the code; the portal opens straight away")
+async def verify_email_code(payload: _CodeIn, request: Request,
+                            current_user: CurrentUser = Depends(get_current_user_allow_pending_password_change), db=Depends(get_db)) -> dict:
+    from app.auth.email_verify import EmailVerificationService
+
+    _no_viewer(current_user)
+    out = await EmailVerificationService(db).verify(current_user.id, payload.code, ip=client_ip(request))
+    out["redirect_to"] = home_for_roles(current_user.roles, current_user.must_change_password) or "/"
+    return out
+
+
+def _no_viewer(current_user: CurrentUser) -> None:
+    from app.core.exceptions import AuthorizationError
+
+    if current_user.viewing_as_by_id:
+        raise AuthorizationError("You are viewing someone else's screens; their email cannot be changed from here.")

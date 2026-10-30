@@ -53,15 +53,17 @@
         <div class="ss-blocks">
           <section class="ss-block">
             <h3>Salary</h3>
-            <p class="ss-hint">Basic salary now, and every change with its date.</p>
+            <p class="ss-hint">Basic salary now, and every change with its date. Setting it from the date the current salary started corrects that amount; payslips already made keep theirs.</p>
             <ul class="ss-timeline" id="salary-history-tbody"></ul>
             <div class="ss-inline ss-gap">
-              <select id="increment-type" class="select-input" aria-label="Increase by">
+              <select id="increment-type" class="select-input" aria-label="Change">
+                <option value="SET">Set exact salary (first salary, decrease or correction)</option>
                 <option value="FIXED_AMOUNT">Increase by amount</option>
                 <option value="PERCENTAGE">Increase by %</option>
               </select>
-              <input type="number" id="increment-value" class="text-input" placeholder="Amount or %" step="0.01" min="0.01" aria-label="Increase" />
-              <input type="text" id="increment-reason" class="text-input" placeholder="Reason (optional)" aria-label="Reason" />
+              <input type="number" id="increment-value" class="text-input" placeholder="New basic salary (Rs.)" step="0.01" min="0.01" aria-label="Amount" />
+              <label class="ss-date">From <input type="date" id="increment-from" class="text-input" aria-label="Starts from" /></label>
+              <input type="text" id="increment-reason" class="text-input" placeholder="Reason (required)" aria-label="Reason" />
               <button id="apply-increment-btn" class="role-btn" type="button">Apply</button>
             </div>
           </section>

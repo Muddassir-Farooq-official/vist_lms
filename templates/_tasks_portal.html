@@ -32,10 +32,12 @@
     <div class="sh-card-head"><h2 id="tk-form-title">Assign a task</h2></div>
     <p class="panel-hint">The person you choose can accept it, or reject it with a reason. The deadline must be <strong>at least 3 hours</strong> from now.</p>
     <form id="tk-form" class="form-grid two-col" novalidate>
-      <div class="form-field two-span"><label for="tk-person-search">Who should do it?</label>
+      <div class="form-field two-span"><label for="tk-person-search">Who should do it? <small class="field-hint inline">(tick one person, or several: each gets their own copy)</small></label>
         <input id="tk-person-search" class="text-input" type="search" placeholder="Type a name or job title to narrow the list&hellip;" autocomplete="off" />
-        <select id="tk-assignee" class="select-input" size="6" aria-label="Staff member"></select>
-        <small id="tk-picked" class="field-hint" aria-live="polite"></small></div>
+        <div class="tk-groups" id="tk-groups" aria-label="Choose a whole group"></div>
+        <div class="tk-pick-list" id="tk-pick-list" role="group" aria-label="Staff members"></div>
+        <div class="tk-pick-bar"><small id="tk-picked" class="field-hint" aria-live="polite"></small>
+          <span><button type="button" class="link-btn" id="tk-pick-all">Tick everyone shown</button> &middot; <button type="button" class="link-btn" id="tk-pick-none">Clear</button></span></div></div>
       <div class="form-field two-span"><label for="tk-title">Task</label><input id="tk-title" class="text-input" maxlength="200" placeholder="e.g. Prepare the exam hall for Monday" /></div>
       <div class="form-field two-span"><label for="tk-desc">Details</label><textarea id="tk-desc" class="text-input" rows="5" maxlength="5000" placeholder="What exactly needs to be done, and what does &ldquo;done&rdquo; look like?"></textarea></div>
       <div class="form-field"><label for="tk-deadline">Deadline</label><input id="tk-deadline" class="text-input" type="datetime-local" />

@@ -1,0 +1,27 @@
+{% extends "parent/_base.html" %}
+{% block title %}My account{% endblock %}
+{% block page_title %}My account{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Your email for notifications about your children, and your password.</div>{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <div class="panel-header"><div class="panel-header-left"><h2>Email address</h2></div></div>
+  <p class="panel-hint">We email you when something needs your attention: fees due, results, attendance warnings, announcements.</p>
+  <form id="pa-form" class="form-grid two-col" novalidate>
+    <div class="form-field"><label for="pa-email">Email</label><input id="pa-email" class="text-input" type="email" maxlength="255" placeholder="name@example.com" autocomplete="email" /></div>
+    <div class="form-actions"><button type="submit" class="role-btn" id="pa-save">Save email</button></div>
+    <p class="dash-alert error two-span" id="pa-error" hidden></p>
+  </form>
+</section>
+{% include "_email_pref.html" %}
+<section class="panel">
+  <div class="panel-header"><div class="panel-header-left"><h2>Password</h2></div></div>
+  <p class="panel-hint">Change the password you sign in with.</p>
+  <a class="role-btn secondary-btn" href="/change-password">Change password</a>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/email-pref.js"></script>
+<script src="/static/js/parent-account.js"></script>
+{% endblock %}

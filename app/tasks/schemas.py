@@ -25,6 +25,16 @@ class TaskCreate(BaseModel):
     follow_up_of_id: uuid.UUID | None = None
 
 
+class TaskBulkCreate(BaseModel):
+    """The same task to several people at once: each gets their own copy to accept, reject and complete."""
+
+    assignee_user_ids: list[uuid.UUID] = Field(min_length=1, max_length=300)
+    title: str = Field(min_length=3, max_length=200)
+    description: str = Field(min_length=3, max_length=5000)
+    priority: TaskPriority = TaskPriority.NORMAL
+    deadline: datetime
+
+
 class TaskUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=3, max_length=200)
     description: str | None = Field(default=None, min_length=3, max_length=5000)

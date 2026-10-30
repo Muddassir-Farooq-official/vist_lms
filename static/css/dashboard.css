@@ -3549,3 +3549,44 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 .pc-missing { margin: 0; font-size: 0.84rem; color: var(--text-secondary); }
 .my-pc { margin: 0 0 14px; }
 #rp-pc { margin: 6px 0 10px; }
+/* Admin dashboard: background services */
+.sys-health { border: 1px solid var(--border, #e1e7f2); border-radius: 14px; padding: 12px 16px; margin: 0 0 16px; background: var(--surface, #fff); }
+.sys-health.warn { border-color: #f5c46b; background: #fffaf0; }
+.sys-health .sh-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.sys-health .sh-items { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-top: 8px; font-size: 0.85rem; color: var(--text-secondary); }
+.sys-health .sh-items span { display: inline-flex; align-items: center; gap: 7px; }
+.sys-health ul { margin: 10px 0 0; padding-left: 18px; font-size: 0.85rem; }
+.sys-health li { margin: 3px 0; }
+.sh-dot { width: 8px; height: 8px; border-radius: 50%; background: #16a34a; display: inline-block; }
+.sh-dot.bad { background: #dc2626; }
+/* Library: Issue & Return desk */
+.lib-desk { display: grid; gap: 16px; }
+@media (min-width: 1100px) { .lib-desk { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); align-items: start; } .lib-desk > .lib-return { order: 2; } }
+.lib-qr { display: flex; gap: 10px; }
+.lib-qr .text-input { flex: 1; min-width: 0; font-family: var(--font-mono, ui-monospace, monospace); text-transform: uppercase; }
+.ss-date { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--text-secondary); white-space: nowrap; }
+.ss-date .text-input { width: auto; }
+/* Tasks: tick one person or many */
+.tk-groups { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 6px; }
+.tk-pick-list { max-height: 260px; overflow: auto; border: 1px solid var(--border, #e1e7f2); border-radius: 12px; padding: 4px; background: var(--surface, #fff); }
+.tk-pick { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px; cursor: pointer; font-size: 0.9rem; font-weight: 400; color: var(--text-primary); }
+.tk-pick:hover { background: var(--surface-2, #f3f6fb); }
+.tk-pick.is-on { background: #eef3ff; }
+.tk-pick span { display: flex; flex-direction: column; min-width: 0; }
+.tk-pick small { color: var(--text-secondary); font-size: 0.78rem; }
+.tk-pick input { flex: none; width: 16px; height: 16px; }
+.tk-pick-bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.form-field .tk-pick { flex-direction: row; align-items: center; margin: 0; font-weight: 400; }
+.form-field .tk-pick strong { font-weight: 600; }
+.tk-pick-bar .link-btn { font-size: 0.82rem; }
+#tk-pick-list .tk-pick { display: flex; flex-direction: row; align-items: center; gap: 10px; }
+#tk-pick-list .tk-pick > span { display: flex; flex-direction: column; }
+
+/* Settings -> Email: verified email requirement and administration copies */
+.em-block { border-top: 1px solid var(--border, #e1e7f2); padding-top: 14px; margin-top: 4px; }
+.em-block .dash-sub-h { margin: 0 0 8px; }
+.em-block .field-hint { display: block; margin-top: 6px; }
+.em-block textarea { min-height: 76px; resize: vertical; }
+.field-label-sm { margin: 12px 0 4px; font-weight: 600; font-size: 0.88rem; }
+.em-cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0 14px; }
+.em-cats .check-row { min-height: 34px; font-weight: 500; }

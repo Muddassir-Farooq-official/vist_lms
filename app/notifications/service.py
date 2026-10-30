@@ -50,7 +50,13 @@ async def create_notification(
     student.user_id / employee.user_id), same as every other place in
     this codebase that does that resolution."""
     notification = Notification(user_id=user_id, category=category, title=title, message=message, link=_known_page(link))
-    return await NotificationRepository(session).create(notification)
+    notification = await NotificationRepository(session).create(notification)
+    # Also by email (when the administrator has turned email on and the person has an address): queued here, sent by
+    # the background sender, so no request ever waits on a mail server.
+    from app.notifications.email_service import queue_for_notification
+
+    await queue_for_notification(session, notification)
+    return notification
 
 
 class NotificationService:

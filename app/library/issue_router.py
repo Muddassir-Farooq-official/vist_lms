@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 
+from pydantic import BaseModel, Field
 from fastapi import APIRouter, Body, Depends
 
 from app.auth.permissions import Permissions
@@ -88,6 +89,40 @@ async def list_overdue_issues(
     overdue = await BookIssueRepository(db).list_overdue()
     enriched = await service._enrich(overdue)
     return [enriched_to_detail(e) for e in enriched]
+
+
+@router.get("/issues/overdue/detailed", summary="Overdue loans with days late, the late fee so far and the borrower's phone")
+async def overdue_detailed(current_user: CurrentUser = Depends(require_permission(Permissions.LIBRARY_VIEW)), db=Depends(get_db)) -> dict:
+    from app.core.clock import institute_today
+    from app.library.overdue import borrower_contacts
+
+    service = IssueService(db)
+    rows = await service._enrich(await BookIssueRepository(db).list_overdue())
+    today = institute_today()
+    contacts = await borrower_contacts(db, [(e["issue"].borrower_type, e["issue"].borrower_id) for e in rows])
+    items = []
+    for e in rows:
+        d = enriched_to_detail(e).model_dump()
+        days, fee = service.late_fee(d["due_date"], today)
+        c = contacts.get((d["borrower_type"], d["borrower_id"]), {})
+        items.append({**d, "days_overdue": days, "late_fee": fee, "borrower_code": c.get("code"), "borrower_phone": c.get("phone"),
+                      "has_login": c.get("user_id") is not None})
+    from app.core.config import settings
+
+    return {"items": items, "late_fee_per_day": settings.library_late_fee_per_day, "late_fee_max": settings.library_late_fee_max,
+            "total_late_fees": round(sum(i["late_fee"] for i in items), 2), "borrowers": len({(i["borrower_type"], i["borrower_id"]) for i in items})}
+
+
+class RemindOverdueIn(BaseModel):
+    issue_ids: list[uuid.UUID] = Field(default_factory=list, max_length=2000)    # empty = every overdue loan
+
+
+@router.post("/issues/overdue/remind", summary="Remind borrowers of overdue books (notification + email); once a day per book")
+async def remind_overdue(payload: RemindOverdueIn, current_user: CurrentUser = Depends(require_permission(Permissions.LIBRARY_ISSUE)),
+                         db=Depends(get_db)) -> dict:
+    from app.library.overdue import remind
+
+    return await remind(db, payload.issue_ids, actor_id=current_user.id)
 
 
 @router.post("/issues/{issue_id}/renew", response_model=BookIssueDetail, summary="Staff-assisted renewal of any loan")

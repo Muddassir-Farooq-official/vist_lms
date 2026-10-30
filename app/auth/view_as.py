@@ -116,7 +116,7 @@ async def start(body: StartIn, request: Request, response: Response, current_use
     fresh = await _fresh_account(db, str(user.id))
     if fresh is None or not fresh[0]:
         raise BusinessRuleViolationError("This account is not active, so there is nothing to view.")
-    _, _, roles, perms = fresh
+    _, _, roles, perms, _ = fresh
     if Roles.ADMIN in roles:
         raise AuthorizationError("Administrators cannot be viewed as.")
     if not roles:
@@ -144,7 +144,7 @@ async def stop(request: Request, response: Response, current_user: CurrentUser =
     if admin is None or fresh is None or not fresh[0] or Permissions.VIEW_AS not in fresh[3]:
         response.delete_cookie(ACCESS_COOKIE, path="/", domain=settings.cookie_domain or None)
         return {"redirect": "/?reauth=1"}
-    _, must_change, roles, perms = fresh
+    _, must_change, roles, perms, _ = fresh
     token = create_access_token(user_id=admin.id, username=admin.username, roles=roles, permissions=perms, must_change_password=must_change)
     _cookie(response, token, settings.jwt_access_token_expire_minutes)
     return {"redirect": "/dashboard/admin/view-as"}

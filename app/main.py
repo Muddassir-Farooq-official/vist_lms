@@ -8,7 +8,9 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.exception_handlers import http_exception_handler as default_http_exception_handler
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.templating import Jinja2Templates
 
 from app.admissions.router import router as admissions_router
@@ -22,6 +24,7 @@ from app.supplementary.router import router as supplementary_router
 from app.sms.router import router as sms_router
 from app.exams.router import router as exams_router
 from app.policy.router import router as policy_router
+from app.notifications.email_router import me_router as email_me_router, router as email_settings_router, status_router as system_status_router
 from app.parents.router import router as parents_router
 from app.academics.router import router as academics_router
 from app.attendance.router import router as attendance_router
@@ -92,6 +95,9 @@ app = FastAPI(
 )
 
 from app.core.duplicate_guard import DuplicateSubmissionGuard  # noqa: E402
+from app.core.background import start_web_sender  # noqa: E402
+
+start_web_sender(app)       # sends queued SMS / emails when the 'sms' service is not running (app/core/background.py)
 
 app.add_middleware(DuplicateSubmissionGuard)
 app.add_middleware(
@@ -284,6 +290,7 @@ STAFF_NAV_ITEMS = [
 PARENT_NAV_ITEMS = [
     _nav("children", "My children", "students", "/dashboard/parent", mobile=True, short="Children"),
     _nav("calendar", "Calendar", "clock", "/dashboard/parent/calendar"),
+    _nav("account", "My account", "settings", "/dashboard/parent/account", mobile=True, short="Account"),
 ]
 
 PRINCIPAL_NAV_ITEMS = [
@@ -442,6 +449,7 @@ async def request_context_middleware(request: Request, call_next):
     """Attaches a request ID to every log line for this request and adds
     baseline security headers (Section 22/37)."""
     request_id = str(uuid.uuid4())
+    request.state.request_id = request_id
     structlog.contextvars.bind_contextvars(request_id=request_id)
     started = time.perf_counter()
     counter = {"n": 0}
@@ -483,6 +491,34 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     )
 
 
+def _wants_page(request: Request) -> bool:
+    """A person opening an address in the browser (not the API, files or health checks): show a page, not JSON."""
+    path = request.scope.get("path", "")
+    if request.scope.get("method") not in ("GET", "HEAD") or path.startswith(("/api/", "/static/", "/health", "/media/", "/uploads/")):
+        return False
+    accept = request.headers.get("accept", "")
+    return "text/html" in accept or (accept in ("", "*/*") and path.startswith("/dashboard"))
+
+
+def error_page(request: Request, status_code: int):
+    """The friendly "Page not found" / "Something went wrong" screen (templates/error.html)."""
+    response = templates.TemplateResponse(request, "error.html", {
+        "status_code": status_code, "path": request.url.path[:200],
+        "request_id": getattr(request.state, "request_id", None) or request.headers.get("x-request-id"),
+    }, status_code=status_code)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_error_handler(request: Request, exc: StarletteHTTPException):
+    """Unknown addresses opened in a browser get a real "Page not found" page instead of {"detail":"Not Found"}.
+    The API and every other status keep their JSON answers exactly as before."""
+    if exc.status_code == 404 and _wants_page(request):
+        return error_page(request, 404)
+    return await default_http_exception_handler(request, exc)
+
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     logger.error("unhandled_exception", path=str(request.url.path), exc_info=exc)
@@ -502,6 +538,8 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
         return JSONResponse(status_code=503, content={"error": {"code": "DATABASE_OUT_OF_DATE", "details": {"missing": f"{found.group(1)} {found.group(2)}"},
                             "message": f"This part of the system needs something the database does not have yet ({found.group(1)} \u201c{found.group(2)}\u201d). The update files for the newest features were probably not installed. "
                                        f"Ask whoever manages the server to copy every file from the migrations folder into migrations/versions, then run: {migration_guard.FIX_COMMAND}"}})
+    if _wants_page(request):
+        return error_page(request, 500)
     return JSONResponse(
         status_code=500,
         content={"error": {"code": "INTERNAL_SERVER_ERROR", "message": "An unexpected error occurred."}},
@@ -510,6 +548,9 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 app.include_router(auth_router, prefix=settings.api_v1_prefix)
 app.include_router(policy_router, prefix=settings.api_v1_prefix)
+app.include_router(email_settings_router, prefix=settings.api_v1_prefix)
+app.include_router(email_me_router, prefix=settings.api_v1_prefix)
+app.include_router(system_status_router, prefix=settings.api_v1_prefix)
 app.include_router(exams_router, prefix=settings.api_v1_prefix)
 app.include_router(sms_router, prefix=settings.api_v1_prefix)
 from app.reports.finance_router import router as finance_reports_router  # noqa: E402
@@ -761,6 +802,16 @@ async def forced_change_password_page(request: Request):
     session for their nav/data loading, which is exactly the state a
     user on this page is NOT yet in."""
     return templates.TemplateResponse(request, "change_password.html", {})
+
+
+@app.get("/verify-email", include_in_schema=False)
+async def verify_email_page(request: Request):
+    """Prove an email address with a one-time code: required before using any portal when the administrator turns it on
+    (Settings -> Email), and the place to change one's email later. Like /change-password it stands alone, outside the
+    portal pages, because those need an account that is allowed in."""
+    response = templates.TemplateResponse(request, "verify_email.html", {})
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.get("/login/{role_slug}", include_in_schema=False)
@@ -1227,6 +1278,11 @@ async def gate_payslips_page(request: Request):
 @app.get("/dashboard/parent", include_in_schema=False)
 async def parent_home_page(request: Request):
     return templates.TemplateResponse(request, "parent/home.html", {"nav_items": PARENT_NAV_ITEMS, "active_nav": "children"})
+
+
+@app.get("/dashboard/parent/account", include_in_schema=False)
+async def parent_account_page(request: Request):
+    return templates.TemplateResponse(request, "parent/account.html", {"nav_items": PARENT_NAV_ITEMS, "active_nav": "account"})
 
 
 @app.get("/dashboard/principal", include_in_schema=False)

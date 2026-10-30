@@ -8,7 +8,16 @@
   <button class="portal-tab" data-tab="issued" role="tab" aria-selected="false"><span>Currently issued</span></button>
 </div>
 
-<div class="portal-tab-panel" data-tab-panel="issue">
+<div class="portal-tab-panel lib-desk" data-tab-panel="issue">
+<section class="panel lib-return">
+  <h2>Return a book</h2>
+  <p class="panel-hint">Scan the barcode or type the copy code (e.g. BK-0004-C001) and press Enter.</p>
+  <form id="qr-form" class="lib-qr" novalidate>
+    <input id="qr-code" class="text-input" type="text" autocomplete="off" placeholder="Copy code" aria-label="Copy code" />
+    <button type="submit" class="role-btn">Return&hellip;</button>
+  </form>
+  <p class="dash-alert error" id="qr-error" role="alert" hidden></p>
+</section>
 <section class="panel">
   <h2>Issue a Book</h2>
 
@@ -45,7 +54,8 @@
 
 <div class="portal-tab-panel" data-tab-panel="issued" hidden>
 <section class="panel">
-  <h2>Currently Issued</h2>
+  <div class="panel-header"><div class="panel-header-left"><h2>Currently issued</h2></div><span class="cc-meta" id="active-count"></span></div>
+  <div class="ann-toolbar"><input id="active-q" class="text-input" type="search" placeholder="Search book, copy code or borrower" aria-label="Search" /></div>
   <table class="dash-table" id="active-issues-table">
     <thead><tr><th>Book</th><th>Copy</th><th>Borrower</th><th>Due</th><th></th></tr></thead>
     <tbody id="active-issues-tbody"></tbody>

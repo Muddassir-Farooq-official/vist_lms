@@ -562,7 +562,7 @@ window.VistAdmin = (function () {
 
     // Fast path: we know who this is from the sign-in a moment ago.
     const cached = readCachedMe();
-    if (cached && !cached.must_change_password && hasAllowedRole(cached.roles)) {
+    if (cached && !cached.must_change_password && !cached.email_verification_required && hasAllowedRole(cached.roles)) {
       fetchMeWithRefresh().then(function (res) {
         if (res.status === 0) return;                 // no network right now: not a reason to sign anyone out
         if (!res.ok || !res.body) {
@@ -590,6 +590,12 @@ window.VistAdmin = (function () {
       return null;
     }
     cacheMe(me.body);
+
+    if (me.body.must_change_password || me.body.email_verification_required) {
+      // Those steps come before any portal, whichever portal address was opened.
+      window.location.replace(me.body.must_change_password ? "/change-password" : "/verify-email");
+      return null;
+    }
 
     if (!hasAllowedRole(me.body.roles)) {
       if (authGate) {
@@ -1028,6 +1034,17 @@ window.VistAdmin = (function () {
     });
   }
 
+  // "My email" in the menu, under "Change password": verify or change the address notices are emailed to.
+  function wireEmailLink() {
+    const pw = document.getElementById("change-password-link");
+    if (!pw || document.getElementById("my-email-link")) return;
+    const a = document.createElement("a");
+    a.id = "my-email-link"; a.className = "drawer-link"; a.href = "/verify-email?from=menu";
+    a.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><span>My email</span>';
+    pw.parentNode.insertBefore(a, pw.nextSibling);
+  }
+
   async function initShell() {
     const me = await requireAdminSession();
     if (!me) return null; // requireAdminSession already redirected or showed a message
@@ -1042,6 +1059,11 @@ window.VistAdmin = (function () {
       window.location.replace("/change-password");
       return null;
     }
+    if (me.email_verification_required) {
+      // The administration requires a verified email first: the API refuses everything else until then.
+      window.location.replace("/verify-email");
+      return null;
+    }
 
     const authGate = document.getElementById("auth-gate");
     const shell = document.getElementById("app-shell");
@@ -1053,6 +1075,7 @@ window.VistAdmin = (function () {
     loadIdentity(me).then(function (ident) { if (ident) paintWhoami(me, ident); });
 
     wireDrawer();
+    wireEmailLink();
     wireLogout();
     wireNotifications();
     wireAnnouncementBadge(me);

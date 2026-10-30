@@ -3,7 +3,7 @@ from __future__ import annotations
 from app.core.clock import institute_today
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import timedelta, date, datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -419,8 +419,8 @@ class EmployeeService:
     ) -> EmployeeSalaryHistory:
         employee = await self.get_employee(employee_id)
         current = await self.repo.get_current_salary(employee_id)
-        if current is None:
-            raise BusinessRuleViolationError("Employee has no current salary record to increment from.")
+        if current is None or float(current.base_salary) <= 0:
+            raise BusinessRuleViolationError("There is no basic salary yet to increase. Use \u201cSet basic salary\u201d first.")
 
         if data.change_type == "FIXED_AMOUNT":
             new_amount = float(current.base_salary) + data.value
@@ -456,6 +456,36 @@ class EmployeeService:
             after={"base_salary": float(new_row.base_salary)},
             metadata={"change_type": data.change_type, "change_value": data.value, "reason": data.reason},
         )
+        return new_row
+
+    async def set_salary(self, employee_id: uuid.UUID, data, *, actor_id: uuid.UUID) -> EmployeeSalaryHistory:
+        """Set the basic salary to an exact amount from a date: the first real salary after hiring with none, a decrease,
+        or a correction of a wrong amount. History stays append-only: the current row is closed and a new one starts.
+        From the current row's own start date it REPLACES that amount (a correction); payslips already made keep the
+        amounts they were made with."""
+        employee = await self.get_employee(employee_id)
+        current = await self.repo.get_current_salary(employee_id)
+        effective_from = data.effective_from or institute_today()
+        if current is not None:
+            if effective_from < current.effective_from:
+                raise BusinessRuleViolationError(f"The salary on record starts on {current.effective_from:%d %b %Y}; a change cannot start before that.")
+            if round(float(current.base_salary), 2) == round(float(data.amount), 2):
+                raise BusinessRuleViolationError("That is already the basic salary.")
+            correction = effective_from == current.effective_from
+            # A correction ends the old row the day before it started, so it never applies; otherwise the old row ends
+            # where the new one starts (same rule as an increment).
+            current.effective_to = effective_from - timedelta(days=1) if correction else effective_from
+        else:
+            correction = False
+        before = float(current.base_salary) if current is not None else None
+        kind = "SET" if not before else ("CORRECTED" if correction else "SET")
+        new_row = EmployeeSalaryHistory(employee_id=employee.id, base_salary=round(float(data.amount), 2), effective_from=effective_from, effective_to=None,
+                                        change_type=kind, change_value=None, reason=data.reason.strip(), changed_by=actor_id, created_at=institute_today())
+        self.session.add(new_row)
+        await self.session.flush()
+        await self.audit.log(actor_user_id=actor_id, action="employee.salary_set", entity_type="employee", entity_id=employee.id,
+                             before={"base_salary": before}, after={"base_salary": float(new_row.base_salary)},
+                             metadata={"effective_from": effective_from.isoformat(), "correction": correction, "reason": data.reason.strip()})
         return new_row
 
     async def award_bonus(

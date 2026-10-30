@@ -120,6 +120,7 @@
         me: {
           id: body.user_id, username: body.username, roles: body.roles || [],
           permissions: body.permissions || [], must_change_password: !!body.must_change_password,
+          email_verification_required: !!body.email_verification_required,
         },
       }));
     } catch (e) { /* private mode etc. — harmless */ }

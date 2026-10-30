@@ -132,9 +132,14 @@ async def current_photo(request_id: uuid.UUID, current_user: CurrentUser = Depen
     return _image(subj.row.photo_storage_key)
 
 
+class ApproveIn(BaseModel):
+    confirm_bank: bool = False      # required when the request changes bank details
+
+
 @router.post("/{request_id}/approve", summary="Approve: every change in the request goes live (administration)")
-async def approve(request_id: uuid.UUID, current_user: CurrentUser = Depends(decide), db=Depends(get_db)) -> dict:
-    req = await ProfileChangeService(db).decide(request_id, approve=True, actor_id=current_user.id, reason=None)
+async def approve(request_id: uuid.UUID, body: ApproveIn | None = None, current_user: CurrentUser = Depends(decide), db=Depends(get_db)) -> dict:
+    req = await ProfileChangeService(db).decide(request_id, approve=True, actor_id=current_user.id, reason=None,
+                                                confirm_bank=bool(body and body.confirm_bank))
     await db.commit()
     return await request_out(db, req, with_subject=True)
 

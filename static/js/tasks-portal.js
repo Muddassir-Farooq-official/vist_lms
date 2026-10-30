@@ -234,45 +234,78 @@
   $("tk-close").addEventListener("click", function () { modal.close(); });
 
   // ------------------------------------------------------------------ assigning (and editing)
+  // A tick list: one person or many. Several people = the same task sent to each (POST /tasks/bulk), each with their own copy.
+  // Editing a task or giving a rejected task to someone else is always one person.
+  let picked = new Set(), single = false, lockedTo = null;
+  const groupOf = function (p) { return String(p.detail || "Other").split(" \u00b7 ")[0] || "Other"; };
   function showPicked() {
-    const sel = $("tk-assignee"), out = $("tk-picked");
-    if (!out) return;
-    const o = sel.options[sel.selectedIndex];
-    out.textContent = sel.value && o ? "Selected: " + o.textContent : "Nobody selected yet \u2014 click a name in the list.";
-    out.className = "field-hint" + (sel.value ? " ok" : "");
+    const out = $("tk-picked");
+    const names = staff.filter(function (p) { return picked.has(p.user_id); }).map(function (p) { return p.name; });
+    if (lockedTo) { out.textContent = "For: " + lockedTo.name; out.className = "field-hint ok"; return; }
+    out.textContent = !names.length ? "Nobody ticked yet." : names.length === 1 ? "Selected: " + names[0]
+      : names.length + " people selected: " + names.slice(0, 6).join(", ") + (names.length > 6 ? " and " + (names.length - 6) + " more" : "") + ". Each gets their own copy.";
+    out.className = "field-hint" + (names.length ? " ok" : "");
+    $("tk-create").textContent = editing ? "Save changes" : names.length > 1 ? "Assign to " + names.length + " people" : "Assign task";
   }
   function drawStaff() {
-    const q = $("tk-person-search").value.trim().toLowerCase(), keepId = $("tk-assignee").value;
-    const rows = staff.filter(function (p) { return !q || p.name.toLowerCase().indexOf(q) !== -1 || (p.detail || "").toLowerCase().indexOf(q) !== -1; });
-    $("tk-assignee").innerHTML = rows.map(function (p) { return '<option value="' + p.user_id + '">' + esc(p.name) + (p.detail ? " \u2014 " + esc(p.detail) : "") + "</option>"; }).join("") || '<option value="" disabled>Nobody matches</option>';
-    if (keepId && rows.some(function (p) { return p.user_id === keepId; })) $("tk-assignee").value = keepId;
-    else if (rows.length === 1) $("tk-assignee").value = rows[0].user_id;      // one match: pick it for them
-    else $("tk-assignee").selectedIndex = -1;
+    const list = $("tk-pick-list");
+    if (lockedTo) {
+      list.innerHTML = '<label class="tk-pick is-on is-locked"><input type="checkbox" checked disabled /> <span><strong>' + esc(lockedTo.name) + "</strong></span></label>";
+      $("tk-groups").innerHTML = ""; showPicked(); return;
+    }
+    const q = $("tk-person-search").value.trim().toLowerCase();
+    const rows = staff.filter(function (p) { return !q || p.name.toLowerCase().indexOf(q) !== -1 || (p.detail || "").toLowerCase().indexOf(q) !== -1 || (p.identifier || "").toLowerCase().indexOf(q) !== -1; });
+    list.innerHTML = rows.map(function (p) {
+      const on = picked.has(p.user_id);
+      return '<label class="tk-pick' + (on ? " is-on" : "") + '"><input type="' + (single ? "radio" : "checkbox") + '" name="tk-pick" value="' + p.user_id + '"' + (on ? " checked" : "") + " /> <span><strong>" +
+        esc(p.name) + "</strong>" + (p.detail ? "<small>" + esc(p.detail) + "</small>" : "") + "</span></label>";
+    }).join("") || '<p class="cc-meta">Nobody matches.</p>';
+    // one chip per job title: tick the whole group at once
+    const groups = {};
+    staff.forEach(function (p) { const g = groupOf(p); groups[g] = (groups[g] || 0) + 1; });
+    $("tk-groups").innerHTML = single ? "" : Object.keys(groups).sort().map(function (g) {
+      return '<button type="button" class="chip-btn" data-group="' + esc(g) + '">All ' + esc(g) + " (" + groups[g] + ")</button>";
+    }).join("");
+    $("tk-pick-all").hidden = $("tk-pick-none").hidden = single;
     showPicked();
   }
-  $("tk-assignee").addEventListener("change", showPicked);
-  $("tk-assignee").addEventListener("click", showPicked);
-  $("tk-assignee").addEventListener("keyup", showPicked);
+  $("tk-pick-list").addEventListener("change", function (e) {
+    const box = e.target.closest("input[name=tk-pick]"); if (!box) return;
+    if (single) picked = new Set([box.value]);
+    else if (box.checked) picked.add(box.value); else picked.delete(box.value);
+    box.closest(".tk-pick").classList.toggle("is-on", box.checked);
+    if (single) drawStaff(); else showPicked();
+  });
+  $("tk-groups").addEventListener("click", function (e) {
+    const b = e.target.closest("[data-group]"); if (!b) return;
+    const g = b.getAttribute("data-group");
+    staff.forEach(function (p) { if (groupOf(p) === g) picked.add(p.user_id); });
+    drawStaff();
+  });
+  $("tk-pick-all").addEventListener("click", function () {
+    $("tk-pick-list").querySelectorAll("input[name=tk-pick]").forEach(function (b) { picked.add(b.value); });
+    drawStaff();
+  });
+  $("tk-pick-none").addEventListener("click", function () { picked = new Set(); drawStaff(); });
   function resetForm() {
-    editing = followUp = null;
+    editing = followUp = null; single = false; lockedTo = null; picked = new Set();
     $("tk-form-title").textContent = "Assign a task"; $("tk-create").textContent = "Assign task";
     ["tk-title", "tk-desc"].forEach(function (id) { $(id).value = ""; $(id).disabled = false; });
-    $("tk-priority").value = "NORMAL"; $("tk-priority").disabled = false; $("tk-person-search").disabled = false; $("tk-assignee").disabled = false; $("tk-person-search").value = ""; drawStaff();
+    $("tk-priority").value = "NORMAL"; $("tk-priority").disabled = false; $("tk-person-search").disabled = false; $("tk-person-search").value = ""; drawStaff();
     $("tk-followup").hidden = true; $("tk-error").hidden = true;
     const d = new Date(Date.now() + 24 * 3600000); d.setMinutes(0, 0, 0); $("tk-deadline").value = toLocalInput(d);
     $("tk-deadline").min = toLocalInput(new Date(Date.now() + MIN_HOURS * 3600000));
   }
   function startEdit(t) {
-    resetForm(); editing = t;
+    resetForm(); editing = t; lockedTo = t.assignee;
     $("tk-form-title").textContent = t.can.edit === "ALL" ? "Edit " + t.reference : "Change the deadline of " + t.reference; $("tk-create").textContent = "Save changes";
     $("tk-title").value = t.title; $("tk-desc").value = t.description; $("tk-priority").value = t.priority; $("tk-deadline").value = toLocalInput(new Date(t.deadline));
-    $("tk-assignee").innerHTML = '<option value="' + t.assignee.user_id + '">' + esc(t.assignee.name) + "</option>"; $("tk-assignee").selectedIndex = 0; showPicked();
-    ["tk-person-search", "tk-assignee"].forEach(function (id) { $(id).disabled = true; });
+    $("tk-person-search").disabled = true; drawStaff();
     if (t.can.edit === "DEADLINE") ["tk-title", "tk-desc", "tk-priority"].forEach(function (id) { $(id).disabled = true; });
     modal.close(); VA.showTab("new"); window.scrollTo({ top: 0, behavior: "smooth" });
   }
   function startFollowUp(t) {
-    resetForm(); followUp = t;
+    resetForm(); followUp = t; single = true; drawStaff();
     $("tk-title").value = t.title; $("tk-desc").value = t.description; $("tk-priority").value = t.priority;
     $("tk-followup").hidden = false;
     $("tk-followup").textContent = t.reference + " was rejected by " + t.assignee.name + " (" + (t.reject_reason_label || "") + "). Choose who should do it instead and set a new deadline.";
@@ -285,21 +318,27 @@
     if (!dl) return fail("Choose a deadline.");
     const date = new Date(dl);
     if (date.getTime() < Date.now() + MIN_HOURS * 3600000) return fail("The deadline must be at least " + MIN_HOURS + " hours from now.");
-    $("tk-create").disabled = true;
-    let r;
+    let r, ids = Array.from(picked);
     if (editing) {
       const body = { deadline: date.toISOString() };
       if (editing.can.edit === "ALL") Object.assign(body, { title: $("tk-title").value, description: $("tk-desc").value, priority: $("tk-priority").value });
+      $("tk-create").disabled = true;
       r = await VA.fetchJson(API + "/" + editing.id, json("PATCH", body));
     } else {
-      if (!$("tk-assignee").value) { $("tk-create").disabled = false; return fail("Choose who should do it."); }
-      if ($("tk-title").value.trim().length < 3) { $("tk-create").disabled = false; return fail("Give the task a title."); }
-      if ($("tk-desc").value.trim().length < 3) { $("tk-create").disabled = false; return fail("Describe what needs to be done."); }
-      r = await VA.fetchJson(API, json("POST", { assignee_user_id: $("tk-assignee").value, title: $("tk-title").value, description: $("tk-desc").value, priority: $("tk-priority").value, deadline: date.toISOString(), follow_up_of_id: followUp ? followUp.id : null }));
+      if (!ids.length) return fail("Tick who should do it.");
+      if ($("tk-title").value.trim().length < 3) return fail("Give the task a title.");
+      if ($("tk-desc").value.trim().length < 3) return fail("Describe what needs to be done.");
+      if (ids.length > 1 && !(await VA.confirm("Send this task to " + ids.length + " people? Each gets their own copy to accept and complete.", "Assign to " + ids.length))) return;
+      $("tk-create").disabled = true;
+      const base = { title: $("tk-title").value, description: $("tk-desc").value, priority: $("tk-priority").value, deadline: date.toISOString() };
+      r = ids.length > 1 ? await VA.fetchJson(API + "/bulk", json("POST", Object.assign({ assignee_user_ids: ids }, base)))
+        : await VA.fetchJson(API, json("POST", Object.assign({ assignee_user_id: ids[0], follow_up_of_id: followUp ? followUp.id : null }, base)));
     }
     $("tk-create").disabled = false;
     if (!r.ok) return fail(msg(r.body, "Could not save the task."));
-    VA.toast(editing ? "Saved. " + editing.assignee.name + " has been told." : "Assigned to " + r.body.assignee.name + ". They have been notified.");
+    VA.toast(editing ? "Saved. " + editing.assignee.name + " has been told."
+      : r.body.created ? "Assigned to " + r.body.created.length + " people. They have been notified." + (r.body.skipped.length ? " Left out: " + r.body.skipped.join("; ") + "." : "")
+      : "Assigned to " + r.body.assignee.name + ". They have been notified.");
     resetForm(); await loadSent(); loadInbox(); if (IS_ADMIN) loadAll(false);
     VA.showTab("sent");
   });

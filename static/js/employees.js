@@ -543,7 +543,7 @@
       const bonusYear = (p.bonuses || []).filter(function (b) { return String(b.awarded_at).slice(0, 4) === String(yr); }).reduce(function (n, b) { return n + Number(b.amount || 0); }, 0);
       const t = p.teaching;
       $("es-kpis").innerHTML = [
-        ["Basic salary", p.current_salary !== null ? money(p.current_salary) : "—", false, (p.salary_history || []).length > 1 ? (p.salary_history.length - 1) + " change" + (p.salary_history.length > 2 ? "s" : "") : "No changes yet"],
+        ["Basic salary", p.current_salary ? money(p.current_salary) : "Not set yet", !p.current_salary, (p.salary_history || []).length > 1 ? (p.salary_history.length - 1) + " change" + (p.salary_history.length > 2 ? "s" : "") : "No changes yet"],
         ["Bonuses " + yr, money(bonusYear), false, (p.bonuses || []).length + " in total"],
         t ? ["Pass rate", t.pass_rate === null ? "—" : Math.round(t.pass_rate * 100) + "%", false, t.offerings_count + " courses · " + t.total_students_taught + " students"]
           : ["Library books", String(p.library.active_loans || 0), p.library.overdue_loans > 0, p.library.overdue_loans ? p.library.overdue_loans + " overdue" : "None overdue"],
@@ -612,10 +612,10 @@
     const result = await VA.fetchJson("/api/v1/employees/" + employeeId + "/salary-history");
     salaryHistoryTbody.innerHTML = "";
     if (!result.ok || !result.body) return;
-    const KIND = { INITIAL: "Starting salary", FIXED_AMOUNT: "Increase", PERCENTAGE: "Increase (%)", MANUAL: "Changed" };
+    const KIND = { INITIAL: "Starting salary", FIXED_AMOUNT: "Increase", PERCENTAGE: "Increase (%)", MANUAL: "Changed", SET: "Set", CORRECTED: "Corrected" };
     salaryHistoryTbody.innerHTML = result.body.slice().reverse().map(function (row) {
       return '<li class="' + (row.effective_to ? "" : "is-now") + '"><b>' + esc(money(row.base_salary)) + "</b><span>" + esc(KIND[row.change_type] || row.change_type || "") +
-        (row.reason ? " · " + esc(row.reason) : "") + "</span><small>" + esc(fmtDate(row.effective_from)) + (row.effective_to ? " – " + esc(fmtDate(row.effective_to)) : " · now") + "</small></li>";
+        (row.reason ? " · " + esc(row.reason) : "") + "</span><small>" + esc(fmtDate(row.effective_from)) + (!row.effective_to ? " · now" : row.effective_to < row.effective_from ? " · replaced by a correction" : " – " + esc(fmtDate(row.effective_to))) + "</small></li>";
     }).join("") || '<li class="ss-empty">No salary on record.</li>';
   }
 
@@ -864,37 +864,51 @@
     resetEmployeePasswordConfirm.hidden = false;
   });
 
+  const incrementFrom = document.getElementById("increment-from");
+  function incrementMode() {
+    const set = incrementType.value === "SET";
+    incrementValue.placeholder = set ? "New basic salary (Rs.)" : incrementType.value === "PERCENTAGE" ? "Increase (%)" : "Increase (Rs.)";
+    incrementReason.placeholder = set ? "Reason (required), e.g. Salary agreed at interview" : "Reason (optional)";
+    if (!incrementFrom.value) incrementFrom.value = new Date().toISOString().slice(0, 10);
+  }
+  incrementType.addEventListener("change", incrementMode);
+  incrementMode();
+
   applyIncrementBtn.addEventListener("click", async function () {
     if (!activeEmployeeId) return;
     const value = parseFloat(incrementValue.value);
+    const set = incrementType.value === "SET";
+    modalError.hidden = true;
+    modalSuccess.hidden = true;
     if (!value || value <= 0) {
-      modalError.textContent = "Enter a positive increment value.";
+      modalError.textContent = set ? "Enter the new basic salary." : "Enter a positive increment value.";
+      modalError.hidden = false;
+      return;
+    }
+    if (set && incrementReason.value.trim().length < 5) {
+      modalError.textContent = "Give the reason (kept on record), e.g. \u201cSalary agreed at interview\u201d or \u201cWrong amount entered\u201d.";
       modalError.hidden = false;
       return;
     }
     applyIncrementBtn.disabled = true;
-    modalError.hidden = true;
-    modalSuccess.hidden = true;
 
-    const result = await VA.fetchJson("/api/v1/employees/" + activeEmployeeId + "/salary-increment", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        change_type: incrementType.value,
-        value: value,
-        reason: incrementReason.value.trim() || null,
-      }),
-    });
+    const result = set
+      ? await VA.fetchJson("/api/v1/employees/" + activeEmployeeId + "/salary", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount: value, effective_from: incrementFrom.value || null, reason: incrementReason.value.trim() }) })
+      : await VA.fetchJson("/api/v1/employees/" + activeEmployeeId + "/salary-increment", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ change_type: incrementType.value, value: value, reason: incrementReason.value.trim() || null, effective_from: incrementFrom.value || null }) });
 
     applyIncrementBtn.disabled = false;
 
     if (!result.ok) {
-      modalError.textContent = extractErrorMessage(result.body, "Could not apply increment.");
+      modalError.textContent = extractErrorMessage(result.body, set ? "Could not set the salary." : "Could not apply increment.");
       modalError.hidden = false;
       return;
     }
 
-    modalSuccess.textContent = "New salary: " + result.body.base_salary;
+    modalSuccess.textContent = "Basic salary is now " + money(result.body.base_salary) + " from " + fmtDate(result.body.effective_from) + ".";
     modalSuccess.hidden = false;
     incrementValue.value = "";
     incrementReason.value = "";
@@ -970,7 +984,7 @@
       hire_date: val("ae-hire-date"),
       department: val("ae-department") || null,
       job_role_id: jobRoleSelect.value,
-      base_salary: parseFloat(val("ae-base-salary")),
+      base_salary: parseFloat(val("ae-base-salary")) || 0,      // empty = not decided yet (set it later on the Pay tab)
       religion: val("ae-religion") || null,
       province: val("ae-province") || null,
       district: val("ae-district") || null,

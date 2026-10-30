@@ -81,6 +81,17 @@ async def gate(session: AsyncSession, *, kind: str, actor_id, target_id=None, pa
     return r
 
 
+async def _users_with_permission(session: AsyncSession, code: str, *, exclude=None) -> list:
+    """Active users holding this permission through any of their roles (optionally leaving one out)."""
+    from app.auth.models import Permission, RolePermission, User, UserRole
+
+    stmt = (select(User.id).distinct().join(UserRole, UserRole.user_id == User.id).join(RolePermission, RolePermission.role_id == UserRole.role_id)
+            .join(Permission, Permission.id == RolePermission.permission_id).where(Permission.code == code, User.is_active.is_(True)))
+    if exclude is not None:
+        stmt = stmt.where(User.id != exclude)
+    return list((await session.execute(stmt)).scalars().all())
+
+
 async def _notify_approvers(session: AsyncSession, r: ApprovalRequest, actor_id) -> None:
     from app.auth.models import Permission, RolePermission, User, UserRole
     from app.notifications.models import NotificationCategory

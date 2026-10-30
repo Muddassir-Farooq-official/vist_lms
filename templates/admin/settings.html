@@ -8,6 +8,7 @@
   <button class="portal-tab active" data-tab="institute" role="tab" aria-selected="true" data-admin-only><span>Institute</span></button>
   <button class="portal-tab" data-tab="look" role="tab" aria-selected="false" data-admin-only><span>Look &amp; documents</span></button>
   <button class="portal-tab" data-tab="rules" role="tab" aria-selected="false" data-admin-only><span>Rules</span></button>
+  <button class="portal-tab" data-tab="email" role="tab" aria-selected="false" data-admin-only><span>Email</span></button>
   <button class="portal-tab" data-tab="account" role="tab" aria-selected="false"><span>My account</span></button>
 </div>
 
@@ -120,6 +121,57 @@
 </div>
 
 <!-- ============================================================ my account -->
+<!-- ============================================================ email -->
+<div class="portal-tab-panel st-grid" data-tab-panel="email" hidden>
+  <section class="panel">
+    <div class="panel-header"><div class="panel-header-left"><h2>Mail server</h2></div><span class="status-pill" id="em-state">Off</span></div>
+    <p class="panel-hint">The account the institute sends email from. When email is on, every notification (fees, results, approvals, announcements, tasks&hellip;) also goes to the person&rsquo;s email, like Google Classroom. People can switch it off on their own profile.</p>
+    <form id="em-form" class="form-grid two-col st-form" novalidate>
+      <div class="form-field two-span"><label class="check-row"><input type="checkbox" id="em-enabled" /> <span>Send email</span></label></div>
+      <div class="form-field"><label for="em-host">Mail server (SMTP host) *</label><input id="em-host" class="text-input" maxlength="255" placeholder="smtp.gmail.com" autocomplete="off" /></div>
+      <div class="form-field"><label for="em-port">Port</label><input id="em-port" class="text-input" type="number" min="1" max="65535" value="587" /></div>
+      <div class="form-field"><label for="em-security">Security</label><select id="em-security" class="select-input"><option value="starttls">STARTTLS (usually port 587)</option><option value="ssl">SSL/TLS (usually port 465)</option><option value="none">None (port 25, not recommended)</option></select></div>
+      <div class="form-field"><label for="em-user">Username</label><input id="em-user" class="text-input" maxlength="255" autocomplete="off" placeholder="usually the full email address" /></div>
+      <div class="form-field"><label for="em-pass">Password</label><input id="em-pass" class="text-input" type="password" maxlength="500" autocomplete="new-password" placeholder="leave empty to keep the saved one" />
+        <small class="field-hint" id="em-pass-hint">Stored encrypted. For Gmail / Google Workspace create an App Password (Google Account &rarr; Security &rarr; App passwords).</small></div>
+      <div class="form-field"><label for="em-from-name">From name</label><input id="em-from-name" class="text-input" maxlength="120" placeholder="e.g. VIST Office" /></div>
+      <div class="form-field"><label for="em-from">From address *</label><input id="em-from" class="text-input" type="email" maxlength="255" placeholder="office@vist.edu.pk" /></div>
+      <div class="form-field"><label for="em-reply">Reply-to address <small class="field-hint inline">(optional)</small></label><input id="em-reply" class="text-input" type="email" maxlength="255" /></div>
+      <div class="form-field two-span"><label class="check-row"><input type="checkbox" id="em-notify" checked /> <span>Also email every notification to the person it is for</span></label></div>
+      <div class="form-field two-span em-block">
+        <h3 class="dash-sub-h">Verified email for every account</h3>
+        <label class="check-row"><input type="checkbox" id="em-require" /> <span>Every account (staff, students, parents and administrators) must confirm an email address with a one-time code before using the portal</span></label>
+        <small class="field-hint" id="em-verified-count"></small>
+        <small class="field-hint">Before you turn this on: email must be on, a test email must have arrived, and your own email must be verified (menu &rarr; <a href="/verify-email?from=menu">My email</a>). If email stops working, people who are already verified keep working; new sign-ins wait until email works again.</small>
+      </div>
+      <div class="form-field two-span em-block">
+        <h3 class="dash-sub-h">Administration email addresses</h3>
+        <label for="em-admin-emails">Get a copy of every notification the system sends <small class="field-hint inline">(one address per line, up to 10)</small></label>
+        <textarea id="em-admin-emails" class="text-input" rows="3" maxlength="3000" placeholder="principal@vist.edu.pk&#10;office@vist.edu.pk"></textarea>
+        <small class="field-hint">The same notice sent to many people (for example an announcement to a whole class) arrives as ONE email that lists who got it.</small>
+        <p class="field-label-sm">Which kinds of notifications to copy</p>
+        <div class="em-cats" id="em-cats"></div>
+      </div>
+      <p class="dash-alert error two-span" id="em-error" hidden></p>
+      <div class="form-actions two-span"><button type="submit" class="role-btn" id="em-save">Save</button>
+        <button type="button" class="role-btn secondary-btn" id="em-remove-pass" hidden>Remove saved password</button></div>
+    </form>
+  </section>
+  <section class="panel">
+    <h2>Send a test email</h2>
+    <p class="panel-hint">Sends one email now with the saved settings and shows exactly what the mail server answered.</p>
+    <form id="em-test-form" class="form-grid st-form" novalidate>
+      <div class="form-field"><label for="em-test-to">Send it to</label><input id="em-test-to" class="text-input" type="email" maxlength="255" /></div>
+      <div class="form-actions"><button type="submit" class="role-btn" id="em-test-go">Send test email</button></div>
+      <p class="cc-meta" id="em-test-result" hidden></p>
+    </form>
+    <h3 class="dash-sub-h">Recent emails</h3>
+    <p class="cc-meta" id="em-counts"></p>
+    <div class="table-scroll"><table class="tk-table no-skeleton"><thead><tr><th>To</th><th>Subject</th><th>Status</th><th>When</th></tr></thead><tbody id="em-outbox"></tbody></table></div>
+    <div class="form-actions"><button type="button" class="role-btn small-btn secondary-btn" id="em-retry" hidden>Try failed emails again</button></div>
+  </section>
+</div>
+
 <div class="portal-tab-panel st-grid" data-tab-panel="account" hidden>
   <section class="panel">
     <h2>Account</h2>
@@ -158,4 +210,5 @@
 {% block extra_scripts %}
 <script src="/static/js/settings.js"></script>
 <script src="/static/js/policy-settings.js"></script>
+<script src="/static/js/email-settings.js"></script>
 {% endblock %}

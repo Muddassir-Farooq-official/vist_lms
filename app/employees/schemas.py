@@ -142,7 +142,7 @@ class EmployeeCreateRequest(BaseModel):
     hire_date: date
     department: str | None = Field(default=None, max_length=100)
     job_role_id: uuid.UUID
-    base_salary: float = Field(ge=0)
+    base_salary: float = Field(default=0, ge=0)    # 0 / left out = not decided yet; set it later with "Set basic salary"
     # Admin sets this directly per the approved decision — no fixed
     # institution-wide default for staff the way students have vertex123.
     password: str = Field(min_length=10, max_length=256)
@@ -475,6 +475,14 @@ class SalaryIncrementRequest(BaseModel):
         if v not in ("FIXED_AMOUNT", "PERCENTAGE"):
             raise ValueError("change_type must be FIXED_AMOUNT or PERCENTAGE.")
         return v
+
+
+class SalarySetRequest(BaseModel):
+    """Set or correct the basic salary to an exact amount (up or down), from a date, with the reason kept on record."""
+
+    amount: float = Field(gt=0, le=10_000_000)
+    effective_from: date | None = None      # default: today
+    reason: str = Field(min_length=5, max_length=255)
 
 
 class SalaryHistoryOut(BaseModel):

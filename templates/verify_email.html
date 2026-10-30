@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#2454d6" />
+  <title>Verify your email &mdash; {{ brand.short_name }}</title>
+  <link rel="stylesheet" href="/static/css/theme.css" />
+  {% from "_brand.html" import brand_head %}{{ brand_head() }}
+</head>
+<body class="auth-body">
+  <main class="auth-shell">
+    <section class="auth-card" aria-labelledby="auth-title">
+      <div class="auth-brand">
+        <span class="auth-logo{% if brand.has_logo %} has-logo{% endif %}" aria-hidden="true">{% if brand.has_logo %}<img src="{{ brand.logo_url }}" alt="" />{% else %}{{ brand.initials }}{% endif %}</span>
+        <span class="auth-brand-text">
+          <strong>{{ brand.short_name }}</strong>
+          <small>{{ brand.name }}</small>
+        </span>
+      </div>
+
+      <h1 id="auth-title">Verify your email</h1>
+      <p class="auth-sub" id="ve-intro">Checking your account&hellip;</p>
+
+      <!-- step 1: the address -->
+      <form id="ve-email-form" novalidate hidden>
+        <div class="auth-field">
+          <label for="ve-email">Your email address</label>
+          <input class="auth-input" type="email" id="ve-email" autocomplete="email" inputmode="email" enterkeyhint="send" maxlength="255" required />
+          <p class="auth-field-error" id="ve-email-error" hidden></p>
+        </div>
+        <button type="submit" class="auth-submit" id="ve-send">
+          <span class="auth-spinner" aria-hidden="true"></span>
+          <span id="ve-send-label">Email me a code</span>
+        </button>
+      </form>
+
+      <!-- step 2: the code -->
+      <form id="ve-code-form" novalidate hidden>
+        <p class="auth-sub" id="ve-sent-to"></p>
+        <div class="auth-field">
+          <label for="ve-code">6-digit code</label>
+          <input class="auth-input ve-code" type="text" id="ve-code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" maxlength="6" enterkeyhint="done" required />
+          <p class="auth-field-error" id="ve-code-error" hidden></p>
+        </div>
+        <button type="submit" class="auth-submit" id="ve-verify">
+          <span class="auth-spinner" aria-hidden="true"></span>
+          <span id="ve-verify-label">Verify and continue</span>
+        </button>
+        <p class="auth-help">
+          <button type="button" class="link-btn" id="ve-resend" disabled>Send a new code</button>
+          &middot; <button type="button" class="link-btn" id="ve-change">Use a different address</button>
+        </p>
+        <p class="auth-help">No email? Look in the Spam or Promotions folder.</p>
+      </form>
+
+      <p class="auth-error" id="ve-error" role="alert" hidden></p>
+      <p class="auth-help" id="ve-done" hidden></p>
+      <p class="auth-help"><a href="/" id="ve-back" hidden>Back to the portal</a> <button type="button" class="link-btn" id="ve-logout">Sign out</button></p>
+    </section>
+    <p class="auth-foot">&copy; {{ brand.name }}</p>
+  </main>
+
+  <script src="/static/js/verify-email.js"></script>
+</body>
+</html>

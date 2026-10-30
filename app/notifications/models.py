@@ -59,3 +59,5 @@ class Notification(UUIDPKMixin, TimestampMixin, Base):
     link: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+from app.notifications import email_models as _email_models  # noqa: E402,F401  (registers email tables with Base)

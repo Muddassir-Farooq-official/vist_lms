@@ -88,3 +88,79 @@ async def completeness(session: AsyncSession, owner_type: str, ids: list[uuid.UU
         done = len(items) - len(missing)
         out[oid] = {"percent": round(done * 100 / len(items)), "done": done, "total": len(items), "missing": missing}
     return out
+
+
+async def active_ids(session: AsyncSession, owner_type: str) -> list[uuid.UUID]:
+    if owner_type == "STUDENT":
+        from app.students.models import Student, StudentStatus
+
+        return list((await session.execute(select(Student.id).where(Student.status == StudentStatus.ACTIVE))).scalars())
+    from app.employees.models import Employee, EmployeeStatus
+
+    return list((await session.execute(select(Employee.id).where(Employee.status == EmployeeStatus.ACTIVE))).scalars())
+
+
+async def incomplete(session: AsyncSession, owner_type: str, *, below: int = 100) -> list[dict]:
+    """Active people whose profile is below `below` %, least complete first."""
+    if owner_type == "STUDENT":
+        from app.students.models import Student as Model
+
+        code = Model.roll_number
+    else:
+        from app.employees.models import Employee as Model
+
+        code = Model.employee_code
+    ids = await active_ids(session, owner_type)
+    out: list[dict] = []
+    for i in range(0, len(ids), 500):
+        part = ids[i:i + 500]
+        result = await completeness(session, owner_type, part)
+        people = {r.id: r for r in (await session.execute(select(Model.id, Model.first_name, Model.last_name, code.label("code"), Model.user_id)
+                                                          .where(Model.id.in_(part)))).all()}
+        for pid, c in result.items():
+            if c["percent"] < below:
+                p = people[pid]
+                out.append({"id": pid, "name": f"{p.first_name} {p.last_name}".strip(), "code": p.code, "has_login": p.user_id is not None, **c})
+    out.sort(key=lambda x: (x["percent"], x["name"]))
+    return out
+
+
+REMIND_TITLE = "Please complete your profile"
+REMIND_GAP_DAYS = 3
+
+
+async def remind(session: AsyncSession, owner_type: str, ids: list[uuid.UUID], *, actor_id: uuid.UUID) -> dict:
+    """Send each person (with a login) a notification, also by email, listing exactly what is missing. Someone reminded
+    in the last REMIND_GAP_DAYS days is skipped, so pressing the button twice does not nag."""
+    from datetime import datetime, timedelta, timezone
+
+    from app.audit.service import AuditService
+    from app.notifications.models import Notification, NotificationCategory
+    from app.notifications.service import create_notification
+
+    if owner_type == "STUDENT":
+        from app.students.models import Student as Model
+    else:
+        from app.employees.models import Employee as Model
+    result = await completeness(session, owner_type, ids)
+    users = dict((await session.execute(select(Model.id, Model.user_id).where(Model.id.in_(list(result))))).all())
+    since = datetime.now(timezone.utc) - timedelta(days=REMIND_GAP_DAYS)
+    recent = set((await session.execute(select(Notification.user_id).where(Notification.title == REMIND_TITLE, Notification.created_at >= since))).scalars())
+    sent = skipped_recent = no_login = complete = 0
+    link = "/dashboard/student/profile" if owner_type == "STUDENT" else "/dashboard/my-profile"
+    for pid, c in result.items():
+        uid = users.get(pid)
+        if c["percent"] >= 100:
+            complete += 1
+        elif uid is None:
+            no_login += 1
+        elif uid in recent:
+            skipped_recent += 1
+        else:
+            await create_notification(session, user_id=uid, category=NotificationCategory.GENERAL, title=REMIND_TITLE,
+                                      message=f"Your profile is {c['percent']}% complete. Still missing: {', '.join(c['missing'])}. "
+                                              "Add the details under Update my details and upload the documents.", link=link)
+            sent += 1
+    await AuditService(session).log(actor_user_id=actor_id, action="records.profile_reminders", entity_type=owner_type.lower(), entity_id=None,
+                                    metadata={"sent": sent, "skipped_recent": skipped_recent, "no_login": no_login, "complete": complete})
+    return {"sent": sent, "skipped_recent": skipped_recent, "no_login": no_login, "complete": complete}

@@ -24,6 +24,9 @@
 
   <p class="dash-alert error" id="dash-error" hidden></p>
 
+  <!-- Background services: import worker, SMS / email sender, anything waiting too long -->
+  <section class="sys-health" id="sys-health" hidden aria-label="Background services"></section>
+
   <!-- Key numbers -->
   <section class="kpi-row" aria-label="Key numbers">
     <a class="kpi" href="/dashboard/admin/students" data-tone="blue">
@@ -187,5 +190,6 @@
 {% block extra_scripts %}
 <script src="/static/js/charts.js"></script>
 <script src="/static/js/dashboard.js"></script>
+<script src="/static/js/system-health.js"></script>
 <script src="/static/js/performance.js"></script>
 {% endblock %}

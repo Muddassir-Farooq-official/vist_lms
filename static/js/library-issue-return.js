@@ -189,57 +189,81 @@
   // ---------------------------------------------------------------------
   // Active issues + return flow
   // ---------------------------------------------------------------------
+  let activeRows = [];
+  const fmtDate = function (iso) { return new Date(iso + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); };
+
   async function loadActiveIssues() {
     const result = await VA.fetchJson("/api/v1/library/issues/active");
+    if (!result.ok || !result.body) return [];
+    activeRows = result.body;
+    renderActive();
+    return activeRows;
+  }
+
+  function renderActive() {
+    const q = (document.getElementById("active-q").value || "").trim().toLowerCase();
+    const shown = activeRows.filter(function (r) { return !q || [r.book_title, r.accession_code, r.borrower_name].join(" ").toLowerCase().indexOf(q) !== -1; });
+    document.getElementById("active-count").textContent = activeRows.length ? activeRows.length + " book" + (activeRows.length === 1 ? "" : "s") + " out" : "";
     activeTbody.innerHTML = "";
-    if (!result.ok || !result.body) return;
-
-    if (result.body.length === 0) {
-      activeEmpty.hidden = false;
-      return;
-    }
-    activeEmpty.hidden = true;
-
+    activeEmpty.hidden = shown.length > 0;
+    activeEmpty.textContent = activeRows.length ? "Nothing matches the search." : "No books currently issued.";
     const today = new Date().toISOString().slice(0, 10);
-
-    result.body.forEach(function (issue) {
+    shown.forEach(function (issue) {
       const tr = document.createElement("tr");
       const overdue = issue.due_date < today;
       tr.innerHTML =
-        "<td>" + VA.escapeHtml(issue.book_title) + "</td>" +
+        "<td><strong>" + VA.escapeHtml(issue.book_title) + "</strong></td>" +
         "<td>" + VA.escapeHtml(issue.accession_code) + "</td>" +
         "<td>" + VA.escapeHtml(issue.borrower_name) + "</td>" +
-        "<td>" + (overdue ? '<span class="status-pill dropped">' : "<span>") + VA.escapeHtml(issue.due_date) + "</span></td>" +
-        '<td class="num"><button type="button" class="row-action return-btn" data-issue-id="' +
-        issue.id + '" data-book-title="' + VA.escapeHtml(issue.book_title) + '">Return</button></td>';
+        "<td>" + (overdue ? '<span class="status-pill dropped">late · ' : "<span>") + VA.escapeHtml(fmtDate(issue.due_date)) + "</span></td>" +
+        '<td class="num"><button type="button" class="row-action return-btn" data-issue-id="' + issue.id + '">Return</button></td>';
       activeTbody.appendChild(tr);
     });
-
     activeTbody.querySelectorAll(".return-btn").forEach(function (btn) {
-      btn.addEventListener("click", async function () {
-        activeReturnIssueId = btn.getAttribute("data-issue-id");
-        returnBookHint.textContent = "Returning: " + btn.getAttribute("data-book-title");
-        returnCondition.value = "";
-        returnIsLost.checked = false;
-        returnFine.value = "";
-        returnError.hidden = true;
-        returnModal.showModal();
-        // Work out the standard late fee so the librarian sees it before confirming.
-        const preview = await VA.fetchJson("/api/v1/library/issues/" + activeReturnIssueId + "/return-preview");
-        if (!preview.ok || activeReturnIssueId !== btn.getAttribute("data-issue-id")) return;
-        const p = preview.body;
-        if (p.days_overdue > 0) {
-          returnBookHint.innerHTML = "Returning: <strong>" + VA.escapeHtml(p.book_title) + "</strong> from " + VA.escapeHtml(p.borrower_name) +
-            ". It is <strong>" + p.days_overdue + " day" + (p.days_overdue > 1 ? "s" : "") + " late</strong> (due " + VA.escapeHtml(p.due_date) +
-            "). Standard late fee: <strong>Rs. " + Number(p.suggested_fine).toLocaleString() + "</strong> (Rs. " + p.late_fee_per_day + " per day). " +
-            "Keep the amount below to charge it, change it, or enter 0 to waive it.";
-          returnFine.value = p.suggested_fine || "";
-        } else {
-          returnBookHint.innerHTML = "Returning: <strong>" + VA.escapeHtml(p.book_title) + "</strong> from " + VA.escapeHtml(p.borrower_name) + ". Returned on time \u2014 no fine.";
-        }
+      btn.addEventListener("click", function () {
+        const row = activeRows.find(function (r) { return r.id === btn.getAttribute("data-issue-id"); });
+        openReturn(row.id, row.book_title);
       });
     });
   }
+
+  async function openReturn(issueId, title) {
+    activeReturnIssueId = issueId;
+    returnBookHint.textContent = "Returning: " + title;
+    returnCondition.value = "";
+    returnIsLost.checked = false;
+    returnFine.value = "";
+    returnError.hidden = true;
+    returnModal.showModal();
+    // Work out the standard late fee so the librarian sees it before confirming.
+    const preview = await VA.fetchJson("/api/v1/library/issues/" + issueId + "/return-preview");
+    if (!preview.ok || activeReturnIssueId !== issueId) return;
+    const p = preview.body;
+    if (p.days_overdue > 0) {
+      returnBookHint.innerHTML = "Returning: <strong>" + VA.escapeHtml(p.book_title) + "</strong> from " + VA.escapeHtml(p.borrower_name) +
+        ". It is <strong>" + p.days_overdue + " day" + (p.days_overdue > 1 ? "s" : "") + " late</strong> (due " + VA.escapeHtml(fmtDate(p.due_date)) +
+        "). Standard late fee: <strong>Rs. " + Number(p.suggested_fine).toLocaleString() + "</strong> (Rs. " + p.late_fee_per_day + " per day). " +
+        "Keep the amount below to charge it, change it, or enter 0 to waive it.";
+      returnFine.value = p.suggested_fine || "";
+    } else {
+      returnBookHint.innerHTML = "Returning: <strong>" + VA.escapeHtml(p.book_title) + "</strong> from " + VA.escapeHtml(p.borrower_name) + ". Returned on time \u2014 no fine.";
+    }
+  }
+
+  // Quick return: scan or type the copy code (a barcode scanner types it and presses Enter).
+  async function quickReturn(code) {
+    const err = document.getElementById("qr-error");
+    err.hidden = true;
+    code = (code || "").trim().toUpperCase();
+    if (!code) return;
+    const rows = await loadActiveIssues();
+    const hit = rows.find(function (r) { return String(r.accession_code).toUpperCase() === code; });
+    if (!hit) { err.textContent = "Copy " + code + " is not out on loan. Check the code on the book."; err.hidden = false; return; }
+    document.getElementById("qr-code").value = "";
+    openReturn(hit.id, hit.book_title);
+  }
+  document.getElementById("qr-form").addEventListener("submit", function (e) { e.preventDefault(); quickReturn(document.getElementById("qr-code").value); });
+  document.getElementById("active-q").addEventListener("input", renderActive);
 
   returnSubmitBtn.addEventListener("click", async function () {
     if (!activeReturnIssueId) return;
@@ -272,7 +296,9 @@
     returnModal.close();
   });
 
-  document.addEventListener("vistadmin:ready", function () {
-    loadActiveIssues();
+  document.addEventListener("vistadmin:ready", async function () {
+    await loadActiveIssues();
+    const m = /return=([^&]+)/.exec(location.hash);
+    if (m) quickReturn(decodeURIComponent(m[1]));        // "Return…" from the Overdue page
   });
 })();

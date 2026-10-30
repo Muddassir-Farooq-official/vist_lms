@@ -91,6 +91,7 @@ class Settings(BaseSettings):
     smtp_user: str | None = None
     smtp_password: str | None = None
     sms_provider: str | None = None
+    web_app_sends_when_sender_down: bool = True   # the web app sends queued SMS / emails itself when the 'sms' service is not running
     sms_api_key: str | None = None
 
     # Institute wall-clock timezone: drives 'today', attendance windows, due dates.

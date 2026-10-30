@@ -1,6 +1,6 @@
-"""SMS sender: run it next to the app (like the import worker).
+"""SMS and email sender: run it next to the app (like the import worker). docker-compose service "sms".
 
-    python scripts/sms_sender.py          # loop: send queued SMS every 30 s; overdue-fee reminders once a day at 10:00
+    python scripts/sms_sender.py          # loop: send queued SMS and emails every 30 s; overdue-fee reminders once a day at 10:00
     python scripts/sms_sender.py --once   # one pass (for cron)
 
 Without SMS_PROVIDER_URL in .env messages are only recorded (LOGGED), never sent.
@@ -16,6 +16,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.core.clock import institute_now  # noqa: E402
 from app.core.database import AsyncSessionLocal  # noqa: E402
 from app.sms.service import SmsService  # noqa: E402
+from app.core.model_registry import load_all_models  # noqa: E402
+
+load_all_models()     # this process saves notifications / emails too: every table must be known (NoReferencedTableError)
 
 REMINDER_HOUR = 10
 
@@ -28,8 +31,13 @@ async def one_pass(with_reminders: bool) -> dict:
         svc = SmsService(session)
         queued = await svc.queue_fee_overdue_reminders() if with_reminders else 0
         result = await svc.send_pending(limit=200)
+        from app.core.background import beat
+        from app.notifications.email_service import send_pending as send_emails
+
+        emails = await send_emails(session, limit=200)
+        await beat(session, "sender", f"{result.get('processed', 0)} SMS, {emails.get('emails', 0)} emails")
         await session.commit()
-        return {"reminders_queued": queued, **result}
+        return {"reminders_queued": queued, **result, **emails}
 
 
 async def main() -> None:
@@ -44,7 +52,7 @@ async def main() -> None:
             r = await one_pass(with_reminders=due)
             if due:
                 last_reminder_day = now.date()
-            if r["processed"] or r["reminders_queued"]:
+            if r["processed"] or r["reminders_queued"] or r.get("emails"):
                 print(now.isoformat(timespec="seconds"), r, flush=True)
         except Exception as exc:  # keep running; the next pass retries
             print(now.isoformat(timespec="seconds"), "error:", exc, flush=True)

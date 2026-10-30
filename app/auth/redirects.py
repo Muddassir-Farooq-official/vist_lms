@@ -9,6 +9,7 @@ from __future__ import annotations
 from app.auth.permissions import Roles
 
 CHANGE_PASSWORD_PATH = "/change-password"
+VERIFY_EMAIL_PATH = "/verify-email"
 
 # First match wins. A person holding several roles lands on the most
 # privileged portal they have.
@@ -28,11 +29,13 @@ PORTAL_BY_ROLE: tuple[tuple[str, str], ...] = (
 )
 
 
-def home_for_roles(roles: list[str] | tuple[str, ...], must_change_password: bool = False) -> str | None:
+def home_for_roles(roles: list[str] | tuple[str, ...], must_change_password: bool = False, must_verify_email: bool = False) -> str | None:
     """The landing path for these roles, or None if none of them has a portal
-    yet (e.g. HOSTEL_WARDEN). A pending forced password change always wins."""
+    yet (e.g. HOSTEL_WARDEN). A pending forced password change always wins, then a required email verification."""
     if must_change_password:
         return CHANGE_PASSWORD_PATH
+    if must_verify_email:
+        return VERIFY_EMAIL_PATH
     held = set(roles)
     for role, path in PORTAL_BY_ROLE:
         if role in held:

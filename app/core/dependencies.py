@@ -23,27 +23,44 @@ from app.core.exceptions import AuthenticationError, AuthorizationError
 from app.core.security import decode_access_token
 
 
-# user id -> (checked_at, is_active, must_change_password, roles, permissions). A signed token alone would let a
+# user id -> (checked_at, is_active, must_change_password, roles, permissions, must_verify_email). A signed token alone would let a
 # deactivated, terminated or re-roled person keep working until it expires, so the account is re-read from the
 # database at most every `session_check_seconds` and what it says there wins over what the token claims.
-_session_ok: dict[str, tuple[float, bool, bool, list[str], list[str]]] = {}
+_session_ok: dict[str, tuple[float, bool, bool, list[str], list[str], bool]] = {}
 
 
-async def _fresh_account(db: AsyncSession, user_id: str) -> tuple[bool, bool, list[str], list[str]] | None:
+async def email_gate_on(db: AsyncSession) -> bool:
+    """True when the administrator requires a verified email AND email can actually be sent (otherwise nobody could
+    get a code, so the requirement waits until the mail server is set up again)."""
+    from app.notifications.email_models import EmailSettings
+
+    row = (await db.execute(select(EmailSettings.require_verified_email, EmailSettings.enabled, EmailSettings.host, EmailSettings.from_email)
+                            .where(EmailSettings.id == 1))).one_or_none()
+    return bool(row and row[0] and row[1] and row[2] and row[3])
+
+
+async def _fresh_account(db: AsyncSession, user_id: str) -> tuple[bool, bool, list[str], list[str], bool] | None:
+    """(is_active, must_change_password, roles, permissions, must_verify_email)."""
     from app.auth.models import Permission, Role, RolePermission, User, UserRole
 
     try:
         uid = uuid.UUID(str(user_id))
     except ValueError:
         return None
-    row = (await db.execute(select(User.is_active, User.must_change_password).where(User.id == uid))).one_or_none()
+    row = (await db.execute(select(User.is_active, User.must_change_password, User.email, User.email_verified_at).where(User.id == uid))).one_or_none()
     if row is None:
         return None
     roles = sorted((await db.execute(select(Role.code).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == uid))).scalars().all())
     perms = sorted((await db.execute(
         select(Permission.code).distinct().join(RolePermission, RolePermission.permission_id == Permission.id)
         .join(UserRole, UserRole.role_id == RolePermission.role_id).where(UserRole.user_id == uid))).scalars().all())
-    return bool(row[0]), bool(row[1]), roles, perms
+    must_verify = not (row[2] and row[3]) and await email_gate_on(db)
+    return bool(row[0]), bool(row[1]), roles, perms, must_verify
+
+
+def forget_session(user_id) -> None:
+    """Re-read this account from the database on its next request (after it changed, e.g. its email was verified)."""
+    _session_ok.pop(str(user_id), None)
 
 
 async def _decode_current_user(
@@ -70,7 +87,8 @@ async def _decode_current_user(
     now = time.monotonic()
     cached = _session_ok.get(user_id)
     ttl = max(int(settings.session_check_seconds or 0), 0)
-    if cached is None or ttl == 0 or now - cached[0] >= ttl:
+    # An account still waiting to verify its email is always re-read, so it gets in the moment it verifies (on every server).
+    if cached is None or ttl == 0 or now - cached[0] >= ttl or cached[5]:
         fresh = await _fresh_account(db, user_id)
         if fresh is None or not fresh[0]:
             _session_ok.pop(user_id, None)
@@ -79,7 +97,7 @@ async def _decode_current_user(
         if len(_session_ok) > 5000:
             _session_ok.clear()
         _session_ok[user_id] = cached
-    _, _, must_change, roles, perms = cached
+    _, _, must_change, roles, perms, must_verify = cached
 
     viewer = payload.get("va")
     return CurrentUser(
@@ -89,6 +107,7 @@ async def _decode_current_user(
         permissions=perms,
         # An administrator viewing someone's screens is never sent to that person's change-password form.
         must_change_password=False if viewer else must_change,
+        email_verification_required=False if viewer else must_verify,
         viewing_as_by=payload.get("va_name") if viewer else None,
         viewing_as_by_id=viewer,
     )
@@ -132,6 +151,8 @@ async def get_current_user(
         raise AuthorizationError(
             "You must change your password before accessing this. Use POST /auth/change-password."
         )
+    if current_user.email_verification_required:
+        raise AuthorizationError("Verify your email address before using the portal: open /verify-email.")
     return current_user
 
 

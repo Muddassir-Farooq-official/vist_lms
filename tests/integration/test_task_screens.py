@@ -25,7 +25,7 @@ async def test_staff_get_the_four_tabs_and_the_administration_gets_three_more(ap
         for tab in ("inbox", "sent", "new", "mine"):
             assert f'data-tab="{tab}"' in html, f"{portal}: {tab}"
         assert 'data-tab="flags"' not in html and 'data-tab="staff"' not in html and "tk-staff-body" not in html, portal
-        for needle in ('id="tk-assignee"', 'id="tk-deadline"', 'id="tk-priority"', 'id="tk-create"', 'id="tk-act"', 'id="tk-modal"', "At least 3 hours", "/static/js/student-ui.js", "tasks-portal.js"):
+        for needle in ('id="tk-pick-list"', 'id="tk-deadline"', 'id="tk-priority"', 'id="tk-create"', 'id="tk-act"', 'id="tk-modal"', "At least 3 hours", "/static/js/student-ui.js", "tasks-portal.js"):
             assert needle in html, f"{portal}: {needle}"
     admin = (await app_client.get("/dashboard/admin/tasks")).text
     for needle in ('data-tab="flags"', 'data-tab="staff"', 'data-tab="all"', 'id="tk-staff-body"', 'id="al-overdue"', 'id="al-days"', 'id="tk-person"', "Last 30"[:0] + "How are these numbers worked out?"):

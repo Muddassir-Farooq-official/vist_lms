@@ -156,6 +156,31 @@ class TaskService:
         await self.audit.log(actor_user_id=assigner, action="task.assigned", entity_type="task", entity_id=task.id)
         return task
 
+    async def create_bulk(self, *, assigner: uuid.UUID, data: dict) -> dict:
+        """One copy of the task for each chosen person (each accepts / rejects / completes their own). Yourself and anyone
+        who cannot receive tasks are left out and listed; nothing is created if nobody is left."""
+        self._check_deadline(data["deadline"])
+        ids = list(dict.fromkeys(data["assignee_user_ids"]))
+        names = await self.people(set(ids))
+        skipped, todo = [], []
+        for uid in ids:
+            who = names.get(uid, {}).get("name") or "Unknown person"
+            if uid == assigner:
+                skipped.append(f"{who} (that is you)")
+            elif not await self._is_staff(uid):
+                skipped.append(f"{who} (cannot receive tasks)")
+            else:
+                todo.append(uid)
+        if not todo:
+            raise BusinessRuleViolationError("Nobody you chose can receive this task: " + "; ".join(skipped) + ".")
+        created = []
+        for uid in todo:
+            task = await self.create(assigner=assigner, data={**data, "assignee_user_id": uid, "follow_up_of_id": None})
+            created.append({"id": task.id, "reference": reference(task), "assignee": names[uid]["name"]})
+        await self.audit.log(actor_user_id=assigner, action="task.assigned_bulk", entity_type="task", entity_id=None,
+                             metadata={"count": len(created), "title": data["title"].strip()[:200], "skipped": skipped})
+        return {"created": created, "skipped": skipped}
+
     async def update(self, task_id: uuid.UUID, *, user_id: uuid.UUID, changes: dict) -> Task:
         task = await self.get(task_id)
         if task.assigner_user_id != user_id:

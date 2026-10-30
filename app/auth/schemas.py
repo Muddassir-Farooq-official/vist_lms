@@ -25,6 +25,7 @@ class TokenResponse(BaseModel):
     roles: list[str] | None = None
     permissions: list[str] | None = None
     must_change_password: bool | None = None
+    email_verification_required: bool | None = None
     redirect_to: str | None = None
 
 
@@ -50,6 +51,8 @@ class CurrentUser(BaseModel):
     roles: list[str]
     permissions: list[str]
     must_change_password: bool
+    # The administrator requires a verified email and this account has none yet: only /verify-email works until it does.
+    email_verification_required: bool = False
     # Set when an administrator is looking at this person's screens through "view as": who is looking.
     # Such a session is read-only (see app/auth/view_as.py and the guard in app/main.py).
     viewing_as_by: str | None = None

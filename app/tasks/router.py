@@ -11,6 +11,7 @@ from app.core.exceptions import AuthorizationError
 from app.tasks.models import TaskStatus
 from app.tasks.schemas import (
     CancelIn,
+    TaskBulkCreate,
     SendBackIn,
     CommentIn,
     CompleteIn,
@@ -69,6 +70,11 @@ async def create_task(payload: TaskCreate, current_user: CurrentUser = Depends(u
     service = TaskService(db)
     task = await service.create(assigner=current_user.id, data=payload.model_dump())
     return await _one(service, task.id, current_user)
+
+
+@router.post("/bulk", status_code=201, summary="Assign the same task to several people at once (each gets their own copy)")
+async def create_tasks_bulk(payload: TaskBulkCreate, current_user: CurrentUser = Depends(use), db=Depends(get_db)) -> dict:
+    return await TaskService(db).create_bulk(assigner=current_user.id, data=payload.model_dump())
 
 
 # ============================================================ the administration

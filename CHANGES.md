@@ -494,3 +494,108 @@ waiting on the Approvals page first (the script lists how many).
   Not started), the failure reason under each file, and it refreshes while something runs.
 - Your 5 stuck uploads: after deploying, upload the same files again; each is picked up and processed.
 - Tests: `tests/integration/test_import_processing.py`.
+
+# Profiles: full details, more changes by request, staff documents, one-PDF download, profile completion (no migration)
+
+- **Admin sees what people uploaded**: Records → Documents now shows the **certificates PDF** and photo each person put on
+  their profile (these were stored but nowhere on the admin side), and **Download all as one PDF**: a cover page listing
+  everything, then the photo, the certificates PDF and every current document (PDF pages as they are, JPG/PNG scans as a
+  page each). Files that cannot go in a PDF (e.g. Word) or cannot be read are named on the cover instead.
+  API: `GET /records/{students|employees}/{id}/documents/all.pdf`, `GET /records/{...}/{id}/profile-files`.
+- **Staff upload their own documents** (My Profile → Documents): CNIC, degrees, experience letters from earlier jobs,
+  domicile… The office still adds contracts. Students keep theirs on "Degree progress & documents". Each person can open
+  only their own files. API: `/records/me/documents` now works for staff too.
+- **My Profile shows everything on record**: staff now also see email, marital status, blood group, employment type,
+  emergency contact and bank details; students also see email and blood group.
+- **More details can be changed by request, every change approved by the office first**: district and province,
+  marital status, blood group, religion; for staff the bank name, account title and IBAN (checked: PK IBAN or account
+  number). Name, CNIC, date of birth and gender stay office-only (identity correction).
+- **Profile completion**: a "Profile" column with a % bar on the Students and Employees lists (hover for what is missing),
+  the same in Records → Documents, and "Your profile is N% complete — still missing …" on each person's own profile.
+  Students: photo, mobile, email, address, guardian phone, emergency contact, blood group, CNIC/B-Form, Matric,
+  Intermediate, Domicile. Staff: photo, mobile, email, address, emergency contact, blood group, marital status, bank
+  details, qualifications, CNIC, degree/certificates, contract. The certificates PDF counts for Matric / Intermediate /
+  Degree. API: `POST /records/completeness`, `GET /records/me/completeness`.
+- **New package `pypdf`** (pure Python, no other packages) joins the PDFs. It is pinned with hashes in requirements.lock;
+  the deploy builds the image as usual, nothing to do by hand.
+- Tests: `tests/integration/test_profile_details_documents.py`.
+
+# Email, background-service status, bank-change safety, profile reminders, parents' account, library desk, faster CI (migration `c5d6e7f8a9b0`)
+
+- **Email (Settings → Email)**: mail server (host, port, STARTTLS / SSL / none), username, password (stored encrypted
+  with a key derived from JWT_SECRET; never shown again), From name / address, Reply-to, and "Send test email" which shows
+  exactly what the mail server answered (e.g. "use an App Password" for Gmail). Recent emails with sent / failed status
+  and "Try failed emails again". Until settings are saved there, SMTP_* in .env are used if present.
+- **Every notification is also emailed** (like Google Classroom) to the person's email (login email, else the one on
+  their student / staff record), with a button that opens the right page. Queued in the same transaction (no request
+  waits on a mail server) and sent within a minute; retried after 1, 5, 15 and 60 minutes, then marked failed. Each
+  person can switch emails off on My Profile ("Email notifications"). Parents now have **My account** with their own
+  email address and the same switch.
+- **No cron job needed**: the existing `sms` service now also sends emails and records a heartbeat. If it is not
+  running, the web app itself sends what is due every minute (one web worker at a time, chosen by a database lock).
+  Turn that off with `WEB_APP_SENDS_WHEN_SENDER_DOWN=false` in .env.
+- **Background services on the admin dashboard**: import worker running or not, SMS & email sender running or covered
+  by the web app, email on/off and waiting, SMS waiting, and warnings for anything waiting more than an hour, failed
+  emails, and CSV uploads that never started. API: `GET /system/status`.
+- **Bank detail changes**: shown with a red warning on Profile changes; approving needs typing CHECKED (confirm it was
+  checked with the employee); an administrator can never approve a change to their own bank details; payroll staff and
+  administrators are notified (account shown as …last 4 digits), and the employee gets a "your salary account was
+  changed — tell the office if this was not you" notice.
+- **Incomplete profiles & reminders** (Students / Employees → More): everyone active below 100 / 80 / 50 %, what each is
+  missing, and "Send reminders" (notification + email listing exactly what is missing; anyone reminded in the last 3
+  days is skipped).
+- **Parent portal**: fees card says how much of the total is fines; "1 unpaid fine" wording; new My account page.
+- **Library**: Issue & Return has a **Return a book** box (scan or type the copy code, press Enter); the issued list has
+  search, a count and readable dates. Overdue shows the borrower's code and phone (tap to call), the late fee so far,
+  totals, search, **Remind** per book and **Remind all borrowers** (once a day per book), and **Return…** straight to
+  the return screen.
+- **CI about 4× faster**: tests run as 4 parallel jobs (each with its own database); migration checks run on their own.
+  `scripts/ci_shard.py` splits the test files evenly and checks every file runs exactly once. Deploy still waits for all.
+- **Migration `c5d6e7f8a9b0`** (additive only, safe while the site is up): new tables email_settings, email_outbox,
+  service_heartbeats; new column users.email_notifications (NOT NULL DEFAULT true — instant on PostgreSQL 11+, no table
+  rewrite). Nothing existing changes; no email goes out until an administrator turns email on. Downgrade drops them.
+- Tests: `tests/integration/test_email_and_services.py`.
+
+# Basic salary set / corrected any time; one task to many people (no migration)
+
+- **Basic salary** (Employees → open → Pay & bonuses): new choice **Set exact salary (first salary, decrease or
+  correction)** with the amount, the date it starts and a required reason. From a later date it is a new salary (shown
+  as "Set"); from the date the current salary started it **corrects** it ("Corrected"; the wrong amount stays in the
+  history marked "replaced by a correction"). It can go down as well as up. A change cannot start before the current
+  salary's start date, and payslips already made keep their amounts. Increases by amount / % now also accept a date.
+  API: `POST /employees/{id}/salary {amount, effective_from, reason}`.
+- **Hiring without a salary**: "Basic salary" is optional when adding an employee (or in the CSV import); the profile
+  shows "Not set yet". Payroll already leaves such people out and names them when it is prepared. Increasing a salary
+  of 0 is refused with "Use Set basic salary first".
+- Payroll picks the corrected amount when two salary rows start the same day (the open one wins).
+- **Assign a task to many people** (Tasks → Assign a task): tick one person or several, tick a whole job title at once
+  ("All Lecturers"), or "Tick everyone shown" after searching. Each person gets their own copy to accept, reject and
+  complete, and is notified (and emailed). Yourself and anyone who cannot receive tasks are left out and listed.
+  Editing a task and giving a rejected task to someone else stay one person. API: `POST /tasks/bulk`.
+- Tests: `tests/integration/test_salary_set_and_bulk_tasks.py`.
+
+# Verified email for every account; administration email copies (migration d6e7f8a9b0c1)
+
+- **Verified email before using the portal** (Settings → Email → "Every account … must confirm an email address"):
+  when on, anyone without a verified address (staff, students, parents, administrators) lands on `/verify-email`
+  after signing in, types their email, gets a 6-digit code by email and enters it. Until then the API refuses every
+  other request (403). The code works 10 minutes, once, 5 wrong tries; one code a minute, 5 an hour per account,
+  20 an hour per network. The address must not belong to another account. Only a keyed hash of the code is kept.
+  Menu → **My email** changes the address later (with a new code).
+- **Safety**: it is OFF after deploying. Turning it on is refused until email is on, a test email arrived, and the
+  administrator's own email is verified. If email is switched off, the requirement pauses by itself (nobody could get
+  a code). Emergency switch on the server: `python scripts/email_verification_off.py`.
+- **Administration email addresses** (Settings → Email): up to 10 addresses get a copy of notifications, with a
+  choice of which kinds (fees, tasks, results…). The same notice sent to many people within two minutes arrives as
+  ONE email that lists who got it. Copies wait 2 minutes before sending so they can be merged.
+- Migration `d6e7f8a9b0c1` (additive, instant, safe while running): `users.email_verified_at`; table
+  `email_verification_codes`; `email_settings.require_verified_email / admin_emails / admin_copy_categories`;
+  `email_outbox.group_key / copy_recipients` plus a small partial index.
+
+# Fix: student import failed with "system error (NoReferencedTableError)"
+
+The import worker (`worker` service, `rq worker`) starts with only the import code loaded. Importing a student also
+creates the fee assignment, whose table points at `enrollments`, a table the worker had never loaded, so every import
+on the server stopped with NoReferencedTableError and nothing was imported (tests and the in-app fallback load every
+table, which is why it only showed on the server). Now the worker, and the SMS / email sender, load every table first
+(`app/core/model_registry.py`). After deploying, upload the same file again. No migration.
