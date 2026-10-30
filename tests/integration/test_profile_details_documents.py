@@ -67,7 +67,7 @@ async def test_staff_ask_to_change_bank_and_marital_status_and_it_goes_live_only
     assert (await app_client.get("/api/v1/employees/me")).json()["bank_iban"] is None      # nothing live yet
 
     await _login_admin(app_client)
-    ok = await app_client.post(f"{PC}/{pending['id']}/approve")
+    ok = await app_client.post(f"{PC}/{pending['id']}/approve", json={"confirm_bank": True})   # bank changes need this confirmation
     assert ok.status_code == 200, ok.text
     await _login(app_client, username, "StaffReal123!")
     mine = (await app_client.get("/api/v1/employees/me")).json()
