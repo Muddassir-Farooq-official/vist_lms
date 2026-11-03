@@ -8,6 +8,9 @@
   if (!holder) return;
   let items = [];
 
+  // Rules that are a choice rather than a number: shown as a list (the stored value is the position).
+  const CHOICES = { amount_display: ["Full amount (Rs. 4,045,000)", "K / M (Rs. 4.05M)", "Lakh / crore (Rs. 40.45 lakh)"] };
+
   function fmt(v) { return Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 }); }
 
   function render() {
@@ -24,9 +27,13 @@
         groups[g].map(function (p) {
           const id = "policy-" + p.key;
           return '<div class="st-rule"><div class="st-rule-text"><label for="' + id + '">' + esc(p.label) + (p.overridden ? ' <span class="status-pill pending">changed</span>' : "") + "</label>" +
-            "<small>" + esc(p.help) + "</small><small class=\"st-rule-default\">Default " + esc(fmt(p.default)) + " · allowed " + esc(fmt(p.min)) + " to " + esc(fmt(p.max)) + "</small></div>" +
-            '<div class="st-rule-input"><input id="' + id + '" data-key="' + esc(p.key) + '" class="text-input small-input" type="number" inputmode="decimal" min="' + p.min + '" max="' + p.max +
-            '" step="' + (p.type === "int" ? "1" : "0.01") + '" value="' + esc(String(p.value)) + '" />' +
+            "<small>" + esc(p.help) + "</small><small class=\"st-rule-default\">Default " + (CHOICES[p.key] ? esc(CHOICES[p.key][Number(p.default)] || "") :
+              esc(fmt(p.default)) + " · allowed " + esc(fmt(p.min)) + " to " + esc(fmt(p.max))) + "</small></div>" +
+            '<div class="st-rule-input">' + (CHOICES[p.key] ?
+              '<select id="' + id + '" data-key="' + esc(p.key) + '" class="select-input">' + CHOICES[p.key].map(function (c, i) {
+                return '<option value="' + i + '"' + (Number(p.value) === i ? " selected" : "") + ">" + esc(c) + "</option>"; }).join("") + "</select>" :
+              '<input id="' + id + '" data-key="' + esc(p.key) + '" class="text-input small-input" type="number" inputmode="decimal" min="' + p.min + '" max="' + p.max +
+            '" step="' + (p.type === "int" ? "1" : "0.01") + '" value="' + esc(String(p.value)) + '" />') +
             (p.overridden ? '<button type="button" class="row-action" data-reset="' + esc(p.key) + '">Use default</button>' : "") + "</div></div>";
         }).join("") + "</details>";
     }).join("");
@@ -34,7 +41,7 @@
 
   function changes() {
     const values = {};
-    holder.querySelectorAll("input[data-key]").forEach(function (input) {
+    holder.querySelectorAll("[data-key]").forEach(function (input) {
       const p = items.find(function (x) { return x.key === input.getAttribute("data-key"); });
       if (input.dataset.reset === "1") { values[p.key] = null; return; }
       const raw = input.value.trim();
@@ -46,6 +53,7 @@
 
   function changed() { document.dispatchEvent(new CustomEvent("settings:changed")); }
   holder.addEventListener("input", changed);
+  holder.addEventListener("change", changed);
   holder.addEventListener("click", function (e) {
     const b = e.target.closest("[data-reset]");
     if (!b) return;

@@ -688,3 +688,22 @@ unchanged. CSS only (`static/css/dashboard.css`, one block at the end); every co
   permissions.
 - Migration a9b0c1d2e3f4 (additive): one new table todo_items with two indexes. Nothing existing changes.
 - Tests: tests/integration/test_todos.py.
+
+## Amounts on dashboard cards: full, K / M or lakh / crore (2026-11-03)
+
+- Settings -> Rules -> Display -> "Amounts on dashboard cards": Full amount (default, Rs. 4,045,000), K / M (Rs. 4.05M)
+  or Lakh / crore (Rs. 40.45 lakh). Change it back any time ("Use default"). Only the summary cards change (and the
+  amounts in their small notes); tables, receipts, challans, reports and downloads always show the full amount.
+  Hover or long-press a card for the exact figure.
+- Stored as the policy value amount_display (0 / 1 / 2) in the existing policy table: no migration. The page reads it
+  from a meta tag (templates/_brand.html, app/core/brand.py) and static/js/admin-common.js shortens card figures.
+- Card figures no longer break inside the number ("4,045,00 / 0") in any style.
+
+## Smaller fixes (2026-11-03)
+
+- Fees page: the accounts office no longer asks for the program list it is not allowed to see (it showed up as a
+  refused action on the Security tab). The program filter is hidden for them.
+- Security tab: administrator accounts show their username (not "parent / other account"); clearer tile text.
+- My to-do: spacing under the list.
+- migrations/env.py registers security_events and todo_items (CI "alembic check" failed without it).
+- tests/integration/test_tabbed_pages.py knows the new My to-do, To-do reports and Security tabs.

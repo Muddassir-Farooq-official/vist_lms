@@ -1176,6 +1176,63 @@ window.VistAdmin = (function () {
     return (n < 0 ? "\u2212" : "") + "Rs. " + Math.abs(n).toLocaleString("en-PK", { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 });
   }
 
+  // Large amounts on the summary CARDS only (Settings -> Rules -> Display): full, K / M, or lakh / crore.
+  // Tables, receipts and downloads never change. The exact figure stays on hover / long-press (title).
+  const AMOUNT_STYLE = (function () {
+    const m = document.querySelector('meta[name="amount-style"]');
+    return (m && m.getAttribute("content")) || "full";
+  })();
+  function per(a, unit) { return String(Math.round(a / (unit / 100)) / 100); }       // 4,045,000 per 1e6 -> "4.05" (no float drift)
+  function shortMoney(v, style) {
+    style = style || AMOUNT_STYLE;
+    const n = Number(v || 0), a = Math.abs(n), sign = n < 0 ? "\u2212" : "";
+    if (style === "km") {
+      if (a >= 1e9) return sign + "Rs. " + per(a, 1e9) + "B";
+      if (a >= 1e6) return sign + "Rs. " + per(a, 1e6) + "M";
+      if (a >= 1e4) return sign + "Rs. " + per(a, 1e3) + "K";
+    } else if (style === "lakh") {
+      if (a >= 1e7) return sign + "Rs. " + per(a, 1e7) + " crore";
+      if (a >= 1e5) return sign + "Rs. " + per(a, 1e5) + " lakh";
+    }
+    return formatMoney(n);
+  }
+  const CARD_VALUES = ".kpi-value, .stat-value, .money-figs strong, .td-total b, .sec-tile b, .dash-stat-value, .mf-value";
+  const CARD_NOTES = ".kpi-sub, .stat-sub, .stat-card small, .kpi small";
+  const AMOUNT_RE = /([\u2212-]?)Rs\.?\s?([\d,]+(?:\.\d+)?)/g;
+  function toNumber(sign, digits) { return (sign ? -1 : 1) * Number(digits.replace(/,/g, "")); }
+  function shortenCards(root) {
+    if (AMOUNT_STYLE === "full") return;
+    (root || document).querySelectorAll(CARD_VALUES).forEach(function (el) {
+      if (el.children.length || el.dataset.short === el.textContent) return;
+      const text = el.textContent.trim(), m = /^([\u2212-]?)Rs\.?\s?([\d,]+(?:\.\d+)?)$/.exec(text);
+      if (!m) return;
+      const short = shortMoney(toNumber(m[1], m[2]));
+      if (short === text) return;
+      el.title = text; el.dataset.short = short; el.textContent = short;
+    });
+    (root || document).querySelectorAll(CARD_NOTES).forEach(function (el) {
+      if (el.dataset.short === el.textContent) return;
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      let node, changed = false, full = el.textContent;
+      while ((node = walker.nextNode())) {
+        const next = node.nodeValue.replace(AMOUNT_RE, function (all, sign, digits) { return shortMoney(toNumber(sign, digits)); });
+        if (next !== node.nodeValue) { node.nodeValue = next; changed = true; }
+      }
+      if (changed) { el.title = full.trim(); }
+      el.dataset.short = el.textContent;
+    });
+  }
+  if (AMOUNT_STYLE !== "full") {
+    let queued = false;
+    const run = function () { queued = false; shortenCards(document); };
+    const watch = function () {
+      new MutationObserver(function () { if (!queued) { queued = true; requestAnimationFrame(run); } })
+        .observe(document.body, { childList: true, subtree: true, characterData: true });
+      run();
+    };
+    if (document.body) watch(); else document.addEventListener("DOMContentLoaded", watch);
+  }
+
   // Inputs that only have grey hint text get a real (spoken) label from it.
   function labelInputs(scope) {
     (scope || document).querySelectorAll("input:not([type=hidden]):not([type=checkbox]):not([type=radio]), select, textarea").forEach(function (el) {
@@ -1196,6 +1253,7 @@ window.VistAdmin = (function () {
     confirm: confirmDialog,
     promptText: promptText,
     formatMoney: formatMoney,
+    shortMoney: shortMoney,
     labelInputs: labelInputs,
     fetchJson: fetchJson,
     insertSkeletons: insertSkeletons,

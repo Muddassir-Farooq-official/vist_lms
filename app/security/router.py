@@ -18,7 +18,7 @@ KIND_CHOICES = ["FAILED_SIGNIN", *service.KINDS.keys()]
 async def security_summary(days: int = Query(7, ge=1, le=90), current_user: CurrentUser = Depends(require_permission(Permissions.AUDIT_VIEW)),
                            db=Depends(get_db)) -> dict:
     out = await service.summary(db, days=days)
-    out["kinds"] = {"FAILED_SIGNIN": "Wrong password", **{k: v[0] for k, v in service.KINDS.items()}}
+    out["kinds"] = {"FAILED_SIGNIN": "Someone typed a wrong password at sign-in", **{k: v[0] for k, v in service.KINDS.items()}}
     return out
 
 

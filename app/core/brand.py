@@ -136,6 +136,11 @@ class BrandView:
     def footer(self) -> str:
         return settings.document_footer or ""
 
+    @property
+    def amount_style(self) -> str:
+        """How dashboard cards show large amounts (Settings -> Rules -> Display): full, km or lakh."""
+        return {1: "km", 2: "lakh"}.get(int(getattr(settings, "amount_display", 0) or 0), "full")
+
 
 # ====================================================================== PDFs
 def _colors():

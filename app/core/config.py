@@ -245,6 +245,7 @@ class Settings(BaseSettings):
     payroll_advance_max_salary_multiple: float = 1.0   # an employee may owe at most this many months' basic salary in advances
     payroll_security_percent: float = 0.0           # % of basic held back each month as a security deposit, until it equals one basic salary
     graduation_min_cgpa: float = 2.0                # degree audit: the lowest CGPA that can graduate
+    amount_display: int = 0                         # amounts on dashboard cards: 0 full, 1 K / M, 2 lakh / crore (Settings -> Rules)
     certificate_signatory: str = "Principal"       # printed under the signature line on certificates
 
     # How long (seconds) one worker trusts "this user is still active and signed in" before checking again.

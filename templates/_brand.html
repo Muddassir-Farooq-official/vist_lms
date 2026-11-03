@@ -2,6 +2,7 @@
 {% macro brand_head() -%}
   <link rel="icon" type="{{ 'image/png' if brand.has_logo else 'image/svg+xml' }}" href="{{ brand.favicon_url }}" />
   {% if brand.theme_css %}<style id="brand-theme">{{ brand.theme_css }}</style>{% endif %}
+  <meta name="amount-style" content="{{ brand.amount_style }}" />
 {%- endmacro %}
 
 {% macro brand_mark(portal) -%}

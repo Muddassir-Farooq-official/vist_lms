@@ -92,6 +92,9 @@ POLICY: tuple[Policy, ...] = (
            "Held from each payslip until the total equals one basic salary. 0 = off. Can be changed per employee."),
     Policy("payroll_advance_max_salary_multiple", "Salary advance: most one employee may owe (x basic salary)", "Payroll", float, 0.1, 6,
            "1 = at most one month's basic salary outstanding in advances, including the one being asked for. Every advance needs administrator approval."),
+    Policy("amount_display", "Amounts on dashboard cards", "Display", int, 0, 2,
+           "Full (Rs. 4,045,000), K / M (Rs. 4.05M) or lakh / crore (Rs. 40.45 lakh). Only the summary cards change; tables, receipts, "
+           "challans, reports and downloads always show the full amount. Hover or tap a card to see the exact figure."),
     Policy("graduation_min_cgpa", "Lowest CGPA that can graduate", "Exams", float, 0, 4,
            "The degree audit asks for every curriculum course passed and at least this CGPA before a student is marked graduated."),
 )

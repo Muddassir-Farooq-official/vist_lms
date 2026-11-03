@@ -429,13 +429,17 @@
     });
     return p;
   }
+  let canViewPrograms = false;
   async function loadAssignmentFilters() {
-    const [s, pr] = await Promise.all([VA.fetchJson("/api/v1/fees/structures", { quiet: true }), VA.fetchJson("/api/v1/programs", { quiet: true })]);
+    // The program filter needs program.view (the accounts office does not have it): do not ask for what will be refused.
+    const [s, pr] = await Promise.all([VA.fetchJson("/api/v1/fees/structures", { quiet: true }),
+      canViewPrograms ? VA.fetchJson("/api/v1/programs", { quiet: true }) : Promise.resolve({ ok: false })]);
     const termSel = document.getElementById("as-term"), progSel = document.getElementById("as-program");
     if (termSel && s.ok) {
       const terms = Array.from(new Set(s.body.map(function (x) { return x.term_label; }).filter(Boolean)));
       termSel.innerHTML = '<option value="">All terms</option>' + terms.map(function (t) { return '<option value="' + VA.escapeHtml(t) + '">' + VA.escapeHtml(t) + "</option>"; }).join("");
     }
+    if (progSel && !pr.ok) progSel.hidden = true;           // nothing to filter by without the program list
     if (progSel && pr.ok) {
       progSel.innerHTML = '<option value="">All programs</option>' + pr.body.map(function (p) { return '<option value="' + p.id + '">' + VA.escapeHtml(p.code + " \u2014 " + p.name) + "</option>"; }).join("");
     }
@@ -715,6 +719,7 @@
   document.addEventListener("vistadmin:ready", function (event) {
     const roles = (event.detail && event.detail.me && event.detail.me.roles) || [];
     const isAdmin = roles.indexOf("ADMIN") !== -1;
+    canViewPrograms = ((event.detail && event.detail.me && event.detail.me.permissions) || []).indexOf("program.view") !== -1;
 
     if (!isAdmin) {
       // Hide the tab BUTTONS themselves, not just the inner sections —

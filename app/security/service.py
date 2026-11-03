@@ -241,9 +241,20 @@ async def alert(session: AsyncSession, key: str, title: str, message: str) -> bo
 
 # ------------------------------------------------------------------ reading (Activity log → Security)
 async def _names(session: AsyncSession, user_ids: set) -> dict:
-    from app.notifications.email_service import _person_label
+    """Name and code for staff and students; the username for anyone else (an administrator account, a parent)."""
+    from app.auth.models import User
+    from app.employees.models import Employee
+    from app.students.models import Student
 
-    return {uid: await _person_label(session, uid) for uid in user_ids if uid}
+    ids = [u for u in user_ids if u]
+    if not ids:
+        return {}
+    out = {u: n for u, n in (await session.execute(select(User.id, User.username).where(User.id.in_(ids)))).all()}
+    for uid, f, l, code in (await session.execute(select(Student.user_id, Student.first_name, Student.last_name, Student.roll_number).where(Student.user_id.in_(ids)))).all():
+        out[uid] = f"{f} {l} (student {code})" if code else f"{f} {l} (student)"
+    for uid, f, l, code in (await session.execute(select(Employee.user_id, Employee.first_name, Employee.last_name, Employee.employee_code).where(Employee.user_id.in_(ids)))).all():
+        out[uid] = f"{f} {l} ({code})"
+    return out
 
 
 async def summary(session: AsyncSession, *, days: int) -> dict:

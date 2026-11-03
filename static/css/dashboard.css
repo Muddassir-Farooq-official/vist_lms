@@ -3795,3 +3795,8 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
   .td-item { flex-wrap: wrap; }
   .td-text { flex-basis: 100%; }
 }
+.td-card > .panel-hint { margin-top: 16px; }
+
+/* Card amounts never break inside the number ("4,045,00 / 0"): at most "Rs." goes on its own line, and the figure shrinks a little on narrow cards. */
+.kpi-value, .stat-value, .money-figs strong { overflow-wrap: normal; word-break: keep-all; }
+.kpi-row .kpi .kpi-value { font-size: clamp(1.15rem, 1.9vw, 1.6rem); }
