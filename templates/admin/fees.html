@@ -59,7 +59,7 @@
     <h3 class="modal-subhead">Scholarships and discounts</h3>
     <div class="table-scroll"><table class="dash-table"><thead><tr><th>Name</th><th>Covers</th><th class="num">Given so far</th><th>Status</th></tr></thead><tbody id="sa-scholarships"></tbody></table></div>
     <p class="form-actions"><button type="button" class="role-btn secondary-btn can-propose" id="sa-grant">Give this student a scholarship or discount</button>
-      <button type="button" class="role-btn secondary-btn admin-only" id="sa-prev">Add previous dues for this student</button></p>
+      <button type="button" class="role-btn secondary-btn can-add-dues" id="sa-prev" hidden>Add previous dues for this student</button></p>
   </div>
 </section>
 </div>
@@ -161,7 +161,7 @@
 
 <!-- ============ PREVIOUS DUES ============ -->
 <div class="portal-tab-panel" data-tab-panel="previous-dues" hidden>
-<section class="panel admin-only">
+<section class="panel can-add-dues" hidden>
   <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("file") }}</div><h2>Bring in previous dues</h2></div></div>
   <p class="panel-hint">What each student already owed in the old (manual) system. Enter the amount still owed today. It becomes a normal payable charge with its own challan, shown as "Previous dues" on the student's account. Scholarships never reduce previous dues.</p>
   <h3 class="modal-subhead">One student</h3>

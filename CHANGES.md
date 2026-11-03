@@ -622,3 +622,11 @@ The institute on the left (logo and name from Settings, "Your campus, one sign-i
 on the right with "Forgot password?" next to the password box. On a phone the left side becomes a short header. The
 panel follows the institute colour set in Settings. Sign-in itself is unchanged (`static/js/login.js` untouched). The
 web address shown at the bottom left is PUBLIC_URL's when set. Files: `templates/login.html`, `static/css/theme.css`, `app/main.py`.
+
+# New dashboard look: "Bold colour blocks" (no migration)
+
+Every portal's dashboard (admin, accounts, principal, HOD, teachers, students, parents, staff, exam, library, gate,
+hostel): the greeting is a solid blue block with yellow and glass-white quick actions; the key numbers are solid colour
+blocks with white text; money figures and "needs attention" counts are solid colours; fee and fine summaries match;
+cards lose their outlines; on phones the bottom bar is a dark floating bar with a yellow active tab. The side drawer is
+unchanged. CSS only (`static/css/dashboard.css`, one block at the end); every colour passes the 4.5:1 contrast rule.

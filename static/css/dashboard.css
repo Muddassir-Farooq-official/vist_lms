@@ -3609,3 +3609,99 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 .kind-preview { display: block; margin-top: 6px; line-height: 1.45; }
 .kind-preview.warn { color: var(--amber-700, #8a5a00); font-weight: 600; }
 .form-field > .input-adorn { flex: 0 0 auto; }
+
+/* ======================================================================
+   Look: "Bold colour blocks" (chosen design C). Applies to every portal's dashboard; the side drawer is unchanged.
+   Strong colour blocks carry white text (each fill passes 4.5:1 contrast with white).
+   ====================================================================== */
+:root {
+  --bold-blue: #1d4ed8; --bold-green: #047857; --bold-orange: #c2410c;
+  --bold-purple: #6d28d9; --bold-teal: #0e7490; --bold-red: #be123c; --bold-yellow: #f5b700; --bold-ink: #0b1630;
+  --bg-page: #f2f4f8;
+}
+
+/* Cards: no outline, softer and rounder */
+.panel { border-color: transparent; border-radius: 20px; box-shadow: 0 1px 2px rgba(11, 22, 48, 0.04); }
+.dash-panel { border-radius: 22px; padding: 20px 22px 18px; }
+.dash-panel-head h2, .dash-panel h2 { font-size: 1.05rem; font-weight: 800; }
+
+/* Greeting: a solid blue block; the first quick action is yellow, the others glass-white */
+.dash-hero {
+  background: var(--blue-600); border: 0; color: #ffffff; border-radius: 24px; padding: 24px 26px;
+}
+.dash-hero h2 { color: #ffffff; font-size: 1.6rem; font-weight: 800; }
+.dash-hero p { color: #dce6ff; }
+.dash-hero .dash-chip { background: rgba(255, 255, 255, 0.18); color: #ffffff; }
+.dash-hero .dash-chip.warn { background: #ffffff; color: var(--bold-red); }
+.dash-hero .dash-action {
+  background: rgba(255, 255, 255, 0.16); border: 0; color: #ffffff; min-height: 44px; border-radius: 14px; font-weight: 700;
+}
+.dash-hero .dash-action svg { color: #ffffff; }
+.dash-hero .dash-action:hover { background: rgba(255, 255, 255, 0.26); box-shadow: none; }
+.dash-hero .dash-action:first-child { background: var(--bold-yellow); color: #1a1300; }
+.dash-hero .dash-action:first-child svg { color: #1a1300; }
+.dash-hero .dash-action:first-child:hover { background: #ffc81f; }
+.dash-hero .dash-action:focus-visible { outline: 3px solid #ffffff; outline-offset: 2px; }
+
+/* Key numbers on every dashboard: solid colour blocks */
+.kpi-row .kpi { --fill: var(--bold-blue); background: var(--fill); border: 0; border-radius: 22px; padding: 18px; color: #ffffff; box-shadow: none; }
+.kpi-row .kpi[data-tone="green"] { --fill: var(--bold-green); }
+.kpi-row .kpi[data-tone="orange"] { --fill: var(--bold-orange); }
+.kpi-row .kpi[data-tone="purple"] { --fill: var(--bold-purple); }
+.kpi-row .kpi[data-tone="teal"] { --fill: var(--bold-teal); }
+.kpi-row .kpi[data-tone="red"] { --fill: var(--bold-red); }
+.kpi-row .kpi:hover { border-color: transparent; transform: translateY(-2px); box-shadow: 0 10px 22px -12px var(--fill); filter: brightness(1.06); }
+.kpi-row .kpi:focus-visible { outline: 3px solid var(--bold-ink); outline-offset: 3px; }
+.kpi-row .kpi-icon { background: rgba(255, 255, 255, 0.18); color: #ffffff; border-radius: 12px; width: 38px; height: 38px; }
+.kpi-row .kpi-label { color: #ffffff; font-weight: 600; font-size: 0.8rem; }
+.kpi-row .kpi-value { color: #ffffff; font-size: 1.6rem; font-weight: 800; }
+.kpi-row .kpi-sub { color: #ffffff; opacity: 0.92; }
+.kpi-row .kpi-sub.bad { opacity: 1; color: #ffffff; font-weight: 700; align-self: flex-start; padding: 3px 9px; border-radius: 8px; background: rgba(0, 0, 0, 0.24); }
+
+/* Fee and fine summaries (stat cards): the same solid colours */
+.stat-card { border-radius: 22px; color: #ffffff; box-shadow: none; background: var(--bold-blue); }   /* a card with no colour of its own is blue */
+.stat-card::after { opacity: 0.12; background: #ffffff; }
+.stat-card--blue { background: var(--bold-blue); color: #ffffff; }
+.stat-card--green { background: var(--bold-green); color: #ffffff; }
+.stat-card--purple { background: var(--bold-purple); color: #ffffff; }
+.stat-card--orange { background: var(--bold-orange); color: #ffffff; }
+.stat-card--red { background: var(--bold-red); color: #ffffff; }
+.stat-card--teal { background: var(--bold-teal); color: #ffffff; }
+.stat-card * { color: inherit; }
+.stat-card .stat-icon-badge { background: rgba(255, 255, 255, 0.18); color: #ffffff; }
+
+/* Money in and out: three solid figures */
+.money-figs div { border-radius: 16px; color: #ffffff; }
+.money-figs div:nth-child(1) { background: var(--bold-blue); }
+.money-figs div:nth-child(2) { background: var(--bold-orange); }
+.money-figs div:nth-child(3) { background: var(--bold-green); }
+.money-figs div:has(.bad) { background: var(--bold-red); }
+.money-figs span { color: rgba(255, 255, 255, 0.88); }
+.money-figs strong, .money-figs .bad { color: #ffffff; font-weight: 800; }
+
+/* Needs attention: solid number chips */
+.attn-item { border-radius: 16px; min-height: 54px; background: var(--bg-page); }
+.attn-count { min-width: 38px; height: 36px; border-radius: 12px; font-weight: 800; font-size: 0.95rem; background: var(--bold-yellow); color: #1a1300; }
+.attn-item.tone-red .attn-count { background: var(--bold-red); color: #ffffff; }
+.attn-item.tone-blue .attn-count { background: var(--bold-blue); color: #ffffff; }
+.attn-item.tone-green .attn-count { background: var(--bold-green); color: #ffffff; }
+.attn-text { font-weight: 600; }
+
+/* Phones: the bottom bar becomes a dark floating bar with a yellow active tab */
+@media (max-width: 899px) {
+  .bottom-nav {
+    left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom));
+    padding: 4px; border: 0; border-radius: 20px;
+    background: var(--bold-ink); box-shadow: 0 10px 28px -12px rgba(11, 22, 48, 0.6);
+  }
+  .bottom-link { color: #c9d2e6; border-radius: 16px; min-height: 52px; }
+  .bottom-link svg { stroke: currentColor; }
+  .bottom-link.active { background: var(--bold-yellow); color: #1a1300; }
+  .bottom-link.active svg { stroke: #1a1300; }
+  .bottom-link:focus-visible { outline: 2px solid #ffffff; outline-offset: -3px; }
+  .content-main { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .dash-hero { padding: 18px; border-radius: 22px; }
+  .dash-hero h2 { font-size: 1.35rem; }
+  .kpi-row .kpi { padding: 14px; border-radius: 20px; }
+  .kpi-row .kpi-value { font-size: 1.35rem; }
+}

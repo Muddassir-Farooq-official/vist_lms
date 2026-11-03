@@ -361,6 +361,31 @@ async def test_previous_dues_once_only_and_cancellable(app_client, admin_user):
 
 
 # ---------------------------------------------------------------- rows written by the old version (already in production)
+async def test_accounts_officer_adds_previous_dues_but_cannot_cancel_them(app_client, admin_user, db_session):
+    from tests.integration.test_payroll import _as, _team
+
+    team = await _team(app_client, db_session)
+    sid, _user = await _create_and_activate_student(app_client, cnic="72001-0000041-1")
+    await _login_admin(app_client)
+    roll = (await app_client.get(f"/api/v1/students/{sid}")).json()["roll_number"]
+    await _as(app_client, team, "officer")
+    body = {"student_id": sid, "amount": 7200, "due_date": str(institute_today()), "note": "Arrears from the manual register"}
+    added = await app_client.post("/api/v1/fees/opening-balances", json=body)
+    assert added.status_code == 201, added.text
+    csv_text = f"roll_number,amount,due_date,note\n{roll},3100,{institute_today().isoformat()},second sheet\n"
+    check = await app_client.post("/api/v1/fees/opening-balances/check", files={"file": ("dues.csv", csv_text.encode(), "text/csv")})
+    assert check.status_code == 200 and check.json()[0]["ok"] is True, check.text
+    imported = await app_client.post("/api/v1/fees/opening-balances/import", files={"file": ("dues.csv", csv_text.encode(), "text/csv")})
+    assert imported.status_code in (200, 201), imported.text
+    listed = (await app_client.get("/api/v1/fees/opening-balances", params={"q": roll})).json()
+    assert sorted(x["remaining"] for x in listed) == [3100.0, 7200.0]
+    # Writing one off stays with an administrator (and a second administrator's approval).
+    c = await app_client.post(f"/api/v1/fees/opening-balances/{listed[0]['ledger_entry_id']}/cancel", json={"reason": "Typed in by mistake"})
+    assert c.status_code == 403
+    # Fee structures stay administrator-only too.
+    assert (await app_client.post("/api/v1/fees/types", json={"code": "XTRA", "name": "Extra"})).status_code == 403
+
+
 async def test_old_style_unlinked_reversal_is_recognised(app_client, admin_user, db_session):
     """Before this fix, "mark unpaid" wrote a reversal that did not point at its payment. Such a payment must not be
     reversible a second time, and the receipt must show as VOID."""

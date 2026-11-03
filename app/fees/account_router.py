@@ -273,7 +273,7 @@ class OpeningBalanceIn(BaseModel):
 
 
 @router.post("/opening-balances", status_code=201, summary="Record what one student already owed before this system (accounts office)")
-async def add_opening_balance(payload: OpeningBalanceIn, current_user: CurrentUser = Depends(require_permission(Permissions.FEE_MANAGE)), db=Depends(get_db)) -> dict:
+async def add_opening_balance(payload: OpeningBalanceIn, current_user: CurrentUser = Depends(require_permission(Permissions.OPENING_BALANCE_ADD)), db=Depends(get_db)) -> dict:
     return await OpeningBalanceService(db).add(student_id=payload.student_id, amount=payload.amount, due_date=payload.due_date, note=payload.note, actor_id=current_user.id)
 
 
@@ -314,10 +314,10 @@ async def _csv(file: UploadFile) -> bytes:
 
 
 @router.post("/opening-balances/check", summary="Check a CSV of previous dues without saving anything (roll_number, amount, due_date, note)")
-async def check_opening_csv(file: UploadFile = File(...), current_user: CurrentUser = Depends(require_permission(Permissions.FEE_MANAGE)), db=Depends(get_db)) -> list[dict]:
+async def check_opening_csv(file: UploadFile = File(...), current_user: CurrentUser = Depends(require_permission(Permissions.OPENING_BALANCE_ADD)), db=Depends(get_db)) -> list[dict]:
     return await OpeningBalanceService(db).check_csv(await _csv(file))
 
 
 @router.post("/opening-balances/import", summary="Import a CSV of previous dues (every row must be valid)")
-async def import_opening_csv(file: UploadFile = File(...), current_user: CurrentUser = Depends(require_permission(Permissions.FEE_MANAGE)), db=Depends(get_db)) -> dict:
+async def import_opening_csv(file: UploadFile = File(...), current_user: CurrentUser = Depends(require_permission(Permissions.OPENING_BALANCE_ADD)), db=Depends(get_db)) -> dict:
     return await OpeningBalanceService(db).import_csv(await _csv(file), actor_id=current_user.id, commit=True)

@@ -257,6 +257,9 @@ class Permissions:
     VIEW_AS = "view_as.use"
     # Approve or reject students' and employees' own requests to change their contact details and photo (administration).
     PROFILE_CHANGE_DECIDE = "profile.change.decide"
+    # Bring in what a student already owed before this system: one student, or a checked CSV (admin + accounts office).
+    # Cancelling (writing off) an entry stays with fee.manage and a second administrator's approval.
+    OPENING_BALANCE_ADD = "fee.opening_balance.add"
 
 
 # Role -> permission seed mapping used by scripts/seed_permissions.py.
@@ -296,6 +299,7 @@ ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
         Permissions.MARKS_PUBLISH,
         Permissions.FEE_VIEW,
         Permissions.FEE_MANAGE,
+        Permissions.OPENING_BALANCE_ADD,
         Permissions.PAYMENT_RECORD,  # pre-existing gap: ADMIN never actually had this until the Fee module needed it — fixed
         Permissions.PAYMENT_REVERSE,
         Permissions.EMPLOYEE_VIEW,
@@ -407,6 +411,9 @@ ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
         # correction/undo action, ADMIN-only via PAYMENT_REVERSE.
         # ACCOUNTS_OFFICER holds PAYMENT_RECORD (mark-paid) only.
         Permissions.PAYMENT_RECORD,
+        # Previous dues: the accounts office brings in what students already owed (one at a time or a checked CSV).
+        # Only an administrator can cancel (write off) an entry, and that needs a second administrator.
+        Permissions.OPENING_BALANCE_ADD,
         Permissions.REPORTS_VIEW,  # scoped to financial reports
         Permissions.AUDIT_VIEW_FINANCIAL,  # scoped audit, financial actions only
         Permissions.FINE_VIEW,

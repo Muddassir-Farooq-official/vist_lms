@@ -527,6 +527,9 @@
     const canPropose = perms.indexOf("scholarship.manage") !== -1 || perms.indexOf("scholarship.propose") !== -1;
     document.querySelectorAll(".can-propose").forEach(function (el) { el.hidden = !canPropose; });
     canProposeSc = canPropose;
+    // Previous dues: the administrator and the accounts office can bring them in; only an administrator can cancel one.
+    const canAddDues = perms.indexOf("fee.opening_balance.add") !== -1;
+    document.querySelectorAll(".can-add-dues").forEach(function (el) { el.hidden = !canAddDues; });
     $("sc-from").value = defaultFrom();
     setTimeout(function () { if (!$("sc-from").dataset.touched) $("sc-from").value = defaultFrom(); }, 1500);   // once the terms have loaded
     $("sc-from").addEventListener("change", function () { $("sc-from").dataset.touched = "1"; });
