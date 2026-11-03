@@ -615,3 +615,10 @@ is saved (for one fee it works out the example, e.g. "Tuition Fall 2026, Rs. 90,
 a fixed amount would come off EVERY fee. A fixed amount comes off each fee it covers (e.g. Rs. 10,000 off tuition every
 semester), spread over that fee's installments, never more than what is owed. The calculation itself was already in the
 system; new tests cover it (`tests/integration/test_discount_fixed_amount.py`).
+
+# New sign-in page (option A, "split campus"; no migration)
+
+The institute on the left (logo and name from Settings, "Your campus, one sign-in.", what the portal is for), the form
+on the right with "Forgot password?" next to the password box. On a phone the left side becomes a short header. The
+panel follows the institute colour set in Settings. Sign-in itself is unchanged (`static/js/login.js` untouched). The
+web address shown at the bottom left is PUBLIC_URL's when set. Files: `templates/login.html`, `static/css/theme.css`, `app/main.py`.

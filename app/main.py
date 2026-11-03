@@ -682,7 +682,10 @@ async def landing_page(request: Request, reauth: int = 0):
                     return RedirectResponse(destination, status_code=302)
             except Exception:  # expired / tampered token -> just show the form
                 pass
-    response = templates.TemplateResponse(request, "login.html", {})
+    from urllib.parse import urlparse
+
+    host = urlparse(settings.public_url or "").hostname or request.url.hostname   # behind a proxy, the address people actually use
+    response = templates.TemplateResponse(request, "login.html", {"site_host": host})
     response.headers["Cache-Control"] = "no-store"
     return response
 

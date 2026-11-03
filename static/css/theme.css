@@ -474,3 +474,71 @@ a:hover { color: var(--blue-700); }
 .auth-logo.has-logo { background: transparent; overflow: hidden; }
 .auth-logo.has-logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .landing-tagline { margin: 4px 0 0; opacity: .85; }
+
+/* =====================================================================
+   Sign-in page: split layout (the institute on the left, the form on the right; on a phone a short header on top).
+   The panel uses --sidebar-bg, so it follows the institute colour set in Settings.
+   ===================================================================== */
+.signin-body { margin: 0; min-height: 100vh; min-height: 100dvh; background: var(--surface); color: var(--text-primary); }
+.signin { display: flex; min-height: 100vh; min-height: 100dvh; }
+
+.signin-panel {
+  flex: 0 0 clamp(380px, 42%, 580px);
+  box-sizing: border-box;
+  padding: 56px clamp(32px, 5vw, 64px);
+  background: var(--sidebar-bg);
+  color: #ffffff;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 40px;
+}
+.signin-brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.signin-chip {
+  flex: none; width: 52px; height: 52px; border-radius: 14px;
+  background: #ffffff; color: var(--sidebar-bg);
+  display: grid; place-items: center; overflow: hidden;
+  font-weight: 800; font-size: 1.5rem;
+}
+.signin-chip img { width: 100%; height: 100%; object-fit: contain; padding: 6px; box-sizing: border-box; }
+.signin-brand-text { display: flex; flex-direction: column; gap: 2px; line-height: 1.25; min-width: 0; }
+.signin-brand-text strong { font-size: 1.2rem; font-weight: 700; }
+.signin-brand-text small { font-size: 0.82rem; color: #c9d4f2; }
+
+.signin-pitch { display: flex; flex-direction: column; gap: 26px; }
+.signin-pitch h2 { margin: 0; font-size: clamp(2rem, 3.4vw, 2.75rem); line-height: 1.12; font-weight: 800; letter-spacing: -0.02em; }
+.signin-pitch p { margin: 0; max-width: 26em; font-size: 1.06rem; line-height: 1.6; color: #dce3f7; }
+.signin-points { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.signin-points li { display: flex; align-items: center; gap: 12px; font-size: 0.95rem; }
+.signin-points svg { flex: none; color: var(--yellow-400); }
+.signin-host { margin: 0; font-size: 0.82rem; color: #afbee8; }
+
+.signin-main {
+  flex: 1; min-width: 0; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+  padding: 48px 24px;
+}
+.signin-card { width: 100%; max-width: 400px; }
+.signin-card h1 { margin: 0 0 8px; font-size: 2rem; line-height: 1.15; font-weight: 800; letter-spacing: -0.01em; }
+.signin-card .auth-sub { margin-bottom: 24px; }
+.signin-card .auth-field { margin-bottom: 18px; }
+.signin-card .auth-input { height: 50px; }
+.signin-card .auth-pw-toggle { height: 50px; }
+.signin-card .auth-submit { height: 52px; margin-top: 4px; }
+.signin-label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.signin-label-row label { margin: 0; }
+.signin-forgot { font-size: 0.86rem; font-weight: 600; color: var(--blue-600); text-decoration: none; }
+.signin-forgot:hover { color: var(--blue-700); text-decoration: underline; }
+.signin-forgot:focus-visible, .signin-note a:focus-visible { outline: 2px solid var(--blue-500); outline-offset: 2px; border-radius: 4px; }
+.signin-note { margin: 18px 0 0; font-size: 0.88rem; line-height: 1.55; color: var(--text-secondary); }
+.signin-note a { color: var(--blue-600); font-weight: 600; }
+.signin-foot { margin: 28px 0 0; font-size: 0.78rem; color: var(--text-muted); }
+
+/* Phones and narrow tablets: the panel becomes a short header with the name and the headline. */
+@media (max-width: 900px) {
+  .signin { flex-direction: column; }
+  .signin-panel { flex: none; gap: 22px; padding: max(32px, env(safe-area-inset-top)) 24px 32px; }
+  .signin-pitch { gap: 0; }
+  .signin-pitch h2 { font-size: 1.9rem; }
+  .signin-pitch p, .signin-points, .signin-host { display: none; }
+  .signin-chip { width: 44px; height: 44px; border-radius: 12px; font-size: 1.3rem; }
+  .signin-main { align-items: flex-start; padding: 28px 20px max(24px, env(safe-area-inset-bottom)); }
+  .signin-card h1 { font-size: 1.65rem; }
+}
