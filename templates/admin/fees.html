@@ -68,12 +68,19 @@
 <div class="portal-tab-panel" data-tab-panel="scholarships" hidden>
 <section class="panel can-propose" id="sc-grant-panel">
   <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("graduation-cap") }}</div><h2>Give a scholarship or discount</h2></div></div>
-  <p class="panel-hint">Students in the same class can pay different amounts: a scholarship or discount takes a percentage or a fixed amount off their unpaid installments, and their challans change to the new amount. It never rewrites what was already paid.</p>
+  <p class="panel-hint">Students in the same class can pay different amounts: a scholarship or discount takes a percentage (e.g. 25%) or a fixed amount (e.g. Rs. 10,000) off their unpaid installments, and their challans change to the new amount. It never rewrites what was already paid.</p>
   <form id="sc-form" class="form-grid two-col" novalidate>
     <div class="form-field two-span"><label for="sc-student">Student</label><input id="sc-student" class="text-input" type="search" placeholder="Name or roll number&hellip;" autocomplete="off" /><div id="sc-student-list" class="picker-list"></div></div>
     <div class="form-field"><label for="sc-name">Name</label><input id="sc-name" class="text-input" maxlength="120" placeholder="e.g. Merit scholarship, Sibling discount" /></div>
-    <div class="form-field"><label for="sc-kind">Type</label><select id="sc-kind" class="select-input"><option value="PERCENT">A percentage of each installment</option><option value="FIXED">A fixed amount (spread over the installments)</option></select></div>
-    <div class="form-field"><label for="sc-value" id="sc-value-label">Percentage (%)</label><input id="sc-value" class="text-input" type="number" min="0.01" step="0.01" /></div>
+    <div class="form-field"><span class="kind-label" id="sc-kind-h">Discount type</span>
+      <div class="seg seg-kind" role="radiogroup" aria-labelledby="sc-kind-h">
+        <label class="seg-opt"><input type="radio" name="sc-kind-r" value="PERCENT" checked /><span>% Percentage</span></label>
+        <label class="seg-opt"><input type="radio" name="sc-kind-r" value="FIXED" /><span>Rs. Fixed amount</span></label>
+      </div>
+      <input type="hidden" id="sc-kind" value="PERCENT" /></div>
+    <div class="form-field"><label for="sc-value" id="sc-value-label">Percentage off</label>
+      <div class="input-adorn"><span class="adorn-pre" id="sc-value-pre" hidden>Rs.</span><input id="sc-value" class="text-input" type="number" min="0.01" step="0.01" inputmode="decimal" /><span class="adorn-suf" id="sc-value-suf">%</span></div>
+      <small class="field-hint kind-preview" id="sc-preview" aria-live="polite"></small></div>
     <div class="form-field"><label for="sc-structure">Applies to</label><select id="sc-structure" class="select-input"><option value="">Every fee of this student</option></select><small class="field-hint">For a tuition discount that continues every semester, choose "Tuition &hellip; only (every semester)": exam, library and other fees are left alone.</small></div>
     <div class="form-field"><label for="sc-from">Covers installments due from</label><input id="sc-from" class="text-input" type="date" /><small class="field-hint">Empty = from the start of the current term, so this term's installments already due are included. Earlier terms' dues are never touched.</small></div>
     <div class="form-field"><label for="sc-until">Until <small class="field-hint inline">(optional)</small></label><input id="sc-until" class="text-input" type="date" /></div>
@@ -129,8 +136,15 @@
     <p class="panel-hint" id="sc-edit-who"></p>
     <div class="form-grid two-col">
       <div class="form-field"><label for="se-name">Name</label><input id="se-name" class="text-input" maxlength="120" /></div>
-      <div class="form-field"><label for="se-kind">Type</label><select id="se-kind" class="select-input"><option value="PERCENT">A percentage of each installment</option><option value="FIXED">A fixed amount (spread over the installments)</option></select></div>
-      <div class="form-field"><label for="se-value" id="se-value-label">Percentage (%)</label><input id="se-value" class="text-input" type="number" min="0.01" step="0.01" /></div>
+      <div class="form-field"><span class="kind-label" id="se-kind-h">Discount type</span>
+        <div class="seg seg-kind" role="radiogroup" aria-labelledby="se-kind-h">
+          <label class="seg-opt"><input type="radio" name="se-kind-r" value="PERCENT" checked /><span>% Percentage</span></label>
+          <label class="seg-opt"><input type="radio" name="se-kind-r" value="FIXED" /><span>Rs. Fixed amount</span></label>
+        </div>
+        <input type="hidden" id="se-kind" value="PERCENT" /></div>
+      <div class="form-field"><label for="se-value" id="se-value-label">Percentage off</label>
+        <div class="input-adorn"><span class="adorn-pre" id="se-value-pre" hidden>Rs.</span><input id="se-value" class="text-input" type="number" min="0.01" step="0.01" inputmode="decimal" /><span class="adorn-suf" id="se-value-suf">%</span></div>
+        <small class="field-hint kind-preview" id="se-preview" aria-live="polite"></small></div>
       <div class="form-field"><label for="se-structure">Applies to</label><select id="se-structure" class="select-input"></select></div>
       <div class="form-field"><label for="se-from">Covers installments due from</label><input id="se-from" class="text-input" type="date" /></div>
       <div class="form-field"><label for="se-until">Until <small class="field-hint inline">(empty = no end)</small></label><input id="se-until" class="text-input" type="date" /></div>

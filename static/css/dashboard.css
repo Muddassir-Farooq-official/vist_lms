@@ -3590,3 +3590,22 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 .field-label-sm { margin: 12px 0 4px; font-weight: 600; font-size: 0.88rem; }
 .em-cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0 14px; }
 .em-cats .check-row { min-height: 34px; font-weight: 500; }
+
+/* Discount type switch (% Percentage / Rs. Fixed amount) and the value box with % or Rs. inside it */
+.kind-label { display: block; font-size: 0.8rem; margin-bottom: 6px; color: var(--text-secondary); }
+.seg.seg-kind { display: flex; width: 100%; }
+.seg-kind .seg-opt { flex: 1 1 0; margin: 0; display: block; }
+.form-field .seg-kind label.seg-opt { margin-bottom: 0; }
+.seg-kind .seg-opt span { min-width: 0; min-height: 42px; white-space: nowrap; }
+.seg-kind .seg-opt + .seg-opt span { border-left: 1.5px solid var(--border-strong); }
+.seg-kind input:checked + span { background: var(--blue-600); color: #fff; }
+.input-adorn { display: flex; align-items: stretch; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.input-adorn:focus-within { outline: 3px solid var(--blue-500); outline-offset: 1px; }
+.form-field .input-adorn input.text-input { border: 0; border-radius: 0; outline: none; min-width: 0; flex: 1 1 auto; box-shadow: none; }
+.adorn-pre, .adorn-suf { display: flex; align-items: center; padding: 0 12px; font-weight: 700; color: var(--text-secondary); background: var(--surface-alt); }
+.adorn-pre { border-right: 1px solid var(--border); }
+.adorn-suf { border-left: 1px solid var(--border); }
+.adorn-pre[hidden], .adorn-suf[hidden] { display: none; }
+.kind-preview { display: block; margin-top: 6px; line-height: 1.45; }
+.kind-preview.warn { color: var(--amber-700, #8a5a00); font-weight: 600; }
+.form-field > .input-adorn { flex: 0 0 auto; }

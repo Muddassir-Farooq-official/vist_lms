@@ -183,7 +183,69 @@
   // ------------------------------------------------------------------ Scholarships & discounts
   let scStudent = null;
   studentPicker($("sc-student"), $("sc-student-list"), function (s) { scStudent = s; });
-  $("sc-kind").addEventListener("change", function () { $("sc-value-label").textContent = $("sc-kind").value === "PERCENT" ? "Percentage (%)" : "Amount (Rs.)"; });
+
+  // Discount type: "% Percentage" or "Rs. Fixed amount" (a switch; the hidden #sc-kind / #se-kind holds the value),
+  // the value box shows % or Rs., and a line under it says exactly what the discount will do before it is saved.
+  let structInfo = {}, latestOfType = {};
+  function previewText(pre) {
+    const kind = $(pre + "-kind").value, v = parseFloat($(pre + "-value").value), scope = $(pre + "-structure").value || "";
+    const fixed = kind === "FIXED";
+    if (!(v > 0)) {
+      return { text: fixed ? "Takes this amount (in rupees) off each fee it covers, spread over that fee's installments."
+                           : "Takes this percentage off every installment of the fees it covers.", warn: false };
+    }
+    if (!fixed && v > 100) return { text: "A percentage can be at most 100.", warn: true };
+    const what = fixed ? money(v) : v + "%";
+    const example = function (st) {
+      if (!st) return "";
+      const off = fixed ? Math.min(v, st.total) : Math.round(st.total * v) / 100;
+      return " Example: " + st.name + " (" + st.term + "), " + money(st.total) + " → " + money(st.total - off) + " to pay." +
+        (fixed && v > st.total ? " (Only " + money(st.total) + " can come off this fee.)" : "");
+    };
+    if (scope.indexOf("fee:") === 0) {
+      const st = structInfo[scope.slice(4)];
+      return { text: what + " off this one fee." + example(st), warn: false };
+    }
+    if (scope.indexOf("type:") === 0) {
+      const tid = scope.slice(5), name = feeTypeNames[tid] || "this kind of fee";
+      return { text: what + " off " + name + " in every semester" + (fixed ? ", spread over its installments." : ".") + example(structInfo[latestOfType[tid]]), warn: false };
+    }
+    return fixed
+      ? { text: money(v) + " off EACH fee this student is charged (tuition, exam, library… each one gets " + money(v) + " off). For tuition only, choose “Tuition … only (every semester)” under Applies to.", warn: true }
+      : { text: v + "% off every fee this student is charged (tuition, exam, library…).", warn: false };
+  }
+  function paintPreview(pre) {
+    const out = $(pre + "-preview");
+    if (!out) return;
+    const p = previewText(pre);
+    out.textContent = p.text + ($(pre + "-kind").value === "FIXED" && parseFloat($(pre + "-value").value) > 0 ? " Never more than what is still owed." : "");
+    out.classList.toggle("warn", !!p.warn);
+  }
+  function wireKind(pre) {
+    const hidden = $(pre + "-kind"), input = $(pre + "-value");
+    const radios = Array.prototype.slice.call(document.querySelectorAll('input[name="' + pre + '-kind-r"]'));
+    function paint() {
+      const fixed = hidden.value === "FIXED";
+      radios.forEach(function (r) { r.checked = r.value === hidden.value; });
+      $(pre + "-value-label").textContent = fixed ? "Amount off (Rs.)" : "Percentage off";
+      $(pre + "-value-pre").hidden = !fixed; $(pre + "-value-suf").hidden = fixed;
+      input.placeholder = fixed ? "e.g. 10000" : "e.g. 25";
+      if (fixed) input.removeAttribute("max"); else input.max = "100";
+      input.step = fixed ? "1" : "0.01";
+      paintPreview(pre);
+    }
+    radios.forEach(function (r) {
+      r.addEventListener("change", function () {
+        if (!r.checked || hidden.value === r.value) return;
+        hidden.value = r.value; input.value = "";           // a percentage is not an amount: start the number again
+        hidden.dispatchEvent(new Event("change")); input.focus();
+      });
+    });
+    hidden.addEventListener("change", paint);
+    input.addEventListener("input", function () { paintPreview(pre); });
+    $(pre + "-structure").addEventListener("change", function () { paintPreview(pre); });
+    paint();
+  }
 
   // "Applies to": every fee; one kind of fee (e.g. Tuition) in every semester; or one fee only.
   let feeTypeNames = {};
@@ -191,8 +253,13 @@
     const [r, t] = await Promise.all([VA.fetchJson("/api/v1/fees/structures", { quiet: true }), VA.fetchJson("/api/v1/fees/types", { quiet: true })]);
     if (!r.ok) return;
     const types = t.ok ? t.body.filter(function (x) { return x.is_active !== false && x.code !== "OPENING"; }) : [];
-    feeTypeNames = {};
+    feeTypeNames = {}; structInfo = {}; latestOfType = {};
     types.forEach(function (x) { feeTypeNames[x.id] = x.name; });
+    r.body.filter(function (x) { return x.status !== "DRAFT"; }).forEach(function (x) {
+      structInfo[x.id] = { name: x.name, term: x.term_label, total: Number(x.total_amount) || 0, from: x.effective_from || "" };
+      const cur = structInfo[latestOfType[x.fee_type_id]];
+      if (!cur || String(x.effective_from || "") > cur.from) latestOfType[x.fee_type_id] = x.id;
+    });
     const sel = $("sc-structure");
     sel.innerHTML = '<option value="">Every fee of this student</option>' +
       (types.length ? '<optgroup label="One kind of fee, every semester">' + types.map(function (x) {
@@ -201,7 +268,9 @@
       '<optgroup label="One fee only">' + r.body.filter(function (s) { return s.status !== "DRAFT"; }).map(function (s) {
         return '<option value="fee:' + s.id + '">Only: ' + esc(s.name) + " (" + esc(s.term_label) + ")</option>";
       }).join("") + "</optgroup>";
+    paintPreview("sc");
   }
+  wireKind("sc"); wireKind("se");
   function appliesTo(s) {
     if (s.fee_type_id) return (feeTypeNames[s.fee_type_id] || "One kind of fee") + " only, every semester";
     return s.fee_structure_id ? "one fee only" : "every fee";
@@ -215,7 +284,8 @@
     $("sc-error").hidden = true;
     if (!scStudent) return fail("sc-error", "Choose the student from the list.");
     if ($("sc-name").value.trim().length < 3) return fail("sc-error", "Give it a name.");
-    if (!($("sc-value").value > 0)) return fail("sc-error", "Enter the percentage or amount.");
+    if (!($("sc-value").value > 0)) return fail("sc-error", $("sc-kind").value === "FIXED" ? "Enter the amount in rupees." : "Enter the percentage.");
+    if ($("sc-kind").value === "PERCENT" && parseFloat($("sc-value").value) > 100) return fail("sc-error", "A percentage can be at most 100.");
     if ($("sc-reason").value.trim().length < 5) return fail("sc-error", "Give the reason (it is kept on record).");
     $("sc-save").disabled = true;
     const r = await VA.fetchJson("/api/v1/fees/scholarships", json("POST", {
@@ -230,7 +300,7 @@
     else VA.toast(r.body.applied && r.body.applied.total_concession > 0
       ? "Saved: " + money(r.body.applied.total_concession) + " taken off " + r.body.applied.assignments_updated + " fee(s)."
       : "Saved. Nothing was due inside its dates yet; it will apply to installments due between those dates.");
-    ["sc-student", "sc-name", "sc-value", "sc-reason", "sc-until"].forEach(function (id) { $(id).value = ""; }); scStudent = null;
+    ["sc-student", "sc-name", "sc-value", "sc-reason", "sc-until"].forEach(function (id) { $(id).value = ""; }); scStudent = null; paintPreview("sc");
     loadScholarships(); refresh();
   });
   let scRows = {}, canProposeSc = false;
@@ -319,14 +389,13 @@
 
   // ---- edit
   let scEditing = null;
-  $("se-kind").addEventListener("change", function () { $("se-value-label").textContent = $("se-kind").value === "PERCENT" ? "Percentage (%)" : "Amount (Rs.)"; });
   function scopeOf(s) { return s.fee_type_id ? "type:" + s.fee_type_id : s.fee_structure_id ? "fee:" + s.fee_structure_id : ""; }
   function openEdit(s) {
     scEditing = s;
     $("sc-edit-who").textContent = s.student_name + (s.roll_number ? " (" + s.roll_number + ")" : "") + " · given so far " + money(s.given_so_far);
     $("se-structure").innerHTML = $("sc-structure").innerHTML;
     $("se-name").value = s.name; $("se-kind").value = s.kind; $("se-kind").dispatchEvent(new Event("change"));
-    $("se-value").value = s.value; $("se-structure").value = scopeOf(s);
+    $("se-value").value = s.value; $("se-structure").value = scopeOf(s); paintPreview("se");
     $("se-from").value = String(s.valid_from || "").slice(0, 10); $("se-until").value = s.valid_until ? String(s.valid_until).slice(0, 10) : "";
     $("se-auto").checked = !!s.auto_apply; $("se-reason").value = s.reason || ""; $("se-note").value = "";
     $("sc-edit-error").hidden = true;
@@ -339,7 +408,8 @@
     if (!s) return;
     $("sc-edit-error").hidden = true;
     if ($("se-note").value.trim().length < 5) return fail("sc-edit-error", "Say why you are changing it (kept on record).");
-    if (!($("se-value").value > 0)) return fail("sc-edit-error", "Enter the percentage or amount.");
+    if (!($("se-value").value > 0)) return fail("sc-edit-error", $("se-kind").value === "FIXED" ? "Enter the amount in rupees." : "Enter the percentage.");
+    if ($("se-kind").value === "PERCENT" && parseFloat($("se-value").value) > 100) return fail("sc-edit-error", "A percentage can be at most 100.");
     const body = { note: $("se-note").value.trim() };
     const scope = $("se-structure").value;
     if ($("se-name").value.trim() !== s.name) body.name = $("se-name").value.trim();

@@ -599,3 +599,19 @@ creates the fee assignment, whose table points at `enrollments`, a table the wor
 on the server stopped with NoReferencedTableError and nothing was imported (tests and the in-app fallback load every
 table, which is why it only showed on the server). Now the worker, and the SMS / email sender, load every table first
 (`app/core/model_registry.py`). After deploying, upload the same file again. No migration.
+
+# "Page not found" page instead of {"detail":"Not Found"} (no migration)
+
+An address that does not exist, opened in a browser, now shows a proper page ("Page not found", with "Go to my portal"
+and "Go back"). A crash while opening a page shows "Something went wrong" with a short reference for the office (the
+same reference is in the server log); no internal details are shown. The API (`/api/...`), static files and health
+checks still answer in JSON exactly as before. Files: `templates/error.html`, `static/js/error-page.js`, handlers in `app/main.py`.
+
+# Discounts: percentage or fixed amount, clearly (no migration)
+
+Fees → Scholarships & discounts (and the Change dialog): a **% Percentage / Rs. Fixed amount** switch replaces the
+easy-to-miss "Type" list; the value box shows % or Rs.; a line under it says exactly what the discount will do before it
+is saved (for one fee it works out the example, e.g. "Tuition Fall 2026, Rs. 90,000 → Rs. 80,000 to pay"), and warns when
+a fixed amount would come off EVERY fee. A fixed amount comes off each fee it covers (e.g. Rs. 10,000 off tuition every
+semester), spread over that fee's installments, never more than what is owed. The calculation itself was already in the
+system; new tests cover it (`tests/integration/test_discount_fixed_amount.py`).
