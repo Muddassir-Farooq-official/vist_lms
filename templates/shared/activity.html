@@ -6,7 +6,12 @@
 {% block page_subtitle %}<div class="content-subtitle">Everything done in the system: who did it (administrator, staff, student, parent or the system itself), what, when and from where.</div>{% endblock %}
 
 {% block content %}
-<div class="dash" id="activity-page">
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="activity" role="tab">{{ nav_icon("file") }}<span>Activity</span></button>
+  <button class="portal-tab" data-tab="security" role="tab">{{ nav_icon("shield") }}<span>Security</span></button>
+</div>
+
+<div class="dash" id="activity-page" data-tab-panel="activity">
   <section class="panel dash-panel" aria-labelledby="al-filter-h">
     <div class="dash-panel-head"><h2 id="al-filter-h">Find activity</h2>
       <button type="button" class="role-btn small-btn secondary-btn" id="al-export" hidden>Download CSV</button></div>
@@ -44,6 +49,40 @@
   </section>
 </div>
 
+<div class="dash" data-tab-panel="security" hidden>
+  <section class="panel dash-panel" aria-labelledby="sec-h">
+    <div class="dash-panel-head"><h2 id="sec-h">Security</h2>
+      <label class="sec-days">Period <select id="sec-days" class="select-input"><option value="1">Last 24 hours</option><option value="7" selected>Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option></select></label></div>
+    <p class="panel-hint">Attempts the system refused or that looked like an attack. Nothing here got through: database queries never run typed text as code, pages show typed text as plain text, and every action checks the person&rsquo;s permission. This list shows who tried, from which network address, and when. Administrators get a notification and an email (Settings &rarr; Email) when attempts pile up.</p>
+    <div class="sec-tiles" id="sec-tiles"></div>
+  </section>
+
+  <div class="sec-grid">
+    <section class="panel dash-panel" aria-labelledby="sec-ip-h">
+      <div class="dash-panel-head"><h2 id="sec-ip-h">Addresses behind the most attempts</h2></div>
+      <div class="table-scroll"><table class="dash-table"><thead><tr><th>Network address</th><th class="num">Refused / suspicious</th><th class="num">Wrong passwords</th><th>Last seen</th></tr></thead><tbody id="sec-ips"></tbody></table></div>
+      <p class="empty-state" id="sec-ips-empty" hidden>Nothing in this period.</p>
+    </section>
+    <section class="panel dash-panel" aria-labelledby="sec-acc-h">
+      <div class="dash-panel-head"><h2 id="sec-acc-h">Accounts with the most wrong passwords</h2></div>
+      <div class="table-scroll"><table class="dash-table"><thead><tr><th>Username tried</th><th class="num">Wrong</th><th class="num">From addresses</th><th>Last</th></tr></thead><tbody id="sec-accounts"></tbody></table></div>
+      <p class="empty-state" id="sec-accounts-empty" hidden>No wrong passwords in this period.</p>
+    </section>
+  </div>
+
+  <section class="panel dash-panel" aria-labelledby="sec-ev-h">
+    <div class="dash-panel-head"><h2 id="sec-ev-h">Every attempt</h2><small class="al-count" id="sec-count"></small></div>
+    <form class="al-filters" id="sec-form">
+      <label>What<select id="sec-kind" class="select-input"><option value="">Everything</option></select></label>
+      <label>Network address<input id="sec-ip" class="text-input" type="search" placeholder="e.g. 203.0.113.7" /></label>
+      <label class="al-q">Search<input id="sec-q" class="text-input" type="search" placeholder="Username, page or detail" /></label>
+      <button type="submit" class="role-btn">Show</button>
+    </form>
+    <div class="table-scroll"><table class="dash-table sec-table"><thead><tr><th>When</th><th>What</th><th>Who</th><th>Address</th><th>Page</th><th>Detail</th></tr></thead><tbody id="sec-events"></tbody></table></div>
+    <p class="empty-state" id="sec-empty" hidden>No attempts match.</p>
+  </section>
+</div>
+
 <dialog id="al-dialog" class="modal modal-wide" aria-labelledby="al-d-title">
   <div class="modal-body">
     <h2 id="al-d-title">Activity</h2>
@@ -60,4 +99,5 @@
 
 {% block extra_scripts %}
 <script src="/static/js/activity.js"></script>
+<script src="/static/js/activity-security.js"></script>
 {% endblock %}

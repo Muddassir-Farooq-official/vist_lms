@@ -52,6 +52,7 @@ from app.students import models as _students_models  # noqa: F401
 from app.hostel import models as _hostel_models  # noqa: F401
 from app.records import models as _records_models  # noqa: F401
 from app.calendar import models as _calendar_models  # noqa: F401
+from app.security import models as _security_models  # noqa: F401
 
 TEST_DATABASE_URL = settings.database_url.rsplit("/", 1)[0] + "/vist_lms_test"
 
@@ -258,3 +259,23 @@ async def app_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, No
         yield client
 
     app.dependency_overrides.clear()
+
+@pytest.fixture(autouse=True)
+def _forget_cached_test_passwords():
+    """Several test modules remember the password a test account chose on its first sign-in (module `_cache`, or
+    `_as.cache`). The database is wiped before every test, so a remembered password from an earlier test belongs to an
+    account that no longer exists: a test that borrows another module's helpers (test_finance_controls uses
+    test_purchasing's) then signs in with it and gets 401, depending only on which tests ran before it in the same
+    process. Forget them all before each test."""
+    import sys
+
+    for name, module in list(sys.modules.items()):
+        if not name.startswith("tests."):
+            continue
+        cache = getattr(module, "_cache", None)
+        if isinstance(cache, dict):
+            cache.clear()
+        helper = getattr(module, "_as", None)
+        if isinstance(getattr(helper, "cache", None), dict):
+            helper.cache.clear()
+    yield

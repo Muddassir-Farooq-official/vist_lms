@@ -3611,7 +3611,8 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 .form-field > .input-adorn { flex: 0 0 auto; }
 
 /* ======================================================================
-   Look: "Bold colour blocks" (chosen design C). Applies to every portal's dashboard; the side drawer is unchanged.
+   Look: "Bold colour blocks" (chosen design C). Applies to every portal's dashboard. The side drawer is a "royal"
+   block in the institute's main colour (Settings -> Look & documents), royal blue when none is set.
    Strong colour blocks carry white text (each fill passes 4.5:1 contrast with white).
    ====================================================================== */
 :root {
@@ -3705,3 +3706,50 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
   .kpi-row .kpi { padding: 14px; border-radius: 20px; }
   .kpi-row .kpi-value { font-size: 1.35rem; }
 }
+
+
+/* ======================================================================
+   Drawer: a royal block in the main colour (royal blue by default; Settings -> Look & documents changes it,
+   e.g. royal red or emerald). The active item is white with the colour as its text; the greeting block turns
+   ink so it does not run into the drawer.
+   ====================================================================== */
+:root { --drawer-top: #1d4ed8; --drawer-bottom: #1e3a8a; }
+.drawer { background: linear-gradient(180deg, var(--drawer-top), var(--drawer-bottom)); border-right: 0; }
+.drawer .drawer-link { color: rgba(255, 255, 255, 0.84); }
+.drawer .drawer-link:hover:not(.disabled) { background: rgba(255, 255, 255, 0.13); color: #ffffff; }
+.drawer .drawer-link.active { background: #ffffff; color: var(--drawer-top); font-weight: 700; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); }
+.drawer .drawer-group { color: rgba(255, 255, 255, 0.68); }
+.drawer .drawer-close, .drawer .brand-text small { color: rgba(255, 255, 255, 0.78); }
+.drawer .brand-mark:not(.has-logo) { background: var(--bold-yellow); color: #1a1300; }
+.drawer .drawer-footer { border-top-color: rgba(255, 255, 255, 0.18); }
+.drawer .logout-link { color: #ffe4e6; }
+.drawer .logout-link:hover { background: rgba(0, 0, 0, 0.18); color: #ffffff; }
+.drawer .soon-badge { color: rgba(255, 255, 255, 0.8); border-color: rgba(255, 255, 255, 0.25); }
+.dash-hero { background: var(--bold-ink); }
+.dash-hero p { color: #c9d2e6; }
+.st-image-box.dark { background: linear-gradient(180deg, var(--drawer-top), var(--drawer-bottom)); }
+.st-prev-menu { background: linear-gradient(180deg, var(--pv), var(--pv-dark)); }
+.st-swatch.on { box-shadow: 0 0 0 2px var(--text-primary, #0b1630); }
+.st-color-name { font-size: .85rem; font-weight: 600; color: var(--text-secondary, #475569); }
+.drawer .drawer-link .nav-badge { background: #ffffff; color: var(--drawer-top); }
+.drawer .drawer-link.active .nav-badge { background: var(--drawer-top); color: #ffffff; }
+.st-prev-mark { background: var(--bold-yellow); color: #1a1300; }
+
+/* Activity log -> Security */
+.sec-days { display: flex; align-items: center; gap: 8px; font-size: .85rem; font-weight: 600; }
+.sec-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 12px; }
+.sec-tile { text-align: left; border: 0; border-radius: 18px; padding: 14px 16px; color: #ffffff; cursor: pointer; display: flex; flex-direction: column; gap: 2px;
+  background: var(--fill, var(--bold-blue)); font-family: inherit; min-height: 44px; }
+.sec-tile b { font-size: 1.6rem; font-weight: 800; line-height: 1.1; }
+.sec-tile span { font-weight: 700; font-size: .9rem; }
+.sec-tile small { font-size: .74rem; opacity: .88; line-height: 1.3; }
+.sec-tile:hover { filter: brightness(1.08); }
+.sec-tile.tone-orange, .sec-pill.tone-orange { --fill: var(--bold-orange); }
+.sec-tile.tone-purple, .sec-pill.tone-purple { --fill: var(--bold-purple); }
+.sec-tile.tone-red, .sec-pill.tone-red { --fill: var(--bold-red); }
+.sec-tile.tone-teal, .sec-pill.tone-teal { --fill: var(--bold-teal); }
+.sec-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.sec-pill { display: inline-block; padding: 3px 9px; border-radius: 8px; background: var(--fill, var(--bold-blue)); color: #ffffff; font-size: .74rem; font-weight: 700; white-space: nowrap; }
+.sec-ua { display: block; color: var(--text-muted, #64748b); font-size: .72rem; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sec-table code { font-size: .76rem; word-break: break-all; }
+.sec-detail { font-size: .8rem; max-width: 320px; word-break: break-word; }

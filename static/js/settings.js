@@ -6,7 +6,9 @@
   const VA = window.VistAdmin;
   const $ = function (id) { return document.getElementById(id); };
   const API = "/api/v1/institute";
-  const SWATCHES = ["#2454d6", "#0b6b5d", "#7a1f3d", "#5b2a86", "#b45309", "#0f5132", "#1e3a5f", "#9b1c1c"];
+  // Ready-made "royal" colours for the menu, buttons and links (white text reads well on every one).
+  const SWATCHES = [["#1d4ed8", "Royal blue"], ["#b91c1c", "Royal red"], ["#047857", "Emerald green"], ["#6d28d9", "Royal purple"],
+    ["#0e7490", "Teal"], ["#c2410c", "Burnt orange"], ["#7a1f3d", "Maroon"], ["#1e3a5f", "Navy"], ["#be185d", "Magenta"], ["#3f3f46", "Graphite"]];
   let profile = null, isAdmin = false;
 
   function msg(r, fallback) { return (r.body && r.body.error && r.body.error.message) || fallback; }
@@ -16,7 +18,7 @@
   function fill(p) {
     profile = p;
     fields().forEach(function (el) { const v = p[el.getAttribute("data-field")]; el.value = v == null ? "" : v; el.classList.remove("st-invalid"); });
-    $("pf-color-pick").value = p.primary_color || "#2454d6";
+    $("pf-color-pick").value = p.primary_color || "#1d4ed8";
     ["logo", "logo_dark", "signature"].forEach(function (kind) {
       const img = $("img-" + kind), has = p["has_" + kind];
       const url = kind === "signature" ? API + "/signature.png?v=" + p.version : (kind === "logo" ? "/branding/logo.png?v=" : "/branding/logo-dark.png?v=") + p.version;
@@ -50,10 +52,14 @@
 
   function preview() {
     const name = $("pf-name").value.trim() || "Institute name", short = $("pf-short").value.trim() || name;
-    const color = validColor($("pf-color").value.trim()) ? $("pf-color").value.trim() : "#2454d6";
+    const typed = $("pf-color").value.trim().toLowerCase();
+    const color = validColor(typed) ? typed : "#1d4ed8";
     const box = $("st-preview");
     box.style.setProperty("--pv", color);
-    box.style.setProperty("--pv-dark", mix(color, [0, 0, 0], 0.62));
+    box.style.setProperty("--pv-dark", mix(color, [0, 0, 0], 0.4));
+    const named = SWATCHES.filter(function (c) { return c[0] === color; })[0];
+    document.querySelectorAll("#pf-swatches [data-color]").forEach(function (b) { b.classList.toggle("on", b.getAttribute("data-color") === color); });
+    if ($("pf-color-name")) $("pf-color-name").textContent = named ? named[1] : (typed ? "Your own colour" : "Royal blue (standard)");
     box.style.setProperty("--pv-soft", mix(color, [255, 255, 255], 0.9));
     $("pv-short").textContent = short;
     $("pv-name").textContent = name;
@@ -73,8 +79,9 @@
   }
 
   $("pf-color-pick").addEventListener("input", function () { $("pf-color").value = $("pf-color-pick").value; preview(); dirty(); });
-  $("pf-color-clear").addEventListener("click", function () { $("pf-color").value = ""; $("pf-color-pick").value = "#2454d6"; preview(); dirty(); });
-  $("pf-swatches").innerHTML = SWATCHES.map(function (c) { return '<button type="button" class="st-swatch" style="background:' + c + '" data-color="' + c + '" aria-label="Colour ' + c + '"></button>'; }).join("");
+  $("pf-color-clear").addEventListener("click", function () { $("pf-color").value = ""; $("pf-color-pick").value = "#1d4ed8"; preview(); dirty(); });
+  $("pf-swatches").innerHTML = SWATCHES.map(function (c) { return '<button type="button" class="st-swatch" style="background:' + c[0] + '" data-color="' + c[0] + '" title="' + c[1] + '" aria-label="' + c[1] + '"></button>'; }).join("") +
+    '<span class="st-color-name" id="pf-color-name"></span>';
   $("pf-swatches").addEventListener("click", function (e) {
     const b = e.target.closest("[data-color]"); if (!b) return;
     $("pf-color").value = b.getAttribute("data-color"); $("pf-color-pick").value = b.getAttribute("data-color"); preview(); dirty();
@@ -156,7 +163,8 @@
       if (!style) { style = document.createElement("style"); style.id = "brand-theme"; document.head.appendChild(style); }
       const c = p.primary_color;
       style.textContent = ":root{--blue-600:" + c + ";--blue-700:" + mix(c, [0, 0, 0], 0.2) + ";--blue-500:" + mix(c, [255, 255, 255], 0.15) + ";--blue-100:" + mix(c, [255, 255, 255], 0.82) +
-        ";--blue-50:" + mix(c, [255, 255, 255], 0.92) + ";--sidebar-bg:" + mix(c, [0, 0, 0], 0.62) + ";--sidebar-bg-alt:" + mix(c, [0, 0, 0], 0.5) + ";}";
+        ";--blue-50:" + mix(c, [255, 255, 255], 0.92) + ";--sidebar-bg:" + mix(c, [0, 0, 0], 0.62) + ";--sidebar-bg-alt:" + mix(c, [0, 0, 0], 0.5) +
+        ";--drawer-top:" + c + ";--drawer-bottom:" + mix(c, [0, 0, 0], 0.4) + ";}";
     }
     const b = document.querySelector(".drawer-brand .brand-text b"); if (b) b.textContent = p.short_name;
   }

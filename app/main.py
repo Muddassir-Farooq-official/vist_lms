@@ -485,10 +485,28 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     """Centralized error shape (Section 28). Raw exceptions/SQL/stack traces
     never reach the client — only the structured code + message."""
     logger.warning("app_error", code=exc.code, path=str(request.url.path), message=exc.message)
+    _flag_security_event(request, exc)
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": {"code": exc.code, "message": exc.message, "details": exc.details}},
     )
+
+
+# Refusals that are part of normal use (finish setting up your account first) are not security events.
+_ROUTINE_REFUSALS = ("You must change your password", "Verify your email address")
+
+
+def _flag_security_event(request: Request, exc: AppError) -> None:
+    """Mark a refused action or a forged sign-in token; app.security.middleware records it once the answer is sent."""
+    from app.core.exceptions import AuthenticationError, AuthorizationError
+
+    try:
+        if isinstance(exc, AuthorizationError) and not exc.message.startswith(_ROUTINE_REFUSALS):
+            request.state.security_event = ("ACCESS_DENIED", exc.message[:300])
+        elif isinstance(exc, AuthenticationError) and exc.message == "Invalid session.":
+            request.state.security_event = ("BAD_TOKEN", "The sign-in token was not one this server issued (forged or altered)")
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _wants_page(request: Request) -> bool:
@@ -618,6 +636,9 @@ app.include_router(fee_challans_router, prefix=settings.api_v1_prefix)
 app.include_router(fee_accounts_router, prefix=settings.api_v1_prefix)
 app.include_router(fee_dashboard_router, prefix=settings.api_v1_prefix)
 app.include_router(fines_router, prefix=settings.api_v1_prefix)
+from app.security.router import router as security_router  # noqa: E402
+
+app.include_router(security_router, prefix=settings.api_v1_prefix)
 # NOTE — deliberately NOT wired in: app.fees.webhook_router. It has no
 # signature/HMAC verification (there's no real 1LINK shared secret to
 # verify against yet), which makes it an open "mark any challan paid"
@@ -1654,3 +1675,9 @@ async def faculty_grading_page(request: Request):
     return templates.TemplateResponse(
         request, "faculty/grading.html", {"nav_items": FACULTY_NAV_ITEMS, "active_nav": "grading"}
     )
+
+
+# Outermost: sees every request and its final status, records attack-looking and refused attempts (app/security).
+from app.security.middleware import SecurityWatch  # noqa: E402
+
+app.add_middleware(SecurityWatch)

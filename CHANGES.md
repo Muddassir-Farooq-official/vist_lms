@@ -630,3 +630,47 @@ hostel): the greeting is a solid blue block with yellow and glass-white quick ac
 blocks with white text; money figures and "needs attention" counts are solid colours; fee and fine summaries match;
 cards lose their outlines; on phones the bottom bar is a dark floating bar with a yellow active tab. The side drawer is
 unchanged. CSS only (`static/css/dashboard.css`, one block at the end); every colour passes the 4.5:1 contrast rule.
+
+## Accounts office can bring in previous dues (2026-11-03)
+
+- New permission `fee.opening_balance.add` (ADMIN, ACCOUNTS_OFFICER). It covers adding previous dues for one
+  student and checking / importing a previous-dues CSV. Before, these needed `fee.manage`, which the accounts
+  officer deliberately does not have (fee structures stay administrator-only).
+- Cancelling (writing off) a previous-dues entry is unchanged: `fee.manage` plus a second administrator's approval.
+- Fees page: the "Bring in previous dues" panel and the "Add previous dues for this student" button now show for
+  anyone holding the new permission, not only administrators.
+- Migration `e7f8a9b0c1d2` (additive): inserts the permission and its two role links. No fee, ledger or payment row
+  is touched. Accounts officers who are signed in get it when they sign in again.
+- Test: `test_accounts_officer_adds_previous_dues_but_cannot_cancel_them`.
+
+## Royal side menu in the institute's colour (2026-11-03)
+
+- The side menu (drawer) is now a solid "royal" block in the main colour (royal blue by default) with a white
+  active item, a yellow logo tile when no logo is uploaded, and white count badges. The dashboard greeting block
+  is dark ink so it does not run into the menu.
+- Settings -> Look & documents -> Main colour: ten named ready-made colours (Royal blue, Royal red, Emerald green,
+  Royal purple, Teal, Burnt orange, Maroon, Navy, Magenta, Graphite), the chosen one's name shown, and the preview
+  menu matches the real one. Any other colour still works; the existing too-light warning still applies.
+- No database change: it uses the existing main colour setting (`app/core/brand.py` adds `--drawer-top/--drawer-bottom`).
+
+## Security tab and alerts (2026-11-03)
+
+- New Activity log -> Security tab (administration and principal): wrong passwords, refused actions (403), attack-looking
+  input (SQL injection, script injection, path or command tricks), forged sign-in tokens, the wrong-password limit, and
+  scans for well-known weak spots (/.env, /wp-admin, *.php). Shows the addresses and accounts behind the most attempts;
+  click an address or username to see everything from it.
+- Nothing is blocked by this (the protection was already there); it records who tried, from which address and browser,
+  and when. Passwords and codes are never read or stored. At most 20 rows per kind and address per 10 minutes.
+- Alerts (portal notification to every administrator + email to the administration addresses and administrators'
+  verified emails, at most once per half hour each): 10 wrong passwords for one account or 20 from one address in
+  15 minutes; 5 different refused actions by one person in 10 minutes; 3 attack-looking or forged-token requests from
+  one address in 10 minutes.
+- Code: app/security/ (models, service, router, middleware), app/main.py (router, middleware, error handler flag).
+- Migration f8a9b0c1d2e3 (additive): one new table security_events with four indexes. Nothing existing changes.
+- Tests: tests/integration/test_security_events.py.
+
+## Test fix: remembered test passwords (2026-11-03)
+
+- tests/conftest.py clears every test module's remembered first-sign-in passwords before each test. The database is
+  wiped per test, so an old remembered password made test_finance_controls fail with 401 depending on test order
+  (it borrows test_purchasing's sign-in helper). Test-only change.

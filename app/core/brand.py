@@ -76,6 +76,7 @@ def theme_css() -> str:
             f"--blue-600:{c};--blue-700:{_mix(c, black, .2)};--blue-500:{_mix(c, white, .15)};"
             f"--blue-100:{_mix(c, white, .82)};--blue-50:{_mix(c, white, .92)};"
             f"--sidebar-bg:{_mix(c, black, .62)};--sidebar-bg-alt:{_mix(c, black, .5)};"
+            f"--drawer-top:{c};--drawer-bottom:{_mix(c, black, .4)};"
             f"--accent-blue-icon:{c};--accent-blue-bg:{_mix(c, white, .9)};"
             "}")
 
