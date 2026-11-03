@@ -674,3 +674,17 @@ unchanged. CSS only (`static/css/dashboard.css`, one block at the end); every co
 - tests/conftest.py clears every test module's remembered first-sign-in passwords before each test. The database is
   wiped per test, so an old remembered password made test_finance_controls fail with 401 depending on test order
   (it borrows test_purchasing's sign-in helper). Test-only change.
+
+## Daily to-do lists for staff (2026-11-03)
+
+- Tasks -> My to-do (every staff portal): write the day's plan, mark each item To do / In progress / Done / Not done,
+  add a note, plan up to a month ahead, and bring unfinished items over from the last day. Yesterday can still be
+  updated; older days are locked as a record (carried-over items stay on their old day as "carried over").
+- Tasks -> To-do reports (administration): pick a month; per person days with a list, items, done, in progress,
+  not done (incl. left open), carried over, done % and last list; staff who wrote nothing are listed too. Click a
+  name for their lists day by day. Download the month (everyone or one person) as CSV (formula-safe).
+- Code: app/todos/ (models, service, router), app/main.py (router), templates/_tasks_portal.html, the eight
+  <portal>/tasks.html pages (script), static/js/todo.js, dashboard.css. Uses the existing task.use / task.manage
+  permissions.
+- Migration a9b0c1d2e3f4 (additive): one new table todo_items with two indexes. Nothing existing changes.
+- Tests: tests/integration/test_todos.py.

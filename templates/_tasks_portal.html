@@ -1,6 +1,7 @@
 {# Tasks between staff -- the same screen in every staff portal; the administration also gets the review, tracking and "all tasks" tabs. #}
 <div class="portal-tabs" role="tablist" data-auto-tabs>
   <button class="portal-tab active" data-tab="inbox" role="tab" aria-selected="true"><span id="tk-tab-inbox">Assigned to me</span></button>
+  <button class="portal-tab" data-tab="todo" role="tab" aria-selected="false"><span>My to-do</span></button>
   <button class="portal-tab" data-tab="sent" role="tab" aria-selected="false"><span>Assigned by me</span></button>
   <button class="portal-tab" data-tab="new" role="tab" aria-selected="false"><span>Assign a task</span></button>
   <button class="portal-tab" data-tab="mine" role="tab" aria-selected="false"><span>My progress</span></button>
@@ -8,6 +9,7 @@
   <button class="portal-tab" data-tab="flags" role="tab" aria-selected="false"><span id="tk-tab-flags">Flagged for review</span></button>
   <button class="portal-tab" data-tab="staff" role="tab" aria-selected="false"><span>Staff progress</span></button>
   <button class="portal-tab" data-tab="all" role="tab" aria-selected="false"><span>All tasks</span></button>
+  <button class="portal-tab" data-tab="todo-report" role="tab" aria-selected="false"><span>To-do reports</span></button>
   {% endif %}
 </div>
 
@@ -16,6 +18,30 @@
     <div class="rv-chips" id="tk-inbox-chips"></div>
     <div id="tk-inbox" class="asg-list" aria-live="polite"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
     <p class="empty-state" id="tk-inbox-empty" hidden>Nobody has assigned you anything here.</p>
+  </section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="todo" hidden>
+  <section class="sh-card td-card">
+    <div class="td-head">
+      <div class="td-daynav">
+        <button type="button" class="page-btn" id="td-prev" aria-label="Previous day">&larr;</button>
+        <input type="date" id="td-date" class="text-input" aria-label="Day" />
+        <button type="button" class="page-btn" id="td-next" aria-label="Next day">&rarr;</button>
+        <button type="button" class="role-btn small-btn secondary-btn" id="td-today">Today</button>
+      </div>
+      <div class="td-progress" id="td-progress" aria-live="polite"></div>
+    </div>
+    <p class="dash-alert td-carry" id="td-carry" hidden><span id="td-carry-text"></span> <button type="button" class="role-btn small-btn" id="td-carry-btn">Bring them to this day</button></p>
+    <form id="td-form" class="td-form" autocomplete="off">
+      <input id="td-title" class="text-input" maxlength="200" placeholder="What do you plan to do? e.g. Check Fall attendance sheets" aria-label="New to-do item" />
+      <input id="td-note" class="text-input" maxlength="1000" placeholder="Note (optional)" aria-label="Note" />
+      <button type="submit" class="role-btn" id="td-add">Add</button>
+    </form>
+    <p class="cc-meta" id="td-locked" hidden>This day is closed: lists older than yesterday stay as they were written.</p>
+    <ul class="td-list" id="td-list" aria-live="polite"></ul>
+    <p class="empty-state" id="td-empty" hidden>Nothing on this day yet. Add what you plan to do.</p>
+    <p class="panel-hint">Write your plan for the day, then mark each item In progress, Done or Not done. You can still update yesterday&rsquo;s list; older days are kept as a record. The administration sees these lists in a monthly report.</p>
   </section>
 </div>
 
@@ -95,6 +121,32 @@
     <button type="button" class="ann-more" id="al-more" hidden>Show more</button>
   </section>
 </div>
+<div class="portal-tab-panel" data-tab-panel="todo-report" hidden>
+  <section class="sh-card">
+    <div class="ann-toolbar">
+      <label class="td-month">Month <input type="month" id="tr-month" class="text-input" /></label>
+      <input id="tr-q" class="text-input" type="search" placeholder="Search name, code or department&hellip;" aria-label="Search staff" />
+      <a class="role-btn secondary-btn" id="tr-csv" href="#" data-download="todo.csv" data-label="To-do report">Download month (CSV)</a>
+    </div>
+    <div class="td-totals" id="tr-totals"></div>
+    <div class="table-scroll"><table class="tk-table" id="tr-table">
+      <thead><tr><th>Staff member</th><th>Department</th><th title="Days on which they wrote a list">Days with a list</th><th>Items</th><th>Done</th><th>In progress</th>
+        <th title="Marked Not done, or left open on a day that has passed">Not done</th><th title="Moved to a later day">Carried over</th><th>Done %</th><th>Last list</th></tr></thead>
+      <tbody id="tr-body"></tbody></table></div>
+    <p class="empty-state" id="tr-empty" hidden>No staff to show.</p>
+    <details class="asg-help"><summary>How are these numbers worked out?</summary>
+      <ul><li><b>Items</b>: everything planned in the month (an item carried to a later day counts once, on the day it ended up on).</li>
+      <li><b>Not done</b>: marked Not done, or still To do / In progress after its day passed.</li>
+      <li><b>Done %</b> = done &divide; items. Staff with no list this month are shown at the end.</li></ul></details>
+  </section>
+</div>
+
+<dialog id="tr-dialog" class="modal modal-wide" aria-labelledby="tr-d-title"><div class="modal-body">
+  <h2 id="tr-d-title">To-do lists</h2><p class="cc-meta" id="tr-d-meta"></p>
+  <p><a class="role-btn small-btn secondary-btn" id="tr-d-csv" href="#" data-download="todo.csv" data-label="To-do list">Download this person (CSV)</a></p>
+  <div id="tr-d-days"></div>
+  <button type="button" class="modal-close-btn" id="tr-d-close">Close</button>
+</div></dialog>
 {% endif %}
 
 <dialog id="tk-modal" class="modal modal-wide" aria-labelledby="tk-title-view">

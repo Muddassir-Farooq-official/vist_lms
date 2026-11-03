@@ -53,6 +53,7 @@ from app.hostel import models as _hostel_models  # noqa: F401
 from app.records import models as _records_models  # noqa: F401
 from app.calendar import models as _calendar_models  # noqa: F401
 from app.security import models as _security_models  # noqa: F401
+from app.todos import models as _todos_models  # noqa: F401
 
 TEST_DATABASE_URL = settings.database_url.rsplit("/", 1)[0] + "/vist_lms_test"
 

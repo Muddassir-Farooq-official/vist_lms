@@ -639,6 +639,9 @@ app.include_router(fines_router, prefix=settings.api_v1_prefix)
 from app.security.router import router as security_router  # noqa: E402
 
 app.include_router(security_router, prefix=settings.api_v1_prefix)
+from app.todos.router import router as todos_router  # noqa: E402
+
+app.include_router(todos_router, prefix=settings.api_v1_prefix)
 # NOTE — deliberately NOT wired in: app.fees.webhook_router. It has no
 # signature/HMAC verification (there's no real 1LINK shared secret to
 # verify against yet), which makes it an open "mark any challan paid"
