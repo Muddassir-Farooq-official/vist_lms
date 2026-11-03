@@ -2,6 +2,7 @@
 <div class="portal-tabs" role="tablist" data-auto-tabs>
   <button class="portal-tab active" data-tab="mine" role="tab" aria-selected="true"><span id="ap-tab-mine">My applications</span></button>
   <button class="portal-tab" data-tab="new" role="tab" aria-selected="false"><span>New application</span></button>
+  {% if not student_portal %}<button class="portal-tab" data-tab="dept" role="tab" aria-selected="false" id="dp-tab" hidden><span id="dp-tab-label">Forwarded to my department</span></button>{% endif %}
 </div>
 
 <div class="portal-tab-panel" data-tab-panel="mine">
@@ -46,6 +47,40 @@
     </form>
   </section>
 </div>
+
+{% if not student_portal %}
+<div class="portal-tab-panel" data-tab-panel="dept" hidden>
+  <section class="sh-card">
+    <p class="panel-hint">Applications the administration forwarded to <b id="dp-names">your department</b>. Do your part, then press <b>Done</b> (or <b>Cannot do</b>) with a note: it goes back to the administration, who makes the final decision. The applicant sees the stage (e.g. &ldquo;Exams is working on it&rdquo;) but not your notes.</p>
+    <div class="ann-toolbar"><select id="dp-show" class="select-input" aria-label="Show"><option value="open">Still with us</option><option value="all">Everything forwarded to us</option></select></div>
+    <div id="dp-list" class="asg-list" aria-live="polite"></div>
+    <p class="empty-state" id="dp-empty" hidden>Nothing has been forwarded to your department.</p>
+  </section>
+</div>
+
+<dialog id="dp-modal" class="modal modal-wide" aria-labelledby="dp-title">
+  <div class="modal-body">
+    <h2 id="dp-title"></h2>
+    <p class="cc-meta" id="dp-meta"></p>
+    <div id="dp-instructions"></div>
+    <h3 class="modal-subhead">The application</h3>
+    <p class="cd-text" id="dp-details"></p>
+    <div id="dp-files"></div>
+    <p class="cd-privacy" id="dp-done-note" hidden></p>
+    <div id="dp-answer">
+      <div class="form-field"><label for="dp-response">Note for the administration</label>
+        <textarea id="dp-response" class="text-input" rows="3" maxlength="2000" placeholder="What you did or found, or why it cannot be done. Needed for Done and Cannot do."></textarea></div>
+      <p id="dp-error" class="dash-alert error" hidden></p>
+      <div class="decision-bar">
+        <button type="button" class="role-btn small-btn secondary-btn" id="dp-start">Start working on it</button>
+        <button type="button" class="role-btn small-btn" id="dp-done">Done: send back to the administration</button>
+        <button type="button" class="danger-btn small-btn" id="dp-cannot">Cannot do</button>
+      </div>
+    </div>
+    <button id="dp-close" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+{% endif %}
 
 <dialog id="ap-modal" class="modal modal-wide" aria-labelledby="ap-title">
   <div class="modal-body">

@@ -89,7 +89,52 @@ async def my_applications(current_user: CurrentUser = Depends(submit), db=Depend
 
 @router.get("/badge", response_model=BadgeOut, summary="A number for the menu: waiting for the administration (admin), or waiting for my answer (applicant)")
 async def badge(current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> BadgeOut:
-    return BadgeOut(count=await ApplicationService(db).badge(current_user.id, _is_admin(current_user)))
+    admin = _is_admin(current_user)
+    count = await ApplicationService(db).badge(current_user.id, admin)
+    if not admin:
+        count += await ForwardingService(db).waiting_count(current_user.roles)       # also what my department still has to look at
+    return BadgeOut(count=count)
+
+
+# ============================================================ departments (an application forwarded to Exams, Accounts ...)
+from app.applications.forwarding import DEPARTMENTS, ForwardingService  # noqa: E402
+from pydantic import BaseModel, Field  # noqa: E402
+
+
+class ForwardIn(BaseModel):
+    department: str = Field(max_length=30)
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class RespondIn(BaseModel):
+    status: str = Field(max_length=15)              # IN_PROGRESS, DONE or CANNOT_DO
+    response: str | None = Field(default=None, max_length=2000)
+
+
+@router.get("/departments", summary="Departments an application can be forwarded to (and whether anyone holds each role)")
+async def departments(current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> list[dict]:
+    fwd = ForwardingService(db)
+    return [{"code": code, "name": name, "people": len(await fwd._members(code))} for code, name in DEPARTMENTS.items()]
+
+
+@router.get("/department/inbox", summary="Applications forwarded to my department (open, or all)")
+async def department_inbox(show: str = "open", current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    fwd = ForwardingService(db)
+    mine = fwd.my_departments(current_user.roles)
+    return {"departments": [{"code": d, "name": DEPARTMENTS[d]} for d in mine], "items": await fwd.inbox(current_user.roles, show="all" if show == "all" else "open")}
+
+
+@router.post("/forwards/{forward_id}/respond", summary="My department's answer: In progress, Done or Cannot do (with a note for the administration)")
+async def department_respond(forward_id: uuid.UUID, payload: RespondIn, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    fwd = ForwardingService(db)
+    f = await fwd.respond(forward_id, user_id=current_user.id, roles=current_user.roles, status=payload.status, response=payload.response)
+    return {"id": str(f.id), "status": f.status}
+
+
+@router.post("/forwards/{forward_id}/recall", summary="Take an application back from a department that has not answered yet (admin)")
+async def recall_forward(forward_id: uuid.UUID, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> ApplicationOut:
+    f = await ForwardingService(db).recall(forward_id, admin_id=current_user.id)
+    return ApplicationOut(**await ApplicationService(db).detail(f.application_id, user_id=current_user.id, is_admin=True))
 
 
 # ============================================================ the administration
@@ -109,7 +154,7 @@ async def list_applications(
 
 @router.get("/attachments/{attachment_id}/file", summary="Open or download an attached document (the applicant and the administration only)")
 async def download(attachment_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> Response:
-    att = await ApplicationService(db).get_attachment(attachment_id, user_id=current_user.id, is_admin=_is_admin(current_user))
+    att = await ApplicationService(db).get_attachment(attachment_id, user_id=current_user.id, is_admin=_is_admin(current_user), roles=current_user.roles)
     path = get_file_path(att.storage_key)
     if path is None:
         raise ResourceNotFoundError("The file is no longer available.")
@@ -142,6 +187,12 @@ async def withdraw(application_id: uuid.UUID, current_user: CurrentUser = Depend
     service = ApplicationService(db)
     await service.withdraw(application_id, user_id=current_user.id)
     return ApplicationOut(**await service.detail(application_id, user_id=current_user.id, is_admin=False))
+
+
+@router.post("/{application_id}/forward", response_model=ApplicationOut, summary="Forward the application to a department to act on (admin)")
+async def forward_application(application_id: uuid.UUID, payload: ForwardIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> ApplicationOut:
+    await ForwardingService(db).forward(application_id, admin_id=current_user.id, department=payload.department, note=payload.note)
+    return ApplicationOut(**await ApplicationService(db).detail(application_id, user_id=current_user.id, is_admin=True))
 
 
 @router.post("/{application_id}/review", response_model=ApplicationOut, summary="Start reviewing, ask for more information, approve or reject (admin)")

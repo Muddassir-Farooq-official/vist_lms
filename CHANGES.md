@@ -707,3 +707,49 @@ unchanged. CSS only (`static/css/dashboard.css`, one block at the end); every co
 - My to-do: spacing under the list.
 - migrations/env.py registers security_events and todo_items (CI "alembic check" failed without it).
 - tests/integration/test_tabbed_pages.py knows the new My to-do, To-do reports and Security tabs.
+
+## Top bars (2026-11-03)
+
+- Admin -> Top bars (menu: Support): a notice strip across the top of every page, under the "Viewing as" bar,
+  e.g. "Free Google AI course for BSCS students, register by 30 Nov  [Register now]".
+  - Message, optional button text and link (https://... or a page of this site; never javascript: or data:),
+    open in a new tab or not, eight colours, live preview.
+  - Who sees it: everyone; groups (all students, all parents, teachers, accounts, exams, ... any mix); students of
+    chosen programs, optionally only some semesters; named students and staff. Shows how many accounts it reaches.
+  - Schedule (from / until), switch on / off any time (Hide / Show), can-be-closed or not, order. At most three
+    bars per person at a time.
+  - Who pressed the button and who closed the bar is recorded; list and CSV per bar. While an administrator is
+    "viewing as" someone, their bars show but nothing is recorded for them. Creating, changing, showing, hiding
+    and deleting are in the Activity log.
+- Code: app/banners/ (models, service, router), app/main.py (router, page, menu item), templates/admin/top_bars.html,
+  static/js/top-bars.js, static/js/admin-common.js (shows the bars on every page), dashboard.css.
+  Uses the existing announcement.manage permission.
+- Migration b0c1d2e3f4a5 (additive): tables top_banners and top_banner_seen. Nothing existing changes.
+- Tests: tests/integration/test_top_banners.py.
+
+## Student documents: one upload per document (2026-11-03)
+
+- Student portal -> My Profile -> Documents: the "Certificates (combined PDF)" upload is gone. Students upload each
+  document separately with a "Document" dropdown (CNIC / B-Form, Matric, Intermediate, Domicile, ...), an optional
+  title and the file, the same way staff do; each shows "Waiting for the office" until it is checked. Uses the
+  existing /api/v1/records/me/documents (no server or database change). Combined PDFs already uploaded stay on file
+  and still count toward profile completeness; staff portals are unchanged.
+- Files: templates/student/profile.html, static/js/my-profile.js (works without the combined-PDF section).
+
+## Applications forwarded to departments (2026-11-03)
+
+- Admin -> Applications -> open one -> Departments: forward it to Exams, Accounts, Library, Hostel, Head of
+  department, Administration staff or Gate, with instructions only staff see. Several departments can have it at
+  once; "Take back" while they have not answered. Departments nobody holds are greyed out.
+- The department gets a notification and a "Forwarded to my department" tab on its Applications page: it reads the
+  application and its files, presses "Start working on it", then "Done: send back to the administration" or
+  "Cannot do" with a note. The administration is notified and sees the note; it still makes the final decision.
+- The applicant sees where it is: "Submitted", "In review", "Forwarded to Exams", "Exams is working on it",
+  "Back with the administration", then Approved / Rejected, with a dated timeline and notifications at each step,
+  but never the internal instructions or the department's note.
+- Code: app/applications/forwarding.py (new), models.py (ApplicationForward), service.py, schemas.py, router.py;
+  templates/_applications_portal.html, templates/student/applications.html, templates/admin/applications.html;
+  static/js/applications-portal.js, static/js/applications-admin.js; dashboard.css.
+- Migration d2f4a6b8c0e1 (additive): table application_forwards. Application statuses are unchanged (a forwarded
+  application is "Under review"); nothing existing is altered.
+- Tests: tests/integration/test_application_forwarding.py; test_tabbed_pages.py knows the new department tab.

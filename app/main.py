@@ -230,6 +230,7 @@ ADMIN_NAV_ITEMS = [
     _nav("panel-staff", "General staff", "employees", "/dashboard/staff", group="Panels"),
     _nav("view-as", "View as a person", "user", "/dashboard/admin/view-as", group="Panels"),
     _nav("announcements", "Announcements", "megaphone", "/dashboard/admin/announcements", group="Support"),
+    _nav("top-bars", "Top bars", "megaphone", "/dashboard/admin/top-bars", group="Support"),
     _nav("gate", "Gate visitors", "shield", "/dashboard/admin/gate", group="Support"),
     _nav("tasks", "Tasks", "tasks", "/dashboard/admin/tasks", group="Support"),
     _nav("applications", "Applications", "file", "/dashboard/admin/applications", group="Support"),
@@ -642,6 +643,9 @@ app.include_router(security_router, prefix=settings.api_v1_prefix)
 from app.todos.router import router as todos_router  # noqa: E402
 
 app.include_router(todos_router, prefix=settings.api_v1_prefix)
+from app.banners.router import router as banners_router  # noqa: E402
+
+app.include_router(banners_router, prefix=settings.api_v1_prefix)
 # NOTE — deliberately NOT wired in: app.fees.webhook_router. It has no
 # signature/HMAC verification (there's no real 1LINK shared secret to
 # verify against yet), which makes it an open "mark any challan paid"
@@ -1390,6 +1394,11 @@ async def admin_view_as_page(request: Request):
 @app.get("/dashboard/admin/profile-changes", include_in_schema=False)
 async def admin_profile_changes_page(request: Request):
     return templates.TemplateResponse(request, "admin/profile_changes.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "profile-changes"})
+
+
+@app.get("/dashboard/admin/top-bars", include_in_schema=False)
+async def admin_top_bars_page(request: Request):
+    return templates.TemplateResponse(request, "admin/top_bars.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "top-bars"})
 
 
 @app.get("/dashboard/admin/activity", include_in_schema=False)

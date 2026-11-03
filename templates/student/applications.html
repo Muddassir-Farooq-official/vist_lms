@@ -5,7 +5,7 @@
 {% block page_subtitle %}<div class="content-subtitle">Apply to the administration for leave, a certificate or anything else, and follow it to a decision.</div>{% endblock %}
 
 {% block content %}
-{% include "_applications_portal.html" %}
+{% with student_portal=True %}{% include "_applications_portal.html" %}{% endwith %}
 {% endblock %}
 
 {% block extra_scripts %}

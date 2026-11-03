@@ -12,6 +12,13 @@
     SUBMITTED: ["Waiting", "pending"], UNDER_REVIEW: ["Under review", "enrolled"], MORE_INFO_NEEDED: ["Waiting for the applicant", "pending"],
     APPROVED: ["Approved", "active"], REJECTED: ["Rejected", "dropped"], WITHDRAWN: ["Withdrawn", ""],
   };
+  // While a department has it, show where it is ("Forwarded to Exams", "Back with the administration").
+  const stagePill = function (a) {
+    const open = ["SUBMITTED", "UNDER_REVIEW", "MORE_INFO_NEEDED"].indexOf(a.status) !== -1;
+    if (!open || !a.forwards || !a.forwards.length || a.status === "MORE_INFO_NEEDED") return pill(a.status);
+    const back = a.stage_label === "Back with the administration";
+    return '<span class="status-pill ' + (back ? "active" : "enrolled") + '">' + esc(a.stage_label) + "</span>";
+  };
   const pill = function (s) { const x = STATUS[s] || [s, ""]; return '<span class="status-pill ' + x[1] + '">' + esc(x[0]) + "</span>"; };
   const fmtDate = function (iso) { return iso ? new Date(iso + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : ""; };
   const range = function (a) { return a.from_date ? fmtDate(a.from_date) + (a.to_date !== a.from_date ? " \u2192 " + fmtDate(a.to_date) : "") + " \u00b7 " + a.days + " day" + (a.days > 1 ? "s" : "") : ""; };
@@ -35,7 +42,7 @@
     el.className = "asg-card " + (a.status === "SUBMITTED" ? "soon" : a.status === "APPROVED" ? "ok" : a.status === "REJECTED" || a.status === "WITHDRAWN" ? "missed" : "");
     el.tabIndex = 0; el.setAttribute("role", "button");
     el.innerHTML =
-      '<div class="asg-top"><span class="pill">' + esc(a.reference) + "</span>" + pill(a.status) + '<span class="pill">' + (who.kind === "EMPLOYEE" ? "Employee" : "Student") + "</span></div>" +
+      '<div class="asg-top"><span class="pill">' + esc(a.reference) + "</span>" + stagePill(a) + '<span class="pill">' + (who.kind === "EMPLOYEE" ? "Employee" : "Student") + "</span></div>" +
       '<div class="rv-who">' + SU.avatar(who.name) + "<span><strong>" + esc(who.name) + "</strong><small>" + esc(who.identifier || "") + "</small></span></div>" +
       "<h3>" + esc(a.subject) + "</h3>" +
       '<p class="asg-snippet">' + esc(a.type_name) + (a.from_date ? " \u00b7 " + esc(range(a)) : "") + "</p>" +
@@ -97,6 +104,7 @@
       return '<li><button type="button" class="linkish" data-open="' + o.id + '">' + esc(o.reference) + "</button> " + esc(o.type_name) + (o.from_date ? " (" + esc(fmtDate(o.from_date)) + ")" : "") + " " + pill(o.status) + "</li>";
     }).join("") + "</ul>" : "";
     $("rv-others").querySelectorAll("[data-open]").forEach(function (b) { b.addEventListener("click", function () { openModal(b.getAttribute("data-open")); }); });
+    renderForwards(a);
     $("rv-thread").innerHTML = a.comments.length ? a.comments.map(function (c) {
       return '<div class="msg ' + c.side.toLowerCase() + '"><strong>' + esc(c.author_name) + "</strong><span>" + esc(c.body) + "</span><small>" + esc(VA.formatDateTime(c.created_at)) + "</small></div>";
     }).join("") : '<p class="home-empty">No messages yet.</p>';
@@ -113,7 +121,53 @@
     showError("");
   }
 
+  // ------------------------------------------------------------------ departments
+  let departments = [];
+  async function loadDepartments() {
+    const r = await VA.fetchJson(API + "/departments", { quiet: true });
+    departments = r.ok ? r.body : [];
+  }
+  function renderForwards(a) {
+    $("rv-progress").innerHTML = (a.timeline || []).map(function (e) {
+      return '<li class="' + esc(e.state) + '"><strong>' + esc(e.label) + "</strong><small>" + esc(VA.formatDateTime(e.at)) + "</small>" + (e.note ? "<span>" + esc(e.note) + "</span>" : "") + "</li>";
+    }).join("");
+    const fws = a.forwards || [];
+    $("rv-forwards").innerHTML = fws.length ? '<ul class="fw-list">' + fws.map(function (f) {
+      const live = f.status === "FORWARDED" || f.status === "IN_PROGRESS";
+      return '<li class="fw-' + esc(f.status.toLowerCase()) + '"><div><strong>' + esc(f.department_name) + '</strong> <span class="fw-state">' + esc(f.status_label) + "</span>" +
+        (f.note ? '<small>Your instructions: ' + esc(f.note) + "</small>" : "") +
+        (f.response ? '<small class="fw-answer"><b>' + esc(f.responded_by || f.department_name) + ":</b> " + esc(f.response) + "</small>" : "") + "</div>" +
+        (live ? '<button type="button" class="role-btn small-btn secondary-btn" data-recall="' + esc(f.id) + '">Take back</button>' : "") + "</li>";
+    }).join("") + "</ul>" : '<p class="cc-meta">Not forwarded. If another department must act on it (e.g. Exams for a paper recheck), forward it below; you still make the final decision.</p>';
+    const open = ["SUBMITTED", "UNDER_REVIEW", "MORE_INFO_NEEDED"].indexOf(a.status) !== -1;
+    $("rv-forward-form").hidden = !open;
+    const busy = fws.filter(function (f) { return f.status === "FORWARDED" || f.status === "IN_PROGRESS"; }).map(function (f) { return f.department; });
+    $("rv-dept").innerHTML = departments.map(function (d) {
+      const off = busy.indexOf(d.code) !== -1 || !d.people;
+      return '<option value="' + esc(d.code) + '"' + (off ? " disabled" : "") + ">" + esc(d.name) + (busy.indexOf(d.code) !== -1 ? " (has it now)" : !d.people ? " (nobody has this role)" : "") + "</option>";
+    }).join("");
+    $("rv-dept-note").value = "";
+  }
+  $("rv-forward").addEventListener("click", async function () {
+    if (!current) return;
+    const btn = this; btn.disabled = true;
+    const r = await VA.fetchJson(API + "/" + current.id + "/forward", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ department: $("rv-dept").value, note: $("rv-dept-note").value.trim() || null }) });
+    btn.disabled = false;
+    if (!r.ok) return showError(msg(r.body, "Could not forward it."));
+    VA.toast("Forwarded. The department and the applicant have been told.");
+    fill(r.body); refresh();
+  });
+  $("rv-forwards").addEventListener("click", async function (e) {
+    const b = e.target.closest("[data-recall]"); if (!b) return;
+    b.disabled = true;
+    const r = await VA.fetchJson(API + "/forwards/" + b.getAttribute("data-recall") + "/recall", { method: "POST" });
+    if (!r.ok) { b.disabled = false; return showError(msg(r.body, "Could not take it back.")); }
+    VA.toast("Taken back from the department."); fill(r.body); refresh();
+  });
+
   async function openModal(id) {
+    if (!departments.length) await loadDepartments();
     const r = await VA.fetchJson(API + "/" + id);
     if (!r.ok) { VA.toast(msg(r.body, "Could not open it."), "error"); return; }
     fill(r.body);

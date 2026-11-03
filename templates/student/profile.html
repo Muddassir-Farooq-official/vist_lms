@@ -30,7 +30,7 @@
 <div class="portal-tabs" role="tablist" data-auto-tabs>
   <button class="portal-tab active" data-tab="details" role="tab" aria-selected="true"><span>Personal details</span></button>
   <button class="portal-tab" data-tab="quals" role="tab" aria-selected="false"><span>Qualifications</span></button>
-  <button class="portal-tab" data-tab="certs" role="tab" aria-selected="false"><span>Certificates</span></button>
+  <button class="portal-tab" data-tab="certs" role="tab" aria-selected="false"><span>Documents</span></button>
 </div>
 
 <div class="portal-tab-panel" data-tab-panel="details">
@@ -74,20 +74,22 @@
 
 <div class="portal-tab-panel" data-tab-panel="certs" hidden>
 <section class="panel">
-  <div class="panel-header">
-    <div class="panel-header-left">
-      <div class="panel-icon-badge">{{ nav_icon("cloud-upload") }}</div>
-      <h2>Certificates (combined PDF)</h2>
-    </div>
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("cloud-upload") }}</div><h2>My documents</h2></div></div>
+  <p class="panel-hint">Upload each document separately: choose what it is, then the file (PDF, JPG or PNG). For example your CNIC or B-form, matric and intermediate certificates, domicile and photos. The office checks each one against the original.</p>
+  <form id="md-form" class="form-grid two-col" data-blocked="CONTRACT,EXPERIENCE" novalidate>
+    <div class="form-field"><label for="md-kind">Document</label><select id="md-kind" class="select-input"></select></div>
+    <div class="form-field"><label for="md-title">Title (optional)</label><input id="md-title" class="text-input" type="text" maxlength="150" placeholder="e.g. Matric 2022, BISE Lahore" /></div>
+    <div class="form-field two-span"><label for="md-file">File</label><input id="md-file" type="file" accept=".pdf,.jpg,.jpeg,.png" /></div>
+    <p class="dash-alert error two-span" id="md-error" role="alert" hidden></p>
+    <div class="form-actions two-span"><button type="submit" class="role-btn">Upload</button></div>
+  </form>
+  <div class="table-scroll">
+    <table class="dash-table" id="md-table">
+      <thead><tr><th>Document</th><th>Uploaded</th><th>Status</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
   </div>
-  <p class="panel-hint">Upload one PDF containing all your degree/certificate scans — this replaces any previous upload.</p>
-  <div class="profile-photo-actions">
-    <input type="file" id="my-certificate-input" accept="application/pdf" />
-    <button type="button" class="role-btn small-btn" id="my-certificate-upload-btn">Upload / Replace</button>
-    <a href="#" class="role-btn small-btn" id="my-certificate-download-link" target="_blank" rel="noopener" hidden>Download Certificate PDF</a>
-    <button type="button" class="danger-btn small-btn" id="my-certificate-remove-btn" hidden>Remove</button>
-  </div>
-  <p id="my-certificate-error" class="dash-alert error" hidden></p>
+  <p class="empty-state" id="md-empty" hidden>You have not uploaded any documents yet.</p>
 </section>
 </div>
 {% endblock %}
@@ -95,6 +97,7 @@
 {% block extra_scripts %}
 <script src="/static/js/profile-completeness.js"></script>
 <script src="/static/js/my-profile.js"></script>
+<script src="/static/js/my-documents.js"></script>
 <script src="/static/js/profile-changes.js"></script>
 <script src="/static/js/email-pref.js"></script>
 {% endblock %}

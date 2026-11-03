@@ -1,0 +1,70 @@
+{% extends "admin/_base.html" %}
+{% block title %}Top bars{% endblock %}
+{% block page_title %}Top bars{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">A notice across the top of every page, with an optional button, for the people you choose: everyone, a group, a program or named students and staff. Show or hide it any time.</div>{% endblock %}
+
+{% block content %}
+<section class="panel dash-panel">
+  <div class="dash-panel-head"><h2>Your top bars</h2><button type="button" class="role-btn" id="tb-new">New top bar</button></div>
+  <p class="panel-hint">Each person sees at most three bars at a time, in the order you set. A bar shows only while it is switched on and inside its dates. Who pressed the button and who closed the bar is recorded.</p>
+  <div class="tb-list" id="tb-list"></div>
+  <p class="empty-state" id="tb-empty" hidden>No top bars yet. Press <b>New top bar</b>, e.g. &ldquo;Register for the Google AI Essentials course by 30 November&rdquo; with a <b>Register</b> button.</p>
+</section>
+
+<dialog id="tb-modal" class="modal modal-wide" aria-labelledby="tb-title"><form class="modal-body" id="tb-form" novalidate>
+  <h2 id="tb-title">New top bar</h2>
+  <h3 class="dash-sub-h">Preview</h3>
+  <div class="tb-preview" id="tb-preview"></div>
+
+  <div class="form-grid two-col">
+    <div class="form-field two-span"><label for="tb-message">Message</label>
+      <textarea id="tb-message" class="text-input" rows="2" maxlength="300" placeholder="e.g. Free Google AI Essentials course for BSCS students: register by 30 November."></textarea></div>
+    <div class="form-field"><label for="tb-label">Button text (optional)</label><input id="tb-label" class="text-input" maxlength="40" placeholder="e.g. Register now" /></div>
+    <div class="form-field"><label for="tb-url">Button opens</label><input id="tb-url" class="text-input" maxlength="500" inputmode="url" placeholder="https://… or /dashboard/student/…" /></div>
+    <label class="check-row two-span"><input type="checkbox" id="tb-newtab" checked /> Open the link in a new tab</label>
+    <div class="form-field two-span"><span class="field-label">Colour</span><div class="tb-swatches" id="tb-tones" role="radiogroup" aria-label="Colour"></div></div>
+  </div>
+
+  <h3 class="dash-sub-h">Who sees it</h3>
+  <label class="check-row"><input type="checkbox" id="tb-everyone" /> Everyone who signs in</label>
+  <div id="tb-groups">
+    <p class="field-label">Groups</p>
+    <div class="tb-chips" id="tb-roles"></div>
+    <div class="form-grid two-col">
+      <div class="form-field"><label for="tb-programs">Students of these programs</label><select id="tb-programs" class="select-input" multiple size="4"></select>
+        <small class="cc-meta">Hold Ctrl (or Cmd) to choose more than one.</small></div>
+      <div class="form-field"><span class="field-label">Only in these semesters (optional)</span><div class="tb-chips" id="tb-semesters"></div></div>
+    </div>
+    <div class="form-field"><label for="tb-person-q">Named students and staff</label>
+      <input id="tb-person-q" class="text-input" type="search" placeholder="Name, roll number or employee code&hellip;" autocomplete="off" />
+      <div id="tb-person-list" class="picker-list"></div>
+      <div class="tb-people" id="tb-people"></div></div>
+  </div>
+  <p class="cc-meta">Reaches <span class="tb-reach" id="tb-reach">&mdash;</span></p>
+
+  <h3 class="dash-sub-h">When</h3>
+  <div class="form-grid two-col">
+    <div class="form-field"><label for="tb-start">Show from (optional)</label><input id="tb-start" class="text-input" type="datetime-local" /></div>
+    <div class="form-field"><label for="tb-end">Until (optional)</label><input id="tb-end" class="text-input" type="datetime-local" /></div>
+    <label class="check-row"><input type="checkbox" id="tb-active" checked /> Switched on</label>
+    <label class="check-row"><input type="checkbox" id="tb-dismiss" checked /> People can close it</label>
+    <div class="form-field"><label for="tb-name">Name for your list (optional)</label><input id="tb-name" class="text-input" maxlength="120" placeholder="e.g. Google AI course, BSCS" /></div>
+    <div class="form-field"><label for="tb-pos">Order (0 shows first)</label><input id="tb-pos" class="text-input small-input" type="number" min="0" max="999" value="0" /></div>
+  </div>
+  <p class="dash-alert error" id="tb-error" hidden></p>
+  <div class="form-actions"><button type="submit" class="role-btn" id="tb-save">Save</button></div>
+  <button type="button" class="modal-close-btn" id="tb-cancel">Cancel</button>
+</form></dialog>
+
+<dialog id="tb-resp" class="modal modal-wide" aria-labelledby="tb-resp-title"><div class="modal-body">
+  <h2 id="tb-resp-title">Responses</h2><p class="cc-meta" id="tb-resp-meta"></p>
+  <p><a class="role-btn small-btn secondary-btn" id="tb-resp-csv" href="#" data-download="top-bar.csv" data-label="Responses">Download (CSV)</a></p>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Person</th><th>Pressed the button</th><th class="num">Times</th><th>Closed the bar</th></tr></thead><tbody id="tb-resp-body"></tbody></table></div>
+  <p class="empty-state" id="tb-resp-empty" hidden>Nobody has pressed the button or closed the bar yet.</p>
+  <button type="button" class="modal-close-btn" id="tb-resp-close">Close</button>
+</div></dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/top-bars.js"></script>
+{% endblock %}

@@ -912,6 +912,33 @@ window.VistAdmin = (function () {
     });
   }
 
+  // Top bars the administration shows to chosen people (Admin -> Top bars). Under the "Viewing as" bar when it is there.
+  // While an administrator is viewing someone's screens, nothing is recorded for that person.
+  async function showTopBars(me) {
+    const r = await fetchJson("/api/v1/banners/mine", { quiet: true });
+    if (!r.ok || !Array.isArray(r.body) || !r.body.length) return;
+    const holder = document.createElement("div");
+    holder.className = "topbars";
+    holder.innerHTML = r.body.map(function (b) {
+      const btn = b.button_url ? '<a class="topbar-btn" href="' + escapeHtml(b.button_url) + '"' + (b.new_tab ? ' target="_blank" rel="noopener noreferrer"' : "") +
+        ' data-bar="' + escapeHtml(b.id) + '">' + escapeHtml(b.button_label || "Open") + (b.new_tab ? ' <span aria-hidden="true">\u2197</span>' : "") + "</a>" : "";
+      const close = b.dismissible ? '<button type="button" class="topbar-close" data-close="' + escapeHtml(b.id) + '" aria-label="Close this notice">\u00d7</button>' : "";
+      return '<div class="topbar tone-' + escapeHtml(b.tone) + '" role="region" aria-label="Notice"><span class="topbar-dot" aria-hidden="true"></span>' +
+        '<span class="topbar-text">' + escapeHtml(b.message) + "</span>" + btn + close + "</div>";
+    }).join("");
+    const viewAs = document.getElementById("viewas-bar");
+    if (viewAs) viewAs.after(holder); else document.body.prepend(holder);
+    const record = function (id, what) {
+      if (me.viewing_as_by) return;
+      try { fetch("/api/v1/banners/" + encodeURIComponent(id) + "/" + what, { method: "POST", credentials: "same-origin", keepalive: true }); } catch (e) { /* ignore */ }
+    };
+    holder.addEventListener("click", function (e) {
+      const a = e.target.closest("a[data-bar]"), x = e.target.closest("[data-close]");
+      if (a) record(a.getAttribute("data-bar"), "click");
+      if (x) { record(x.getAttribute("data-close"), "dismiss"); x.closest(".topbar").remove(); if (!holder.children.length) holder.remove(); }
+    });
+  }
+
   // The number of announcements I have not opened yet, shown beside "Announcements" in the menu.
   function wireAnnouncementBadge(me) {
     if ((me.roles || []).indexOf("ADMIN") !== -1 && (me.roles || []).length === 1) return;
@@ -1099,6 +1126,7 @@ window.VistAdmin = (function () {
 
     // An administrator looking at this person's screens ("view as"): say so on every page, read-only, with a way out.
     if (me.viewing_as_by) showViewAsBar(me);
+    showTopBars(me);
 
     insertSkeletons(document.querySelector(".content-main") || document);
     addPortalSwitcher(me);

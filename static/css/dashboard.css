@@ -3800,3 +3800,43 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 /* Card amounts never break inside the number ("4,045,00 / 0"): at most "Rs." goes on its own line, and the figure shrinks a little on narrow cards. */
 .kpi-value, .stat-value, .money-figs strong { overflow-wrap: normal; word-break: keep-all; }
 .kpi-row .kpi .kpi-value { font-size: clamp(1.15rem, 1.9vw, 1.6rem); }
+
+/* ==========================================================================
+   Top bars (Admin -> Top bars): notices across the top of every page
+   ========================================================================== */
+.topbars { display: flex; flex-direction: column; }
+.topbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 9px 16px; color: #fff; font-size: 0.9rem; background: var(--bar, var(--bold-blue)); }
+.topbar.tone-blue { --bar: var(--bold-blue); } .topbar.tone-green { --bar: var(--bold-green); } .topbar.tone-orange { --bar: var(--bold-orange); }
+.topbar.tone-red { --bar: var(--bold-red); } .topbar.tone-purple { --bar: var(--bold-purple); } .topbar.tone-teal { --bar: var(--bold-teal); }
+.topbar.tone-ink { --bar: var(--bold-ink); } .topbar.tone-yellow { --bar: var(--bold-yellow); color: #1a1300; }
+.topbar-dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; opacity: .75; flex: none; }
+.topbar-text { flex: 1 1 260px; min-width: 0; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.topbar-btn { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 14px; border-radius: 10px; background: #fff;
+  color: var(--bar, var(--bold-blue)); font-weight: 800; text-decoration: none; }
+.topbar.tone-yellow .topbar-btn { background: #1a1300; color: #f5b700; }
+.topbar-btn:hover { filter: brightness(0.95); text-decoration: none; }
+.topbar-close { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 10px; border: 0; background: rgba(255,255,255,.16); color: inherit; font-size: 1.3rem; line-height: 1; cursor: pointer; }
+.topbar.tone-yellow .topbar-close { background: rgba(0,0,0,.1); }
+.topbar-close:hover { background: rgba(255,255,255,.28); }
+@media (max-width: 600px) { .topbar { padding: 8px 12px; } .topbar-text { flex-basis: calc(100% - 52px); } }
+
+/* Admin -> Top bars */
+.tb-list { display: flex; flex-direction: column; gap: 12px; }
+.tb-item { border-radius: 18px; background: var(--surface, #fff); box-shadow: 0 1px 2px rgba(11,22,48,.05); overflow: hidden; border: 1px solid var(--border); }
+.tb-item .topbar { border-radius: 0; }
+.tb-meta { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; padding: 12px 16px; font-size: .84rem; color: var(--text-secondary); }
+.tb-meta b { color: var(--text-primary); }
+.tb-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.tb-state { padding: 3px 9px; border-radius: 8px; font-size: .74rem; font-weight: 800; color: #fff; background: #64748b; }
+.tb-state.s-SHOWING { background: var(--bold-green); } .tb-state.s-SCHEDULED { background: var(--bold-blue); } .tb-state.s-ENDED { background: #64748b; } .tb-state.s-HIDDEN { background: var(--bold-orange); }
+.tb-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.tb-swatch { width: 34px; height: 34px; border-radius: 10px; border: 3px solid #fff; box-shadow: 0 0 0 1px var(--border-strong); cursor: pointer; }
+.tb-swatch.on { box-shadow: 0 0 0 3px var(--text-primary, #0b1630); }
+.tb-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.tb-chip { min-height: 36px; padding: 5px 12px; border-radius: 99px; border: 1.5px solid var(--border-strong); background: var(--surface, #fff); font: inherit; font-size: .84rem; font-weight: 600; cursor: pointer; }
+.tb-chip[aria-pressed="true"] { background: var(--blue-600); border-color: var(--blue-600); color: #fff; }
+.tb-people { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tb-person { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border-radius: 99px; background: var(--blue-50, #eef3fd); font-size: .82rem; font-weight: 600; }
+.tb-person button { border: 0; background: none; cursor: pointer; font-size: 1rem; line-height: 1; padding: 2px 4px; }
+.tb-preview { border-radius: 14px; overflow: hidden; border: 1px solid var(--border); }
+.tb-reach { font-weight: 700; color: var(--text-primary); }

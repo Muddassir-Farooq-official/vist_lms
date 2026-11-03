@@ -13,6 +13,11 @@
   };
   const pill = function (s) { const x = STATUS[s] || [s, ""]; return '<span class="status-pill ' + x[1] + '">' + esc(x[0]) + "</span>"; };
   const OPEN = ["SUBMITTED", "UNDER_REVIEW", "MORE_INFO_NEEDED"];
+  // Where an open application is now, in the words the server chose ("Forwarded to Exams", "In review" ...).
+  const stagePill = function (a) {
+    if (OPEN.indexOf(a.status) === -1 || !a.stage_label || a.status === "MORE_INFO_NEEDED") return pill(a.status);
+    return '<span class="status-pill ' + (a.status === "SUBMITTED" ? "pending" : "enrolled") + '">' + esc(a.stage_label) + "</span>";
+  };
 
   let apps = [];
   let types = [];
@@ -33,7 +38,7 @@
     el.className = "asg-card " + (mineNow ? "urgent" : a.status === "APPROVED" ? "ok" : a.status === "REJECTED" || a.status === "WITHDRAWN" ? "missed" : "");
     el.tabIndex = 0; el.setAttribute("role", "button");
     el.innerHTML =
-      '<div class="asg-top"><span class="pill">' + esc(a.reference) + "</span>" + pill(a.status) + "</div>" +
+      '<div class="asg-top"><span class="pill">' + esc(a.reference) + "</span>" + stagePill(a) + "</div>" +
       "<h3>" + esc(a.subject) + "</h3>" +
       '<p class="asg-snippet">' + esc(a.type_name) + (a.from_date ? " \u00b7 " + esc(range(a)) : "") + "</p>" +
       (mineNow ? '<p class="asg-due urgent"><strong>The administration asked you a question. Open it to reply.</strong></p>'
@@ -81,7 +86,7 @@
 
   function fill(a) {
     current = a; replyFiles = [];
-    $("ap-badges").innerHTML = '<span class="pill">' + esc(a.reference) + "</span>" + pill(a.status);
+    $("ap-badges").innerHTML = '<span class="pill">' + esc(a.reference) + "</span>" + stagePill(a);
     $("ap-title").textContent = a.subject;
     $("ap-meta").textContent = a.type_name + (a.from_date ? " \u00b7 " + range(a) : "");
     const reviewed = ["UNDER_REVIEW", "MORE_INFO_NEEDED", "APPROVED", "REJECTED"].indexOf(a.status) !== -1;
@@ -92,6 +97,13 @@
         esc(a.reviewed_at ? VA.formatDateTime(a.reviewed_at) : (a.status === "WITHDRAWN" ? "\u2014" : "Waiting for the administration")) + "</span></li>" +
       '<li class="' + (final ? "done " + a.status.toLowerCase() : a.status === "WITHDRAWN" ? "done withdrawn" : "") + '"><strong>' + (a.status === "WITHDRAWN" ? "Withdrawn" : final ? STATUS[a.status][0] : "Decision") +
         "</strong><span>" + esc(a.decided_at ? VA.formatDateTime(a.decided_at) : "Not decided yet") + "</span></li>";
+    if (a.timeline && a.timeline.length) {
+      const last = a.timeline.length - 1, open = OPEN.indexOf(a.status) !== -1;
+      $("ap-timeline").innerHTML = a.timeline.map(function (e, i) {
+        const cls = e.state === "good" ? "done approved" : e.state === "bad" ? "done rejected" : "done" + (open && i === last ? " current" : "");
+        return '<li class="' + cls + '"><strong>' + esc(e.label) + "</strong><span>" + esc(VA.formatDateTime(e.at)) + "</span></li>";
+      }).join("") + (open ? '<li><strong>Decision</strong><span>' + esc(a.stage_label || "Not decided yet") + "</span></li>" : "");
+    }
     $("ap-decision").innerHTML = a.decision_note && a.status !== "WITHDRAWN"
       ? '<div class="cc-note ' + (a.status === "APPROVED" ? "good" : "") + '"><strong>' + (a.status === "APPROVED" ? "Note from the administration" : "Why it was not approved") + "</strong><span>" + esc(a.decision_note) + "</span></div>" : "";
     $("ap-details-view").textContent = a.details;
@@ -225,7 +237,67 @@
   $("ap-new").addEventListener("click", function () { VA.showTab("new"); });
   $("ap-form").addEventListener("submit", function (e) { e.preventDefault(); });
 
+  // ------------------------------------------------------------------ forwarded to my department
+  let deptItems = [], deptCurrent = null;
+  const FSTATE = { FORWARDED: ["New", "pending"], IN_PROGRESS: ["In progress", "enrolled"], DONE: ["Done, sent back", "active"], CANNOT_DO: ["Could not do, sent back", "dropped"] };
+  async function loadDept() {
+    if (!$("dp-list")) return;
+    const r = await VA.fetchJson(API + "/department/inbox?show=" + ($("dp-show").value || "open"), { quiet: true });
+    if (!r.ok || !r.body.departments.length) return;
+    $("dp-tab").hidden = false;
+    $("dp-names").textContent = r.body.departments.map(function (d) { return d.name; }).join(" and ");
+    deptItems = r.body.items;
+    const waiting = deptItems.filter(function (x) { return x.forward.status === "FORWARDED"; }).length;
+    $("dp-tab-label").textContent = "Forwarded to my department" + (waiting ? " · " + waiting + " new" : "");
+    $("dp-empty").hidden = deptItems.length > 0;
+    $("dp-list").innerHTML = deptItems.map(function (x, i) {
+      const a = x.application, f = x.forward, st = FSTATE[f.status] || [f.status, ""];
+      return '<article class="asg-card ' + (f.status === "FORWARDED" ? "soon" : "") + '" tabindex="0" role="button" data-dp="' + i + '">' +
+        '<div class="asg-top"><span class="pill">' + esc(a.reference) + '</span><span class="status-pill ' + st[1] + '">' + esc(st[0]) + '</span><span class="pill">' + esc(f.department_name) + "</span></div>" +
+        "<h3>" + esc(a.subject) + "</h3>" + '<p class="asg-snippet">' + esc(a.applicant.name) + (a.applicant.identifier ? " · " + esc(a.applicant.identifier) : "") + " · " + esc(a.type_name) + "</p>" +
+        (f.note ? '<div class="cc-note"><strong>From the administration</strong><span>' + esc(f.note) + "</span></div>" : "") +
+        '<div class="asg-foot"><span class="cc-meta">Forwarded ' + esc(VA.formatDateTime(f.forwarded_at)) + '</span><span class="role-btn small-btn secondary-btn">Open</span></div></article>';
+    }).join("");
+  }
+  function openDept(i) {
+    const x = deptItems[i]; if (!x) return;
+    deptCurrent = x;
+    const a = x.application, f = x.forward;
+    $("dp-title").textContent = a.subject;
+    $("dp-meta").textContent = a.reference + " · " + a.type_name + " · " + a.applicant.name + (a.applicant.identifier ? " (" + a.applicant.identifier + ")" : "") + (a.applicant.detail ? " · " + a.applicant.detail : "");
+    $("dp-instructions").innerHTML = f.note ? '<div class="cc-note"><strong>From the administration</strong><span>' + esc(f.note) + "</span></div>" : "";
+    $("dp-details").textContent = a.details;
+    $("dp-files").innerHTML = filesHtml(a);
+    const live = f.status === "FORWARDED" || f.status === "IN_PROGRESS";
+    $("dp-answer").hidden = !live;
+    $("dp-done-note").hidden = live;
+    $("dp-done-note").textContent = live ? "" : "Sent back to the administration " + VA.formatDateTime(f.finished_at) + (f.response ? ": " + f.response : "");
+    $("dp-start").hidden = f.status !== "FORWARDED";
+    $("dp-response").value = "";
+    $("dp-error").hidden = true;
+    $("dp-modal").showModal();
+  }
+  async function answer(status) {
+    if (!deptCurrent) return;
+    const note = $("dp-response").value.trim();
+    if (status !== "IN_PROGRESS" && note.length < 3) { $("dp-error").textContent = "Write a short note for the administration: what you did, or why it cannot be done."; $("dp-error").hidden = false; return; }
+    const r = await VA.fetchJson(API + "/forwards/" + deptCurrent.forward.id + "/respond", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: status, response: note || null }) });
+    if (!r.ok) { $("dp-error").textContent = msg(r.body, "Could not save it."); $("dp-error").hidden = false; return; }
+    VA.toast(status === "IN_PROGRESS" ? "Marked as in progress. The applicant can see it." : "Sent back to the administration.");
+    $("dp-modal").close(); loadDept(); updateBadge();
+  }
+  if ($("dp-list")) {
+    $("dp-list").addEventListener("click", function (e) { const c = e.target.closest("[data-dp]"); if (c) openDept(Number(c.getAttribute("data-dp"))); });
+    $("dp-list").addEventListener("keydown", function (e) { const c = e.target.closest("[data-dp]"); if (c && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openDept(Number(c.getAttribute("data-dp"))); } });
+    $("dp-show").addEventListener("change", loadDept);
+    $("dp-start").addEventListener("click", function () { answer("IN_PROGRESS"); });
+    $("dp-done").addEventListener("click", function () { answer("DONE"); });
+    $("dp-cannot").addEventListener("click", function () { answer("CANNOT_DO"); });
+    $("dp-close").addEventListener("click", function () { $("dp-modal").close(); });
+  }
+
   document.addEventListener("vistadmin:ready", async function () {
+    loadDept();
     const r = await VA.fetchJson(API + "/types");
     types = r.ok ? r.body : [];
     $("ap-type").innerHTML = types.map(function (t) { return '<option value="' + t.id + '">' + esc(t.name) + "</option>"; }).join("") || '<option value="">Nothing can be applied for right now</option>';

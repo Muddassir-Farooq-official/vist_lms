@@ -128,6 +128,9 @@ class ApplicationOut(BaseModel):
     applicant: ApplicantInfo | None = None       # shown to the administration
     others: list[BriefOut] = []                  # the applicant's recent applications (administration only)
     usage: Usage | None = None
+    stage_label: str | None = None               # where it is now, in plain words ("Forwarded to Exams")
+    timeline: list[dict] = []                    # every step so far (the administration also sees the internal notes)
+    forwards: list[dict] = []                    # departments it was forwarded to (administration only)
 
 
 class CommentIn(BaseModel):

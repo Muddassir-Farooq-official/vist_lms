@@ -82,6 +82,16 @@
     <p class="cd-text" id="rv-details"></p>
     <div id="rv-files"></div>
     <div id="rv-others"></div>
+    <h3 class="modal-subhead">Progress</h3>
+    <ol class="fw-timeline" id="rv-progress"></ol>
+    <h3 class="modal-subhead">Departments</h3>
+    <div id="rv-forwards"></div>
+    <div class="fw-form" id="rv-forward-form">
+      <div class="form-field"><label for="rv-dept">Forward to</label><select id="rv-dept" class="select-input"></select></div>
+      <div class="form-field fw-note"><label for="rv-dept-note">Instructions for the department (only staff see this)</label>
+        <input id="rv-dept-note" class="text-input" maxlength="2000" placeholder="e.g. Please recheck the Data Structures mid-term paper and send me the result." /></div>
+      <button type="button" class="role-btn small-btn" id="rv-forward">Forward</button>
+    </div>
     <h3 class="modal-subhead">Conversation</h3>
     <div class="thread" id="rv-thread"></div>
     <div class="form-field"><label for="rv-note">Your message or decision note</label>

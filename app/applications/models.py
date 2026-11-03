@@ -98,3 +98,27 @@ class ApplicationComment(UUIDPKMixin, TimestampMixin, Base):
     author_user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     side: Mapped[str] = mapped_column(String(10), nullable=False)       # APPLICANT or ADMIN
     body: Mapped[str] = mapped_column(Text, nullable=False)
+
+class ApplicationForward(UUIDPKMixin, TimestampMixin, Base):
+    """The administration hands an application to a department (Exams, Accounts, Library ...) to act on.
+
+    The department marks it In progress, then Done or Cannot do with a note, which sends it back to the
+    administration; the administration still makes the final decision. The applicant follows the stage
+    ("Forwarded to Exams", "Exams is working on it", "Back with the administration") but not the internal notes.
+    """
+
+    __tablename__ = "application_forwards"
+    __table_args__ = (
+        Index("ix_application_forwards_application", "application_id"),
+        Index("ix_application_forwards_department_status", "department", "status"),
+    )
+
+    application_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("applications.id", ondelete="CASCADE"), nullable=False)
+    department: Mapped[str] = mapped_column(String(30), nullable=False)          # a role code: EXAM_CONTROLLER, ACCOUNTS_OFFICER ...
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)               # the administration's instructions (internal)
+    status: Mapped[str] = mapped_column(String(15), nullable=False, default="FORWARDED", server_default="FORWARDED")  # FORWARDED | IN_PROGRESS | DONE | CANNOT_DO | RECALLED
+    forwarded_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    response: Mapped[str | None] = mapped_column(Text, nullable=True)           # the department's note back (internal)
+    responded_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

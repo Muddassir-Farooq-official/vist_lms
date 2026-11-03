@@ -253,7 +253,12 @@ class ApplicationService:
         counts = {aid: n for aid, n in (await self.session.execute(
             select(ApplicationComment.application_id, func.count()).where(ApplicationComment.application_id.in_([a.id for a in apps])).group_by(ApplicationComment.application_id))).all()}
         people = await self._applicants_by_user(list({a.applicant_user_id for a in apps})) if admin else {}
+        from app.applications.forwarding import ForwardingService, forward_out, stage_label, timeline
         from app.core.storage import attachment_is_inline
+
+        fwd = ForwardingService(self.session)
+        forwards = await fwd.for_apps([a.id for a in apps])
+        fnames = await fwd._names({f.forwarded_by for fs in forwards.values() for f in fs} | {f.responded_by for fs in forwards.values() for f in fs}) if admin else {}
 
         out = []
         for a in apps:
@@ -267,6 +272,9 @@ class ApplicationService:
                                  "is_image": x.content_type.startswith("image/"), "inline": attachment_is_inline(x.content_type)} for x in atts.get(a.id, [])],
                 "comment_count": counts.get(a.id, 0),
                 "applicant": who,
+                "stage_label": stage_label(a, forwards.get(a.id, [])),
+                "timeline": timeline(a, forwards.get(a.id, []), internal=admin),
+                "forwards": [forward_out(f, fnames) for f in forwards.get(a.id, [])] if admin else [],
             })
         return out
 
@@ -366,10 +374,15 @@ class ApplicationService:
         await self._notify_admins(app, f"New file on {reference(app)}", f"{who['name']} added {len(files)} file{'s' if len(files) > 1 else ''}.")
         return app
 
-    async def get_attachment(self, attachment_id: uuid.UUID, *, user_id: uuid.UUID, is_admin: bool) -> ApplicationAttachment:
+    async def get_attachment(self, attachment_id: uuid.UUID, *, user_id: uuid.UUID, is_admin: bool, roles: list[str] | None = None) -> ApplicationAttachment:
         att = await self.session.get(ApplicationAttachment, attachment_id)
         if att is None:
             raise ResourceNotFoundError("Attachment not found.")
+        if roles:
+            from app.applications.forwarding import ForwardingService
+
+            if await ForwardingService(self.session).can_see(att.application_id, roles):
+                return att                          # the department it was forwarded to may open its documents
         await self._visible(att.application_id, user_id, is_admin)
         return att
 

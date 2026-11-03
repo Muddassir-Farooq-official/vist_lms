@@ -184,6 +184,7 @@
   }
 
   function updateCertificateDisplay(hasCertificate) {
+    if (!certError) return;                      // the student page has separate documents instead of one combined PDF
     certError.hidden = true;
     if (hasCertificate) {
       certDownloadLink.href = myCertificateUrl();
@@ -196,7 +197,7 @@
     }
   }
 
-  certUploadBtn.addEventListener("click", async function () {
+  if (certUploadBtn) certUploadBtn.addEventListener("click", async function () {
     certError.hidden = true;
     if (!certInput.files.length) {
       certError.textContent = "Choose a PDF file first.";
@@ -218,7 +219,7 @@
     updateCertificateDisplay(true);
   });
 
-  certRemoveBtn.addEventListener("click", async function () {
+  if (certRemoveBtn) certRemoveBtn.addEventListener("click", async function () {
     certError.hidden = true;
     certRemoveBtn.disabled = true;
     const result = await VA.fetchJson(myCertificateUrl(), { method: "DELETE" });
