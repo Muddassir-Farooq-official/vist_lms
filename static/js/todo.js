@@ -8,7 +8,9 @@
   const STATUS = [["TODO", "To do"], ["IN_PROGRESS", "In progress"], ["DONE", "Done"], ["NOT_DONE", "Not done"]];
   if (!$("td-list")) return;
 
-  let day = null, today = null, data = null;
+  // A reminder links to /tasks?day=2026-11-04#todo: open that day's list.
+  const askedDay = new URLSearchParams(window.location.search).get("day");
+  let day = /^\d{4}-\d{2}-\d{2}$/.test(askedDay || "") ? askedDay : null, today = null, data = null;
 
   function msg(r, fallback) { return (r.body && r.body.error && r.body.error.message) || fallback; }
   function iso(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
@@ -112,6 +114,8 @@
     if (!$("tr-month").value) $("tr-month").value = report.month;
     $("tr-csv").href = API + "/report.csv?month=" + report.month;
     $("tr-csv").setAttribute("data-download", "todo-" + report.month + ".csv");
+    $("tr-pdf").href = API + "/report.pdf?month=" + report.month;
+    $("tr-pdf").setAttribute("data-download", "todo-" + report.month + ".pdf");
     const t = report.totals;
     $("tr-totals").innerHTML = [[t.people_with_lists + " of " + t.people, "staff wrote a list in " + report.label], [t.items, "items planned"],
       [t.done, "done"], [t.not_done + t.left_open, "not done"], [t.done_pct == null ? "—" : t.done_pct + "%", "done overall"]]
@@ -138,6 +142,8 @@
     $("tr-d-meta").textContent = [p.code, p.department].filter(Boolean).join(" · ");
     $("tr-d-csv").href = API + "/report.csv?month=" + d.month + "&user_id=" + userId;
     $("tr-d-csv").setAttribute("data-download", "todo-" + d.month + "-" + (p.code || "person") + ".csv");
+    $("tr-d-pdf").href = API + "/report.pdf?month=" + d.month + "&user_id=" + userId;
+    $("tr-d-pdf").setAttribute("data-download", "todo-" + d.month + "-" + (p.code || "person") + ".pdf");
     const label = { LEFT_OPEN: "Left open" };
     $("tr-d-days").innerHTML = d.days.length ? d.days.map(function (x) {
       return '<h3 class="dash-sub-h">' + esc(nice(x.date)) + '</h3><ul class="td-list td-readonly">' + x.items.map(function (i) {

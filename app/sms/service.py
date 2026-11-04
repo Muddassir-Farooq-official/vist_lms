@@ -40,7 +40,8 @@ from app.sms.models import SmsMessage, SmsStatus
 MAX_ATTEMPTS = 3
 MAX_BODY = 300
 EVENT_SWITCH = {"ATTENDANCE_FINE": "sms_on_attendance_fine", "DATESHEET": "sms_on_datesheet",
-                "RESULTS": "sms_on_results", "FEE_OVERDUE": "sms_on_fee_overdue", "ADMISSION": "sms_on_admission"}
+                "RESULTS": "sms_on_results", "FEE_OVERDUE": "sms_on_fee_overdue", "ADMISSION": "sms_on_admission",
+                "SECURITY": "sms_on_security_alert"}
 
 
 def normalize_pk_mobile(raw: str | None) -> str | None:
@@ -119,6 +120,26 @@ class SmsService:
                                     last_error=None if norm else "Not a valid Pakistani mobile number"))
         await self.session.flush()
         return 1 if norm else 0
+
+    async def queue_to_admins(self, *, event: str, body: str, admin_user_ids: list) -> int:
+        """To the administrators' own mobiles (their employee record) and the institute phone when it is a mobile."""
+        switch = EVENT_SWITCH.get(event)
+        if switch and not int(getattr(settings, switch, 1)):
+            return 0
+        from app.employees.models import Employee
+
+        numbers = list((await self.session.execute(select(Employee.contact_no).where(Employee.user_id.in_(admin_user_ids)))).scalars().all()) if admin_user_ids else []
+        numbers.append(settings.institute_phone or "")
+        seen, n = set(), 0
+        for number in numbers:
+            norm = normalize_pk_mobile(number)
+            if not norm or norm in seen:
+                continue
+            seen.add(norm)
+            self.session.add(SmsMessage(to_number=number[:20], recipient="ADMIN", body=_clip(body), event=event, status=SmsStatus.QUEUED))
+            n += 1
+        await self.session.flush()
+        return n
 
     async def bulk(self, *, audience: str, message: str, program_id=None, semester: int | None = None, section: str | None = None,
                    defaulters_only: bool = False, job_role_id=None, dry_run: bool = True, actor_id=None) -> dict:

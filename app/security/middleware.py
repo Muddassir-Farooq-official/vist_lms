@@ -41,9 +41,24 @@ class SecurityWatch:
                 seen["size"] += len(chunk)
             return message
 
+        # Every browser that opens the sign-in page or signs in gets a random id (no personal data) so that one browser
+        # used for several people's accounts can be noticed (app/security/service.py: track_device).
+        device = _cookie(headers, DEVICE_COOKIE)
+        new_device = None
+        if not device and (scope["path"] == LOGIN_PATH or (scope["method"] == "GET" and scope["path"] == "/")):
+            import secrets
+
+            new_device = device = secrets.token_urlsafe(18)
+        scope["state"]["device_id"] = device
+
         async def send_watch(message):
             if message.get("type") == "http.response.start":
                 seen["status"] = message.get("status", 0)
+                if new_device:
+                    secure = "; Secure" if settings.is_production else ""
+                    message.setdefault("headers", [])
+                    message["headers"] = list(message["headers"]) + [(b"set-cookie", (f"{DEVICE_COOKIE}={new_device}; Max-Age={2 * 365 * 86400}; "
+                                                                                     f"Path=/; HttpOnly; SameSite=Lax{secure}").encode())]
             await send(message)
 
         await self.app(scope, receive_tee if tee else receive, send_watch)
@@ -69,13 +84,16 @@ class SecurityWatch:
             events.append(("SUSPICIOUS_INPUT", f"{hit[0]}: {hit[1]}"))
         if status == 404 and service.looks_like_probe(path):
             events.append(("PROBE", "Looked for " + path[:200]))
-        login = path == f"{settings.api_v1_prefix}/auth/login"
+        login = path == LOGIN_PATH
         login_username = None
-        if login and status in (401, 429):
+        if login and status in (200, 401, 429):
             login_username = _login_username(body, ctype)
             if status == 429:
                 events.append(("SIGNIN_LIMIT", f"Too many wrong passwords for \"{login_username or '?'}\""))
-        if not events and not (login and status == 401):
+        wrong = _wrong_portal(scope, headers, status)
+        if wrong:
+            events.append(("WRONG_PORTAL", wrong))
+        if not events and not (login and status in (200, 401)):
             return
 
         from starlette.requests import Request
@@ -92,10 +110,66 @@ class SecurityWatch:
                     continue                     # the same refusal again within ten minutes: one row is enough
                 await service.record(session, kind, ip=ip, user_id=user_id, username=username, user_agent=headers.get("user-agent"),
                                      method=scope["method"], path=(path + ("?" + query if query else ""))[:255], detail=detail)
+            if login and status in (200, 401):
+                await service.track_device(session, device_id=state.get("device_id") or "", username=login_username, success=status == 200,
+                                           ip=ip, user_agent=headers.get("user-agent"), path=path)
             if login and status == 401:
                 await service.failed_signin_check(session, username=login_username, ip=ip)
         finally:
             await agen.aclose()
+
+
+DEVICE_COOKIE = "vist_device"
+LOGIN_PATH = f"{settings.api_v1_prefix}/auth/login"
+# Portals a student or a parent may open. Anything else under /dashboard/ is someone else's screens.
+OWN_PORTALS = {"STUDENT": ("student",), "PARENT": ("parent",)}
+
+
+def _cookie(headers: dict, name: str) -> str | None:
+    from http.cookies import SimpleCookie
+
+    if not headers.get("cookie"):
+        return None
+    try:
+        jar = SimpleCookie()
+        jar.load(headers["cookie"])
+        value = jar[name].value if name in jar else None
+    except Exception:  # noqa: BLE001
+        return None
+    if name == DEVICE_COOKIE:                       # our own random id: anything else in that cookie is ignored
+        return value if value and len(value) <= 40 and value.replace("-", "").replace("_", "").isalnum() else None
+    return value or None
+
+
+def _wrong_portal(scope, headers: dict, status: int) -> str | None:
+    """A student or parent opening a page of another portal (administration, teachers, accounts ...)."""
+    path = scope["path"]
+    if scope["method"] != "GET" or not path.startswith("/dashboard/") or status >= 400:
+        return None
+    parts = path.split("/")
+    portal = parts[2] if len(parts) > 2 else ""
+    roles = _roles(headers)
+    if not roles or any(r not in OWN_PORTALS for r in roles):
+        return None                                       # staff move between screens as their work needs; the APIs decide
+    allowed = {p for r in roles for p in OWN_PORTALS[r]}
+    if portal in allowed or not portal:
+        return None
+    return f"A {'student' if 'STUDENT' in roles else 'parent'} account opened {path[:120]} (the {portal} screens)."
+
+
+def _roles(headers: dict) -> list[str]:
+    from app.core.security import decode_access_token
+
+    token = _cookie(headers, "access_token") if headers.get("cookie") else None
+    if not token:
+        auth = headers.get("authorization", "")
+        token = auth.split(" ", 1)[1] if auth.lower().startswith("bearer ") else None
+    if not token:
+        return []
+    try:
+        return list(decode_access_token(token).get("roles") or [])
+    except Exception:  # noqa: BLE001
+        return []
 
 
 def _login_username(body: bytes, ctype: str) -> str | None:

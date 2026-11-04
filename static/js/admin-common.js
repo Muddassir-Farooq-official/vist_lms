@@ -1072,6 +1072,102 @@ window.VistAdmin = (function () {
     pw.parentNode.insertBefore(a, pw.nextSibling);
   }
 
+  // ------------------------------------------------------------------ the portal as an app
+  // The service worker (/sw.js) shows push notifications; "Install app" and "Phone notifications" sit in the menu
+  // under "My email". Push itself is sent by the server (app/push) once the person turns it on for a device.
+  let installPrompt = null;
+  window.addEventListener("beforeinstallprompt", function (e) {
+    e.preventDefault(); installPrompt = e;
+    const link = document.getElementById("install-app-link"); if (link) link.hidden = false;
+  });
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () { navigator.serviceWorker.register("/sw.js").catch(function () { /* push just stays off */ }); });
+  }
+  const isStandalone = function () { return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true; };
+  const isIos = function () { return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); };
+  function keyBytes(b64) {
+    const pad = "=".repeat((4 - (b64.length % 4)) % 4), raw = atob((b64 + pad).replace(/-/g, "+").replace(/_/g, "/"));
+    return Uint8Array.from(raw, function (c) { return c.charCodeAt(0); });
+  }
+  function menuLink(id, label, icon) {
+    const a = document.createElement("a");
+    a.id = id; a.className = "drawer-link"; a.href = "#";
+    a.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + icon + "</svg><span>" + label + "</span>";
+    return a;
+  }
+  function wireAppLinks(me) {
+    const after = document.getElementById("my-email-link") || document.getElementById("change-password-link");
+    if (!after || document.getElementById("push-link")) return;
+    const install = menuLink("install-app-link", "Install app", '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M12 7v7M9 11l3 3 3-3"/>');
+    install.hidden = !(installPrompt || (isIos() && !isStandalone()));
+    install.addEventListener("click", async function (e) {
+      e.preventDefault();
+      if (installPrompt) { installPrompt.prompt(); const r = await installPrompt.userChoice; if (r && r.outcome === "accepted") install.hidden = true; installPrompt = null; return; }
+      appDialog("Install the app", "<p>On iPhone or iPad, in Safari: tap the <b>Share</b> button, then <b>Add to Home Screen</b>, then <b>Add</b>.</p>" +
+        "<p>Open the portal from its new Home Screen icon, then turn on <b>Phone notifications</b> in the menu.</p>");
+    });
+    const bell = menuLink("push-link", "Phone notifications", '<path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21h4"/>');
+    bell.addEventListener("click", function (e) { e.preventDefault(); pushDialog(me); });
+    after.parentNode.insertBefore(bell, after.nextSibling);
+    after.parentNode.insertBefore(install, after.nextSibling);
+  }
+  function appDialog(title, html, buttons) {
+    const old = document.getElementById("app-dialog"); if (old) old.remove();
+    const d = document.createElement("dialog");
+    d.id = "app-dialog"; d.className = "modal"; d.setAttribute("aria-labelledby", "app-dialog-title");
+    d.innerHTML = '<div class="modal-body"><h2 id="app-dialog-title">' + escapeHtml(title) + '</h2><div class="app-dialog-text">' + html + "</div>" +
+      '<p class="dash-alert error" id="app-dialog-error" hidden></p><div class="form-actions app-dialog-actions"></div>' +
+      '<button type="button" class="modal-close-btn" data-close>Close</button></div>';
+    (buttons || []).forEach(function (b) {
+      const el = document.createElement("button"); el.type = "button"; el.className = "role-btn" + (b.secondary ? " secondary-btn" : "");
+      el.textContent = b.label; el.addEventListener("click", function () { b.run(el, d); }); d.querySelector(".app-dialog-actions").appendChild(el);
+    });
+    d.querySelector("[data-close]").addEventListener("click", function () { d.close(); d.remove(); });
+    document.body.appendChild(d); d.showModal();
+    return d;
+  }
+  async function pushDialog(me) {
+    const r = await fetchJson("/api/v1/push/key", { quiet: true });
+    if (!r.ok || !r.body.enabled) return appDialog("Phone notifications", "<p>Push notifications are not set up on this server yet. Ask the administration.</p>");
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      return appDialog("Phone notifications", isIos() && !isStandalone()
+        ? "<p>On iPhone and iPad, notifications work in the installed app: in Safari tap <b>Share</b> \u2192 <b>Add to Home Screen</b>, open the portal from that icon, then come back here.</p>"
+        : "<p>This browser cannot receive push notifications. Try Chrome, Edge, Firefox or Samsung Internet, or the installed app.</p>");
+    }
+    const reg = await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    const fail = function (d, text) { const e = d.querySelector("#app-dialog-error"); e.textContent = text; e.hidden = false; };
+    const blocked = window.Notification && Notification.permission === "denied";
+    const status = sub ? "<p><b>On</b> for this device. Messages from the portal (applications, fees, results, notices\u2026) appear on this device even when the portal is closed.</p>"
+      : blocked ? "<p>Notifications are <b>blocked</b> for this site in the browser settings. Allow them there (site settings \u2192 Notifications), then try again.</p>"
+      : "<p><b>Off</b> for this device. Turn it on to get messages from the portal on this phone or computer, even when the portal is closed.</p>";
+    const devices = "<p class=\"cc-meta\">Turned on for " + r.body.devices + " device" + (r.body.devices === 1 ? "" : "s") + " of yours.</p>";
+    const buttons = sub ? [
+      { label: "Send a test", run: async function (b, d) { b.disabled = true; const t = await fetchJson("/api/v1/push/test", { method: "POST" }); b.disabled = false;
+        if (!t.ok || !t.body.sent) fail(d, "The test could not be delivered. Turn it off and on again."); else toast("Test sent. It should appear in a few seconds."); } },
+      { label: "Turn off", secondary: true, run: async function (b, d) {
+        b.disabled = true; const endpoint = sub.endpoint; await sub.unsubscribe().catch(function () {});
+        await fetchJson("/api/v1/push/unsubscribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: endpoint }) });
+        d.close(); d.remove(); toast("Phone notifications are off for this device."); } },
+    ] : blocked ? [] : [
+      { label: "Turn on", run: async function (b, d) {
+        if (me.viewing_as_by) return fail(d, "Not while viewing someone else's screens.");
+        b.disabled = true;
+        try {
+          const perm = await Notification.requestPermission();
+          if (perm !== "granted") { b.disabled = false; return fail(d, "Notifications were not allowed. Allow them for this site, then try again."); }
+          sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(r.body.public_key) });
+          const s = await fetchJson("/api/v1/push/subscribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sub.toJSON()) });
+          if (!s.ok) { b.disabled = false; return fail(d, (s.body && s.body.error && s.body.error.message) || "Could not turn it on."); }
+          await fetchJson("/api/v1/push/test", { method: "POST" });
+          d.close(); d.remove(); toast("Phone notifications are on. A test message is on its way.");
+        } catch (err) { b.disabled = false; fail(d, "This browser refused: " + (err && err.message ? err.message : "unknown reason")); }
+      } },
+    ];
+    appDialog("Phone notifications", status + devices, buttons);
+  }
+
   async function initShell() {
     const me = await requireAdminSession();
     if (!me) return null; // requireAdminSession already redirected or showed a message
@@ -1103,6 +1199,7 @@ window.VistAdmin = (function () {
 
     wireDrawer();
     wireEmailLink();
+    wireAppLinks(me);
     wireLogout();
     wireNotifications();
     wireAnnouncementBadge(me);

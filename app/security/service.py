@@ -25,6 +25,8 @@ KINDS = {
     "BAD_TOKEN": ("Used a forged or tampered sign-in token", "HIGH"),
     "SIGNIN_LIMIT": ("Stopped by the wrong-password limit", "WARN"),
     "PROBE": ("Scanned for well-known weak spots (e.g. /.env, /wp-admin)", "INFO"),
+    "DEVICE_SWITCH": ("A browser one person signs in with was used for someone else's account", "HIGH"),
+    "WRONG_PORTAL": ("Opened another portal's screens (e.g. a student on the administration pages)", "HIGH"),
 }
 
 # At most this many rows per kind and address in ten minutes: a scanner hammering the site cannot fill the database.
@@ -190,6 +192,12 @@ async def _check_failed_signins(session: AsyncSession, *, username: str | None, 
 
 
 async def check_alerts(session: AsyncSession, kind: str, *, ip: str | None, user_id, username: str | None) -> None:
+    if kind in ("DEVICE_SWITCH", "WRONG_PORTAL"):
+        last = (await session.execute(select(SecurityEvent.detail).where(SecurityEvent.kind == kind).order_by(SecurityEvent.created_at.desc()).limit(1))).scalar_one_or_none()
+        title = ("Security alert: one browser, several people's accounts" if kind == "DEVICE_SWITCH"
+                 else "Security alert: someone opened screens that are not theirs")
+        await alert(session, f"{kind.lower()}:{user_id or username or ip}", title, (last or "") + (f" (address {ip})" if ip else ""))
+        return
     since = datetime.now(timezone.utc) - timedelta(minutes=10)
     base = select(func.count()).select_from(SecurityEvent).where(SecurityEvent.kind == kind, SecurityEvent.created_at >= since)
     if kind == "ACCESS_DENIED" and user_id:
@@ -235,6 +243,14 @@ async def alert(session: AsyncSession, key: str, title: str, message: str) -> bo
         subject, text, body = render(title, message + "\n\nOpen Activity log → Security to see every attempt and where it came from.", link, footer=footer)
         for address in sorted(addresses):
             session.add(EmailOutbox(to_email=address, subject=subject, body_text=text, body_html=body, kind="SECURITY"))
+    try:
+        from app.core.config import settings
+        from app.sms.service import SmsService
+
+        short = f"{settings.app_name or 'VIST'} security: {title.replace('Security alert: ', '')}. {message}"
+        await SmsService(session).queue_to_admins(event="SECURITY", body=short, admin_user_ids=[a[0] for a in admins])
+    except Exception as exc:  # noqa: BLE001 - an SMS problem must not stop the portal and email alert
+        logger.warning("security_alert_sms_failed", error=str(exc))
     logger.warning("security_alert", key=key, title=title)
     return True
 
@@ -327,3 +343,60 @@ async def events(session: AsyncSession, *, days: int, kind: str | None, ip: str 
     for r in rows:
         r["person"] = names.get(uuid.UUID(r["user_id"])) if r["user_id"] else None
     return rows
+
+
+# ------------------------------------------------------------------ the same browser, different people
+STAFF_ROLES = {"ADMIN", "TEACHER", "HOD", "PRINCIPAL", "ACCOUNTS_OFFICER", "LIBRARIAN", "EXAM_CONTROLLER", "HOSTEL_WARDEN", "SECURITY_GUARD", "STAFF"}
+
+
+async def _kind_of(session: AsyncSession, user_id) -> tuple[str, str]:
+    """("staff" | "student" | "parent", a name people recognise)."""
+    from app.auth.models import Role, UserRole
+
+    roles = set((await session.execute(select(Role.code).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == user_id))).scalars().all())
+    name = (await _names(session, {user_id})).get(user_id, "an account")
+    if "ADMIN" in roles:
+        name += " \u2014 administrator"
+    return ("staff" if roles & STAFF_ROLES else "student" if "STUDENT" in roles else "parent"), name
+
+
+async def track_device(session: AsyncSession, *, device_id: str, username: str | None, success: bool, ip: str | None,
+                       user_agent: str | None, path: str) -> None:
+    """Remember which accounts each browser is used for. A browser that a student (or parent) signs in with, now
+    signing in to, or trying, a staff or administrator account is a security event, with both names on it."""
+    from app.auth.models import User
+    from app.core.side_log import committed_now
+    from app.security.models import DeviceSignIn
+
+    if not device_id or not username:
+        return
+    try:
+        async with committed_now(session) as side:
+            user = (await side.execute(select(User).where(func.lower(User.username) == username.strip().lower()))).scalars().first()
+            if user is None:
+                return
+            row = await side.get(DeviceSignIn, (device_id, user.id))
+            now = datetime.now(timezone.utc)
+            if row is None:
+                row = DeviceSignIn(device_id=device_id, user_id=user.id, first_seen=now, sign_ins=0, failed=0)
+                side.add(row)
+            row.last_seen, row.last_ip = now, (ip if ip and ip != "unknown" else row.last_ip)
+            if success:
+                row.sign_ins = (row.sign_ins or 0) + 1
+            else:
+                row.failed = (row.failed or 0) + 1
+            await side.flush()
+            others = (await side.execute(select(DeviceSignIn.user_id).where(DeviceSignIn.device_id == device_id, DeviceSignIn.user_id != user.id,
+                                                                           DeviceSignIn.sign_ins > 0))).scalars().all()
+            if not others:
+                return
+            target_kind, target_name = await _kind_of(side, user.id)
+            owners = [await _kind_of(side, o) for o in others]
+            regular = [n for k, n in owners if k in ("student", "parent")]
+            if target_kind != "staff" or not regular:
+                return                       # e.g. siblings sharing a phone, or a teacher's own second account: not flagged
+            what = "signed in to" if success else "tried to sign in to (wrong password)"
+            detail = f"A browser used by {', '.join(regular[:3])} {what} the account of {target_name}."
+        await record(session, "DEVICE_SWITCH", ip=ip, user_id=user.id, username=username, user_agent=user_agent, method="POST", path=path, detail=detail)
+    except Exception as exc:  # noqa: BLE001 - tracking must never break a sign-in
+        logger.warning("device_tracking_failed", error=str(exc)[:200])

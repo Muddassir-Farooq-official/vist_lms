@@ -3,6 +3,14 @@
   <link rel="icon" type="{{ 'image/png' if brand.has_logo else 'image/svg+xml' }}" href="{{ brand.favicon_url }}" />
   {% if brand.theme_css %}<style id="brand-theme">{{ brand.theme_css }}</style>{% endif %}
   <meta name="amount-style" content="{{ brand.amount_style }}" />
+  {# Installable as an app (Add to Home Screen / Install app) with push notifications: app/push/app_shell.py #}
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="{{ brand.theme_color }}" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="{{ brand.short_name }}" />
+  <link rel="apple-touch-icon" href="/branding/app-icon-180.png" />
 {%- endmacro %}
 
 {% macro brand_mark(portal) -%}

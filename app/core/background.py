@@ -47,9 +47,29 @@ async def send_due(session: AsyncSession, *, time_budget: float = 20) -> dict:
     from app.sms.service import SmsService
 
     await apply_from_db(session)
+    try:
+        from app.todos.service import remind_missing_lists
+
+        async with session.begin_nested():                               # a failure here is rolled back on its own
+            await remind_missing_lists(session)                          # daily, from the reminder hour; idempotent
+    except Exception as exc:  # noqa: BLE001 - a reminder problem must not stop sending
+        logger.warning("todo_reminder_failed", error=str(exc)[:300])
     sms = await SmsService(session).send_pending(limit=100, time_budget=time_budget)
     emails = await send_emails(session, limit=100, time_budget=time_budget)
-    return {**sms, **emails}
+    pushed = await push_round(session)
+    return {**sms, **emails, **pushed}
+
+
+async def push_round(session: AsyncSession) -> dict:
+    """New notifications to people's phones and browsers (when push is set up). Never raises."""
+    try:
+        from app.push.service import PushService
+
+        async with session.begin_nested():
+            return await PushService(session).push_new_notifications()
+    except Exception as exc:  # noqa: BLE001 - a push problem must not stop SMS and email
+        logger.warning("push_round_failed", error=str(exc)[:300])
+        return {"pushed": 0}
 
 
 async def _web_round() -> None:

@@ -3840,3 +3840,22 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 .tb-person button { border: 0; background: none; cursor: pointer; font-size: 1rem; line-height: 1; padding: 2px 4px; }
 .tb-preview { border-radius: 14px; overflow: hidden; border: 1px solid var(--border); }
 .tb-reach { font-weight: 700; color: var(--text-primary); }
+
+/* Applications: progress timeline and departments (forwarding) */
+.fw-timeline { list-style: none; margin: 0 0 8px; padding: 0 0 0 14px; border-left: 3px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
+.fw-timeline li { position: relative; display: flex; flex-direction: column; gap: 2px; }
+.fw-timeline li::before { content: ""; position: absolute; left: -21px; top: 4px; width: 11px; height: 11px; border-radius: 50%; background: var(--bold-blue); border: 2px solid #fff; }
+.fw-timeline li.warn::before { background: var(--bold-orange); } .fw-timeline li.good::before { background: var(--bold-green); } .fw-timeline li.bad::before { background: var(--bold-red); }
+.fw-timeline small { color: var(--text-secondary); } .fw-timeline span { font-size: .86rem; background: var(--surface-alt, #f5f7fb); border-radius: 8px; padding: 6px 10px; }
+.fw-list { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.fw-list li { display: flex; align-items: center; gap: 10px; justify-content: space-between; padding: 10px 12px; border-radius: 12px; background: var(--surface-alt, #f5f7fb); border-left: 5px solid var(--bold-blue); }
+.fw-list li > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.fw-list li.fw-in_progress { border-left-color: var(--bold-orange); } .fw-list li.fw-done { border-left-color: var(--bold-green); }
+.fw-list li.fw-cannot_do { border-left-color: var(--bold-red); } .fw-list li.fw-recalled { border-left-color: #94a3b8; opacity: .75; }
+.fw-state { align-self: flex-start; font-size: .74rem; font-weight: 800; padding: 2px 8px; border-radius: 8px; background: #fff; }
+.fw-list small { color: var(--text-secondary); overflow-wrap: anywhere; } .fw-answer { color: var(--text-primary) !important; }
+.fw-form { display: grid; grid-template-columns: minmax(160px, 1fr) 2fr auto; gap: 8px; align-items: end; margin-bottom: 8px; }
+@media (max-width: 700px) { .fw-form { grid-template-columns: 1fr; } }
+
+/* Phones: the greeting block shows no shortcut buttons (they do not fit); the bottom bar and the menu cover them. */
+@media (max-width: 699px) { .dash-hero .dash-actions { display: none; } }

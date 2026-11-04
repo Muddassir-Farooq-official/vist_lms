@@ -5,7 +5,7 @@ import csv
 import io
 import uuid
 from calendar import monthrange
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone  # noqa: F401
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -208,6 +208,24 @@ class TodoService:
         return {"month": f"{first:%Y-%m}", "label": f"{first:%B %Y}", "person": people.get(user_id) or {"user_id": str(user_id), "name": "?", "code": "", "department": ""},
                 "days": [{"date": d, "items": v} for d, v in days.items()]}
 
+    async def pdf_month(self, month: str | None, user_id: uuid.UUID | None = None) -> tuple[bytes, str]:
+        """The month as a printable PDF: everyone's summary, then each person's lists (or one person's)."""
+        import asyncio
+
+        from app.todos.report_pdf import render
+
+        report = await self.report(month)
+        if user_id:
+            report["people"] = [p for p in report["people"] if p["user_id"] == str(user_id)]
+        people_days = []
+        for p in report["people"]:
+            if p["days_with_list"]:
+                detail = await self.person_month(uuid.UUID(p["user_id"]), report["month"])
+                people_days.append((p, detail["days"]))
+        body = await asyncio.to_thread(render, report, people_days, generated=institute_now())
+        who = ("-" + (report["people"][0]["code"] or "person")) if user_id and report["people"] else ""
+        return body, f"todo-{report['month']}{who}.pdf"
+
     async def csv_month(self, month: str | None, user_id: uuid.UUID | None = None) -> tuple[str, str]:
         from app.employees.router import _csv_safe
 
@@ -229,3 +247,50 @@ class TodoService:
                         _csv_safe(i.title), _csv_safe(i.note or ""), label.get(self._effective(i, today), i.status), done, "Yes" if i.carried_from_id else ""])
         who = ("-" + (people.get(user_id, {}).get("code") or "person")) if user_id else ""
         return "﻿" + out.getvalue(), f"todo-{first:%Y-%m}{who}.csv"
+
+
+
+REMINDER_TITLE = "Write today's to-do list"
+
+
+async def remind_missing_lists(session: AsyncSession) -> int:
+    """From the reminder hour (Settings -> Rules -> Tasks), once a day except Sunday: a notification to each active member
+    of staff who has not written anything for today. Safe to call every minute: someone already reminded today is skipped."""
+    from app.auth.models import Role, User, UserRole
+    from app.core.config import settings
+    from app.employees.models import Employee, EmployeeStatus
+    from app.notifications.models import Notification, NotificationCategory
+
+    hour = int(getattr(settings, "todo_reminder_hour", 0) or 0)
+    now = institute_now()
+    today = now.date()
+    if not hour or now.hour < hour or today.weekday() == 6:
+        return 0
+    start = datetime.combine(today, datetime.min.time(), tzinfo=now.tzinfo).astimezone(timezone.utc)
+    staff = (await session.execute(select(Employee.user_id).join(User, User.id == Employee.user_id).where(
+        Employee.user_id.is_not(None), Employee.status == EmployeeStatus.ACTIVE, User.is_active.is_(True)))).scalars().all()
+    if not staff:
+        return 0
+    wrote = set((await session.execute(select(TodoItem.user_id).where(TodoItem.work_date == today, TodoItem.user_id.in_(staff)))).scalars().all())
+    mark = f"day={today.isoformat()}"                        # the reminder's link names its day: one reminder per person per day
+    told = set((await session.execute(select(Notification.user_id).where(Notification.title == REMINDER_TITLE, Notification.link.like(f"%{mark}%"),
+                                                                        Notification.created_at >= start - timedelta(days=1),
+                                                                        Notification.user_id.in_(staff)))).scalars().all())
+    roles: dict = {}
+    for uid, code in (await session.execute(select(UserRole.user_id, Role.code).join(Role, Role.id == UserRole.role_id).where(UserRole.user_id.in_(staff)))).all():
+        roles.setdefault(uid, []).append(code)
+    portal = {"TEACHER": "faculty", "HOD": "faculty", "LIBRARIAN": "library", "ACCOUNTS_OFFICER": "accounts", "SECURITY_GUARD": "gate",
+              "EXAM_CONTROLLER": "exam", "HOSTEL_WARDEN": "warden", "STAFF": "staff", "ADMIN": "admin"}
+    n = 0
+    for uid in staff:
+        if uid in wrote or uid in told :
+            continue
+        where = next((portal[r] for r in roles.get(uid, []) if r in portal), None)
+        if where is None:
+            continue
+        session.add(Notification(user_id=uid, category=NotificationCategory.TASK, title=REMINDER_TITLE,
+                                 message="You have not written your to-do list for today yet. Add what you plan to do and mark what is done.",
+                                 link=f"/dashboard/{where}/tasks?{mark}#todo"))
+        n += 1
+    await session.flush()
+    return n

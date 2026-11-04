@@ -39,6 +39,7 @@
       <input id="tb-person-q" class="text-input" type="search" placeholder="Name, roll number or employee code&hellip;" autocomplete="off" />
       <div id="tb-person-list" class="picker-list"></div>
       <div class="tb-people" id="tb-people"></div></div>
+    <label class="check-row"><input type="checkbox" id="tb-parents" /> Also show it to the parents / guardians of these students</label>
   </div>
   <p class="cc-meta">Reaches <span class="tb-reach" id="tb-reach">&mdash;</span></p>
 
@@ -47,7 +48,7 @@
     <div class="form-field"><label for="tb-start">Show from (optional)</label><input id="tb-start" class="text-input" type="datetime-local" /></div>
     <div class="form-field"><label for="tb-end">Until (optional)</label><input id="tb-end" class="text-input" type="datetime-local" /></div>
     <label class="check-row"><input type="checkbox" id="tb-active" checked /> Switched on</label>
-    <label class="check-row"><input type="checkbox" id="tb-dismiss" checked /> People can close it</label>
+    <label class="check-row"><input type="checkbox" id="tb-dismiss" checked /> Parents can close it <small class="cc-meta">(students and staff never can)</small></label>
     <div class="form-field"><label for="tb-name">Name for your list (optional)</label><input id="tb-name" class="text-input" maxlength="120" placeholder="e.g. Google AI course, BSCS" /></div>
     <div class="form-field"><label for="tb-pos">Order (0 shows first)</label><input id="tb-pos" class="text-input small-input" type="number" min="0" max="999" value="0" /></div>
   </div>

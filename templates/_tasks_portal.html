@@ -126,7 +126,8 @@
     <div class="ann-toolbar">
       <label class="td-month">Month <input type="month" id="tr-month" class="text-input" /></label>
       <input id="tr-q" class="text-input" type="search" placeholder="Search name, code or department&hellip;" aria-label="Search staff" />
-      <a class="role-btn secondary-btn" id="tr-csv" href="#" data-download="todo.csv" data-label="To-do report">Download month (CSV)</a>
+      <a class="role-btn" id="tr-pdf" href="#" data-download="todo.pdf" data-label="To-do report">Month as PDF</a>
+      <a class="role-btn secondary-btn" id="tr-csv" href="#" data-download="todo.csv" data-label="To-do report">CSV</a>
     </div>
     <div class="td-totals" id="tr-totals"></div>
     <div class="table-scroll"><table class="tk-table" id="tr-table">
@@ -143,7 +144,8 @@
 
 <dialog id="tr-dialog" class="modal modal-wide" aria-labelledby="tr-d-title"><div class="modal-body">
   <h2 id="tr-d-title">To-do lists</h2><p class="cc-meta" id="tr-d-meta"></p>
-  <p><a class="role-btn small-btn secondary-btn" id="tr-d-csv" href="#" data-download="todo.csv" data-label="To-do list">Download this person (CSV)</a></p>
+  <p><a class="role-btn small-btn" id="tr-d-pdf" href="#" data-download="todo.pdf" data-label="To-do list">This person (PDF)</a>
+    <a class="role-btn small-btn secondary-btn" id="tr-d-csv" href="#" data-download="todo.csv" data-label="To-do list">CSV</a></p>
   <div id="tr-d-days"></div>
   <button type="button" class="modal-close-btn" id="tr-d-close">Close</button>
 </div></dialog>

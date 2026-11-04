@@ -60,6 +60,9 @@ POLICY: tuple[Policy, ...] = (
     Policy("sms_on_results", "SMS when results are published (1 = yes, 0 = no)", "SMS", int, 0, 1, "One SMS per student per course published."),
     Policy("sms_on_fee_overdue", "SMS weekly reminder for overdue fees (1 = yes, 0 = no)", "SMS", int, 0, 1, "At most once a week per student."),
     Policy("sms_on_admission", "SMS applicants selected in a merit list (1 = yes, 0 = no)", "SMS", int, 0, 1, "One SMS per offered applicant."),
+    Policy("sms_on_security_alert", "SMS administrators on a security alert (1 = yes, 0 = no)", "SMS", int, 0, 1,
+           "Sent to administrators' own mobile numbers (their employee record) and the institute phone if it is a mobile. "
+           "At most once per half hour for the same kind of attack."),
     Policy("sms_to_guardian", "Also send each SMS to the guardian (1 = yes, 0 = no)", "SMS", int, 0, 1,
            "Uses the guardian's contact number on the student record."),
     Policy("fee_backdated_grace_days", "Late fee grace for backdated instalments (days)", "Fees", int, 0, 90,
@@ -92,6 +95,9 @@ POLICY: tuple[Policy, ...] = (
            "Held from each payslip until the total equals one basic salary. 0 = off. Can be changed per employee."),
     Policy("payroll_advance_max_salary_multiple", "Salary advance: most one employee may owe (x basic salary)", "Payroll", float, 0.1, 6,
            "1 = at most one month's basic salary outstanding in advances, including the one being asked for. Every advance needs administrator approval."),
+    Policy("todo_reminder_hour", "Remind staff with no to-do list today, from this hour (0 = never)", "Tasks", int, 0, 23,
+           "E.g. 15: at 3 pm, staff who have not written today's list get a notification (once a day, not on Sundays). "
+           "Their list then shows in the monthly to-do report."),
     Policy("amount_display", "Amounts on dashboard cards", "Display", int, 0, 2,
            "Full (Rs. 4,045,000), K / M (Rs. 4.05M) or lakh / crore (Rs. 40.45 lakh). Only the summary cards change; tables, receipts, "
            "challans, reports and downloads always show the full amount. Hover or tap a card to see the exact figure."),

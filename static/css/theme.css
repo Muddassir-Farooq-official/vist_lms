@@ -1,3 +1,14 @@
+/* Outfit (SIL Open Font License, static/fonts/OUTFIT-OFL.txt), served from this site: the security policy allows
+   fonts from here only. One variable file covers every weight from 100 to 900 (Latin; other scripts fall back). */
+@font-face {
+  font-family: "Outfit";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("/static/fonts/outfit-latin-variable.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 /* VIST LMS — shared theme: light background, blue text/accents, yellow
    highlights. Mobile-first. All colors live in CSS custom properties so
    the whole app (this file + dashboard.css) stays consistent from one
@@ -68,7 +79,7 @@
   --shadow-sm: 0 1px 2px rgba(15, 31, 61, 0.06);
   --shadow-md: 0 8px 24px -8px rgba(15, 31, 61, 0.14);
   --shadow-lg: 0 24px 60px -24px rgba(15, 31, 61, 0.25);
-  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+  --font: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
 }
 
 * { box-sizing: border-box; }

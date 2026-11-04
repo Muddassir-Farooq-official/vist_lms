@@ -753,3 +753,75 @@ unchanged. CSS only (`static/css/dashboard.css`, one block at the end); every co
 - Migration d2f4a6b8c0e1 (additive): table application_forwards. Application statuses are unchanged (a forwarded
   application is "Under review"); nothing existing is altered.
 - Tests: tests/integration/test_application_forwarding.py; test_tabbed_pages.py knows the new department tab.
+
+## Six follow-ups (2026-11-03)
+
+1. **Accounts office keeps its own menu.** Opening an administration page that the accounts portal also has
+   (/dashboard/admin/fees, fines, refunds, inventory, assets, payroll, finance, finance-reports, approvals) as the
+   accounts officer now sends them to /dashboard/accounts/... (same screen, their own menu). Other roles and pages are
+   unchanged. (app/main.py, middleware own_portal_redirect.)
+2. **Outfit font served from the site** (static/fonts/outfit-latin-variable.woff2, SIL Open Font License in
+   static/fonts/OUTFIT-OFL.txt), loaded in static/css/theme.css and used on every page. The security policy already
+   allows fonts from the site itself.
+3. **Security alerts by SMS.** Each security alert (already at most once per half hour per kind) is also texted to
+   administrators' own mobiles (their employee record) and to the institute phone when it is a mobile.
+   Settings -> Rules -> SMS -> "SMS administrators on a security alert" (default on).
+4. **Daily to-do reminder.** From Settings -> Rules -> Tasks -> reminder hour (default 15 = 3 pm; 0 = off), except
+   Sundays, active staff who have not written today's list get one notification a day, linking to that day's list.
+   Runs in the sender service and, when it is stopped, in the web app's sender loop. (app/todos/service.py,
+   scripts/sms_sender.py, app/core/background.py.)
+5. **Top bars for parents.** "Also show it to the parents / guardians of these students": a guardian sees the bar when
+   one of their children is in its audience (by program, semester, name or "all students"); reach counts them.
+6. **Monthly to-do report as PDF**: "Month as PDF" (everyone: summary, then each person's lists day by day) and
+   "This person (PDF)" next to the CSV downloads. (app/todos/report_pdf.py, /api/v1/todos/report.pdf.)
+
+No migration: the two new settings are policy values in the existing table.
+Tests: added to test_todos.py, test_security_events.py and test_top_banners.py; test_refunds.py follows the
+accounts redirect.
+
+
+## Installable app with real push notifications (2026-11-04)
+
+- The portal is now an installable app (a Progressive Web App): on Android, Chrome / Edge / Samsung offer "Install
+  app" (also in the side menu); on iPhone / iPad, Safari -> Share -> Add to Home Screen (the menu explains it). It opens
+  full screen with the institute's icon (made from the uploaded logo, or its initial in the main colour).
+- Push notifications, sent by this server itself (standard Web Push with VAPID; no OneSignal / Firebase account and no
+  data to a third party). Menu -> "Phone notifications" -> Turn on (a test message follows), Send a test, Turn off.
+  Every notification the portal creates (applications, fees, results, announcements, security alerts, to-do
+  reminders ...) is also pushed to that person's devices, within about a minute, by the background sender (or the web
+  app's own loop when the sender service is stopped). Tapping it opens the right page. Devices that are gone are
+  forgotten automatically. iPhone / iPad: iOS 16.4 or later, from the installed (Home Screen) app.
+- Server setup (once): `python scripts/push_keys.py` prints VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY; put them and
+  VAPID_SUBJECT in .env and restart. Without them push is simply off (the menu says so).
+- Code: app/push/ (webpush.py: RFC 8291 encryption + RFC 8292 VAPID; service.py; router.py; app_shell.py: manifest,
+  icons, /sw.js), static/js/service-worker.js, static/js/admin-common.js (menu items, turning push on/off),
+  templates/_brand.html (manifest + app meta tags on every page), app/core/background.py and scripts/sms_sender.py
+  (the push round), app/notifications/models.py (pushed_at), app/core/config.py, .env.example, scripts/push_keys.py.
+- New dependency: cryptography 46.0.3 (added to pyproject.toml and requirements.lock with its hashes; cffi and
+  pycparser were already there).
+- Migration e3a5b7c9d1f2 (additive): table push_subscriptions; nullable column notifications.pushed_at (instant in
+  PostgreSQL, no rewrite); index ix_notifications_created_at built CONCURRENTLY (no write lock). Old notifications are
+  never pushed (only the last 15 minutes are considered).
+- Tests: tests/integration/test_push.py (a message encrypted here decrypts the way a browser does it; the VAPID token
+  verifies with the public key; devices; the background round; the manifest, icons and service worker).
+
+## Top bars stay put, no shortcuts on phones, and tracking who uses whose account (2026-11-04)
+
+- **Top bars:** students and staff (including administrators) can never close a bar; it shows until the
+  administration hides it or its end date passes. Only parents / guardians can close a bar, and only one that allows it
+  ("Parents can close it"). The close request is refused on the server too. (app/banners/service.py may_close.)
+- **Phones:** the shortcut buttons in the dashboard greeting block are hidden below 700 px wide (the bottom bar and the
+  menu cover them).
+- **Security tab, two new kinds of event, each alerting the administration at once (portal, email, SMS):**
+  - *Someone else's account* (DEVICE_SWITCH): every browser gets a random id in a cookie (vist_device, 2 years,
+    HttpOnly; nothing about the device is read). When a browser that a student or parent signs in with is used to
+    sign in to, or even try, a staff or administrator account, it is recorded with both names, e.g. "A browser used by
+    Ali Raza (student 26001) tried to sign in to (wrong password) the account of Admin - administrator". Siblings
+    sharing a phone, or staff using two accounts, are not flagged. Table device_sign_ins.
+  - *Wrong portal* (WRONG_PORTAL): a student or parent account opening another portal's screens (e.g.
+    /dashboard/admin/..., /dashboard/faculty/...). The page's own role check still sends them away; now it is on record.
+- Limits (said plainly on purpose): the browser id is lost if someone clears cookies, uses a private window or another
+  device; it identifies a browser, not a person. Refused actions, wrong passwords and addresses are still recorded as
+  before, so a pattern usually shows anyway.
+- Migration f4b6c8d0e2a3 (additive): table device_sign_ins. Nothing existing changes.
+- Tests: test_security_events.py (both new events), test_top_banners.py (who may close).

@@ -46,7 +46,7 @@ async def banner_click(banner_id: uuid.UUID, current_user: CurrentUser = Depends
 
 @router.post("/{banner_id}/dismiss", status_code=204, summary="Close this bar for me (only bars that allow it)")
 async def banner_dismiss(banner_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> Response:
-    await BannerService(db).dismissed(banner_id, current_user.id)
+    await BannerService(db).dismissed(banner_id, current_user.id, current_user.roles)
     return Response(status_code=204)
 
 

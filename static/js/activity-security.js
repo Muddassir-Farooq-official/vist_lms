@@ -5,9 +5,10 @@
   const VA = window.VistAdmin, esc = VA.escapeHtml;
   const $ = function (id) { return document.getElementById(id); };
   const API = "/api/v1/security";
-  const TONE = { FAILED_SIGNIN: "orange", SIGNIN_LIMIT: "orange", ACCESS_DENIED: "purple", SUSPICIOUS_INPUT: "red", BAD_TOKEN: "red", PROBE: "teal" };
+  const TONE = { FAILED_SIGNIN: "orange", SIGNIN_LIMIT: "orange", ACCESS_DENIED: "purple", SUSPICIOUS_INPUT: "red", BAD_TOKEN: "red", PROBE: "teal",
+    DEVICE_SWITCH: "red", WRONG_PORTAL: "purple" };
   const SHORT = { FAILED_SIGNIN: "Wrong password", SIGNIN_LIMIT: "Sign-in limit", ACCESS_DENIED: "Not allowed", SUSPICIOUS_INPUT: "Attack-looking input",
-    BAD_TOKEN: "Forged sign-in", PROBE: "Scanning" };
+    BAD_TOKEN: "Forged sign-in", PROBE: "Scanning", DEVICE_SWITCH: "Someone else's account", WRONG_PORTAL: "Wrong portal" };
   let kinds = {}, loaded = false;
 
   function when(iso) { return VA.formatDateTime ? VA.formatDateTime(iso) : iso; }
@@ -21,8 +22,9 @@
     if ($("sec-kind").options.length === 1) {
       $("sec-kind").insertAdjacentHTML("beforeend", Object.keys(kinds).map(function (k) { return '<option value="' + esc(k) + '">' + esc(SHORT[k] || k) + "</option>"; }).join(""));
     }
-    const tiles = [["FAILED_SIGNIN", d.failed_signins], ["ACCESS_DENIED", d.counts.ACCESS_DENIED], ["SUSPICIOUS_INPUT", d.counts.SUSPICIOUS_INPUT],
-      ["BAD_TOKEN", d.counts.BAD_TOKEN], ["SIGNIN_LIMIT", d.counts.SIGNIN_LIMIT], ["PROBE", d.counts.PROBE]];
+    const tiles = [["DEVICE_SWITCH", d.counts.DEVICE_SWITCH], ["WRONG_PORTAL", d.counts.WRONG_PORTAL], ["FAILED_SIGNIN", d.failed_signins],
+      ["ACCESS_DENIED", d.counts.ACCESS_DENIED], ["SUSPICIOUS_INPUT", d.counts.SUSPICIOUS_INPUT], ["BAD_TOKEN", d.counts.BAD_TOKEN],
+      ["SIGNIN_LIMIT", d.counts.SIGNIN_LIMIT], ["PROBE", d.counts.PROBE]];
     $("sec-tiles").innerHTML = tiles.map(function (t) {
       return '<button type="button" class="sec-tile tone-' + TONE[t[0]] + '" data-kind="' + t[0] + '"><b>' + Number(t[1] || 0).toLocaleString() + "</b><span>" +
         esc(SHORT[t[0]]) + "</span><small>" + esc(kinds[t[0]] || "") + "</small></button>";

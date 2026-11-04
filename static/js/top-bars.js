@@ -76,18 +76,19 @@
 
   // ------------------------------------------------------------------ form
   function blank() { return { message: "", button_label: "", button_url: "", new_tab: true, tone: "blue", dismissible: true, is_active: true, position: 0, name: "",
-    starts_at: null, ends_at: null, audience: { everyone: false, roles: [], program_ids: [], semesters: [], user_ids: [] } }; }
+    starts_at: null, ends_at: null, audience: { everyone: false, roles: [], program_ids: [], semesters: [], user_ids: [], include_parents: false } }; }
 
   async function open(b) {
     editing = b ? b.id : null;
     form = JSON.parse(JSON.stringify(b || blank()));
-    form.audience = Object.assign({ everyone: false, roles: [], program_ids: [], semesters: [], user_ids: [] }, form.audience || {});
+    form.audience = Object.assign({ everyone: false, roles: [], program_ids: [], semesters: [], user_ids: [], include_parents: false }, form.audience || {});
     $("tb-title").textContent = b ? "Change top bar" : "New top bar";
     $("tb-message").value = form.message; $("tb-label").value = form.button_label || ""; $("tb-url").value = form.button_url || "";
     $("tb-newtab").checked = form.new_tab; $("tb-dismiss").checked = form.dismissible; $("tb-active").checked = form.is_active;
     $("tb-name").value = b ? form.name : ""; $("tb-pos").value = form.position || 0;
     $("tb-start").value = localInput(form.starts_at); $("tb-end").value = localInput(form.ends_at);
     $("tb-everyone").checked = !!form.audience.everyone;
+    $("tb-parents").checked = !!form.audience.include_parents;
     $("tb-error").hidden = true;
     renderAudience();
     people = {};
@@ -145,6 +146,7 @@
   ["tb-message", "tb-label", "tb-url"].forEach(function (id) { $(id).addEventListener("input", preview); });
   ["tb-newtab", "tb-dismiss"].forEach(function (id) { $(id).addEventListener("change", preview); });
   $("tb-everyone").addEventListener("change", function () { $("tb-groups").hidden = $("tb-everyone").checked; reach(); });
+  $("tb-parents").addEventListener("change", function () { form.audience.include_parents = $("tb-parents").checked; reach(); });
   $("tb-tones").addEventListener("click", function (e) { const b = e.target.closest("[data-tone]"); if (!b) return; form.tone = b.getAttribute("data-tone"); renderAudience(); preview(); });
   $("tb-roles").addEventListener("click", function (e) {
     const b = e.target.closest("[data-role]"); if (!b) return;

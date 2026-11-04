@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, func
 from sqlalchemy.dialects.postgresql import INET
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -37,3 +37,22 @@ class SecurityEvent(Base):
     method: Mapped[str | None] = mapped_column(String(10), nullable=True)
     path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     detail: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+
+class DeviceSignIn(Base):
+    """Which accounts have been used from which browser. Each browser gets a random, meaningless id in a long-lived
+    cookie when it first opens the sign-in page; nothing about the device itself is read or stored.
+
+    This is how "a browser that a student normally signs in with has now signed in to (or tried) a teacher's or an
+    administrator's account" is noticed and named on the Security tab."""
+
+    __tablename__ = "device_sign_ins"
+    __table_args__ = (Index("ix_device_sign_ins_user", "user_id"),)
+
+    device_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    last_ip: Mapped[str | None] = mapped_column(INET, nullable=True)
+    sign_ins: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    failed: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")

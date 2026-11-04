@@ -50,9 +50,10 @@ async def test_a_bar_reaches_only_its_audience_and_records_responses(app_client,
     await _login(app_client, student_username, "StudentPass123!")
     mine = (await app_client.get(f"{B}/mine")).json()
     assert [m["id"] for m in mine] == [bar["id"]] and mine[0]["button_url"] == "https://grow.google/ai"
+    assert mine[0]["dismissible"] is False                                   # students can never close a bar
     assert (await app_client.post(f"{B}/{bar['id']}/click")).status_code == 204
-    assert (await app_client.post(f"{B}/{bar['id']}/dismiss")).status_code == 204
-    assert (await app_client.get(f"{B}/mine")).json() == []
+    assert (await app_client.post(f"{B}/{bar['id']}/dismiss")).status_code == 422
+    assert len((await app_client.get(f"{B}/mine")).json()) == 1
     assert (await app_client.get(B)).status_code == 403
 
     # a teacher sees the staff bar, which cannot be closed
@@ -65,9 +66,9 @@ async def test_a_bar_reaches_only_its_audience_and_records_responses(app_client,
     # the administration sees who responded, hides the bar, and it disappears
     await _login_admin(app_client)
     listed = {b["id"]: b for b in (await app_client.get(B)).json()["bars"]}
-    assert (listed[bar["id"]]["clicked"], listed[bar["id"]]["closed"]) == (1, 1)
+    assert (listed[bar["id"]]["clicked"], listed[bar["id"]]["closed"]) == (1, 0)
     resp = (await app_client.get(f"{B}/{bar['id']}/responses")).json()
-    assert resp[0]["clicks"] == 1 and resp[0]["dismissed_at"]
+    assert resp[0]["clicks"] == 1 and resp[0]["dismissed_at"] is None
     csv = await app_client.get(f"{B}/{bar['id']}/responses.csv")
     assert csv.status_code == 200 and "Yes" in csv.text
     hidden = (await app_client.patch(f"{B}/{staff_bar['id']}", json={"is_active": False})).json()
@@ -94,3 +95,29 @@ async def test_named_people_and_schedule(app_client, admin_user, db_session):
     assert [m["id"] for m in (await app_client.get(f"{B}/mine")).json()] == [now_bar["id"]]
     await _as(app_client, team, "t1")
     assert (await app_client.get(f"{B}/mine")).json() == []
+
+
+def test_parents_of_chosen_students_see_the_bar():
+    import uuid as _uuid
+
+    from app.banners.models import TopBanner
+    from app.banners.service import BannerService
+
+    prog = str(_uuid.uuid4())
+    bar = TopBanner(message="Fee reminder", audience={"program_ids": [prog], "semesters": [3], "include_parents": True}, is_active=True)
+    svc = BannerService(None)
+    parent = _uuid.uuid4()
+    child_in = (_uuid.uuid4(), _uuid.UUID(prog), 3)
+    child_out = (_uuid.uuid4(), _uuid.UUID(prog), 1)
+    assert svc._matches(bar, parent, ["PARENT"], None, [child_out, child_in]) is True
+    assert svc._matches(bar, parent, ["PARENT"], None, [child_out]) is False
+    bar.audience = {**bar.audience, "include_parents": False}
+    assert svc._matches(bar, parent, ["PARENT"], None, [child_in]) is False
+
+
+def test_only_parents_may_close_a_bar():
+    from app.banners.service import may_close
+
+    assert may_close(["PARENT"]) is True
+    for roles in (["STUDENT"], ["TEACHER"], ["ACCOUNTS_OFFICER"], ["ADMIN"], ["PARENT", "TEACHER"], []):
+        assert may_close(roles) is False, roles

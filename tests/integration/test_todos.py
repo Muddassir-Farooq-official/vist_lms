@@ -70,3 +70,39 @@ async def test_csv_neutralises_formulas(app_client, admin_user, db_session):
     await _login_admin(app_client)
     csv = (await app_client.get(f"{T}/report.csv")).text
     assert "'=HYPERLINK" in csv
+
+
+async def test_month_pdf_and_daily_reminder(app_client, admin_user, db_session, monkeypatch):
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from sqlalchemy import select
+
+    import app.todos.service as todo_service
+    from app.notifications.models import Notification
+    from tests.integration.test_purchasing import _as, _team
+
+    team = await _team(app_client, db_session)
+    await _as(app_client, team, "t1")
+    assert (await app_client.post(T, json={"title": "Mark the BSCS-3 quizzes", "note": "Section A"})).status_code == 201
+    await _login_admin(app_client)
+    pdf = await app_client.get(f"{T}/report.pdf")
+    assert pdf.status_code == 200 and pdf.content[:4] == b"%PDF" and "attachment" in pdf.headers["content-disposition"]
+
+    # 4 pm on a Wednesday: t2 (no list today) is reminded once; t1 (has a list) is not
+    wednesday = datetime(2026, 11, 4, 16, 0, tzinfo=ZoneInfo(settings.institute_timezone))
+    monkeypatch.setattr(todo_service, "institute_now", lambda: wednesday)
+    monkeypatch.setattr(todo_service, "institute_today", lambda: wednesday.date())
+    monkeypatch.setattr(settings, "todo_reminder_hour", 15)
+    from app.todos.models import TodoItem
+
+    for item in (await db_session.execute(select(TodoItem))).scalars():
+        item.work_date = wednesday.date()                    # t1's list counts for that day
+    await db_session.flush()
+    first = await todo_service.remind_missing_lists(db_session)
+    again = await todo_service.remind_missing_lists(db_session)
+    assert first >= 1 and again == 0
+    told = (await db_session.execute(select(Notification).where(Notification.title == todo_service.REMINDER_TITLE))).scalars().all()
+    assert all(n.link.endswith("/tasks?day=2026-11-04#todo") for n in told)
+    monkeypatch.setattr(settings, "todo_reminder_hour", 0)
+    assert await todo_service.remind_missing_lists(db_session) == 0

@@ -76,3 +76,9 @@ async def person_report(user_id: uuid.UUID, month: str | None = Month, current_u
 async def month_csv(month: str | None = Month, user_id: uuid.UUID | None = None, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> Response:
     body, name = await TodoService(db).csv_month(month, user_id)
     return Response(content=body, media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
+
+
+@router.get("/report.pdf", summary="One month of to-do lists as a printable PDF, everyone or one person (administration)")
+async def month_pdf(month: str | None = Month, user_id: uuid.UUID | None = None, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> Response:
+    body, name = await TodoService(db).pdf_month(month, user_id)
+    return Response(content=body, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})

@@ -45,7 +45,8 @@ class Notification(UUIDPKMixin, TimestampMixin, Base):
     — no restructuring needed, just one more call at each site."""
 
     __tablename__ = "notifications"
-    __table_args__ = (Index("ix_notifications_user_id", "user_id"), Index("ix_notifications_is_read", "is_read"))
+    __table_args__ = (Index("ix_notifications_user_id", "user_id"), Index("ix_notifications_is_read", "is_read"),
+                      Index("ix_notifications_created_at", "created_at"))
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     category: Mapped[NotificationCategory] = mapped_column(
@@ -59,5 +60,7 @@ class Notification(UUIDPKMixin, TimestampMixin, Base):
     link: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # When it was pushed to the person's phones / browsers (app/push). Empty = not yet (or push is off).
+    pushed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 from app.notifications import email_models as _email_models  # noqa: E402,F401  (registers email tables with Base)

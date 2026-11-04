@@ -56,10 +56,17 @@ def clean_audience(raw: dict | None) -> dict:
     user_ids = list(dict.fromkeys(user_ids))
     if len(user_ids) > MAX_PEOPLE:
         raise ValidationAppError(f"At most {MAX_PEOPLE} named people per bar; use roles or programs for larger groups.")
-    out = {"everyone": bool(raw.get("everyone")), "roles": roles, "program_ids": program_ids, "semesters": semesters, "user_ids": user_ids}
+    out = {"everyone": bool(raw.get("everyone")), "roles": roles, "program_ids": program_ids, "semesters": semesters, "user_ids": user_ids,
+           "include_parents": bool(raw.get("include_parents"))}
     if not (out["everyone"] or roles or program_ids or user_ids):
         raise ValidationAppError("Choose who sees this bar: everyone, a group, a program or named people.")
     return out
+
+
+def may_close(roles: list[str]) -> bool:
+    """Students and staff always see their bars until the administration hides them; only parents / guardians
+    (and only on bars that allow it) can close one."""
+    return bool(roles) and all(r == "PARENT" for r in roles)
 
 
 class BannerService:
@@ -76,7 +83,16 @@ class BannerService:
     def _live(b: TopBanner, now: datetime) -> bool:
         return b.is_active and (b.starts_at is None or b.starts_at <= now) and (b.ends_at is None or b.ends_at > now)
 
-    def _matches(self, b: TopBanner, user_id: uuid.UUID, roles: list[str], student) -> bool:
+    @staticmethod
+    def _student_matches(a: dict, student_user_id, program_id, semester) -> bool:
+        """Would this student be in the audience (all students, their program / semester, or named)?"""
+        if "STUDENT" in (a.get("roles") or []) or str(student_user_id) in (a.get("user_ids") or []):
+            return True
+        if a.get("program_ids") and program_id and str(program_id) in a["program_ids"]:
+            return not a.get("semesters") or semester in a["semesters"]
+        return bool(not a.get("program_ids") and a.get("semesters") and semester in a["semesters"])
+
+    def _matches(self, b: TopBanner, user_id: uuid.UUID, roles: list[str], student, children=()) -> bool:
         a = b.audience or {}
         if a.get("everyone"):
             return True
@@ -84,11 +100,10 @@ class BannerService:
             return True
         if str(user_id) in (a.get("user_ids") or []):
             return True
-        if student and a.get("program_ids") and student[0] and str(student[0]) in a["program_ids"]:
-            return not a.get("semesters") or (student[1] in a["semesters"])
-        if student and not a.get("program_ids") and a.get("semesters") and student[1] in a["semesters"]:
+        if student and self._student_matches({**a, "roles": [], "user_ids": []}, user_id, student[0], student[1]):
             return True
-        return False
+        # "and their parents": a guardian sees it when any of their children is in the audience
+        return bool(a.get("include_parents") and any(self._student_matches(a, c[0], c[1], c[2]) for c in children))
 
     async def mine(self, user_id: uuid.UUID, roles: list[str]) -> list[dict]:
         now = datetime.now(timezone.utc)
@@ -99,13 +114,22 @@ class BannerService:
         closed = set((await self.session.execute(select(TopBannerSeen.banner_id).where(
             TopBannerSeen.user_id == user_id, TopBannerSeen.dismissed_at.is_not(None), TopBannerSeen.banner_id.in_([b.id for b in bars])))).scalars().all())
         student = await self._student_of(user_id) if "STUDENT" in roles else None
+        children = []
+        if "PARENT" in roles and any((b.audience or {}).get("include_parents") for b in bars):
+            from app.parents.models import ParentStudentLink
+            from app.students.models import Student
+
+            children = (await self.session.execute(select(Student.user_id, Student.program_id, Student.current_semester)
+                                                   .join(ParentStudentLink, ParentStudentLink.student_id == Student.id)
+                                                   .where(ParentStudentLink.user_id == user_id))).all()
+        can_close = may_close(roles)
         out = []
         for b in bars:
-            if b.id in closed and b.dismissible:
+            if b.id in closed and b.dismissible and can_close:
                 continue
-            if self._matches(b, user_id, roles, student):
+            if self._matches(b, user_id, roles, student, children):
                 out.append({"id": str(b.id), "message": b.message, "button_label": b.button_label if b.button_url else None, "button_url": b.button_url,
-                            "new_tab": b.new_tab, "tone": b.tone, "dismissible": b.dismissible})
+                            "new_tab": b.new_tab, "tone": b.tone, "dismissible": b.dismissible and can_close})
             if len(out) >= MAX_SHOWN:
                 break
         return out
@@ -128,7 +152,12 @@ class BannerService:
     async def clicked(self, banner_id, user_id) -> None:
         await self._mark(banner_id, user_id, click=True)
 
-    async def dismissed(self, banner_id, user_id) -> None:
+    async def dismissed(self, banner_id, user_id, roles: list[str] | None = None) -> None:
+        from app.core.exceptions import BusinessRuleViolationError
+
+        bar = await self.session.get(TopBanner, banner_id)
+        if bar is not None and (not bar.dismissible or not may_close(roles or [])):
+            raise BusinessRuleViolationError("This notice cannot be closed.")
         await self._mark(banner_id, user_id, click=False)
 
     # ------------------------------------------------------------------ administration
@@ -160,6 +189,24 @@ class BannerService:
             if a.get("semesters"):
                 s = s.where(Student.current_semester.in_(a["semesters"]))
             conds.append(User.id.in_(s))
+        if a.get("include_parents"):
+            from app.parents.models import ParentStudentLink
+
+            kids = select(Student.id).where(Student.user_id.is_not(None))
+            sub = []
+            if "STUDENT" in (a.get("roles") or []):
+                sub.append(Student.user_id.is_not(None))
+            if a.get("user_ids"):
+                sub.append(Student.user_id.in_([uuid.UUID(u) for u in a["user_ids"]]))
+            if a.get("program_ids") or a.get("semesters"):
+                c = [Student.program_id.in_([uuid.UUID(p) for p in a["program_ids"]])] if a.get("program_ids") else []
+                if a.get("semesters"):
+                    c.append(Student.current_semester.in_(a["semesters"]))
+                from sqlalchemy import and_
+
+                sub.append(and_(*c))
+            if sub:
+                conds.append(User.id.in_(select(ParentStudentLink.user_id).where(ParentStudentLink.student_id.in_(kids.where(or_(*sub))))))
         if not conds:
             return 0
         return (await self.session.execute(select(func.count()).select_from(User).where(User.is_active.is_(True), or_(*conds)))).scalar_one()
@@ -187,7 +234,8 @@ class BannerService:
             parts.append("Students in semester " + ", ".join(str(s) for s in a["semesters"]))
         if a.get("user_ids"):
             parts.append(f"{len(a['user_ids'])} named {'person' if len(a['user_ids']) == 1 else 'people'}")
-        return " · ".join(parts) or "Nobody"
+        label = " · ".join(parts) or "Nobody"
+        return label + (" (and their parents)" if a.get("include_parents") and parts else "")
 
     async def _stats(self, ids: list) -> dict:
         if not ids:

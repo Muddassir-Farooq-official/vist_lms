@@ -142,7 +142,7 @@ async def test_finance_report_subtracts_refunds(app_client, admin_user, db_sessi
 async def test_refund_pages_and_students_are_kept_out(app_client, admin_user, db_session):
     _sid, user, aid, acc = await _setup(app_client, db_session, "78001-0000005-5", paid=0)
     for path in ("/dashboard/admin/refunds", "/dashboard/accounts/refunds"):
-        page = await app_client.get(path)
+        page = await app_client.get(path, follow_redirects=True)        # the accounts office is sent to its own copy of the page
         assert page.status_code == 200 and "refunds.js" in page.text and 'data-allowed-roles="ADMIN,ACCOUNTS_OFFICER"' in page.text
     await _login(app_client, user, "StudentPass123!")
     assert (await app_client.get(F)).status_code == 403

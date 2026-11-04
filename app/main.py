@@ -428,6 +428,41 @@ async def view_as_is_read_only(request: Request, call_next):
     return await call_next(request)
 
 
+# Someone who is not an administrator but opens an /dashboard/admin/... page that their own portal also has (e.g. the
+# accounts office following a link to /dashboard/admin/fees) is sent to their portal's copy, so they see their own
+# menu instead of the administration's. Pages only the administration has are left to the page's own role check.
+# Only where the portal copy is the SAME screen (same template) with the portal's own menu: e.g. a teacher's
+# /dashboard/faculty/attendance is a different screen from the administration's, so it is not a redirect target.
+_SAME_SCREEN = {"ACCOUNTS_OFFICER": ("accounts", {"fees", "fines", "refunds", "inventory", "assets", "payroll", "finance", "finance-reports",
+                                                 "approvals", "staff-attendance"})}
+_page_routes: set[str] | None = None
+
+
+@app.middleware("http")
+async def own_portal_redirect(request: Request, call_next):
+    global _page_routes
+    path = request.url.path
+    if request.method == "GET" and path.startswith("/dashboard/admin/") and request.cookies.get("access_token"):
+        try:
+            from app.core.security import decode_access_token
+
+            roles = decode_access_token(request.cookies["access_token"]).get("roles") or []
+        except Exception:  # noqa: BLE001 - an expired or bad token is the page's business, not ours
+            roles = []
+        if roles and "ADMIN" not in roles:
+            if _page_routes is None:
+                _page_routes = {r.path for r in app.routes if getattr(r, "path", "").startswith("/dashboard/") and "GET" in (getattr(r, "methods", None) or set())}
+            rest = path[len("/dashboard/admin/"):]
+            for role in roles:
+                portal, pages = _SAME_SCREEN.get(role, (None, set()))
+                target = f"/dashboard/{portal}/{rest}" if portal and rest in pages else None
+                if target and target in _page_routes:
+                    from fastapi.responses import RedirectResponse
+
+                    return RedirectResponse(target + (("?" + request.url.query) if request.url.query else ""), status_code=307)
+    return await call_next(request)
+
+
 @app.middleware("http")
 async def database_up_to_date_guard(request: Request, call_next):
     """If the database is behind the code (or is missing tables the code needs), answer with one clear instruction instead of a crash."""
@@ -646,6 +681,11 @@ app.include_router(todos_router, prefix=settings.api_v1_prefix)
 from app.banners.router import router as banners_router  # noqa: E402
 
 app.include_router(banners_router, prefix=settings.api_v1_prefix)
+from app.push.router import router as push_router  # noqa: E402
+from app.push.app_shell import router as app_shell_router  # noqa: E402
+
+app.include_router(push_router, prefix=settings.api_v1_prefix)
+app.include_router(app_shell_router)            # /manifest.webmanifest, /sw.js, /branding/app-icon-*.png
 # NOTE — deliberately NOT wired in: app.fees.webhook_router. It has no
 # signature/HMAC verification (there's no real 1LINK shared secret to
 # verify against yet), which makes it an open "mark any challan paid"

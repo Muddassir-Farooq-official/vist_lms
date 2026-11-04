@@ -30,11 +30,21 @@ async def one_pass(with_reminders: bool) -> dict:
         await apply_from_db(session)                 # use the administrator's current SMS switches
         svc = SmsService(session)
         queued = await svc.queue_fee_overdue_reminders() if with_reminders else 0
+        from app.todos.service import remind_missing_lists
+
+        try:
+            async with session.begin_nested():
+                await remind_missing_lists(session)   # staff with no to-do list today (Settings -> Rules -> Tasks); once a day
+        except Exception as exc:  # noqa: BLE001
+            print("to-do reminder failed:", exc, flush=True)
         result = await svc.send_pending(limit=200)
         from app.core.background import beat
         from app.notifications.email_service import send_pending as send_emails
 
         emails = await send_emails(session, limit=200)
+        from app.core.background import push_round
+
+        emails.update(await push_round(session))         # new notifications to phones / browsers (when push is set up)
         await beat(session, "sender", f"{result.get('processed', 0)} SMS, {emails.get('emails', 0)} emails")
         await session.commit()
         return {"reminders_queued": queued, **result, **emails}

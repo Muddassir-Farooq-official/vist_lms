@@ -71,6 +71,10 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:8000"
     # The address people type to reach the portal (printed on certificates for verification). Empty = the first CORS origin.
     public_url: str = ""
+    # Phone / browser push notifications (app/push). Make the keys with: python scripts/push_keys.py
+    vapid_public_key: str = ""
+    vapid_private_key: str = ""
+    vapid_subject: str = ""                         # mailto:admin@your-institute.edu.pk (push services contact this address if needed)
     asset_tag_prefix: str = "VIST"          # fixed-asset tags: VIST-IT-0001 (set before the first asset is added)
 
     # File storage
@@ -225,6 +229,7 @@ class Settings(BaseSettings):
     sms_on_fee_overdue: int = 1
     sms_to_guardian: int = 1
     sms_on_admission: int = 1
+    sms_on_security_alert: int = 1                  # text administrators when a security alert fires (at most once per half hour per kind)
     # The weighted-average cutoff on a course's graded components (see
     # app/academics's AssessmentComponent/StudentMark) that separates
     # an auto-computed PASSED from FAILED.
@@ -245,6 +250,7 @@ class Settings(BaseSettings):
     payroll_advance_max_salary_multiple: float = 1.0   # an employee may owe at most this many months' basic salary in advances
     payroll_security_percent: float = 0.0           # % of basic held back each month as a security deposit, until it equals one basic salary
     graduation_min_cgpa: float = 2.0                # degree audit: the lowest CGPA that can graduate
+    todo_reminder_hour: int = 15                    # staff with no to-do list today get a reminder from this hour (0 = off)
     amount_display: int = 0                         # amounts on dashboard cards: 0 full, 1 K / M, 2 lakh / crore (Settings -> Rules)
     certificate_signatory: str = "Principal"       # printed under the signature line on certificates
 
