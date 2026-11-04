@@ -19,7 +19,6 @@ from app.core.config import settings
 from app.core.exceptions import ValidationAppError
 from app.core.logging import get_logger
 from app.push.models import PushSubscription
-from app.push.webpush import encrypt, vapid_headers
 
 logger = get_logger(__name__)
 
@@ -33,8 +32,17 @@ async def deliver(client: httpx.AsyncClient, endpoint: str, body: bytes, headers
     return await client.post(endpoint, content=body, headers=headers)
 
 
+def library_ok() -> bool:
+    """The encryption library (cryptography) is installed. If an image was built without it, push is simply off."""
+    try:
+        import cryptography  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
 def enabled() -> bool:
-    return bool(settings.vapid_public_key and settings.vapid_private_key)
+    return bool(settings.vapid_public_key and settings.vapid_private_key) and library_ok()
 
 
 def device_name(user_agent: str | None) -> str:
@@ -80,6 +88,8 @@ class PushService:
     # ------------------------------------------------------------------ sending
     async def _send_one(self, client: httpx.AsyncClient, sub: PushSubscription, payload: dict) -> bool:
         """True when the push service accepted it. A device that is gone (404 / 410) is forgotten."""
+        from app.push.webpush import encrypt, vapid_headers      # imported here: without the library only push is off, never the portal
+
         body = encrypt(json.dumps(payload, ensure_ascii=False).encode(), sub.p256dh, sub.auth)
         headers = {**vapid_headers(sub.endpoint, public_key=settings.vapid_public_key, private_key=settings.vapid_private_key,
                                    subject=settings.vapid_subject or f"mailto:{settings.institute_email or 'admin@example.com'}"),
