@@ -244,7 +244,7 @@ async def test_every_kind_of_user_is_told_in_their_own_portal(app_client, admin_
         await _as(app_client, raw, who)
         ids[who] = (await _apply(app_client, t["doc" if False else "leave"], subject=f"From {who}", start=_d(30), end=_d(31))).json()["id"]
     await _login(app_client, **ADMIN)
-    admin_notes = (await db_session.execute(select(Notification).where(Notification.title.like("New application:%")))).scalars().all()
+    admin_notes = (await db_session.execute(select(Notification).where(Notification.title.like("New application from %")))).scalars().all()
     assert len(admin_notes) == 4 and all(n.link.startswith("/dashboard/admin/applications?open=") for n in admin_notes)
     for who, portal in expected.items():
         await app_client.post(f"{API}/{ids[who]}/review", json={"action": "APPROVE"})

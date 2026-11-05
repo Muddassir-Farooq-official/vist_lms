@@ -54,6 +54,7 @@ from app.records import models as _records_models  # noqa: F401
 from app.calendar import models as _calendar_models  # noqa: F401
 from app.security import models as _security_models  # noqa: F401
 from app.todos import models as _todos_models  # noqa: F401
+from app.teaching import models as _teaching_models  # noqa: F401
 from app.banners import models as _banners_models  # noqa: F401
 from app.push import models as _push_models  # noqa: F401
 

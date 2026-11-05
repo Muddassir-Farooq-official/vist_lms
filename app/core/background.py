@@ -54,10 +54,23 @@ async def send_due(session: AsyncSession, *, time_budget: float = 20) -> dict:
             await remind_missing_lists(session)                          # daily, from the reminder hour; idempotent
     except Exception as exc:  # noqa: BLE001 - a reminder problem must not stop sending
         logger.warning("todo_reminder_failed", error=str(exc)[:300])
+    await missed_class_round(session)
     sms = await SmsService(session).send_pending(limit=100, time_budget=time_budget)
     emails = await send_emails(session, limit=100, time_budget=time_budget)
     pushed = await push_round(session)
     return {**sms, **emails, **pushed}
+
+
+async def missed_class_round(session: AsyncSession) -> int:
+    """Classes whose teacher checked in but did not take attendance -> the administration is told (once per class). Never raises."""
+    try:
+        from app.teaching.service import TeachingService
+
+        async with session.begin_nested():
+            return await TeachingService(session).alert_missed_classes()
+    except Exception as exc:  # noqa: BLE001 - an alert problem must not stop sending
+        logger.warning("missed_class_alert_failed", error=str(exc)[:300])
+        return 0
 
 
 async def push_round(session: AsyncSession) -> dict:

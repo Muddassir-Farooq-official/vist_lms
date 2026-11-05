@@ -45,6 +45,8 @@ POLICY: tuple[Policy, ...] = (
     Policy("attendance_fine_amount", "Attendance fine (Rs.)", "Attendance", float, 0, 1_000_000, "Amount of each attendance fine."),
     Policy("attendance_marking_window_minutes", "Teacher marking window (minutes)", "Attendance", int, 5, 1440,
            "How long after a class starts the teacher can still mark it; after that it needs a correction request."),
+    Policy("missed_class_alerts", "Alert when a teacher on campus misses a class", "Attendance", int, 0, 1,
+           "When a class's marking window closes with no attendance although its teacher had checked in, every administrator gets a notification (Attendance -> Teachers)."),
     Policy("withdrawal_deadline_days", "Course withdrawal deadline (days after the term starts)", "Attendance", int, 0, 200,
            "Before it a withdrawal leaves no mark; after it the course shows as W on the transcript and only the office can withdraw a student."),
     Policy("promotion_max_courses_to_clear", "Promotion: max failed courses still to clear", "Promotion", int, 0, 20,

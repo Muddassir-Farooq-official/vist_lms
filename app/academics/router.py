@@ -79,6 +79,7 @@ from app.academics.schemas import (
     TeacherPerformanceEntry,
     TeacherProgressEntry,
     TimetableSlotCreatedOut,
+    TimetableSlotChangeRequest,
     TimetableSlotCreateRequest,
     TimetableSlotOut,
 )
@@ -1525,7 +1526,7 @@ async def create_timetable_slot(
         raise AuthorizationError("You are not the assigned teacher for this offering.")
     slot, generated_count = await TimetableService(db).create_slot(
         course_offering_id=offering_id, period_id=payload.period_id, day_of_week=payload.day_of_week,
-        room=payload.room, actor_id=current_user.id,
+        room=payload.room, actor_id=current_user.id, starts_from=payload.starts_from,
     )
     return TimetableSlotCreatedOut(slot=TimetableSlotOut.model_validate(slot), sessions_generated=generated_count)
 
@@ -1545,7 +1546,7 @@ async def auto_assign_timetable(
         raise AuthorizationError("You are not the assigned teacher for this offering.")
     slots, generated_count = await TimetableService(db).auto_assign(
         course_offering_id=offering_id, sessions_per_week=payload.sessions_per_week,
-        room=payload.room, actor_id=current_user.id,
+        room=payload.room, actor_id=current_user.id, starts_from=payload.starts_from,
     )
     return AutoAssignResultOut(
         slots=[TimetableSlotOut.model_validate(s) for s in slots], sessions_generated=generated_count
@@ -1586,6 +1587,49 @@ async def delete_timetable_slot(
         raise AuthorizationError("You are not the assigned teacher for this offering.")
     cancelled_count = await service.delete_slot(slot_id, actor_id=current_user.id)
     return {"future_sessions_cancelled": cancelled_count}
+
+
+async def _slot_for_manager(db, slot_id: uuid.UUID, current_user: CurrentUser):
+    service = TimetableService(db)
+    slot = await service.slot_repo.get_by_id(slot_id)
+    if slot is None:
+        raise ResourceNotFoundError("Timetable slot not found.")
+    offering = await CourseOfferingService(db).get(slot.course_offering_id)
+    if not await _can_manage_offering(db, offering, current_user):
+        raise AuthorizationError("You are not the assigned teacher for this offering.")
+    return service, slot
+
+
+@router.get(
+    "/timetable-slots/{slot_id}/change-preview",
+    summary="What changing or removing this slot from a date would do to its classes and attendance (nothing is changed)",
+)
+async def timetable_slot_change_preview(
+    slot_id: uuid.UUID,
+    from_date: date | None = None,
+    current_user: CurrentUser = Depends(get_current_user),
+    db=Depends(get_db),
+) -> dict:
+    from app.core.clock import institute_today
+
+    service, _slot = await _slot_for_manager(db, slot_id, current_user)
+    return await service.change_preview(slot_id, from_date=from_date or institute_today())
+
+
+@router.post(
+    "/timetable-slots/{slot_id}/change",
+    summary="Move a slot to another day / period / room from a date on. Earlier classes and all attendance stay as they are",
+)
+async def change_timetable_slot(
+    slot_id: uuid.UUID,
+    payload: TimetableSlotChangeRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+    db=Depends(get_db),
+) -> dict:
+    service, _slot = await _slot_for_manager(db, slot_id, current_user)
+    result = await service.change_slot(slot_id, from_date=payload.from_date, day_of_week=payload.day_of_week, period_id=payload.period_id,
+                                       room=payload.room, actor_id=current_user.id)
+    return {**result, "slot": TimetableSlotOut.model_validate(result["slot"])}
 
 
 # ---------------------------------------------------------------------------

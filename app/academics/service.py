@@ -1170,7 +1170,9 @@ class TimetableService:
                         )
         return None
 
-    async def _generate_sessions_for_slot(self, slot: TimetableSlot, offering: CourseOffering) -> int:
+    async def _generate_sessions_for_slot(self, slot: TimetableSlot, offering: CourseOffering, from_date: date | None = None) -> int:
+        """from_date: only classes from that day on (a slot added or changed in the middle of a term must not create classes
+        in the past -- they never happened and would show up as 'attendance never taken')."""
         from app.calendar.service import student_holidays
 
         holidays = await student_holidays(self.session, offering.term_start_date, offering.term_end_date)   # from the academic calendar
@@ -1190,13 +1192,15 @@ class TimetableService:
                 )
             )).scalars().all()
         }
-        current = offering.term_start_date
+        current = max(offering.term_start_date, from_date) if from_date else offering.term_start_date
         while current <= offering.term_end_date:
             if DAY_OF_WEEK_BY_PYTHON_WEEKDAY[current.weekday()] == slot.day_of_week:
                 off = holidays.get(current)
                 prior = existing.get(current)
                 if prior is not None:
-                    if prior.timetable_slot_id is None:
+                    if from_date is not None and prior.attendance_taken_at is not None:
+                        pass                       # a class already held stays exactly as it was recorded
+                    elif prior.timetable_slot_id is None:
                         prior.timetable_slot_id = slot.id
                         prior.end_time = slot.end_time
                         prior.room = slot.room
@@ -1221,7 +1225,7 @@ class TimetableService:
 
     async def create_slot(
         self, *, course_offering_id: uuid.UUID, period_id: uuid.UUID, day_of_week: DayOfWeek,
-        room: str, actor_id: uuid.UUID,
+        room: str, actor_id: uuid.UUID, starts_from: date | None = None,
     ) -> tuple[TimetableSlot, int]:
         offering = await self.offering_repo.get_by_id(course_offering_id)
         if offering is None:
@@ -1232,6 +1236,9 @@ class TimetableService:
             )
         if offering.term_start_date > offering.term_end_date:
             raise BusinessRuleViolationError("term_start_date must be before term_end_date.")
+
+        if starts_from is not None and starts_from > offering.term_end_date:
+            raise BusinessRuleViolationError("That date is after the end of the term.")
 
         period = await self.period_repo.get_by_id(period_id)
         if period is None:
@@ -1249,7 +1256,7 @@ class TimetableService:
         )
         await self.slot_repo.create(slot)
         self._day_memo.pop(day_of_week, None)
-        generated_count = await self._generate_sessions_for_slot(slot, offering)
+        generated_count = await self._generate_sessions_for_slot(slot, offering, starts_from)
 
         await self.audit.log(
             actor_user_id=actor_id, action="timetable_slot.created", entity_type="timetable_slot", entity_id=slot.id,
@@ -1257,6 +1264,7 @@ class TimetableService:
                 "course_offering_id": str(course_offering_id), "period_number": period.period_number,
                 "day_of_week": day_of_week.value, "start_time": str(start_time), "end_time": str(end_time),
                 "room": room, "sessions_generated": generated_count,
+                "starts_from": str(starts_from) if starts_from else None,
             },
         )
         return slot, generated_count
@@ -1292,7 +1300,7 @@ class TimetableService:
         return None
 
     async def auto_assign(
-        self, *, course_offering_id: uuid.UUID, sessions_per_week: int, room: str, actor_id: uuid.UUID,
+        self, *, course_offering_id: uuid.UUID, sessions_per_week: int, room: str, actor_id: uuid.UUID, starts_from: date | None = None,
     ) -> tuple[list[TimetableSlot], int]:
         """A simple greedy auto-scheduler, not a full optimizer — see
         the conversation this was scoped in. Tries each defined Period
@@ -1333,7 +1341,7 @@ class TimetableService:
         for day in chosen_days:
             slot, count = await self.create_slot(
                 course_offering_id=course_offering_id, period_id=chosen_period.id, day_of_week=day,
-                room=day_rooms[day], actor_id=actor_id,
+                room=day_rooms[day], actor_id=actor_id, starts_from=starts_from,
             )
             created_slots.append(slot)
             total_sessions += count
@@ -1406,7 +1414,8 @@ class TimetableService:
                 "AND cs.topic_completed = false AND cs.title IS NULL AND cs.description IS NULL "
                 "AND NOT EXISTS (SELECT 1 FROM attendance_records a WHERE a.class_session_id = cs.id) "
                 "AND NOT EXISTS (SELECT 1 FROM attendance_correction_requests r WHERE r.class_session_id = cs.id) "
-                "AND NOT EXISTS (SELECT 1 FROM class_session_resources x WHERE x.class_session_id = cs.id)"
+                "AND NOT EXISTS (SELECT 1 FROM class_session_resources x WHERE x.class_session_id = cs.id) "
+                "AND NOT EXISTS (SELECT 1 FROM class_covers c WHERE c.class_session_id = cs.id)"
             ),
             {"slot": slot_id, "today": today},
         )
@@ -1430,6 +1439,97 @@ class TimetableService:
             after={"future_sessions_cancelled": len(future_sessions)},
         )
         return len(future_sessions)
+
+    # ------------------------------------------------------------------ changing a slot in the middle of a term
+    _KEEP_SQL = ("(cs.attendance_taken_at IS NOT NULL OR cs.content_locked_at IS NOT NULL OR cs.topic_completed = true "
+                 "OR cs.title IS NOT NULL OR cs.description IS NOT NULL "
+                 "OR EXISTS (SELECT 1 FROM attendance_records a WHERE a.class_session_id = cs.id) "
+                 "OR EXISTS (SELECT 1 FROM attendance_correction_requests r WHERE r.class_session_id = cs.id) "
+                 "OR EXISTS (SELECT 1 FROM class_session_resources x WHERE x.class_session_id = cs.id) "
+                 "OR EXISTS (SELECT 1 FROM class_covers c WHERE c.class_session_id = cs.id))")
+
+    async def change_preview(self, slot_id: uuid.UUID, *, from_date: date) -> dict:
+        """What changing (or removing) this slot from a date would do -- nothing is changed. Classes before the date, and
+        every attendance mark ever taken, stay exactly as they are; students' attendance % only counts classes whose
+        attendance was taken, so it does not move."""
+        from sqlalchemy import text
+
+        slot = await self.slot_repo.get_by_id(slot_id)
+        if slot is None:
+            raise ResourceNotFoundError("Timetable slot not found.")
+        offering = await self.offering_repo.get_by_id(slot.course_offering_id)
+        row = (await self.session.execute(text(
+            "SELECT "
+            " count(*) FILTER (WHERE cs.session_date < :d) AS before_total,"
+            " count(*) FILTER (WHERE cs.session_date < :d AND cs.attendance_taken_at IS NOT NULL) AS before_taken,"
+            " count(*) FILTER (WHERE cs.session_date < :d AND cs.attendance_taken_at IS NULL AND cs.status = 'SCHEDULED') AS before_untaken,"
+            " count(*) FILTER (WHERE cs.session_date >= :d AND cs.status = 'SCHEDULED') AS after_total,"
+            f" count(*) FILTER (WHERE cs.session_date >= :d AND cs.status = 'SCHEDULED' AND {self._KEEP_SQL}) AS after_with_work,"
+            " (SELECT count(*) FROM attendance_records a JOIN class_sessions s2 ON s2.id = a.class_session_id WHERE s2.timetable_slot_id = :slot) AS marks"
+            " FROM class_sessions cs WHERE cs.timetable_slot_id = :slot"), {"slot": slot_id, "d": from_date})).mappings().one()
+        return {
+            "slot_id": slot.id, "from_date": from_date, "term_start_date": offering.term_start_date if offering else None,
+            "term_end_date": offering.term_end_date if offering else None,
+            "classes_before": row["before_total"], "classes_before_taken": row["before_taken"], "classes_before_not_taken": row["before_untaken"],
+            "classes_from_date": row["after_total"], "classes_from_date_with_work": row["after_with_work"],
+            "attendance_marks_kept": row["marks"],
+            "explanation": (
+                f"Classes before {from_date:%d %b %Y} stay exactly as they are, with all their attendance. "
+                f"From {from_date:%d %b %Y}: {row['after_total']} upcoming class(es) of this slot are taken off the timetable"
+                + (f" ({row['after_with_work']} already have a topic, files or marks, so they are kept as cancelled, not deleted)" if row["after_with_work"] else "")
+                + ". Students' attendance % does not change: it only counts classes whose attendance was taken."),
+        }
+
+    async def change_slot(
+        self, slot_id: uuid.UUID, *, from_date: date, day_of_week: DayOfWeek, period_id: uuid.UUID, room: str, actor_id: uuid.UUID,
+    ) -> dict:
+        """Move a recurring slot (day, period or room) from a date on. Classes before the date are never touched; this slot's
+        upcoming classes are taken off (deleted if empty, cancelled if they already have a topic / files / marks) and the
+        new pattern's classes are created from the date to the end of the term. All in one transaction: if the new time
+        clashes with anything, nothing changes."""
+        from sqlalchemy import text, update
+
+        slot = await self.slot_repo.get_by_id(slot_id)
+        if slot is None:
+            raise ResourceNotFoundError("Timetable slot not found.")
+        offering = await self.offering_repo.get_by_id(slot.course_offering_id)
+        today = institute_today()
+        if from_date < today:
+            raise BusinessRuleViolationError("A change can start today or later. Classes that already happened cannot be moved.")
+        if offering.term_end_date is None or from_date > offering.term_end_date:
+            raise BusinessRuleViolationError("That date is after the end of the term.")
+        period = await self.period_repo.get_by_id(period_id)
+        if period is None:
+            raise ResourceNotFoundError("Period not found.")
+        room = (room or "").strip()
+        if not room:
+            raise BusinessRuleViolationError("Enter the room.")
+        if (day_of_week, period.start_time, period.end_time, room) == (slot.day_of_week, slot.start_time, slot.end_time, slot.room):
+            raise BusinessRuleViolationError("Nothing would change: pick a different day, period or room.")
+        await self._check_conflicts(course_offering_id=offering.id, day_of_week=day_of_week, start_time=period.start_time,
+                                    end_time=period.end_time, room=room, exclude_slot_id=slot.id)
+        before = {"day_of_week": slot.day_of_week.value, "start_time": str(slot.start_time), "end_time": str(slot.end_time), "room": slot.room}
+        params = {"slot": slot_id, "d": from_date}
+        kept = (await self.session.execute(text(
+            "UPDATE class_sessions cs SET status = 'CANCELLED', cancelled_reason = 'Timetable slot removed' "
+            f"WHERE cs.timetable_slot_id = :slot AND cs.session_date >= :d AND cs.status = 'SCHEDULED' AND cs.attendance_taken_at IS NULL AND {self._KEEP_SQL}"),
+            params)).rowcount
+        removed = (await self.session.execute(text(
+            f"DELETE FROM class_sessions cs WHERE cs.timetable_slot_id = :slot AND cs.session_date >= :d AND NOT {self._KEEP_SQL}"), params)).rowcount
+        await self.session.execute(update(ClassSession).where(ClassSession.timetable_slot_id == slot_id).values(timetable_slot_id=None)
+                                   .execution_options(synchronize_session="fetch"))
+        self._day_memo.pop(slot.day_of_week, None)
+        self._day_memo.pop(day_of_week, None)
+        await self.slot_repo.delete(slot)
+        new = TimetableSlot(course_offering_id=offering.id, period_id=period.id, day_of_week=day_of_week, start_time=period.start_time,
+                            end_time=period.end_time, room=room, created_by=actor_id)
+        await self.slot_repo.create(new)
+        created = await self._generate_sessions_for_slot(new, offering, from_date)
+        after = {"day_of_week": day_of_week.value, "start_time": str(period.start_time), "end_time": str(period.end_time), "room": room}
+        await self.audit.log(actor_user_id=actor_id, action="timetable_slot.changed", entity_type="timetable_slot", entity_id=new.id, before=before,
+                             after={**after, "from_date": str(from_date), "old_slot_id": str(slot_id), "upcoming_removed": removed,
+                                    "upcoming_kept_cancelled": kept, "sessions_generated": created})
+        return {"slot": new, "from_date": from_date, "removed": removed, "kept_cancelled": kept, "sessions_generated": created}
 
 
 class ClassSessionService:

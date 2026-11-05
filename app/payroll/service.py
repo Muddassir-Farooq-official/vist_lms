@@ -387,6 +387,10 @@ class PayrollService:
             (earn if it.kind == PayItemKind.ALLOWANCE else ded).append((LineKind.EARNING if it.kind == PayItemKind.ALLOWANCE else LineKind.DEDUCTION, "ALLOWANCE" if it.kind == PayItemKind.ALLOWANCE else "DEDUCTION", label, amt, None))
         for b in await self._bonuses_for(emp.id, month, run.id):
             earn.append((LineKind.EARNING, "BONUS", f"Bonus: {b.reason}", rules.q2(b.amount), b.id))
+        from app.teaching.service import covers_payable    # classes taken for an absent teacher (Attendance -> Teachers)
+
+        for c in await covers_payable(self.session, emp.id, rules.month_end(month), run.id):
+            earn.append((LineKind.EARNING, "COVER", f"Class cover: {c.description}"[:160], rules.q2(c.amount), c.id))
         adj = rules.q2(slip.adjustment)
         if adj > 0:
             earn.append((LineKind.EARNING, "ADJUSTMENT", slip.adjustment_note or "Adjustment", adj, None))

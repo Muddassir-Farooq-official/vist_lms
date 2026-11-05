@@ -678,6 +678,9 @@ app.include_router(security_router, prefix=settings.api_v1_prefix)
 from app.todos.router import router as todos_router  # noqa: E402
 
 app.include_router(todos_router, prefix=settings.api_v1_prefix)
+from app.teaching.router import router as teaching_router  # noqa: E402
+
+app.include_router(teaching_router, prefix=settings.api_v1_prefix)
 from app.banners.router import router as banners_router  # noqa: E402
 
 app.include_router(banners_router, prefix=settings.api_v1_prefix)

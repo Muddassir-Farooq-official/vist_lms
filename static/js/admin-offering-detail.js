@@ -118,6 +118,11 @@
     updateSyllabusDisplay(offering);
     termStartInput.value = offering.term_start_date || "";
     termEndInput.value = offering.term_end_date || "";
+    termDates = { start: offering.term_start_date, end: offering.term_end_date };
+    const todayIso = isoToday();
+    const started = !!(offering.term_start_date && offering.term_start_date < todayIso && (!offering.term_end_date || offering.term_end_date >= todayIso));
+    document.getElementById("ts-from-field").hidden = !started;
+    if (started && !document.getElementById("ts-from").value) document.getElementById("ts-from").value = todayIso;
 
     loadPeriods();
     loadTimetableSlots();
@@ -190,9 +195,13 @@
   // ---------------------------------------------------------------------
   const tsPeriodSelect = document.getElementById("ts-period");
 
+  let termDates = { start: null, end: null }, periodsCache = [];
+  function isoToday() { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+
   async function loadPeriods() {
     const result = await VA.fetchJson("/api/v1/academics/periods");
     if (!result.ok) return;
+    periodsCache = result.body;
     tsPeriodSelect.innerHTML = "";
     if (result.body.length === 0) {
       tsPeriodSelect.innerHTML = '<option value="">No periods defined yet \u2014 add one on the Timetable page</option>';
@@ -232,9 +241,13 @@
         "<td>" + VA.escapeHtml(dayLabel(slot.day_of_week)) + "</td>" +
         "<td>" + slot.start_time.slice(0, 5) + "\u2013" + slot.end_time.slice(0, 5) + "</td>" +
         "<td>" + VA.escapeHtml(slot.room) + "</td>" +
-        '<td><button type="button" class="danger-btn small-btn slot-delete" data-id="' + slot.id + '">Delete</button></td>';
+        '<td><button type="button" class="role-btn small-btn slot-change" data-id="' + slot.id + '">Change</button> ' +
+        '<button type="button" class="danger-btn small-btn slot-delete" data-id="' + slot.id + '">Delete</button></td>';
+      tr.querySelector(".slot-change").addEventListener("click", function () { openSlotChange(slot); });
       tr.querySelector(".slot-delete").addEventListener("click", async function () {
-        if (!(await window.VistAdmin.confirm("Delete this recurring slot? Its not-yet-occurred sessions will be cancelled; past sessions are kept."))) return;
+        const pv = await VA.fetchJson("/api/v1/academics/timetable-slots/" + slot.id + "/change-preview");
+        const text = pv.ok ? "Remove this slot from today? " + pv.body.explanation : "Delete this recurring slot? Its not-yet-occurred sessions will be cancelled; past sessions are kept.";
+        if (!(await window.VistAdmin.confirm(text, "Remove the slot"))) return;
         const delResult = await VA.fetchJson("/api/v1/academics/timetable-slots/" + slot.id, { method: "DELETE" });
         if (!delResult.ok) {
           addSlotError.textContent = extractErrorMessage(delResult.body, "Could not delete this slot.");
@@ -261,6 +274,7 @@
         day_of_week: document.getElementById("ts-day").value,
         room: document.getElementById("ts-room").value.trim(),
         period_id: tsPeriodSelect.value,
+        starts_from: document.getElementById("ts-from-field").hidden ? null : (document.getElementById("ts-from").value || null),
       }),
     });
 
@@ -272,9 +286,61 @@
       return;
     }
 
+    const keepFrom = document.getElementById("ts-from").value;
     addSlotForm.reset();
+    document.getElementById("ts-from").value = keepFrom;       // a reset must never fall back to "the whole term, including past days"
     addSlotSuccess.textContent = "Slot added \u2014 " + result.body.sessions_generated + " class session(s) generated.";
     addSlotSuccess.hidden = false;
+    loadTimetableSlots();
+    loadClassSessions();
+  });
+
+  // Changing a slot in the middle of the term: earlier classes and all attendance stay; the new pattern starts from a date.
+  const scDialog = document.getElementById("slot-change-dialog");
+  let scSlot = null, scTimer = null;
+  function scPeriodOptions(selected) {
+    document.getElementById("sc-period").innerHTML = periodsCache.map(function (p) {
+      return '<option value="' + p.id + '"' + (p.id === selected ? " selected" : "") + ">Period " + p.period_number + " (" + p.start_time.slice(0, 5) + "\u2013" + p.end_time.slice(0, 5) + ")</option>";
+    }).join("");
+  }
+  async function scPreview() {
+    const box = document.getElementById("sc-preview");
+    const from = document.getElementById("sc-from").value;
+    if (!scSlot || !from) { box.hidden = true; return; }
+    const r = await VA.fetchJson("/api/v1/academics/timetable-slots/" + scSlot.id + "/change-preview?from_date=" + encodeURIComponent(from));
+    if (!r.ok) { box.hidden = true; return; }
+    box.textContent = r.body.explanation + " New classes are created on the new day from this date to the end of the term (holidays are skipped).";
+    box.hidden = false;
+  }
+  function openSlotChange(slot) {
+    scSlot = slot;
+    document.getElementById("sc-current").textContent = "Now: every " + dayLabel(slot.day_of_week) + ", " + slot.start_time.slice(0, 5) + "\u2013" + slot.end_time.slice(0, 5) + ", room " + slot.room + ".";
+    const from = document.getElementById("sc-from");
+    from.min = isoToday(); if (termDates.end) from.max = termDates.end;
+    from.value = isoToday();
+    document.getElementById("sc-day").value = slot.day_of_week;
+    scPeriodOptions(slot.period_id);
+    document.getElementById("sc-room").value = slot.room;
+    document.getElementById("sc-error").hidden = true;
+    scDialog.showModal();
+    scPreview();
+  }
+  document.getElementById("sc-from").addEventListener("change", function () { clearTimeout(scTimer); scTimer = setTimeout(scPreview, 150); });
+  document.getElementById("sc-close").addEventListener("click", function () { scDialog.close(); });
+  document.getElementById("sc-save").addEventListener("click", async function () {
+    const err = document.getElementById("sc-error"), btn = this;
+    err.hidden = true;
+    btn.disabled = true;
+    const r = await VA.fetchJson("/api/v1/academics/timetable-slots/" + scSlot.id + "/change", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ from_date: document.getElementById("sc-from").value, day_of_week: document.getElementById("sc-day").value,
+        period_id: document.getElementById("sc-period").value, room: document.getElementById("sc-room").value.trim() }),
+    });
+    btn.disabled = false;
+    if (!r.ok) { err.textContent = extractErrorMessage(r.body, "Could not change this slot."); err.hidden = false; return; }
+    scDialog.close();
+    VA.toast("Slot changed: " + r.body.sessions_generated + " class(es) created from " + r.body.from_date + "; " + r.body.removed + " upcoming class(es) removed" +
+      (r.body.kept_cancelled ? ", " + r.body.kept_cancelled + " kept as cancelled (they had a topic or files)" : "") + ".");
     loadTimetableSlots();
     loadClassSessions();
   });
@@ -291,6 +357,7 @@
       body: JSON.stringify({
         sessions_per_week: parseInt(document.getElementById("aa-sessions-per-week").value, 10),
         room: document.getElementById("aa-room").value.trim(),
+        starts_from: document.getElementById("ts-from-field").hidden ? null : (document.getElementById("ts-from").value || null),
       }),
     });
 

@@ -239,6 +239,7 @@ class Settings(BaseSettings):
     # exempt and can mark anytime, but must supply a note when marking
     # outside this window (see AttendanceService.mark_session).
     attendance_marking_window_minutes: int = 15
+    missed_class_alerts: int = 1                    # 1 = tell the administration when a teacher who checked in did not take a class
 
     # Payroll from staff attendance (editable in Settings). A day's pay = basic salary / working days of the run.
     payroll_default_working_days: int = 0           # 0 = each person's own working days in the month (from their timing); or one number for everyone, e.g. 26

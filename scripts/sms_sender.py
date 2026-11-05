@@ -37,6 +37,9 @@ async def one_pass(with_reminders: bool) -> dict:
                 await remind_missing_lists(session)   # staff with no to-do list today (Settings -> Rules -> Tasks); once a day
         except Exception as exc:  # noqa: BLE001
             print("to-do reminder failed:", exc, flush=True)
+        from app.core.background import missed_class_round
+
+        await missed_class_round(session)            # a teacher on campus who did not take a class -> the administration (once per class)
         result = await svc.send_pending(limit=200)
         from app.core.background import beat
         from app.notifications.email_service import send_pending as send_emails

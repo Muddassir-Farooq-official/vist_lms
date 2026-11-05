@@ -210,7 +210,7 @@ class ApplicationService:
                 delete_file(key)
             raise
         await self.audit.log(actor_user_id=user_id, action="application.submitted", entity_type="application", entity_id=app.id)
-        await self._notify_admins(app, f"New application: {t.name}", f"{who['name']} ({'student' if who['kind'] == ApplicantKind.STUDENT else 'employee'}) \u2014 {subject}")
+        await self._notify_admins(app, f"New application from {who['name']}", f"{t.name}: \u201c{subject}\u201d ({'student' if who['kind'] == ApplicantKind.STUDENT else 'employee'}) \u00b7 Ref. {reference(app)}")
         return app
 
     @staticmethod
@@ -347,9 +347,9 @@ class ApplicationService:
         await self.session.flush()
         if side == "APPLICANT":
             who = await self.applicant(app.applicant_user_id)
-            await self._notify_admins(app, f"Reply on {reference(app)}", f"{who['name']}: {body}")
+            await self._notify_admins(app, f"{who['name']} replied", f"{body} \u00b7 On \u201c{app.subject}\u201d \u00b7 {reference(app)}")
         else:
-            await self._notify_applicant(app, "Message about your application", f"{reference(app)}: {body}")
+            await self._notify_applicant(app, "Message about your application", f"{body} \u00b7 On \u201c{app.subject}\u201d \u00b7 {reference(app)}")
         return app
 
     async def add_attachments(self, application_id: uuid.UUID, *, user_id: uuid.UUID, files: list[tuple[str, bytes, str | None]]) -> Application:
@@ -371,7 +371,7 @@ class ApplicationService:
         if app.status == ApplicationStatus.MORE_INFO_NEEDED:
             app.status = ApplicationStatus.SUBMITTED
         who = await self.applicant(user_id)
-        await self._notify_admins(app, f"New file on {reference(app)}", f"{who['name']} added {len(files)} file{'s' if len(files) > 1 else ''}.")
+        await self._notify_admins(app, f"{who['name']} added {len(files)} file{'s' if len(files) > 1 else ''}", f"To \u201c{app.subject}\u201d \u00b7 {reference(app)}")
         return app
 
     async def get_attachment(self, attachment_id: uuid.UUID, *, user_id: uuid.UUID, is_admin: bool, roles: list[str] | None = None) -> ApplicationAttachment:
@@ -393,7 +393,7 @@ class ApplicationService:
         app.status, app.decided_at, app.decision_note = ApplicationStatus.WITHDRAWN, _now(), "Withdrawn by the applicant."
         await self.audit.log(actor_user_id=user_id, action="application.withdrawn", entity_type="application", entity_id=app.id)
         who = await self.applicant(user_id)
-        await self._notify_admins(app, f"Withdrawn: {reference(app)}", f"{who['name']} withdrew \u201c{app.subject}\u201d.")
+        await self._notify_admins(app, f"{who['name']} withdrew an application", f"\u201c{app.subject}\u201d \u00b7 {reference(app)}")
         return app
 
     # ------------------------------------------------------------------ the administration decides
@@ -411,14 +411,14 @@ class ApplicationService:
                 raise BusinessRuleViolationError("This application is already being reviewed or has been decided.")
             app.status = ApplicationStatus.UNDER_REVIEW
             app.reviewed_at = app.reviewed_at or _now()
-            await self._notify_applicant(app, "Application under review", f"{ref}: \u201c{app.subject}\u201d is being looked at.")
+            await self._notify_applicant(app, "Application under review", f"\u201c{app.subject}\u201d is being looked at. Ref. {ref}")
         elif action == "REQUEST_INFO":
             if app.status not in OPEN_STATUSES:
                 raise BusinessRuleViolationError("This application has already been decided.")
             app.status = ApplicationStatus.MORE_INFO_NEEDED
             app.reviewed_at = app.reviewed_at or _now()
             self.session.add(ApplicationComment(application_id=app.id, author_user_id=admin_id, side="ADMIN", body=note))
-            await self._notify_applicant(app, "More information needed", f"{ref}: {note}")
+            await self._notify_applicant(app, "More information needed", f"{note} \u00b7 On \u201c{app.subject}\u201d \u00b7 {ref}")
         elif action in ("APPROVE", "REJECT"):
             approved = action == "APPROVE"
             app.status = ApplicationStatus.APPROVED if approved else ApplicationStatus.REJECTED
@@ -427,7 +427,7 @@ class ApplicationService:
             if approved:
                 await self._excuse_attendance(app, admin_id)
             await self._notify_applicant(app, "Application approved" if approved else "Application rejected",
-                                         f"{ref}: \u201c{app.subject}\u201d" + (f" \u2014 {note}" if note else ""))
+                                         f"\u201c{app.subject}\u201d" + (f" \u2014 {note}" if note else "") + f" \u00b7 {ref}")
         else:
             raise BusinessRuleViolationError("Unknown action.")
         await self.audit.log(actor_user_id=admin_id, action=f"application.{action.lower()}", entity_type="application", entity_id=app.id)

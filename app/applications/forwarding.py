@@ -144,9 +144,11 @@ class ForwardingService:
         app.reviewed_at = app.reviewed_at or _now()
         await self.session.flush()
         ref = reference(app)
-        self._notify(await self._members(department), f"Application forwarded to {dept_name(department)}", f"{ref}: “{app.subject}”" + (f" — {f.note}" if f.note else ""),
+        who = await service.applicant(app.applicant_user_id)
+        self._notify(await self._members(department), f"New application for {dept_name(department)} from {who['name']}",
+                     f"“{app.subject}”" + (f" \u2014 note: {f.note}" if f.note else "") + f" \u00b7 Ref. {ref}",
                      f"/dashboard/{PORTAL_OF[department]}/applications#dept")
-        await service._notify_applicant(app, f"Forwarded to {dept_name(department)}", f"{ref}: “{app.subject}” is now with the {dept_name(department)} department.")
+        await service._notify_applicant(app, f"Your application is with {dept_name(department)}", f"“{app.subject}” has been sent to the {dept_name(department)} department. Ref. {ref}")
         await AuditService(self.session).log(actor_user_id=admin_id, action="application.forwarded", entity_type="application", entity_id=app.id,
                                              after={"department": department, "note": f.note})
         return f
@@ -221,14 +223,14 @@ class ForwardingService:
                 f.status, f.started_at = "IN_PROGRESS", _now()
                 if response:
                     f.response = response[:2000]
-                await service._notify_applicant(app, f"{dept} is working on your application", f"{ref}: “{app.subject}”")
+                await service._notify_applicant(app, f"{dept} is working on your application", f"“{app.subject}” · Ref. {ref}")
         else:
             f.status, f.finished_at = status, _now()
             f.started_at = f.started_at or f.finished_at
             f.response, f.responded_by = response[:2000], user_id
-            self._notify(await self._admins(), f"{dept} {'finished' if status == 'DONE' else 'could not do'} {ref}", f"“{app.subject}” — {response}",
+            self._notify(await self._admins(), f"{dept} {'has finished' if status == 'DONE' else 'could not do'} “{app.subject}”"[:200], f"{response} \u00b7 Ref. {ref}",
                          f"/dashboard/admin/applications?open={app.id}")
-            await service._notify_applicant(app, "Back with the administration", f"{ref}: {dept} has done its part. The administration will make the final decision.")
+            await service._notify_applicant(app, "Back with the administration", f"{dept} has done its part on “{app.subject}”. The administration will make the final decision. Ref. {ref}")
         f.responded_by = user_id
         await self.session.flush()
         await AuditService(self.session).log(actor_user_id=user_id, action=f"application.department_{status.lower()}", entity_type="application", entity_id=app.id,

@@ -273,6 +273,7 @@ class ClassSession(UUIDPKMixin, TimestampMixin, Base):
         UniqueConstraint("course_offering_id", "session_date", "start_time", name="uq_class_sessions_offering_date_start"),
         Index("ix_class_sessions_offering_id", "course_offering_id"),
         Index("ix_class_sessions_slot_id", "timetable_slot_id"),
+        Index("ix_class_sessions_session_date", "session_date"),
     )
 
     course_offering_id: Mapped[uuid.UUID] = mapped_column(

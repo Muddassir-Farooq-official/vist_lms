@@ -3859,3 +3859,30 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 
 /* Phones: the greeting block shows no shortcut buttons (they do not fit); the bottom bar and the menu cover them. */
 @media (max-width: 699px) { .dash-hero .dash-actions { display: none; } }
+
+/* Attendance -> Teachers (missed classes, punctuality, class cover) */
+.sec-pill.tone-green, .tc-chip.tone-green { --fill: var(--bold-green); }
+.sec-pill.tone-grey { --fill: #64748b; }
+.tc-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.tc-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: .82rem; font-weight: 600;
+  background: var(--surface-alt); border: 1px solid var(--border); color: var(--text-primary); }
+.tc-chip b { font-size: 1rem; }
+.tc-chip.tone-green, .tc-chip.tone-red, .tc-chip.tone-orange { background: var(--fill); color: #ffffff; border-color: transparent; }
+.tc-chip.tone-red { --fill: var(--bold-red); } .tc-chip.tone-orange { --fill: var(--bold-orange); }
+.tc-table td small.list-sub, #tc-covers-table small.list-sub, #tc-punct-table small.list-sub, #tc-dialog small.list-sub { display: block; }
+#tc-day { max-width: 220px; flex: 0 1 220px; }
+.tc-row-red td { background: var(--danger-bg); }
+.tc-row-red td:first-child { box-shadow: inset 4px 0 0 var(--bold-red); }
+.tc-row-amber td { background: #fff7ed; }
+.tc-row-amber td:first-child { box-shadow: inset 4px 0 0 var(--bold-orange); }
+.tc-focus td { outline: 2px solid var(--bold-blue); outline-offset: -2px; }
+.tc-flag { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 6px; background: var(--bold-red); color: #ffffff; font-size: .72rem; font-weight: 700; }
+.tc-click { cursor: pointer; }
+.tc-click:hover td { background: var(--surface-alt); }
+.tc-detail > td { background: var(--surface-alt); padding: 4px 8px 10px; }
+.cv-list { display: grid; gap: 10px; }
+.cv-item { border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+.cv-item b { display: block; }
+.cv-register { width: 100%; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tc-row-amber td { background: rgba(194, 65, 12, .16); } }
+:root[data-theme="dark"] .tc-row-amber td { background: rgba(194, 65, 12, .16); }

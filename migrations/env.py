@@ -57,6 +57,7 @@ from app.academics import terms as academics_terms  # noqa: F401
 from app.notifications import email_models as notifications_email_models  # noqa: F401
 from app.security import models as security_models  # noqa: F401
 from app.todos import models as todos_models  # noqa: F401
+from app.teaching import models as teaching_models  # noqa: F401
 from app.banners import models as banners_models  # noqa: F401
 from app.push import models as push_models  # noqa: F401
 

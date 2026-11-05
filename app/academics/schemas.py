@@ -178,6 +178,15 @@ class TimetableSlotCreateRequest(BaseModel):
     period_id: uuid.UUID
     day_of_week: DayOfWeek
     room: str = Field(min_length=1, max_length=50)
+    # Added in the middle of a term: classes only from this day on (empty = the whole term, as before).
+    starts_from: date | None = None
+
+
+class TimetableSlotChangeRequest(BaseModel):
+    from_date: date
+    period_id: uuid.UUID
+    day_of_week: DayOfWeek
+    room: str = Field(min_length=1, max_length=50)
 
 
 class TimetableSlotOut(BaseModel):
@@ -200,6 +209,7 @@ class TimetableSlotCreatedOut(BaseModel):
 class AutoAssignRequest(BaseModel):
     sessions_per_week: int = Field(ge=1, le=5)
     room: str = Field(min_length=1, max_length=50)
+    starts_from: date | None = None          # in the middle of a term: classes only from this day on
 
 
 class AutoAssignResultOut(BaseModel):

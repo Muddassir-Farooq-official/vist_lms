@@ -92,9 +92,28 @@
       <label for="ts-period">Period</label>
       <select id="ts-period" class="select-input" required></select>
     </div>
+    <div class="form-field two-span" id="ts-from-field" hidden>
+      <label for="ts-from">Classes start from</label>
+      <input type="date" id="ts-from" class="text-input" />
+      <small class="list-sub">The term has already started: classes are created from this day to the end of the term, not for days that are already past.</small>
+    </div>
     <div class="form-actions two-span"><button type="submit" class="role-btn" id="add-slot-submit">Add Slot</button></div>
   </form>
   <p id="add-slot-error" class="dash-alert error" hidden></p>
+  <dialog id="slot-change-dialog" class="modal" aria-labelledby="sc-title"><div class="modal-body">
+    <h2 id="sc-title">Change this slot</h2>
+    <p class="cc-meta" id="sc-current"></p>
+    <div class="form-field"><label for="sc-from">From (today or later)</label><input type="date" id="sc-from" class="text-input" /></div>
+    <div class="form-field"><label for="sc-day">New day</label><select id="sc-day" class="select-input">
+      <option value="MONDAY">Monday</option><option value="TUESDAY">Tuesday</option><option value="WEDNESDAY">Wednesday</option>
+      <option value="THURSDAY">Thursday</option><option value="FRIDAY">Friday</option><option value="SATURDAY">Saturday</option><option value="SUNDAY">Sunday</option></select></div>
+    <div class="form-field"><label for="sc-period">New period</label><select id="sc-period" class="select-input"></select></div>
+    <div class="form-field"><label for="sc-room">Room</label><input type="text" id="sc-room" class="text-input" maxlength="50" /></div>
+    <p class="dash-alert" id="sc-preview" hidden></p>
+    <p class="dash-alert error" id="sc-error" role="alert" hidden></p>
+    <div class="form-actions"><button type="button" class="role-btn" id="sc-save">Apply the change</button></div>
+    <button type="button" class="back-link modal-close-btn" id="sc-close">Cancel</button>
+  </div></dialog>
   <p id="add-slot-success" class="dash-alert" hidden></p>
 
   <h4 style="margin-top:20px">Or: Auto-Assign</h4>

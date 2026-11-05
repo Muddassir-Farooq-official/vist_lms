@@ -637,7 +637,7 @@ class ReportCenter:
 
         def head(ln) -> str:
             if ln.kind == LineKind.EARNING:
-                return {"BASE": "Basic", "BONUS": "Bonus", "ADJUSTMENT": "Adjustment +"}.get(ln.source, "Allowances")
+                return {"BASE": "Basic", "BONUS": "Bonus", "COVER": "Class cover", "ADJUSTMENT": "Adjustment +"}.get(ln.source, "Allowances")
             return {"ABSENT": "Absence", "LATE": "Late marks", "UNPAID": "Unpaid leave", "ADVANCE": "Advance recovery", "SECURITY": "Security deposit",
                     "ADJUSTMENT": "Adjustment −"}.get(ln.source, ln.label.split("(")[0].strip()[:30] or "Deduction")
 

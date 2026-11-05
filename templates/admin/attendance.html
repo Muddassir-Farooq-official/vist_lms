@@ -8,6 +8,7 @@
 <div class="portal-tabs" role="tablist" data-auto-tabs>
   <button class="portal-tab active" data-tab="attention" role="tab" aria-selected="true"><span>Needs attention</span> <span class="ss-count" id="att-attn-count"></span></button>
   <button class="portal-tab" data-tab="corrections" role="tab" aria-selected="false"><span>Correction requests</span> <span class="ss-count" id="att-corr-count"></span></button>
+  {% if not hod_view %}<button class="portal-tab" data-tab="teachers" role="tab" aria-selected="false"><span>Teachers</span> <span class="ss-count" id="att-teach-count"></span></button>{% endif %}
   {% if not hod_view %}<button class="portal-tab" data-tab="mark" role="tab" aria-selected="false"><span>Mark attendance</span></button>{% endif %}
   {% if not hod_view %}<button class="portal-tab" data-tab="lock" role="tab" aria-selected="false"><span>Lock the term</span></button>{% endif %}
   {% if not hod_view %}<button class="portal-tab" data-tab="holiday" role="tab" aria-selected="false"><span>Holidays</span></button>{% endif %}
@@ -30,6 +31,68 @@
   <p class="empty-state" id="needs-attention-empty" hidden>Nothing needs attention — every session's attendance was taken on time.</p>
 </section>
 </div>
+
+{% if not hod_view %}
+<div class="portal-tab-panel" data-tab-panel="teachers" hidden>
+<section class="panel" id="tc-day-panel">
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("clock") }}</div><h2>Classes and teachers on a day</h2></div></div>
+  <p class="panel-hint">Every class with its teacher's check-in and whether attendance was taken in the marking window. <b>Red</b>: the teacher had checked in but the class was not taken. <b>Amber</b>: the teacher has not checked in or is on leave: give the class to someone free with <b>Find cover</b>.</p>
+  <div class="td-daynav">
+    <button type="button" class="role-btn small-btn" id="tc-prev" aria-label="Previous day">&larr;</button>
+    <input type="date" id="tc-day" class="text-input" aria-label="Day" />
+    <button type="button" class="role-btn small-btn" id="tc-next" aria-label="Next day">&rarr;</button>
+    <button type="button" class="role-btn small-btn" id="tc-today">Today</button>
+  </div>
+  <div class="tc-chips" id="tc-chips"></div>
+  <p class="dash-alert" id="tc-absent" hidden></p>
+  <div class="table-scroll"><table class="dash-table tc-table" id="tc-table">
+    <thead><tr><th>Time</th><th>Class</th><th>Teacher</th><th>Attendance</th><th>Cover</th><th></th></tr></thead>
+    <tbody id="tc-tbody"></tbody>
+  </table></div>
+  <p class="empty-state" id="tc-empty" hidden>No classes on this day.</p>
+</section>
+
+<section class="panel" id="tc-punct-panel">
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("attendance") }}</div><h2>Attendance-taking punctuality</h2></div>
+    <a class="role-btn small-btn" id="tc-csv" href="#">Download (CSV)</a></div>
+  <p class="panel-hint">For classes already due: <b>on time</b> = taken within the marking window; <b>after the window</b> = taken afterwards by the administration or a correction; <b>never taken</b> = still not marked. "Average" is how many minutes after the start the teacher took attendance. A covered class counts for whoever covered it. Click a teacher to see their classes.</p>
+  <div class="ar-form">
+    <label>From<input type="date" id="tc-from" class="text-input" /></label>
+    <label>To<input type="date" id="tc-to" class="text-input" /></label>
+    <div class="att-go"><button type="button" class="role-btn" id="tc-load">Show</button></div>
+  </div>
+  <p class="panel-hint" id="tc-totals"></p>
+  <div class="table-scroll"><table class="dash-table" id="tc-punct-table">
+    <thead><tr><th>Teacher</th><th class="num">Due</th><th class="num">On time</th><th class="num">After window</th><th class="num">Never taken</th><th class="num">On time %</th><th class="num">Average</th><th>Verdict</th></tr></thead>
+    <tbody id="tc-punct-tbody"></tbody>
+  </table></div>
+  <p class="empty-state" id="tc-punct-empty" hidden>No classes were due in this period.</p>
+</section>
+
+<section class="panel" id="tc-covers-panel">
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("employees") }}</div><h2>Class covers and cover pay</h2></div></div>
+  <p class="panel-hint">Cover pay is the absent teacher's day's pay (basic &divide; working days, as payroll works it out) shared by their classes that day. It goes on the substitute's payslip only after the class is held (its attendance was taken), once. You can change it or take the cover back until it is on a payroll. Shown for the report&rsquo;s period and the coming month.</p>
+  <div class="table-scroll"><table class="dash-table" id="tc-covers-table">
+    <thead><tr><th>Date</th><th>Class</th><th>Covered by</th><th class="num">Pay</th><th>Status</th><th>Payroll</th><th></th></tr></thead>
+    <tbody id="tc-covers-tbody"></tbody>
+  </table></div>
+  <p class="empty-state" id="tc-covers-empty" hidden>No covers in this period.</p>
+</section>
+
+<dialog id="tc-dialog" class="modal modal-wide" aria-labelledby="tc-d-title"><div class="modal-body">
+  <h2 id="tc-d-title">Find cover</h2>
+  <p class="cc-meta" id="tc-d-class"></p>
+  <p class="panel-hint">Free at that time and not on leave, best first: teachers, then those who teach this course, same department, already checked in, and fewer classes that day.</p>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th></th><th>Person</th><th>Why</th></tr></thead><tbody id="tc-d-people"></tbody></table></div>
+  <p class="empty-state" id="tc-d-none" hidden>Nobody is free at that time.</p>
+  <div class="form-field"><label for="tc-d-amount">Cover pay (Rs.)</label><input type="number" id="tc-d-amount" class="text-input small-input" min="0" step="1" inputmode="decimal" />
+    <small class="list-sub" id="tc-d-note"></small></div>
+  <p class="dash-alert error" id="tc-d-error" role="alert" hidden></p>
+  <div class="form-actions"><button type="button" class="role-btn" id="tc-d-save">Give this class</button></div>
+  <button type="button" class="back-link modal-close-btn" id="tc-d-close">Cancel</button>
+</div></dialog>
+</div>
+{% endif %}
 
 <div class="portal-tab-panel" data-tab-panel="corrections" hidden>
 <section class="panel" id="corrections-panel">
@@ -130,4 +193,5 @@
 {% block extra_scripts %}
 <script src="/static/js/attendance-common.js"></script>
 <script src="/static/js/admin-attendance.js"></script>
+{% if not hod_view %}<script src="/static/js/admin-teachers.js"></script>{% endif %}
 {% endblock %}
