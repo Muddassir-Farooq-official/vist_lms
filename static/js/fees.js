@@ -78,6 +78,36 @@
       : '<span class="status-pill dropped">Dues Pending</span>';
   }
 
+  // A small dialog: (instalment), new due date (today or later) and the reason. Resolves {installment, date, reason} or null.
+  function dueDateDialog(o) {
+    return new Promise(function (resolve) {
+      const d = document.createElement("dialog");
+      d.className = "modal";
+      const t = new Date();
+      const today = t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");
+      let opts = "";
+      for (let i = 1; i <= (o.installments || 0); i++) opts += '<option value="' + i + '">Instalment ' + i + "</option>";
+      d.innerHTML = '<div class="modal-body"><h2>' + VA.escapeHtml(o.title) + '</h2><p class="cc-meta">' + VA.escapeHtml(o.intro || "") + "</p>" +
+        (o.installments ? '<div class="form-field"><label for="dd-inst">Instalment</label><select id="dd-inst" class="select-input">' + opts + "</select></div>" : "") +
+        '<div class="form-field"><label for="dd-date">New due date</label><input type="date" id="dd-date" class="text-input" min="' + today + '"></div>' +
+        '<div class="form-field"><label for="dd-reason">Reason (kept on record)</label><input type="text" id="dd-reason" class="text-input" maxlength="300" placeholder="e.g. Extension approved by the principal"></div>' +
+        '<p class="dash-alert error" role="alert" hidden></p><div class="form-actions"><button type="button" class="role-btn" data-dd="ok">Change the due date</button></div>' +
+        '<button type="button" class="back-link modal-close-btn" data-dd="no">Cancel</button></div>';
+      document.body.appendChild(d);
+      if (o.value && o.value >= today) d.querySelector("#dd-date").value = o.value;
+      function finish(v) { if (d.open) d.close(); d.remove(); resolve(v); }
+      d.querySelector('[data-dd="no"]').addEventListener("click", function () { finish(null); });
+      d.addEventListener("cancel", function (e) { e.preventDefault(); finish(null); });
+      d.querySelector('[data-dd="ok"]').addEventListener("click", function () {
+        const date = d.querySelector("#dd-date").value, reason = d.querySelector("#dd-reason").value.trim(), err = d.querySelector(".dash-alert");
+        if (!date || date < today) { err.textContent = "Choose a date from today on."; err.hidden = false; return; }
+        if (reason.length < 4) { err.textContent = "Write the reason (at least 4 letters)."; err.hidden = false; return; }
+        finish({ installment: o.installments ? parseInt(d.querySelector("#dd-inst").value, 10) : null, date: date, reason: reason });
+      });
+      d.showModal();
+    });
+  }
+
   function money(n) {
     return window.VistAdmin && window.VistAdmin.formatMoney ? window.VistAdmin.formatMoney(n) : "Rs. " + Number(n || 0).toLocaleString("en-PK");
   }
@@ -269,6 +299,10 @@
               (s.status === "DRAFT" ? "Activate" : "Re-check") + "</button>"
             : "") +
           (s.status === "ACTIVE" ? ' &middot; <button type="button" class="row-action undo-activation-btn" data-id="' + s.id + '">Undo activation\u2026</button>' : "") +
+          (s.status === "ACTIVE" || s.status === "DRAFT" ? ' &middot; <button type="button" class="row-action late-rate-btn" data-id="' + s.id + '" data-rate="' + (s.late_fee_per_day || 0) +
+            '" data-name="' + VA.escapeHtml(s.name) + '">Late fee' + (s.late_fee_per_day ? " (" + money(s.late_fee_per_day) + "/day)" : "") + "\u2026</button>" : "") +
+          (s.status === "ACTIVE" ? ' &middot; <button type="button" class="row-action due-all-btn" data-id="' + s.id + '" data-count="' + s.installment_count +
+            '" data-name="' + VA.escapeHtml(s.name) + '">Change due date\u2026</button>' : "") +
           ' &middot; <button type="button" class="row-action clone-structure-btn" data-id="' + s.id +
           '" data-name="' + VA.escapeHtml(s.name) + '" data-amount="' + s.total_amount + '">Clone &amp; Adjust</button>' +
           "</td>";
@@ -317,6 +351,43 @@
             'Created "' + result.body.name + '" as a draft at ' + money(result.body.total_amount) + ". Activate it when ready.";
           structureSuccess.hidden = false;
           loadStructures();
+        });
+      });
+
+      structuresTbody.querySelectorAll(".late-rate-btn").forEach(function (btn) {
+        btn.addEventListener("click", async function () {
+          const rate = await VA.ask({ title: "Daily late fee for \u201c" + btn.getAttribute("data-name") + "\u201d",
+            intro: "Rs. charged for every day an instalment is unpaid after its due date (0 = no late fee). It counts for all late days, including days already late. " +
+              "Doubling, grace days and the limits are set for all fees in Settings \u2192 Rules \u2192 Fees. Late fees already posted as fines stay as they are.",
+            label: "Rs. per day", input: "number", value: btn.getAttribute("data-rate"), ok: "Next" });
+          if (rate == null) return;
+          const reason = await VA.ask({ title: "Reason for the change", label: "Reason (kept on record)", ok: "Save" });
+          if (reason == null) return;
+          const res = await VA.fetchJson("/api/v1/fees/structures/" + btn.getAttribute("data-id") + "/late-fee", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ late_fee_per_day: Number(rate), reason: reason }) });
+          if (!res.ok) { VA.showError(extractErrorMessage(res.body, "Could not change the late fee.")); return; }
+          VA.toast(res.body.late_fee_per_day ? "Late fee is now " + money(res.body.late_fee_per_day) + " a day." : "No late fee on this fee now.");
+          loadStructures();
+        });
+      });
+
+      structuresTbody.querySelectorAll(".due-all-btn").forEach(function (btn) {
+        btn.addEventListener("click", async function () {
+          const count = parseInt(btn.getAttribute("data-count"), 10) || 1;
+          const r = await dueDateDialog({
+            title: "Change a due date for everyone on \u201c" + btn.getAttribute("data-name") + "\u201d",
+            intro: "Moves the chosen instalment's due date for every student on this fee. Instalments already paid in full stay as they are. Amounts never change; each open challan gets the new date and each student is told.",
+            installments: count,
+          });
+          if (!r) return;
+          const res = await VA.fetchJson("/api/v1/fees/structures/" + btn.getAttribute("data-id") + "/installments/" + r.installment + "/due-date", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ due_date: r.date, reason: r.reason }),
+          });
+          if (!res.ok) { VA.showError(extractErrorMessage(res.body, "Could not change the due date.")); return; }
+          const b = res.body;
+          VA.toast("Instalment " + r.installment + " now due " + r.date + " for " + b.changed + " student" + (b.changed === 1 ? "" : "s") +
+            (b.already_paid ? "; " + b.already_paid + " already paid" : "") + (b.already_on_that_date ? "; " + b.already_on_that_date + " already on that date" : "") +
+            (b.with_late_fee_already_posted ? ". " + b.with_late_fee_already_posted + " had a late fee already posted as a fine \u2014 waive those under Fines if they should not be charged." : "."));
         });
       });
 
@@ -522,8 +593,28 @@
         '<td class="num">' + money(r.paid) + "</td>" +
         '<td class="num"><strong>' + money(r.remaining) + "</strong></td>" +
         '<td><span class="status-pill ' + pill[0] + '">' + pill[1] + "</span>" +
-          (r.late_fee > 0.005 ? '<br><small>late fee ' + money(r.late_fee) + (r.late_fee_posted ? " (" + money(r.late_fee_posted) + " posted)" : "") + "</small>" : "") + "</td>" +
+          (r.late_fee > 0.005 ? '<br><small>late fee ' + money(r.late_fee) + (r.late_fee_posted ? " (" + money(r.late_fee_posted) + " posted)" : "") +
+            (r.late_fee_rate_now ? " \u00b7 now " + money(r.late_fee_rate_now) + "/day" + (r.late_fee_rate_rises_on ? ", doubles on " + VA.escapeHtml(r.late_fee_rate_rises_on) : "") : "") + "</small>" : "") + "</td>" +
         '<td class="row-actions"></td>';
+      if (r.remaining > 0.005) {
+        const dueBtn = document.createElement("button");
+        dueBtn.className = "role-btn small-btn";
+        dueBtn.type = "button";
+        dueBtn.textContent = "Change due date";
+        dueBtn.addEventListener("click", async function () {
+          const d = await dueDateDialog({ title: "Change the due date of " + r.label, intro: "Now due " + (r.due_date || "\u2014") + ". " + money(r.remaining) +
+            " still to pay. The amount does not change; the open challan gets the new date and the student is told.", value: r.due_date });
+          if (!d) return;
+          const res = await VA.fetchJson("/api/v1/fees/assignments/" + assignmentId + "/installments/" + r.ledger_entry_id + "/due-date", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ due_date: d.date, reason: d.reason }),
+          });
+          if (!res.ok) { VA.toast(extractErrorMessage(res.body, "Could not change the due date."), "error"); return; }
+          VA.toast("Now due " + d.date + "." + (res.body.late_fee_already_posted ? " A late fee of " + money(res.body.late_fee_already_posted) +
+            " was already posted as a fine; waive it under Fines if it should not be charged." : ""));
+          loadLedger(assignmentId);
+        });
+        tr.querySelector(".row-actions").appendChild(dueBtn);
+      }
       if (r.late_fee > r.late_fee_posted + 0.005) {
         const postFeeBtn = document.createElement("button");
         postFeeBtn.className = "role-btn small-btn";

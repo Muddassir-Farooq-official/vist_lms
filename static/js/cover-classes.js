@@ -9,7 +9,7 @@
 
   function hm(t) { return t ? String(t).slice(0, 5) : ""; }
   function msg(body, fallback) { return (body && body.error && body.error.message) || fallback; }
-  const LABEL = { UPCOMING: "Not started", OPEN: "Take attendance now", ON_TIME: "Attendance taken", LATE: "Taken late", MISSED: "Window closed, not taken" };
+  const LABEL = { UPCOMING: "Not started", OPEN: "Take attendance now", ON_TIME: "Attendance taken", LATE: "Taken late", MISSED: "Waiting for the office" };
 
   async function load() {
     const r = await VA.fetchJson(API);
@@ -24,6 +24,7 @@
         " · room " + esc(c.room) + (c.amount > 0 ? " · cover pay " + (VA.formatMoney ? VA.formatMoney(c.amount) : c.amount) : "") + "</small></div>" +
         '<span class="sec-pill ' + (c.state === "ON_TIME" ? "tone-green" : c.state === "OPEN" ? "tone-teal" : c.state === "MISSED" ? "tone-red" : "tone-grey") + '">' + esc(LABEL[c.state] || c.state) + "</span>" +
         (c.can_mark ? '<button type="button" class="role-btn small-btn" data-open="' + c.id + '">' + (c.state === "ON_TIME" ? "Correct attendance" : "Take attendance") + "</button>" : "") +
+        (c.state === "MISSED" ? '<small class="list-sub cv-note">The marking window has closed. The office records this class\u2019s attendance (Attendance \u2192 Teachers \u2192 Record attendance); your cover pay is added once it is recorded.</small>' : "") +
         '<div class="cv-register" hidden></div></div>';
     }).join("");
     if (location.hash === "#covers" && items.length && VA.showTab) VA.showTab("covers");

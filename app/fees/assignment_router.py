@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, Query, Response
@@ -313,6 +314,30 @@ async def post_late_fee(
     if fine is None:
         return {"posted": False, "message": "Nothing new to post for this installment."}
     return {"posted": True, "fine_id": str(fine.id), "amount": fine.amount}
+
+
+class DueDateChange(BaseModel):
+    due_date: date
+    reason: str = Field(min_length=4, max_length=300)
+
+
+@router.post(
+    "/{assignment_id}/installments/{ledger_entry_id}/due-date",
+    summary="Move one unpaid instalment's due date (today or later, with a reason). Amounts are not touched; its challan gets the new date",
+)
+async def change_installment_due_date(
+    assignment_id: uuid.UUID,
+    ledger_entry_id: uuid.UUID,
+    payload: DueDateChange,
+    current_user: CurrentUser = Depends(require_permission(Permissions.FEE_MANAGE)),
+    db=Depends(get_db),
+) -> dict:
+    from app.fees.models import FeeLedgerEntry
+
+    entry = await db.get(FeeLedgerEntry, ledger_entry_id)
+    if entry is None or entry.fee_assignment_id != assignment_id:
+        raise ResourceNotFoundError("Instalment not found.")
+    return await FeeAssignmentService(db).change_due_date(ledger_entry_id, new_date=payload.due_date, reason=payload.reason, actor_id=current_user.id)
 
 
 @router.patch("/{assignment_id}/status", response_model=FeeAssignmentOut, summary="Change an assignment's status")

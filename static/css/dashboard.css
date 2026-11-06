@@ -3886,3 +3886,4 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 .cv-register { width: 100%; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tc-row-amber td { background: rgba(194, 65, 12, .16); } }
 :root[data-theme="dark"] .tc-row-amber td { background: rgba(194, 65, 12, .16); }
+.cv-note { width: 100%; display: block; }

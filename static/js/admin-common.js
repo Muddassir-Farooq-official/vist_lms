@@ -1081,7 +1081,27 @@ window.VistAdmin = (function () {
     const link = document.getElementById("install-app-link"); if (link) link.hidden = false;
   });
   if ("serviceWorker" in navigator) {
-    window.addEventListener("load", function () { navigator.serviceWorker.register("/sw.js").catch(function () { /* push just stays off */ }); });
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("/sw.js").then(refreshPushKey).catch(function () { /* push just stays off */ });
+    });
+  }
+  // When the server's push keys are changed (a new VAPID key pair), phones that had notifications on quietly move to the
+  // new key the next time the portal is opened, so nobody has to turn notifications on again.
+  async function refreshPushKey(reg) {
+    try {
+      if (!reg || !reg.pushManager || !("Notification" in window) || Notification.permission !== "granted") return;
+      const sub = await reg.pushManager.getSubscription();
+      if (!sub || !sub.options || !sub.options.applicationServerKey) return;
+      const r = await fetchJson("/api/v1/push/key", { quiet: true });
+      if (!r.ok || !r.body || !r.body.enabled || !r.body.public_key) return;
+      const now = keyBytes(r.body.public_key), had = new Uint8Array(sub.options.applicationServerKey);
+      if (had.length === now.length && had.every(function (v, i) { return v === now[i]; })) return;
+      const oldEndpoint = sub.endpoint;
+      await sub.unsubscribe().catch(function () {});
+      const fresh = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: now });
+      await fetchJson("/api/v1/push/subscribe", { method: "POST", quiet: true, headers: { "Content-Type": "application/json" }, body: JSON.stringify(fresh.toJSON()) });
+      await fetchJson("/api/v1/push/unsubscribe", { method: "POST", quiet: true, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: oldEndpoint }) });
+    } catch (e) { /* the person can turn it on again from the menu */ }
   }
   const isStandalone = function () { return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true; };
   const isIos = function () { return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); };

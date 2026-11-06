@@ -101,6 +101,14 @@ def render_challan_pdf(d: dict, *, institute_name: str | None = None) -> bytes:
             c.setFillColor(colors.HexColor("#92400e")); c.setFont("Helvetica", 7.4)
             c.drawString(x, y + 1 * mm, f"Late fee: Rs. {d['late_fee_per_day']:,.0f} for every day after the due date.")
             y -= 3.5 * mm
+            from app.core.config import settings as _s
+
+            every = int(getattr(_s, "fee_late_fee_double_every_days", 0) or 0)
+            if every > 0:
+                top = float(getattr(_s, "fee_late_fee_max_per_day", 0) or 0)
+                c.drawString(x, y + 1 * mm, f"It doubles every {every} days late (Rs. {d['late_fee_per_day'] * 2:,.0f}, Rs. {d['late_fee_per_day'] * 4:,.0f} ...)"
+                             + (f", up to Rs. {top:,.0f} a day." if top > 0 else "."))
+                y -= 3.5 * mm
         bar = code128.Code128(d["consumer_number"], barHeight=11 * mm, barWidth=0.33 * mm, humanReadable=False)
         bar.drawOn(c, x + max(0, ((right - x) - bar.width) / 2), y - 12 * mm)
         y -= 14.5 * mm

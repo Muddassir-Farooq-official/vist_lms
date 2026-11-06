@@ -152,8 +152,8 @@ class TeachingService:
                 absent.setdefault(teacher.id, {"employee_id": teacher.id, "name": name(teacher), "presence_label": pres["presence_label"], "classes": 0})
                 absent[teacher.id]["classes"] += 1
             out.append({
-                "class_session_id": cs.id, "date": cs.session_date, "start_time": cs.start_time, "end_time": cs.end_time, "room": cs.room,
-                "course_code": course.code, "course_title": course.title, "section": off.section_label, "term_label": off.term_label,
+                "class_session_id": cs.id, "course_offering_id": off.id, "date": cs.session_date, "start_time": cs.start_time, "end_time": cs.end_time,
+                "room": cs.room, "course_code": course.code, "course_title": course.title, "section": off.section_label, "term_label": off.term_label,
                 "teacher_id": off.assigned_teacher_id, "teacher_name": name(teacher), **pres,
                 "cover": self._cover_out(cover, people) if cover else None,
                 **st, "late_note": cs.late_marking_note, "missed_while_in": missed_while_in, "needs_cover": needs_cover,
@@ -470,7 +470,7 @@ class TeachingService:
             st = class_state(cs, now)
             status = ("Cancelled" if c.status != "ACTIVE" else "Class cancelled" if cs.status != ClassSessionStatus.SCHEDULED
                       else "Taken" if cs.attendance_taken_at else "Not taken" if st["state"] == "MISSED" else "Waiting")
-            out.append({"id": c.id, "class_session_id": cs.id, "date": c.cover_date, "description": c.description,
+            out.append({"id": c.id, "class_session_id": cs.id, "course_offering_id": cs.course_offering_id, "date": c.cover_date, "description": c.description,
                         "substitute_id": c.substitute_employee_id, "substitute_name": name(people.get(c.substitute_employee_id)),
                         "absent_name": name(people.get(c.absent_employee_id)), "amount": float(c.amount), "amount_note": c.amount_note,
                         "status": status, "active": c.status == "ACTIVE", "payable": c.status == "ACTIVE" and cs.attendance_taken_at is not None,

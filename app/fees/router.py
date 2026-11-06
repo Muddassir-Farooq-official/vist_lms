@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -185,3 +186,54 @@ async def clone_fee_structure(
 ) -> FeeStructureOut:
     clone = await FeeStructureService(db).clone(structure_id, payload, actor_id=current_user.id)
     return await _to_structure_out(db, clone)
+
+
+class DueDateForAll(BaseModel):
+    due_date: date
+    reason: str = Field(min_length=4, max_length=300)
+
+
+@structures_router.post(
+    "/{structure_id}/installments/{installment_number}/due-date",
+    summary="Move one instalment's due date for everyone on this fee (instalments already paid in full are left as they are)",
+)
+async def change_due_date_for_all(
+    structure_id: uuid.UUID,
+    installment_number: int,
+    payload: DueDateForAll,
+    current_user: CurrentUser = Depends(require_permission(Permissions.FEE_MANAGE)),
+    db=Depends(get_db),
+) -> dict:
+    from app.fees.assignment_service import FeeAssignmentService
+
+    return await FeeAssignmentService(db).change_due_date_for_structure(structure_id, installment_number, new_date=payload.due_date,
+                                                                       reason=payload.reason, actor_id=current_user.id)
+
+
+class LateFeeRate(BaseModel):
+    late_fee_per_day: float = Field(ge=0, le=100_000)          # 0 = no late fee on this fee
+    reason: str = Field(min_length=4, max_length=300)
+
+
+@structures_router.post(
+    "/{structure_id}/late-fee",
+    summary="Set this fee's daily late fee (Rs. per day after the due date; 0 = none). Late fines already posted stay as they are",
+)
+async def set_late_fee(
+    structure_id: uuid.UUID,
+    payload: LateFeeRate,
+    current_user: CurrentUser = Depends(require_permission(Permissions.FEE_MANAGE)),
+    db=Depends(get_db),
+) -> dict:
+    from app.audit.service import AuditService
+    from app.core.exceptions import ResourceNotFoundError
+
+    structure = await FeeStructureRepository(db).get_by_id(structure_id)
+    if structure is None:
+        raise ResourceNotFoundError("Fee structure not found.")
+    before = float(structure.late_fee_per_day) if structure.late_fee_per_day else 0.0
+    structure.late_fee_per_day = round(payload.late_fee_per_day, 2) or None
+    await AuditService(db).log(actor_user_id=current_user.id, action="fee.late_fee_rate_changed", entity_type="fee_structure", entity_id=structure.id,
+                               before={"late_fee_per_day": before}, after={"late_fee_per_day": payload.late_fee_per_day, "reason": payload.reason.strip()})
+    await db.flush()
+    return {"id": structure.id, "late_fee_per_day": float(structure.late_fee_per_day or 0)}

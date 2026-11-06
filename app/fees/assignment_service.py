@@ -74,6 +74,32 @@ class FeeStatusCalculator:
         return max(days, 0)
 
     @staticmethod
+    def rate_for_day(day_index: int, rate: float) -> float:
+        """The daily late fee on the n-th late day (0 = the first). With "double every N days" set, the rate doubles
+        after each N late days, up to the highest daily rate if one is set."""
+        every = int(getattr(settings, "fee_late_fee_double_every_days", 0) or 0)
+        top = float(getattr(settings, "fee_late_fee_max_per_day", 0) or 0)
+        r = rate * (2 ** min(day_index // every, 40)) if every > 0 else rate
+        return min(r, top) if top > 0 else r
+
+    @staticmethod
+    def late_amount(days: int, rate: float) -> float:
+        """Total late fee for this many late days: flat, or doubling in steps (see rate_for_day)."""
+        if days <= 0 or not rate:
+            return 0.0
+        every = int(getattr(settings, "fee_late_fee_double_every_days", 0) or 0)
+        if every <= 0:
+            top = float(getattr(settings, "fee_late_fee_max_per_day", 0) or 0)
+            return days * (min(rate, top) if top > 0 else rate)
+        total, step = 0.0, 0
+        while days > 0:
+            n = min(every, days)
+            total += n * FeeStatusCalculator.rate_for_day(step * every, rate)
+            days -= n
+            step += 1
+        return total
+
+    @staticmethod
     def installments(entries: list[FeeLedgerEntry], late_fee_per_day: float | None, *, as_of: date | None = None,
                      pause: tuple | None = None) -> list[dict]:
         """One row per installment, worked out from the append-only ledger.
@@ -189,13 +215,19 @@ class FeeStatusCalculator:
             if grace:
                 late_from = max(late_from, due + timedelta(days=grace))     # no late fee during the grace days after the due date
             late_fee = 0.0
+            rate_now, rises_on = None, None
             if late_fee_per_day:
                 if remaining > 0.005 and late_from < today:
-                    late_fee = FeeStatusCalculator._late_days(late_from, today, pause) * late_fee_per_day
+                    days_late = FeeStatusCalculator._late_days(late_from, today, pause)
+                    late_fee = FeeStatusCalculator.late_amount(days_late, late_fee_per_day)
+                    rate_now = FeeStatusCalculator.rate_for_day(days_late, late_fee_per_day)      # what tomorrow's late day costs
+                    every = int(getattr(settings, "fee_late_fee_double_every_days", 0) or 0)
+                    if every > 0 and FeeStatusCalculator.rate_for_day(days_late + every, late_fee_per_day) > rate_now:
+                        rises_on = today + timedelta(days=every - days_late % every)
                 elif remaining <= 0.005 and owed > 1e-9:
                     settled_on = settled_at if settled_at else today
                     if settled_on > late_from:
-                        late_fee = FeeStatusCalculator._late_days(late_from, settled_on, pause) * late_fee_per_day
+                        late_fee = FeeStatusCalculator.late_amount(FeeStatusCalculator._late_days(late_from, settled_on, pause), late_fee_per_day)
             cap = float(settings.fee_late_fee_cap or 0)
             if cap > 0:
                 late_fee = min(late_fee, cap)          # one instalment can never build up more than the cap
@@ -211,6 +243,7 @@ class FeeStatusCalculator:
                 "ledger_entry_id": d.id, "installment_number": d.installment_number, "due_date": d.due_date,
                 "description": d.description, "charged": round(charged, 2), "concession": round(concession, 2),
                 "paid": round(paid, 2), "remaining": remaining, "status": status, "late_fee": round(late_fee, 2),
+                "late_fee_rate_now": round(rate_now, 2) if rate_now else None, "late_fee_rate_rises_on": rises_on,
                 "late_fee_posted": round(float(d.late_fee_charged_amount or 0), 2),
                 "paid_from": paid_from,
             })
@@ -509,6 +542,99 @@ class FeeAssignmentService:
             after={"amount_posted": new_amount, "fine_id": str(fine.id)},
         )
         return fine
+
+    async def change_due_date(self, ledger_entry_id: uuid.UUID, *, new_date: date, reason: str, actor_id: uuid.UUID) -> dict:
+        """Move one instalment's due date (e.g. an extension for a student, or the whole class). Only an instalment that is
+        still owed, only to today or later (never backwards into the past, which would charge late fees for days that
+        were not late), always with a reason. The ledger amounts are not touched; the instalment's open challan gets the
+        new date; the old and new dates are kept in the audit log. A late fee that was already posted as a fine is not
+        changed here (waive it under Fines if it should no longer be charged)."""
+        reason = (reason or "").strip()
+        if len(reason) < 4:
+            raise ValidationAppError("Write the reason for changing the due date (it is kept on record).")
+        today = institute_today()
+        if new_date < today:
+            raise ValidationAppError("The new due date must be today or later.")
+        if new_date > today + timedelta(days=730):
+            raise ValidationAppError("The new due date must be within two years.")
+        debit = await self.session.get(FeeLedgerEntry, ledger_entry_id)
+        if debit is None or debit.entry_type != LedgerEntryType.DEBIT or FeeStatusCalculator._is_reversal(debit):
+            raise ResourceNotFoundError("Instalment not found.")
+        assignment = await lock_assignment(self.session, debit.fee_assignment_id)
+        if assignment.status != AssignmentStatus.ACTIVE:
+            raise BusinessRuleViolationError("This fee is not active, so its due dates cannot be changed.")
+        entries = await self.repo.get_ledger(assignment.id)
+        row = next((r for r in FeeStatusCalculator.installments(entries, await _late_fee_per_day(self.session, assignment), pause=late_pause(assignment))
+                    if r["ledger_entry_id"] == debit.id), None)
+        if row is None:
+            raise ResourceNotFoundError("Instalment not found.")
+        if row["remaining"] <= 0.005:
+            raise BusinessRuleViolationError("This instalment is already paid in full.")
+        old = debit.due_date
+        if old == new_date:
+            raise ValidationAppError("That is already its due date.")
+        debit.due_date = new_date
+        challans = (await self.session.execute(select(PaymentChallan).where(
+            PaymentChallan.fee_ledger_entry_id == debit.id, PaymentChallan.status.in_((ChallanStatus.PENDING, ChallanStatus.EXPIRED))))).scalars().all()
+        for ch in challans:
+            ch.due_date = new_date
+            if ch.status == ChallanStatus.EXPIRED:
+                ch.status = ChallanStatus.PENDING          # payable again until the new date
+        posted = round(float(debit.late_fee_charged_amount or 0), 2)
+        await self.audit.log(actor_user_id=actor_id, action="fee.due_date_changed", entity_type="fee_ledger_entry", entity_id=debit.id,
+                             before={"due_date": str(old) if old else None},
+                             after={"due_date": str(new_date), "reason": reason[:300], "assignment_id": str(assignment.id),
+                                    "remaining": row["remaining"], "late_fee_before": row["late_fee"], "late_fee_already_posted": posted})
+        payer_user_id = await _resolve_payer_user_id(self.session, assignment.payer_type, assignment.payer_id)
+        if payer_user_id is not None:
+            await create_notification(
+                self.session, user_id=payer_user_id, category=NotificationCategory.FEE, title="Fee due date changed",
+                message=(f"{debit.description or 'Instalment ' + str(debit.installment_number or '')}: now due on {new_date:%d %b %Y}"
+                         + (f" (was {old:%d %b %Y})" if old else "") + f". Rs. {row['remaining']:,.0f} to pay."),
+            )
+        await self.session.flush()
+        return {"ledger_entry_id": debit.id, "assignment_id": assignment.id, "old_due_date": old, "new_due_date": new_date,
+                "remaining": row["remaining"], "late_fee_already_posted": posted}
+
+    async def change_due_date_for_structure(self, structure_id: uuid.UUID, installment_number: int, *, new_date: date, reason: str,
+                                            actor_id: uuid.UUID) -> dict:
+        """The same change for one instalment of a fee for everyone on it (e.g. "2nd instalment of Fall 2026 tuition now
+        due 30 Nov"). Instalments already paid in full are left as they are and counted."""
+        structure = await self.structure_repo.get_by_id(structure_id)
+        if structure is None:
+            raise ResourceNotFoundError("Fee structure not found.")
+        if not 1 <= installment_number <= int(structure.installment_count or 1):
+            raise ValidationAppError(f"This fee has instalments 1 to {structure.installment_count}.")
+        if len((reason or "").strip()) < 4:
+            raise ValidationAppError("Write the reason for changing the due date (it is kept on record).")
+        if new_date < institute_today():
+            raise ValidationAppError("The new due date must be today or later.")
+        debits = (await self.session.execute(
+            select(FeeLedgerEntry).join(FeeAssignment, FeeAssignment.id == FeeLedgerEntry.fee_assignment_id)
+            .where(FeeAssignment.fee_structure_id == structure_id, FeeAssignment.status == AssignmentStatus.ACTIVE,
+                   FeeLedgerEntry.entry_type == LedgerEntryType.DEBIT, FeeLedgerEntry.installment_number == installment_number)
+            .order_by(FeeLedgerEntry.created_at))).scalars().all()
+        changed = paid = same = other = posted = 0
+        for d in debits:
+            if FeeStatusCalculator._is_reversal(d):
+                continue
+            if d.due_date == new_date:
+                same += 1
+                continue
+            try:
+                r = await self.change_due_date(d.id, new_date=new_date, reason=reason, actor_id=actor_id)
+            except BusinessRuleViolationError as exc:
+                if "paid in full" in str(exc):
+                    paid += 1
+                else:
+                    other += 1
+                continue
+            changed += 1
+            posted += 1 if r["late_fee_already_posted"] > 0 else 0
+        await self.audit.log(actor_user_id=actor_id, action="fee.due_date_changed_for_all", entity_type="fee_structure", entity_id=structure.id,
+                             after={"installment_number": installment_number, "due_date": str(new_date), "reason": reason.strip()[:300],
+                                    "changed": changed, "already_paid": paid, "already_on_that_date": same, "skipped": other})
+        return {"changed": changed, "already_paid": paid, "already_on_that_date": same, "skipped": other, "with_late_fee_already_posted": posted}
 
     async def change_status(
         self, assignment_id: uuid.UUID, *, status: AssignmentStatus, actor_id: uuid.UUID, reason: str | None = None, approved: bool = False

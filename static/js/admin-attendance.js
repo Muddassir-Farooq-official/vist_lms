@@ -40,16 +40,20 @@
         "<td>" + VA.escapeHtml(entry.teacher_name || "\u2014 unassigned") + "</td>" +
         "<td>" + VA.escapeHtml(entry.room) + "</td>" +
         '<td>' + (canMark ? '<button type="button" class="role-btn small-btn attend-now-btn" data-offering="' + entry.course_offering_id + '" data-session="' + entry.id + '">Mark Now</button>' : "") + "</td>";
-      if (canMark) tr.querySelector(".attend-now-btn").addEventListener("click", async function () {
-        goTab("mark");
-        await selectOfferingById(entry.course_offering_id);
-        document.getElementById("session-select").value = entry.id;
-        document.getElementById("session-select").dispatchEvent(new Event("change"));
-        document.getElementById("session-picker-area").scrollIntoView({ behavior: "smooth" });
-      });
+      if (canMark) tr.querySelector(".attend-now-btn").addEventListener("click", function () { openForMarking(entry.course_offering_id, entry.id); });
       needsAttentionTbody.appendChild(tr);
     });
   }
+
+  // Open one class in "Mark attendance" (also used by Attendance -> Teachers for a covered class whose window has closed).
+  async function openForMarking(offeringId, sessionId) {
+    goTab("mark");
+    await selectOfferingById(offeringId);
+    document.getElementById("session-select").value = sessionId;
+    document.getElementById("session-select").dispatchEvent(new Event("change"));
+    document.getElementById("session-picker-area").scrollIntoView({ behavior: "smooth" });
+  }
+  window.VistOpenForMarking = openForMarking;
 
   // ---------------------------------------------------------------------
   // Term / Offering / Session pickers

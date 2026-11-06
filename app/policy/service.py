@@ -76,6 +76,11 @@ POLICY: tuple[Policy, ...] = (
     Policy("fee_late_fee_grace_days", "Late fee: grace days after the due date", "Fees", int, 0, 60,
            "No late fee is charged for this many days after an instalment falls due; after that it counts from the end of the grace days. "
            "It never runs while a student is suspended or after they leave."),
+    Policy("fee_late_fee_double_every_days", "Late fee: double the daily rate every ... days (0 = never)", "Fees", int, 0, 365,
+           "E.g. 7 with a Rs. 50 daily late fee: Rs. 50 a day in the first week late, Rs. 100 a day in the second, Rs. 200 in the third, and so on. "
+           "0 keeps one flat daily rate. It applies to every overdue instalment, counting its late days from the due date."),
+    Policy("fee_late_fee_max_per_day", "Late fee: highest daily rate (Rs., 0 = no limit)", "Fees", float, 0, 1_000_000,
+           "The doubling stops at this daily rate. Together with the cap on one instalment's total late fee, it keeps a forgotten fee from growing without limit."),
     Policy("purchase_second_approval_above", "Purchases: a second administrator approves above (Rs., 0 = never)", "Accounts", float, 0, 100_000_000,
            "A purchase above this amount needs approval from an administrator other than the one who asked for it or recorded it."),
     Policy("fee_payment_max_backdate_days", "Payments may be dated back at most (days)", "Fees", int, 1, 365,

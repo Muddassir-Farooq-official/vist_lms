@@ -48,7 +48,9 @@
       const cls = r.missed_while_in ? "tc-row-red" : r.needs_cover ? "tc-row-amber" : "";
       const cover = r.cover ? "<b>" + esc(r.cover.substitute_name || "") + '</b><small class="list-sub">' + money(r.cover.amount) + "</small>" : '<span class="sd-dim">—</span>';
       const canCover = !r.taken_at && (r.needs_cover || r.cover || r.state === "UPCOMING" || r.state === "OPEN");
-      const btn = canCover ? '<button type="button" class="role-btn small-btn" data-cover="' + r.class_session_id + '">' + (r.cover ? "Change cover" : "Find cover") + "</button>" : "";
+      const rec = !r.taken_at && r.state === "MISSED" && window.VistOpenForMarking
+        ? '<button type="button" class="link-btn" data-record="' + r.class_session_id + '" data-offering="' + r.course_offering_id + '">Record attendance</button>' : "";
+      const btn = rec + (canCover ? '<button type="button" class="role-btn small-btn" data-cover="' + r.class_session_id + '">' + (r.cover ? "Change cover" : "Find cover") + "</button>" : "");
       return '<tr class="' + cls + (focus === r.class_session_id ? " tc-focus" : "") + '"><td>' + hm(r.start_time) + "–" + hm(r.end_time) + '<small class="list-sub">' + esc(r.room) + "</small></td>" +
         '<td><span class="crs-code">' + esc(r.course_code) + "</span> " + esc(r.course_title) + '<small class="list-sub">Section ' + esc(r.section) + " · " + esc(r.term_label) + "</small></td>" +
         "<td>" + (r.teacher_name ? esc(r.teacher_name) : '<span class="sd-dim">No teacher</span>') + '<small class="list-sub">' + esc(r.presence_label) + "</small>" +
@@ -105,11 +107,13 @@
     $("tc-covers-table").hidden = r.body.length === 0;
     $("tc-covers-tbody").innerHTML = r.body.map(function (c) {
       const tone = c.status === "Taken" ? "tone-green" : c.status === "Waiting" ? "tone-teal" : "tone-red";
-      const acts = c.active && !c.payroll ? '<button type="button" class="link-btn" data-amount="' + c.id + '" data-value="' + c.amount + '">Change pay</button> ' +
-        '<button type="button" class="link-btn" data-cancel="' + c.id + '">Take back</button>' : "";
+      const record = c.active && c.status === "Not taken" && window.VistOpenForMarking
+        ? '<button type="button" class="role-btn small-btn" data-record="' + c.class_session_id + '" data-offering="' + c.course_offering_id + '">Record attendance</button> ' : "";
+      const acts = record + (c.active && !c.payroll ? '<button type="button" class="link-btn" data-amount="' + c.id + '" data-value="' + c.amount + '">Change pay</button> ' +
+        '<button type="button" class="link-btn" data-cancel="' + c.id + '">Take back</button>' : "");
       return "<tr><td>" + esc(shortDate(c.date)) + "</td><td>" + esc(c.description) + "</td><td>" + esc(c.substitute_name || "") + '</td><td class="num">' + money(c.amount) +
         (c.amount_note ? '<small class="list-sub">' + esc(c.amount_note) + "</small>" : "") + '</td><td><span class="sec-pill ' + tone + '">' + esc(c.status) + "</span>" +
-        (c.active && c.status !== "Taken" ? '<small class="list-sub">paid only once the class is held</small>' : "") + "</td><td>" + (c.payroll ? esc(c.payroll) : '<span class="sd-dim">—</span>') +
+        (c.active && c.status === "Not taken" ? '<small class="list-sub">window closed: record its attendance to pay the cover</small>' : c.active && c.status !== "Taken" ? '<small class="list-sub">paid only once the class is held</small>' : "") + "</td><td>" + (c.payroll ? esc(c.payroll) : '<span class="sd-dim">—</span>') +
         "</td><td>" + acts + "</td></tr>";
     }).join("");
   }
@@ -152,6 +156,12 @@
 
   panel.addEventListener("click", async function (e) {
     const cov = e.target.closest("[data-cover]"), amt = e.target.closest("[data-amount]"), can = e.target.closest("[data-cancel]"), row = e.target.closest("[data-teacher]");
+    const rec = e.target.closest("[data-record]");
+    if (rec) {
+      // a class whose marking window has closed: the office records its attendance (with a note) in "Mark attendance";
+      // once recorded, a cover on it shows "Taken" and is paid
+      return window.VistOpenForMarking(rec.getAttribute("data-offering"), rec.getAttribute("data-record"));
+    }
     if (cov) return openCover(cov.getAttribute("data-cover"));
     if (amt) {
       const v = await VA.ask({ title: "Change cover pay", label: "Cover pay (Rs.)", input: "number", value: amt.getAttribute("data-value"), ok: "Save" });

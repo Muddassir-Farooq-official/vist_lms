@@ -95,3 +95,41 @@ async def service_worker() -> Response:
     # Served from the site root so it can control every page (a worker only reaches pages under its own folder).
     return Response(content=SW_PATH.read_text(encoding="utf-8"), media_type="application/javascript",
                     headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/", "X-Content-Type-Options": "nosniff"})
+
+
+@router.get("/offline")
+async def offline_page() -> Response:
+    """The page the app shows when the phone has no connection, or the portal is not answering (e.g. during an update).
+    The service worker keeps a copy of it; it holds nothing private, only the institute's name and colour."""
+    import html
+
+    colour = html.escape(brand.color("#1d4ed8"))
+    name, short = html.escape(brand.name()), html.escape(brand.short_name())
+    initials = html.escape(brand.initials())
+    body = f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="{colour}"><title>Offline &mdash; {short}</title>
+<style>
+  :root {{ --brand: {colour}; --bg: #f2f4f8; --card: #ffffff; --text: #0f172a; --muted: #475569; }}
+  @media (prefers-color-scheme: dark) {{ :root {{ --bg: #0b1220; --card: #111a2e; --text: #e2e8f0; --muted: #94a3b8; }} }}
+  * {{ box-sizing: border-box; }}
+  body {{ margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; background: var(--bg); color: var(--text);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }}
+  .card {{ width: 100%; max-width: 420px; background: var(--card); border-radius: 20px; padding: 32px 24px; text-align: center;
+          box-shadow: 0 10px 30px rgba(15, 23, 42, .08); }}
+  .chip {{ width: 64px; height: 64px; border-radius: 18px; background: var(--brand); color: #fff; display: grid; place-items: center;
+          font-weight: 800; font-size: 24px; margin: 0 auto 16px; }}
+  h1 {{ font-size: 1.35rem; margin: 0 0 8px; }}
+  p {{ color: var(--muted); margin: 0 0 20px; }}
+  button {{ appearance: none; border: 0; border-radius: 12px; background: var(--brand); color: #fff; font: inherit; font-weight: 700;
+           padding: 12px 22px; min-width: 160px; cursor: pointer; }}
+  small {{ display: block; margin-top: 18px; color: var(--muted); }}
+</style></head>
+<body><main class="card" role="main">
+  <div class="chip" aria-hidden="true">{initials}</div>
+  <h1 id="off-title">You're offline</h1>
+  <p id="off-text">{short} needs an internet connection. Check your mobile data or Wi-Fi; the page will open by itself as soon as you are back online.</p>
+  <button type="button" id="off-retry">Try again</button>
+  <small>{name}</small>
+</main><script src="/static/js/offline.js"></script></body></html>"""
+    return Response(content=body, media_type="text/html", headers={"Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff"})

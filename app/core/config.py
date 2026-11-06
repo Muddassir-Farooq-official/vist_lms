@@ -180,6 +180,8 @@ class Settings(BaseSettings):
     purchase_over_estimate_percent: float = 10.0    # goods costing more than this % over the approved estimate need the price approved before payment
     fee_late_fee_cap: float = 0.0                   # most late fee one instalment can build up (Rs.); 0 = no cap
     fee_late_fee_grace_days: int = 0                # no late fee for this many days after an instalment's due date
+    fee_late_fee_double_every_days: int = 0         # the daily late fee doubles after every this many late days (0 = never, flat rate)
+    fee_late_fee_max_per_day: float = 0.0           # the daily late fee never goes above this (Rs.); 0 = no limit
     purchase_second_approval_above: float = 50000.0  # purchase orders / payments above this need a second administrator (0 = never)
     require_attendance_lock_before_publish: bool = True
     # End Semester only after every course with students has locked attendance and a published result

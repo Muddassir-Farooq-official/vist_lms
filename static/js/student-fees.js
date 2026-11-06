@@ -28,7 +28,9 @@
         '<td class="num">' + esc(SU.money(r.concession)) + "</td>" +
         '<td class="num">' + esc(SU.money(r.paid)) + "</td>" +
         '<td class="num">' + esc(SU.money(r.remaining)) + "</td>" +
-        '<td class="num">' + esc(SU.money(r.late_fee || 0)) + "</td>" +
+        '<td class="num">' + esc(SU.money(r.late_fee || 0)) +
+          (r.late_fee_rate_now ? '<small class="list-sub" style="display:block">' + esc(SU.money(r.late_fee_rate_now)) + " a day now" +
+            (r.late_fee_rate_rises_on ? ", doubles on " + day(r.late_fee_rate_rises_on) : "") + "</small>" : "") + "</td>" +
         "<td>" + SU.pill(r.status) + "</td>" +
         "<td>" + challanCell + "</td>" +
         "</tr>";
