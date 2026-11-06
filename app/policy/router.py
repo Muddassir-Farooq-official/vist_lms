@@ -25,6 +25,11 @@ async def get_policy(current_user: CurrentUser = Depends(require_permission(Perm
     return service.current()
 
 
+@router.get("/sections", summary="The sections the rules are shown in on Settings, in order")
+async def get_sections(current_user: CurrentUser = Depends(require_permission(Permissions.POLICY_MANAGE))) -> list[dict]:
+    return service.sections()
+
+
 @router.put("", summary="Change policy values; takes effect immediately, audited (administrator)")
 async def update_policy(payload: PolicyUpdate, current_user: CurrentUser = Depends(require_permission(Permissions.POLICY_MANAGE)),
                         db=Depends(get_db)) -> list[dict]:

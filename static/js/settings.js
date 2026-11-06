@@ -123,7 +123,10 @@
     const n = pendingCount();
     $("st-savebar").hidden = n === 0;
     document.body.classList.toggle("has-savebar", n > 0);
-    $("st-savebar-text").textContent = n + " unsaved change" + (n === 1 ? "" : "s");
+    const names = (window.SettingsPolicy && window.SettingsPolicy.changedLabels ? window.SettingsPolicy.changedLabels() : [])
+      .concat(Object.keys(profileChanges()).length ? ["institute details"] : []);
+    $("st-savebar-text").innerHTML = "<b>" + n + " change" + (n === 1 ? "" : "s") + "</b> not saved yet" +
+      (names.length ? '<small> \u00b7 ' + VA.escapeHtml(names.slice(0, 3).join(", ") + (names.length > 3 ? " and " + (names.length - 3) + " more" : "")) + "</small>" : "");
   }
   document.addEventListener("settings:changed", dirty);
   window.addEventListener("beforeunload", function (e) { if (pendingCount()) { e.preventDefault(); e.returnValue = ""; } });
@@ -184,6 +187,53 @@
     $("password-success").textContent = "Password updated."; $("password-success").hidden = false;
   });
 
+  // ------------------------------------------------------------------ side menu (a dropdown on phones)
+  // Shows one panel: institute | look | email | account, or "rules" with one rules section. The address keeps it
+  // (#rules/Fees%20%26%20fines), so a refresh or a shared link opens the same place.
+  function navItems() { return Array.prototype.filter.call(document.querySelectorAll("#st-nav .st-nav-item"), function (b) { return !b.hidden && !b.closest("[hidden]"); }); }
+  function go(panel, section, keepSearch) {
+    if (panel !== "rules" && window.SettingsPolicy && !keepSearch) window.SettingsPolicy.clearSearch();
+    document.querySelectorAll(".st-panel").forEach(function (p) { p.hidden = p.getAttribute("data-tab-panel") !== panel; });
+    if (panel === "rules" && window.SettingsPolicy) {
+      if (!keepSearch) window.SettingsPolicy.clearSearch();
+      window.SettingsPolicy.showSection(section);
+      section = window.SettingsPolicy.current();
+    }
+    navItems().forEach(function (b) {
+      const on = b.getAttribute("data-go") === panel && (panel !== "rules" || b.getAttribute("data-section") === section);
+      b.classList.toggle("is-active", on);
+      if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+    });
+    const sel = $("st-nav-select");
+    if (sel) sel.value = panel + (panel === "rules" ? "|" + section : "");
+    const hash = "#" + panel + (panel === "rules" && section ? "/" + encodeURIComponent(section) : "");
+    if (location.hash !== hash && !keepSearch) history.replaceState(null, "", hash);
+  }
+  function buildSelect() {
+    const sel = $("st-nav-select");
+    if (!sel) return;
+    let html = "", group = null;
+    Array.prototype.forEach.call(document.querySelectorAll("#st-nav > .st-nav-head, #st-nav .st-nav-item"), function (el) {
+      if (el.hidden || el.closest("[hidden]")) return;
+      if (el.classList.contains("st-nav-head")) { if (group !== null) html += "</optgroup>"; group = el.textContent; html += '<optgroup label="' + VA.escapeHtml(group) + '">'; return; }
+      const v = el.getAttribute("data-go") + (el.getAttribute("data-go") === "rules" ? "|" + el.getAttribute("data-section") : "");
+      html += '<option value="' + VA.escapeHtml(v) + '">' + VA.escapeHtml(el.querySelector("span") ? el.querySelector("span").textContent : el.textContent) + "</option>";
+    });
+    sel.innerHTML = html + (group !== null ? "</optgroup>" : "");
+    const active = document.querySelector("#st-nav .st-nav-item.is-active");
+    if (active) sel.value = active.getAttribute("data-go") + (active.getAttribute("data-go") === "rules" ? "|" + active.getAttribute("data-section") : "");
+  }
+  $("st-nav").addEventListener("click", function (e) {
+    const b = e.target.closest(".st-nav-item");
+    if (b) go(b.getAttribute("data-go"), b.getAttribute("data-section"));
+  });
+  $("st-nav-select").addEventListener("change", function () {
+    const parts = this.value.split("|");
+    go(parts[0], parts[1]);
+  });
+  document.addEventListener("settings:nav", function () { buildSelect(); });
+  window.SettingsNav = { go: go };
+
   document.addEventListener("vistadmin:ready", async function (event) {
     const me = event.detail.me;
     $("acct-username").textContent = me.username;
@@ -191,14 +241,15 @@
     isAdmin = (me.permissions || []).indexOf("institute.profile.manage") !== -1;
     if (!isAdmin) {
       document.querySelectorAll("[data-admin-only]").forEach(function (el) { el.hidden = true; });
-      const t = document.querySelector('.portal-tab[data-tab="account"]'); if (t) t.click();
     } else {
       const r = await VA.fetchJson(API + "/profile");
       if (r.ok) fill(r.body);
     }
     if (window.SettingsPolicy) await window.SettingsPolicy.load();
-    const want = (location.hash || "").replace("#", "");
-    const tab = want && document.querySelector('.portal-tab[data-tab="' + want + '"]');
-    if (tab && !tab.hidden) tab.click();
+    buildSelect();
+    const want = decodeURIComponent((location.hash || "").replace("#", "")).split("/");
+    const okPanel = ["institute", "look", "email", "account", "rules"].indexOf(want[0]) !== -1 &&
+      (isAdmin || want[0] === "account" || (want[0] === "rules" && window.SettingsPolicy && window.SettingsPolicy.current()));
+    go(okPanel ? want[0] : (isAdmin ? "institute" : "account"), want[1]);
   });
 })();

@@ -4,16 +4,28 @@
 {% block page_subtitle %}<div class="content-subtitle">Your institute's name, logo and details (they appear on every page, document and SMS), its look, the rules the system applies, and your own account.</div>{% endblock %}
 
 {% block content %}
-<div class="portal-tabs" role="tablist" data-auto-tabs>
-  <button class="portal-tab active" data-tab="institute" role="tab" aria-selected="true" data-admin-only><span>Institute</span></button>
-  <button class="portal-tab" data-tab="look" role="tab" aria-selected="false" data-admin-only><span>Look &amp; documents</span></button>
-  <button class="portal-tab" data-tab="rules" role="tab" aria-selected="false" data-admin-only><span>Rules</span></button>
-  <button class="portal-tab" data-tab="email" role="tab" aria-selected="false" data-admin-only><span>Email</span></button>
-  <button class="portal-tab" data-tab="account" role="tab" aria-selected="false"><span>My account</span></button>
+<label class="st-nav-mobile" for="st-nav-select"><span>Section</span>
+  <select id="st-nav-select" class="select-input" aria-label="Settings section"></select>
+</label>
+<div class="st-layout">
+<nav class="st-nav" id="st-nav" aria-label="Settings sections">
+  <p class="st-nav-head" data-admin-only>Institute</p>
+  <button type="button" class="st-nav-item" data-go="institute" data-admin-only>Profile &amp; contact</button>
+  <button type="button" class="st-nav-item" data-go="look" data-admin-only>Look &amp; documents</button>
+  <button type="button" class="st-nav-item" data-go="email" data-admin-only>Email</button>
+  <p class="st-nav-head" data-admin-only id="st-nav-rules-head" hidden>Rules</p>
+  <div id="st-nav-rules" data-admin-only></div>
+  <p class="st-nav-head">You</p>
+  <button type="button" class="st-nav-item" data-go="account">My account</button>
+</nav>
+<div class="st-main">
+<div class="st-search-row" data-admin-only>
+  <label class="st-search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+    <input id="policy-search" type="search" placeholder="Search rules, e.g. late fee" aria-label="Search rules" /></label>
 </div>
 
 <!-- ============================================================ institute -->
-<div class="portal-tab-panel st-grid" data-tab-panel="institute">
+<div class="st-panel st-grid" data-tab-panel="institute">
   <section class="panel">
     <h2>Institute details</h2>
     <p class="panel-hint">Shown on the sign-in page, the menu, every PDF (challans, receipts, certificates, ID cards, result cards, payslips, admit cards) and in SMS.</p>
@@ -51,7 +63,7 @@
 </div>
 
 <!-- ============================================================ look and documents -->
-<div class="portal-tab-panel st-grid" data-tab-panel="look" hidden>
+<div class="st-panel st-grid" data-tab-panel="look" hidden>
   <section class="panel">
     <h2>Main colour</h2>
     <p class="panel-hint">Used for the side menu, buttons and links, and headings on PDFs. Pick a ready-made colour (royal blue, royal red, emerald&hellip;) or your own. Leave empty for the standard royal blue.</p>
@@ -110,19 +122,18 @@
 </div>
 
 <!-- ============================================================ rules -->
-<div class="portal-tab-panel" data-tab-panel="rules" hidden>
-<section class="panel" id="policy-panel" aria-labelledby="policy-h">
-  <div class="panel-header"><div class="panel-header-left"><h2 id="policy-h">Rules the system applies</h2></div>
-    <input id="policy-search" class="text-input" type="search" placeholder="Find a rule&hellip;" aria-label="Find a rule" /></div>
-  <p class="panel-hint">Changes apply to everyone straight away (within a minute on every server) and are kept in the audit log. <span class="status-pill pending">changed</span> marks a rule set differently from the default.</p>
+<div class="st-panel" data-tab-panel="rules" hidden>
+<section id="policy-panel" aria-labelledby="policy-h">
+  <div class="st-section-head"><h2 id="policy-h">Rules</h2><p id="policy-about"></p></div>
   <div id="policy-groups"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
-  <p class="empty-state" id="policy-none" hidden>No rule matches.</p>
+  <p class="empty-state" id="policy-none" hidden>No rule matches your search.</p>
+  <p class="st-foot">Changes apply to everyone straight away and are kept in the activity log.</p>
 </section>
 </div>
 
 <!-- ============================================================ my account -->
 <!-- ============================================================ email -->
-<div class="portal-tab-panel st-grid" data-tab-panel="email" hidden>
+<div class="st-panel st-grid" data-tab-panel="email" hidden>
   <section class="panel">
     <div class="panel-header"><div class="panel-header-left"><h2>Mail server</h2></div><span class="status-pill" id="em-state">Off</span></div>
     <p class="panel-hint">The account the institute sends email from. When email is on, every notification (fees, results, approvals, announcements, tasks&hellip;) also goes to the person&rsquo;s email, like Google Classroom. People can switch it off on their own profile.</p>
@@ -172,7 +183,7 @@
   </section>
 </div>
 
-<div class="portal-tab-panel st-grid" data-tab-panel="account" hidden>
+<div class="st-panel st-grid" data-tab-panel="account" hidden>
   <section class="panel">
     <h2>Account</h2>
     <dl class="detail-list" id="account-details">
@@ -198,6 +209,9 @@
     <p id="password-error" class="dash-alert error" hidden></p>
     <p id="password-success" class="success-text" hidden></p>
   </section>
+</div>
+
+</div>
 </div>
 
 <div class="st-savebar" id="st-savebar" hidden role="region" aria-label="Unsaved changes">

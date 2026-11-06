@@ -56,7 +56,7 @@ POLICY: tuple[Policy, ...] = (
     Policy("admit_card_requires_fees_cleared", "Withhold admit card while fees are overdue (1 = yes, 0 = no)", "Exams", int, 0, 1,
            "With 1, a student with any overdue fee instalment gets an admit card marked WITHHELD until it is paid."),
     Policy("supplementary_max_grade_points", "Supplementary: highest grade points a pass can earn (0 = no cap)", "Exams", float, 0, 4,
-           "Many universities cap a supplementary pass, e.g. 2.0 = at most a C. 0 means the normal grade applies."),
+           "Many universities cap a supplementary pass, e.g. 2.0 means at most a C. With no cap the normal grade applies."),
     Policy("sms_on_attendance_fine", "SMS when an attendance fine is issued (1 = yes, 0 = no)", "SMS", int, 0, 1, "Each SMS costs money."),
     Policy("sms_on_datesheet", "SMS when a datesheet is published (1 = yes, 0 = no)", "SMS", int, 0, 1, "Each SMS costs money."),
     Policy("sms_on_results", "SMS when results are published (1 = yes, 0 = no)", "SMS", int, 0, 1, "One SMS per student per course published."),
@@ -77,11 +77,11 @@ POLICY: tuple[Policy, ...] = (
            "No late fee is charged for this many days after an instalment falls due; after that it counts from the end of the grace days. "
            "It never runs while a student is suspended or after they leave."),
     Policy("fee_late_fee_auto_post", "Late fee: add it to Fines when a late instalment is paid", "Fees", int, 0, 1,
-           "On: the moment a late instalment is paid (at the counter, by challan or online), its late fee is added to the student's Fines, "
-           "so it shows in Fines and is collected. Off: late fees are only shown, and become fines when someone posts them."),
+           "When on, the moment a late instalment is paid (at the counter, by challan or online), its late fee is added to the student's Fines, "
+           "so it shows in Fines and is collected. When off, late fees are only shown, and become fines when someone posts them."),
     Policy("fee_late_fee_double_every_days", "Late fee: double the daily rate every ... days (0 = never)", "Fees", int, 0, 365,
-           "E.g. 7 with a Rs. 50 daily late fee: Rs. 50 a day in the first week late, Rs. 100 a day in the second, Rs. 200 in the third, and so on. "
-           "0 keeps one flat daily rate. It applies to every overdue instalment, counting its late days from the due date."),
+           "E.g. every week with a Rs. 50 daily late fee: Rs. 50 a day in the first week late, Rs. 100 a day in the second, Rs. 200 in the third, and so on. "
+           "It applies to every overdue instalment, counting its late days from the due date."),
     Policy("fee_late_fee_max_per_day", "Late fee: highest daily rate (Rs., 0 = no limit)", "Fees", float, 0, 1_000_000,
            "The doubling stops at this daily rate. Together with the cap on one instalment's total late fee, it keeps a forgotten fee from growing without limit."),
     Policy("purchase_second_approval_above", "Purchases: a second administrator approves above (Rs., 0 = never)", "Accounts", float, 0, 100_000_000,
@@ -89,22 +89,22 @@ POLICY: tuple[Policy, ...] = (
     Policy("fee_payment_max_backdate_days", "Payments may be dated back at most (days)", "Fees", int, 1, 365,
            "Staff cannot record a payment dated earlier than this."),
     Policy("payroll_default_working_days", "Working days in a month (0 = each person's own working days)", "Payroll", int, 0, 31,
-           "A day's pay = basic salary / working days. 0: each person's own working days in the month, from their timing in Staff attendance "
-           "(someone who works 8 days a month earns basic / 8 a day). Or one number for everyone, e.g. 26. Can also be changed per payroll and per person."),
+           "A day's pay = basic salary / working days. Off: each person's own working days in the month, from their timing in Staff attendance "
+           "(someone who works 8 days a month earns basic / 8 a day). On: one number for everyone, e.g. 26. Can also be changed per payroll and per person."),
     Policy("payroll_attendance_deductions", "Deduct absences and late arrivals from pay (1 = yes, 0 = no)", "Payroll", int, 0, 1,
            "Uses Staff attendance. Someone with no attendance recorded in a month is never treated as absent."),
     Policy("payroll_casual_leaves_staff", "Casual leaves per month: non-teaching staff", "Payroll", int, 0, 10,
            "Absences up to this many in a month are not deducted."),
     Policy("payroll_casual_leaves_teacher", "Casual leaves per month: teachers", "Payroll", int, 0, 10,
-           "0 = every absence is deducted."),
+           "Set it to 0 to deduct every absence."),
     Policy("payroll_late_marks_per_day", "Late arrivals / early leavings that equal one day's pay", "Payroll", int, 1, 31,
            "E.g. 4: four late arrivals or early check-outs in a month cut one day's pay (eight cut two)."),
     Policy("payroll_missing_checkout_counts", "A day with no check-out counts as leaving early (1 = yes, 0 = no)", "Payroll", int, 0, 1,
            "Stops people from simply not marking out."),
     Policy("payroll_security_percent", "Security deposit: % of basic held each month", "Payroll", float, 0, 100,
-           "Held from each payslip until the total equals one basic salary. 0 = off. Can be changed per employee."),
+           "Held from each payslip until the total equals one basic salary. Set it to 0 to hold nothing. Can be changed per employee."),
     Policy("payroll_advance_max_salary_multiple", "Salary advance: most one employee may owe (x basic salary)", "Payroll", float, 0.1, 6,
-           "1 = at most one month's basic salary outstanding in advances, including the one being asked for. Every advance needs administrator approval."),
+           "1 means at most one month's basic salary outstanding in advances, including the one being asked for. Every advance needs administrator approval."),
     Policy("todo_reminder_hour", "Remind staff with no to-do list today, from this hour (0 = never)", "Tasks", int, 0, 23,
            "E.g. 15: at 3 pm, staff who have not written today's list get a notification (once a day, not on Sundays). "
            "Their list then shows in the monthly to-do report."),
@@ -128,9 +128,19 @@ def _default(key: str):
 
 
 def current() -> list[dict]:
-    return [{"key": p.key, "label": p.label, "group": p.group, "type": p.kind.__name__, "min": p.minimum, "max": p.maximum,
-             "help": p.help, "value": getattr(settings, p.key), "default": _default(p.key), "overridden": p.key in _applied}
-            for p in POLICY]
+    from app.policy.ui import UI, ui_for
+
+    order = {k: i for i, k in enumerate(UI)}
+    return sorted([{"key": p.key, "label": p.label, "group": p.group, "type": p.kind.__name__, "min": p.minimum, "max": p.maximum,
+             "help": p.help, "value": getattr(settings, p.key), "default": _default(p.key), "overridden": p.key in _applied,
+             "ui": ui_for(p.key, p.group, p.label, p.minimum, p.maximum)}
+            for p in POLICY], key=lambda r: order.get(r["key"], len(order)))           # in the order Settings shows them
+
+
+def sections() -> list[dict]:
+    from app.policy.ui import SECTIONS
+
+    return [{"name": n, "about": a} for n, a in SECTIONS]
 
 
 def _coerce(p: Policy, raw) -> float | int:
