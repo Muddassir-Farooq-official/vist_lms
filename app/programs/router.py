@@ -29,19 +29,24 @@ async def programs_overview(current_user: CurrentUser = Depends(require_permissi
     from sqlalchemy import func, select
 
     from app.academics.models import Course, CourseProgram
-    from app.students.models import Student
+    from app.students.models import Student, StudentStatus
 
     programs = await ProgramService(db).list_programs(active_only=False)
     students: dict = {}
     for pid, status, n in (await db.execute(select(Student.program_id, Student.status, func.count()).where(Student.program_id.is_not(None))
                                             .group_by(Student.program_id, Student.status))).all():
         students.setdefault(pid, {})[status.value if hasattr(status, "value") else str(status)] = int(n)
+    by_sem: dict = {}
+    for pid, sem, n in (await db.execute(select(Student.program_id, Student.current_semester, func.count()).where(
+            Student.program_id.is_not(None), Student.status == StudentStatus.ACTIVE).group_by(Student.program_id, Student.current_semester))).all():
+        by_sem.setdefault(pid, []).append({"semester": sem, "students": int(n)})
     curriculum: dict = {}
     for pid, n, ch, sems in (await db.execute(select(CourseProgram.program_id, func.count(), func.coalesce(func.sum(Course.credit_hours), 0),
                                                      func.count(func.distinct(CourseProgram.semester_number)))
                                               .join(Course, Course.id == CourseProgram.course_id).group_by(CourseProgram.program_id))).all():
         curriculum[pid] = {"courses": int(n), "credit_hours": int(ch), "semesters_planned": int(sems)}
     return [{**ProgramOut.model_validate(p).model_dump(), "students": students.get(p.id, {}),
+             "active_by_semester": sorted(by_sem.get(p.id, []), key=lambda x: (x["semester"] is None, x["semester"] or 0)),
              "curriculum": curriculum.get(p.id, {"courses": 0, "credit_hours": 0, "semesters_planned": 0})} for p in programs]
 
 

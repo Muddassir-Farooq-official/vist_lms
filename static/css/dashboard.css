@@ -3887,3 +3887,8 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tc-row-amber td { background: rgba(194, 65, 12, .16); } }
 :root[data-theme="dark"] .tc-row-amber td { background: rgba(194, 65, 12, .16); }
 .cv-note { width: 100%; display: block; }
+.pg-sems { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
+.pg-sem { display: inline-flex; gap: 6px; align-items: center; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-alt);
+  color: var(--text-primary); font-size: .8rem; text-decoration: none; }
+.pg-sem b { color: var(--bold-blue); }
+.pg-sem:hover { border-color: var(--bold-blue); }

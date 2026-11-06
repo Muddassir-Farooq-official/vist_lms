@@ -17,6 +17,9 @@
       <option value="DROPPED">Left</option>
     </select>
     <select id="program-filter" class="select-input" aria-label="Program"><option value="">All programs</option></select>
+    <select id="semester-filter" class="select-input" aria-label="Semester"><option value="">All semesters</option>
+      {% for n in range(1, 13) %}<option value="{{ n }}">Semester {{ n }}</option>{% endfor %}</select>
+    <input type="text" id="section-filter" class="text-input small-input" maxlength="30" placeholder="Section" aria-label="Section" style="max-width:110px" />
     <div class="sd-tools">
       <button id="open-add-student" class="role-btn" type="button">{{ nav_icon("plus") }}<span>Add student</span></button>
       <details class="sd-menu">
@@ -31,6 +34,7 @@
     </div>
   </div>
 
+  <p class="panel-hint" id="students-count" aria-live="polite"></p>
   <div class="sd-table-wrap" id="students-table-wrap">
     <table class="dash-table sd-table no-stack" id="students-table">
       <thead><tr><th>Student</th><th>Program</th><th>Mobile</th><th>Session</th><th>Status</th><th>Profile</th><th><span class="sr-only">Actions</span></th></tr></thead>

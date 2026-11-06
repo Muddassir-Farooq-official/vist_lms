@@ -12,7 +12,7 @@ from app.audit.service import AuditService
 from app.core.config import settings
 from app.core.exceptions import BusinessRuleViolationError, ResourceNotFoundError, ValidationAppError
 from app.employees.models import Employee
-from app.fees.models import AssignmentStatus, FeeAssignment, FeeLedgerEntry, LedgerEntryType, PayerType
+from app.fees.models import AssignmentStatus, FeeAssignment, FeeLedgerEntry, FeeStructure, LedgerEntryType, PayerType
 from app.fees.payment_gateway import get_payment_gateway
 from app.fees.payment_models import ChallanStatus, PaymentChallan
 from app.fees.repository import ChallanRepository, FeeAssignmentRepository, FeeStructureRepository
@@ -392,6 +392,34 @@ def validate_paid_on(paid_on: date | None) -> date:
     return day
 
 
+async def post_settled_late_fees(session: AsyncSession, assignment: FeeAssignment, actor_id: uuid.UUID | None) -> float:
+    """After a payment: every instalment of this fee that is now paid in full but still has a late fee not yet posted gets
+    that late fee posted as a Fine (Fines section, collectible, on the student's account). Uses the same posting as the
+    "Post late fee" button, so nothing is ever charged twice. Never stops a payment: a problem is only logged.
+    Off when Settings -> Rules -> Fees -> "add it to Fines when a late instalment is paid" is off."""
+    if not int(getattr(settings, "fee_late_fee_auto_post", 1) or 0):
+        return 0.0
+    from app.core.logging import get_logger
+
+    try:
+        async with session.begin_nested():
+            structure = await session.get(FeeStructure, assignment.fee_structure_id)
+            if structure is None or not structure.late_fee_per_day:
+                return 0.0
+            entries = await FeeAssignmentRepository(session).get_ledger(assignment.id)
+            rows = FeeStatusCalculator.installments(entries, float(structure.late_fee_per_day), pause=late_pause(assignment))
+            svc = FeeAssignmentService(session)
+            total = 0.0
+            for r in rows:
+                if r["remaining"] <= 0.005 and r["late_fee"] > float(r.get("late_fee_posted") or 0) + 0.005:
+                    fine = await svc.post_late_fee(r["ledger_entry_id"], actor_id=actor_id)
+                    total += float(fine.amount) if fine is not None else 0.0
+            return round(total, 2)
+    except Exception as exc:  # noqa: BLE001 - the payment itself must always go through
+        get_logger(__name__).warning("late_fee_auto_post_failed", assignment=str(assignment.id), error=str(exc)[:300])
+        return 0.0
+
+
 class FeeAssignmentService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -465,6 +493,7 @@ class FeeAssignmentService:
         )
         await self.repo.add_ledger_entry(entry)
         await sync_challans(self.session, assignment)        # challans of installments this payment settled stop being payable
+        self.late_fee_posted = await post_settled_late_fees(self.session, assignment, actor_id)
 
         await self.audit.log(
             actor_user_id=actor_id,
@@ -907,6 +936,7 @@ class ChallanService:
         challan.paid_at = paid_at
         challan.paid_entry_id = credit.id
         await sync_challans(self.session, assignment)
+        challan.late_fee_posted = await post_settled_late_fees(self.session, assignment, actor_id)    # not stored: told to the person
 
         await self.audit.log(
             actor_user_id=actor_id,

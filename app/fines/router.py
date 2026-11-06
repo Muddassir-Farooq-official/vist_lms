@@ -203,6 +203,26 @@ async def list_fines(
     return [await _to_detail(db, f) for f in fines]
 
 
+@router.get("/late-fees-building", summary="Late fees growing on fee instalments that are still unpaid (not fines yet)")
+async def late_fees_building(
+    current_user: CurrentUser = Depends(require_permission(Permissions.PAYMENT_RECORD)),       # administration and accounts
+    db=Depends(get_db),
+) -> dict:
+    from app.fees.late_fees import building
+
+    return await building(db)
+
+
+@router.post("/late-fees-building/post-all", summary="Post every late fee built up so far as fines now")
+async def post_all_late_fees(
+    current_user: CurrentUser = Depends(require_permission(Permissions.FINE_ISSUE)),
+    db=Depends(get_db),
+) -> dict:
+    from app.fees.late_fees import post_all
+
+    return await post_all(db, current_user.id)
+
+
 @router.get("/me", response_model=list[FineDetail], summary="My own fines")
 async def my_fines(
     current_user: CurrentUser = Depends(require_permission(Permissions.FINE_VIEW)),

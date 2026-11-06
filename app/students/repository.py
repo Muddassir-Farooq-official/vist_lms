@@ -45,6 +45,8 @@ class StudentRepository:
         query: str | None = None,
         program_id: uuid.UUID | None = None,
         status: StudentStatus | None = None,
+        semester: int | None = None,
+        section: str | None = None,
     ) -> tuple[list[Student], int]:
         stmt = select(Student)
         count_stmt = select(func.count()).select_from(Student)
@@ -69,6 +71,15 @@ class StudentRepository:
         if status:
             stmt = stmt.where(Student.status == status)
             count_stmt = count_stmt.where(Student.status == status)
+
+        if semester:
+            stmt = stmt.where(Student.current_semester == semester)
+            count_stmt = count_stmt.where(Student.current_semester == semester)
+
+        if section:
+            cond = func.upper(func.trim(Student.section_label)) == section.strip().upper()
+            stmt = stmt.where(cond)
+            count_stmt = count_stmt.where(cond)
 
         total = (await self.session.execute(count_stmt)).scalar_one()
         stmt = stmt.order_by(Student.last_name, Student.first_name).offset(page.offset).limit(page.page_size)

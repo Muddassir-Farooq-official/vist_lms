@@ -9,7 +9,7 @@
   let items = [];
 
   // Rules that are a choice rather than a number: shown as a list (the stored value is the position).
-  const CHOICES = { amount_display: ["Full amount (Rs. 4,045,000)", "K / M (Rs. 4.05M)", "Lakh / crore (Rs. 40.45 lakh)"], missed_class_alerts: ["Off", "On"] };
+  const CHOICES = { amount_display: ["Full amount (Rs. 4,045,000)", "K / M (Rs. 4.05M)", "Lakh / crore (Rs. 40.45 lakh)"], missed_class_alerts: ["Off", "On"], fee_late_fee_auto_post: ["Off", "On"] };
 
   function fmt(v) { return Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 }); }
 

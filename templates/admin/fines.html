@@ -7,6 +7,13 @@
 
 {% block content %}
 <div class="crs-chips tp-summary" id="fines-summary"></div>
+<section class="panel" id="lf-panel" hidden>
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("fees") }}</div><h2>Late fees building up</h2></div>
+    <button type="button" class="role-btn small-btn" id="lf-post" hidden>Post them as fines now</button></div>
+  <p class="panel-hint" id="lf-summary"></p>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Who</th><th>Fee</th><th class="num">Late fee so far</th><th class="num">Growing by</th><th>Oldest due</th></tr></thead>
+    <tbody id="lf-tbody"></tbody></table></div>
+</section>
 <section class="panel sd-panel">
   <div class="sd-toolbar">
     <label class="sd-search">{{ nav_icon("search") }}<input type="search" id="fines-q" placeholder="Search name, roll no. or reason" aria-label="Search fines" /></label>

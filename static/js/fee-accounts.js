@@ -166,6 +166,10 @@
   function openChallanPaid(c, f, row) {
     challan = c;
     $("cp-for").textContent = current.payer.name + " · " + f.fee_name + " · " + (f.is_previous_dues ? "previous dues" : "installment " + row.installment_number) + " · " + money(c.amount) + " · challan " + c.consumer_number;
+    const unposted = Math.max(0, (row.late_fee || 0) - (row.late_fee_posted || 0));
+    $("cp-late").hidden = unposted <= 0.005;
+    $("cp-late").textContent = unposted > 0.005 ? "This instalment is late: a late fee of " + money(unposted) +
+      " will be added to Fines when you record it. Collect it as well (Fines \u2192 Record payment)." : "";
     $("cp-ref").value = ""; $("cp-date").value = today; $("cp-error").hidden = true; $("cp-modal").showModal();
   }
   $("cp-cancel").addEventListener("click", function () { $("cp-modal").close(); });
@@ -177,7 +181,10 @@
     const r = await VA.fetchJson("/api/v1/fees/challans/" + challan.id + "/mark-paid", json("POST", { method: method, reference: $("cp-ref").value.trim() || null, paid_on: $("cp-date").value || null }));
     $("cp-ok").disabled = false;
     if (!r.ok) return fail("cp-error", msg(r.body, "Could not record it."));
-    $("cp-modal").close(); VA.toast("Recorded. A receipt has been issued."); refresh();
+    $("cp-modal").close();
+    VA.toast("Recorded. A receipt has been issued." + (r.body && r.body.late_fee_posted ? " Its late fee of " + money(r.body.late_fee_posted) +
+      " was added to Fines; collect it there." : ""));
+    refresh();
   });
 
   // ------------------------------------------------------------------ Scholarships & discounts

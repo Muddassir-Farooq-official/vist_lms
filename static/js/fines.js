@@ -292,4 +292,40 @@
     canWaive = !!(me && Array.isArray(me.permissions) && me.permissions.indexOf("fine.waive") !== -1);
     loadFines();
   });
+
+  // ---- late fees still building up on unpaid instalments (they become fines when the instalment is paid, or when posted)
+  let canPostLate = false;
+  async function loadBuilding() {
+    const panel = document.getElementById("lf-panel");
+    if (!panel) return;
+    const r = await VA.fetchJson("/api/v1/fines/late-fees-building", { quiet: true });
+    if (!r.ok || !r.body.total) { panel.hidden = true; return; }
+    const d = r.body;
+    panel.hidden = false;
+    document.getElementById("lf-summary").textContent = "Rs. " + Number(d.total).toLocaleString() + " in late fees on " + d.instalments + " unpaid instalment" +
+      (d.instalments === 1 ? "" : "s") + " of " + d.people + " " + (d.people === 1 ? "person" : "people") +
+      ". Each one is added to Fines automatically when its instalment is paid (the student also sees it on their fee page). Post them now to collect them before then.";
+    document.getElementById("lf-tbody").innerHTML = d.list.map(function (p) {
+      return "<tr><td><b>" + VA.escapeHtml(p.name) + '</b><small class="list-sub" style="display:block">' + VA.escapeHtml(p.code || "") + " · " + (p.payer_type === "STUDENT" ? "student" : "employee") +
+        "</small></td><td>" + VA.escapeHtml(p.fees.join(", ")) + '</td><td class="num">Rs. ' + Number(p.amount).toLocaleString() + '</td><td class="num">' +
+        (p.rate_now ? "Rs. " + Number(p.rate_now).toLocaleString() + "/day" : "—") + "</td><td>" + VA.escapeHtml(p.oldest_due || "") + "</td></tr>";
+    }).join("");
+    document.getElementById("lf-post").hidden = !canPostLate;
+  }
+  const lfPost = document.getElementById("lf-post");
+  if (lfPost) lfPost.addEventListener("click", async function () {
+    if (!(await VA.confirm("Post every late fee built up so far as a fine now? Each student gets a fine for the days late until today; the days after today are added when the instalment is paid. Nobody is charged twice.", "Post as fines"))) return;
+    lfPost.disabled = true;
+    const r = await VA.fetchJson("/api/v1/fines/late-fees-building/post-all", { method: "POST" });
+    lfPost.disabled = false;
+    if (!r.ok) return VA.toast((r.body && r.body.error && r.body.error.message) || "Could not post them.", "error");
+    VA.toast(r.body.fines + " fine" + (r.body.fines === 1 ? "" : "s") + " posted, Rs. " + Number(r.body.total).toLocaleString() + " in all.");
+    loadBuilding();
+    if (typeof loadFines === "function") loadFines();
+  });
+  document.addEventListener("vistadmin:ready", function (event) {
+    const me = event.detail && event.detail.me;
+    canPostLate = !!(me && Array.isArray(me.permissions) && me.permissions.indexOf("fine.issue") !== -1);
+    loadBuilding();
+  });
 })();

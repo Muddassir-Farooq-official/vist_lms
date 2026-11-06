@@ -740,6 +740,70 @@ class ReportCenter:
                    col("dropped", "Dropped", "number", True), col("graduated", "Graduated", "number", True), col("total", "All records", "number", True)]
         return table(columns, [groups[k] for k in sorted(groups)])
 
+    async def teacher_workload(self, params: dict, user) -> dict:
+        """Credit hours each teacher carries: every section they teach counts (two sections of a 3-credit course = 6), with
+        students, weekly classes and the programs those students are in. One term, or all terms together."""
+        from app.academics.models import CourseProgram, Enrollment, EnrollmentStatus, TimetableSlot
+        from app.programs.models import Program
+        from app.students.models import Student
+
+        offerings = await self._offerings(params, user)
+        if not offerings:
+            return table([], [], notes=["No classes match."])
+        ids = [o.id for o, _c, _t in offerings]
+        students = dict((await self.session.execute(select(Enrollment.course_offering_id, func.count()).where(
+            Enrollment.course_offering_id.in_(ids), Enrollment.status.in_((EnrollmentStatus.ENROLLED, EnrollmentStatus.COMPLETED)))
+            .group_by(Enrollment.course_offering_id))).all())
+        weekly = dict((await self.session.execute(select(TimetableSlot.course_offering_id, func.count()).where(TimetableSlot.course_offering_id.in_(ids))
+                                                  .group_by(TimetableSlot.course_offering_id))).all())
+        progs: dict = {}
+        for oid, pid, code in (await self.session.execute(select(Enrollment.course_offering_id, Program.id, Program.code).join(Student, Student.id == Enrollment.student_id)
+                                                          .join(Program, Program.id == Student.program_id).where(Enrollment.course_offering_id.in_(ids))
+                                                          .distinct())).all():
+            progs.setdefault(oid, {})[pid] = code
+        curriculum: dict = {}
+        for cid, pid, code in (await self.session.execute(select(CourseProgram.course_id, Program.id, Program.code).join(Program, Program.id == CourseProgram.program_id)
+                                                          .where(CourseProgram.course_id.in_({c.id for _o, c, _t in offerings})))).all():
+            curriculum.setdefault(cid, {})[pid] = code
+        want = _uuid(params.get("program_id"))
+        detail = params.get("view") == "section"
+        rows, per = [], {}
+        for o, c, t in offerings:
+            pmap = progs.get(o.id) or curriculum.get(c.id) or {}
+            if want and want not in pmap:
+                continue
+            name = f"{t.first_name} {t.last_name}".strip() if t else "No teacher assigned"
+            n, wk, ch = students.get(o.id, 0), weekly.get(o.id, 0), int(c.credit_hours or 0)
+            if detail:
+                rows.append({"teacher": name, "term": o.term_label, "course": f"{c.code} — {c.title}", "section": o.section_label, "credit_hours": ch,
+                             "students": n, "weekly": wk, "programs": ", ".join(sorted(pmap.values()))})
+                continue
+            k = t.id if t else None
+            r = per.setdefault(k, {"teacher": name, "code": t.employee_code if t else "", "department": (t.department or "") if t else "",
+                                   "terms": set(), "courses": set(), "sections": 0, "credit_hours": 0, "students": 0, "weekly": 0, "programs": set()})
+            r["terms"].add(o.term_label)
+            r["courses"].add(c.code)
+            r["sections"] += 1
+            r["credit_hours"] += ch
+            r["students"] += n
+            r["weekly"] += wk
+            r["programs"].update(pmap.values())
+        notes = ["Each section counts on its own: two sections of a 3-credit course are 6 credit hours.",
+                 "Weekly classes are the class's timetable slots per week."]
+        if detail:
+            rows.sort(key=lambda r: (r["teacher"], r["term"], r["course"], r["section"]))
+            columns = [col("teacher", "Teacher"), col("term", "Term"), col("course", "Course"), col("section", "Section"),
+                       col("credit_hours", "Credit hours", "number", True), col("students", "Students", "number", True),
+                       col("weekly", "Classes a week", "number", True), col("programs", "Programs")]
+            return table(columns, rows, notes=notes)
+        for r in per.values():
+            rows.append({**r, "terms": ", ".join(sorted(r["terms"])), "courses": len(r["courses"]), "programs": ", ".join(sorted(r["programs"]))})
+        rows.sort(key=lambda r: (-r["credit_hours"], r["teacher"]))
+        columns = [col("teacher", "Teacher"), col("code", "Code"), col("department", "Department"), col("terms", "Terms"),
+                   col("courses", "Courses", "number"), col("sections", "Sections", "number", True), col("credit_hours", "Credit hours", "number", True),
+                   col("students", "Students", "number", True), col("weekly", "Classes a week", "number", True), col("programs", "Programs")]
+        return table(columns, rows, notes=notes)
+
     async def _offerings(self, params: dict, user):
         from app.academics.models import Course, CourseOffering
         from app.employees.models import Employee
@@ -1107,6 +1171,11 @@ REPORTS: dict[str, Report] = {r.key: r for r in [
            (P.PAYROLL_VIEW,), [F_YEAR], lambda c, p, u: c.annual_deductions(p, u)),
     Report("academics.class_strength", "Academics", "Class strength", "Students by program, semester and section: active (male / female), suspended, dropped, graduated.",
            ACADEMIC + (P.STUDENT_CREATE,), [F_PROGRAM], lambda c, p, u: c.class_strength(p, u)),
+    Report("academics.teacher_workload", "Academics", "Teacher workload (credit hours)",
+           "Credit hours, sections, students and weekly classes each teacher carries, for one term or all terms, for one program or all.",
+           ACADEMIC + (P.EMPLOYEE_VIEW,), [F_TERM, F_PROGRAM, {"key": "view", "label": "Show", "type": "select", "options": [
+               {"value": "", "label": "One line per teacher"}, {"value": "section", "label": "Every section"}]}],
+           lambda c, p, u: c.teacher_workload(p, u)),
     Report("academics.attendance_shortage", "Academics", "Attendance shortage", "Students below the minimum attendance in a course, and how many classes they still need.",
            ACADEMIC, [F_TERM, F_PROGRAM, {"key": "below", "label": "Below (%)", "type": "number"}], lambda c, p, u: c.attendance_shortage(p, u), needs=("term",)),
     Report("academics.result_analysis", "Academics", "Result analysis", "Per course and section: pass %, average, grade spread and result-sheet status.",

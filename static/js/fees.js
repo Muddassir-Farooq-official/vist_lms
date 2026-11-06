@@ -716,7 +716,7 @@
       "<dt>Paid</dt><dd>" + money(a.total_paid) + "</dd>" +
       "<dt>Still owed</dt><dd>" + money(a.total_remaining) + "</dd>" +
       "<dt>Overdue Principal</dt><dd>" + money(a.overdue_principal) + "</dd>" +
-      "<dt>Accrued Fine</dt><dd>" + money(a.accrued_fine) + "</dd>" +
+      "<dt>Late fee (not yet in Fines)</dt><dd>" + money(a.accrued_fine) + (a.accrued_fine > 0.005 ? ' <small class="list-sub">added to Fines when that instalment is paid</small>' : "") + "</dd>" +
       "<dt>Total Due Now</dt><dd><strong>" + money(a.total_due_now) + "</strong></dd>" +
       "<dt>Standing</dt><dd>" + standingPillHtml(a.is_in_good_standing) + "</dd>";
     assignmentStatusSelect.value = a.status;
@@ -758,7 +758,9 @@
       return;
     }
 
-    assignmentModalSuccess.textContent = "Payment recorded. The receipt is in the ledger below.";
+    assignmentModalSuccess.textContent = "Payment recorded. The receipt is in the ledger below." +
+      (result.body && result.body.late_fee_posted ? " This paid a late instalment, so its late fee of " + money(result.body.late_fee_posted) +
+        " has been added to Fines; collect it there (Fines \u2192 Record payment)." : "");
     assignmentModalSuccess.hidden = false;
     paymentAmount.value = "";
     paymentDescription.value = "";

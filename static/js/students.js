@@ -41,14 +41,20 @@
     const q = document.getElementById("search-input").value.trim();
     const st = document.getElementById("status-filter").value;
     const pr = document.getElementById("program-filter").value;
+    const sm = document.getElementById("semester-filter").value;
+    const sc = document.getElementById("section-filter").value.trim();
     if (q) params.set("q", q);
     if (st) params.set("status", st);
     if (pr) params.set("program_id", pr);
+    if (sm) params.set("semester", sm);
+    if (sc) params.set("section", sc);
     link.href = "/api/v1/students/export" + (params.toString() ? "?" + params.toString() : "");
   }
   document.getElementById("search-input").addEventListener("input", syncExportLink);
   document.getElementById("status-filter").addEventListener("change", syncExportLink);
   document.getElementById("program-filter").addEventListener("change", syncExportLink);
+  document.getElementById("semester-filter").addEventListener("change", syncExportLink);
+  document.getElementById("section-filter").addEventListener("input", syncExportLink);
 
   const openAdvanceSemesterBtn = document.getElementById("open-advance-semester");
   const advanceSemesterModal = document.getElementById("advance-semester-modal");
@@ -86,6 +92,9 @@
     if (searchInput.value.trim()) params.set("q", searchInput.value.trim());
     if (statusFilter.value) params.set("status", statusFilter.value);
     if (programFilter.value) params.set("program_id", programFilter.value);
+    const semFilter = document.getElementById("semester-filter"), secFilter = document.getElementById("section-filter");
+    if (semFilter.value) params.set("semester", semFilter.value);
+    if (secFilter.value.trim()) params.set("section", secFilter.value.trim());
 
     const result = await VA.fetchJson("/api/v1/students?" + params.toString());
 
@@ -110,6 +119,12 @@
       if (window.ProfileCompleteness) window.ProfileCompleteness.fill(tbody, "students");
     }
 
+    const what = [programFilter.value ? programFilter.options[programFilter.selectedIndex].text : "",
+      document.getElementById("semester-filter").value ? "semester " + document.getElementById("semester-filter").value : "",
+      document.getElementById("section-filter").value.trim() ? "section " + document.getElementById("section-filter").value.trim().toUpperCase() : "",
+      statusFilter.value ? statusFilter.options[statusFilter.selectedIndex].text.toLowerCase() : ""].filter(Boolean).join(", ");
+    document.getElementById("students-count").innerHTML = "<b>" + Number(data.total).toLocaleString() + "</b> student" + (data.total === 1 ? "" : "s") +
+      (what ? " \u2014 " + VA.escapeHtml(what) : " in all") + (searchInput.value.trim() ? " matching \u201c" + VA.escapeHtml(searchInput.value.trim()) + "\u201d" : "") + ".";
     const from = data.total ? (currentPage - 1) * data.page_size + 1 : 0;
     pageInfo.textContent = from + "–" + Math.min(data.total, currentPage * data.page_size) + " of " + data.total + " students";
     prevBtn.disabled = currentPage <= 1;
@@ -692,6 +707,12 @@
     currentPage = 1;
     loadStudents();
   });
+  document.getElementById("semester-filter").addEventListener("change", function () { currentPage = 1; loadStudents(); });
+  let secTimer = null;
+  document.getElementById("section-filter").addEventListener("input", function () {
+    clearTimeout(secTimer);
+    secTimer = setTimeout(function () { currentPage = 1; loadStudents(); }, 350);
+  });
   // The "More" menu closes after a choice or a click elsewhere.
   const moreMenu = document.querySelector(".sd-menu");
   moreMenu.addEventListener("click", function (e) { if (e.target.closest("[role=menuitem]")) moreMenu.open = false; });
@@ -700,8 +721,11 @@
   document.addEventListener("vistadmin:ready", async function () {
     await ensureProgramsLoaded();
     // Opened from Programs ("Students" on a program card): filter to that program.
-    const wanted = new URLSearchParams(location.search).get("program");
-    if (wanted && programsCache.some(function (p) { return p.id === wanted; })) { programFilter.value = wanted; syncExportLink(); }
+    const qs = new URLSearchParams(location.search), wanted = qs.get("program");
+    if (wanted && programsCache.some(function (p) { return p.id === wanted; })) programFilter.value = wanted;
+    if (qs.get("semester")) document.getElementById("semester-filter").value = qs.get("semester");
+    if (qs.get("status")) statusFilter.value = qs.get("status");
+    syncExportLink();
     loadStudents();
   });
 })();

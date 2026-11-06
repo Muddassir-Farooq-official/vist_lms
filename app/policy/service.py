@@ -76,6 +76,9 @@ POLICY: tuple[Policy, ...] = (
     Policy("fee_late_fee_grace_days", "Late fee: grace days after the due date", "Fees", int, 0, 60,
            "No late fee is charged for this many days after an instalment falls due; after that it counts from the end of the grace days. "
            "It never runs while a student is suspended or after they leave."),
+    Policy("fee_late_fee_auto_post", "Late fee: add it to Fines when a late instalment is paid", "Fees", int, 0, 1,
+           "On: the moment a late instalment is paid (at the counter, by challan or online), its late fee is added to the student's Fines, "
+           "so it shows in Fines and is collected. Off: late fees are only shown, and become fines when someone posts them."),
     Policy("fee_late_fee_double_every_days", "Late fee: double the daily rate every ... days (0 = never)", "Fees", int, 0, 365,
            "E.g. 7 with a Rs. 50 daily late fee: Rs. 50 a day in the first week late, Rs. 100 a day in the second, Rs. 200 in the third, and so on. "
            "0 keeps one flat daily rate. It applies to every overdue instalment, counting its late days from the due date."),

@@ -4,7 +4,7 @@ from app.core.clock import institute_today
 
 import uuid
 
-from fastapi import APIRouter, Depends, UploadFile
+from fastapi import APIRouter, Depends, Query, UploadFile
 from fastapi.responses import Response
 from sqlalchemy import select
 
@@ -99,6 +99,8 @@ async def list_students(
     q: str | None = None,
     program_id: uuid.UUID | None = None,
     status: StudentStatus | None = None,
+    semester: int | None = Query(default=None, ge=1, le=20),
+    section: str | None = Query(default=None, max_length=30),
     page: PageParams = Depends(page_params),
     current_user: CurrentUser = Depends(require_permission(Permissions.STUDENT_VIEW)),
     db=Depends(get_db),
@@ -108,7 +110,7 @@ async def list_students(
     endpoint over other students' data."""
     _assert_directory_access(current_user, allow_exam_department=True)
 
-    result = await StudentService(db).search_students(page=page, query=q, program_id=program_id, status=status)
+    result = await StudentService(db).search_students(page=page, query=q, program_id=program_id, status=status, semester=semester, section=section)
     ids = {s.program_id for s in result.items if s.program_id}
     programs = {p.id: p for p in (await db.execute(select(Program).where(Program.id.in_(ids)))).scalars()} if ids else {}
 
@@ -177,6 +179,8 @@ async def export_students_csv(
     q: str | None = None,
     program_id: uuid.UUID | None = None,
     status: StudentStatus | None = None,
+    semester: int | None = Query(default=None, ge=1, le=20),
+    section: str | None = Query(default=None, max_length=30),
     current_user: CurrentUser = Depends(require_permission(Permissions.STUDENT_VIEW)),
     db=Depends(get_db),
 ):
@@ -201,7 +205,7 @@ async def export_students_csv(
     page_no = 1
     while page_no <= 100:  # hard ceiling: 20,000 rows
         rows, _total = await repo.search(
-            page=PageParams(page=page_no, page_size=200), query=q, program_id=program_id, status=status
+            page=PageParams(page=page_no, page_size=200), query=q, program_id=program_id, status=status, semester=semester, section=section
         )
         if not rows:
             break

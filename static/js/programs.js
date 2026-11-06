@@ -49,6 +49,10 @@
       '<p class="pg-meta">' + esc(p.duration_years) + " year" + (p.duration_years === 1 ? "" : "s") + " · " + esc(p.total_semesters) + " semesters · up to " + esc(p.max_credit_hours_per_semester) + " credit hours a semester</p>" +
       '<div class="pg-stats"><div><b>' + n(active) + "</b><span>active students</span></div><div><b>" + n(c.courses) + "</b><span>courses</span></div><div><b>" + n(c.credit_hours) +
       "</b><span>credit hours</span></div></div>" +
+      ((p.active_by_semester || []).length ? '<div class="pg-sems" aria-label="Active students by semester">' + p.active_by_semester.map(function (x) {
+        return '<a class="pg-sem" href="/dashboard/admin/students?program=' + esc(p.id) + (x.semester ? "&semester=" + x.semester : "") + '&status=ACTIVE" title="Open this list">' +
+          (x.semester ? "Sem " + x.semester : "No semester") + " <b>" + n(x.students) + "</b></a>";
+      }).join("") + "</div>" : "") +
       '<div class="pg-plan"><span>Curriculum planned for ' + planned + " of " + esc(p.total_semesters) + ' semesters</span><span class="crs-meter"><i style="width:' + pct + '%"></i></span></div>' +
       (others ? '<p class="pg-meta">' + [st.GRADUATED ? n(st.GRADUATED) + " graduated" : "", st.SUSPENDED ? n(st.SUSPENDED) + " suspended" : "", st.DROPPED ? n(st.DROPPED) + " left" : ""].filter(Boolean).join(" · ") + "</p>" : "") +
       '<footer><a class="sd-view" href="/dashboard/admin/courses?program=' + esc(p.id) + '#curriculum">Curriculum</a><a class="sd-view" href="/dashboard/admin/students?program=' + esc(p.id) + '">Students</a>' +

@@ -292,7 +292,8 @@ async def record_payment(
     service = FeeAssignmentService(db)
     await service.record_payment(assignment_id, payload, actor_id=current_user.id)
     assignment = await service.get(assignment_id)
-    return await _to_assignment_out(db, assignment)
+    out = await _to_assignment_out(db, assignment)
+    return out.model_copy(update={"late_fee_posted": getattr(service, "late_fee_posted", 0.0) or None})
 
 
 @router.post(

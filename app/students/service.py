@@ -56,9 +56,10 @@ class StudentService:
         return student
 
     async def search_students(
-        self, *, page: PageParams, query: str | None, program_id: uuid.UUID | None, status: StudentStatus | None
+        self, *, page: PageParams, query: str | None, program_id: uuid.UUID | None, status: StudentStatus | None,
+        semester: int | None = None, section: str | None = None,
     ) -> RawPage[Student]:
-        items, total = await self.repo.search(page=page, query=query, program_id=program_id, status=status)
+        items, total = await self.repo.search(page=page, query=query, program_id=program_id, status=status, semester=semester, section=section)
         return RawPage[Student](items=items, total=total, page=page.page, page_size=page.page_size)
 
     async def change_status(

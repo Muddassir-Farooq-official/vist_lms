@@ -72,7 +72,7 @@ async def mark_challan_paid(
         challan_id, actor_id=current_user.id, note=payload.note,
         method=payload.method.value, reference=payload.reference, paid_on=payload.paid_on,
     )
-    return ChallanOut.model_validate(challan)
+    return ChallanOut.model_validate(challan).model_copy(update={"late_fee_posted": getattr(challan, "late_fee_posted", 0.0) or None})
 
 
 @router.post(

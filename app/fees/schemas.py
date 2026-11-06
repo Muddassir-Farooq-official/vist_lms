@@ -111,6 +111,8 @@ class FeeStructureOut(BaseModel):
 class FeeAssignmentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    late_fee_posted: float | None = None          # set by "record a payment" when it settled a late instalment (its late fee went to Fines)
+
     id: uuid.UUID
     fee_structure_id: uuid.UUID
     fee_structure_name: str
@@ -204,6 +206,8 @@ class FeeDashboardResponse(BaseModel):
 
 class ChallanOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
+    late_fee_posted: float | None = None          # set when paying this settled a late instalment and its late fee went to Fines
 
     id: uuid.UUID
     fee_assignment_id: uuid.UUID
