@@ -30,7 +30,7 @@ async def test_student_asks_admin_approves_and_it_goes_live(app_client, admin_us
     old_phone = me["values"]["contact_no"]
 
     # Office-only details are refused; bad values are refused; nothing changes until approved.
-    r = await app_client.post(f"{P}/me", json={"values": {"first_name": "X"}})
+    r = await app_client.post(f"{P}/me", json={"values": {"roll_number": "X"}})                 # the roll number never changes
     assert r.status_code == 422 and "office" in r.json()["error"]["message"]
     assert (await app_client.post(f"{P}/me", json={"values": {"contact_no": "abc"}})).status_code == 422
     r = await app_client.post(f"{P}/me", json={"values": {"contact_no": "0301-7654321", "email": "me@example.pk"}, "note": "New SIM"})
@@ -97,3 +97,38 @@ async def test_only_the_administration_decides(app_client, admin_user, db_sessio
     await _login_admin(app_client)
     assert (await app_client.get("/dashboard/admin/profile-changes")).status_code == 200
     assert (await app_client.get(f"{P}/me")).status_code == 422                     # the administrator has no student / staff profile
+
+
+async def test_a_student_asks_to_correct_name_cnic_and_guardian_and_the_office_approves(app_client, admin_user, db_session):
+    sid, username = await _create_and_activate_student(app_client, cnic="93001-0000009-1")
+    other, _ = await _create_and_activate_student(app_client, cnic="93001-0000010-1")
+    await _login(app_client, username, STUDENT_PASSWORD)
+    me = (await app_client.get(f"{P}/me")).json()
+    keys = {f["key"] for f in me["fields"]}
+    assert {"first_name", "last_name", "date_of_birth", "gender", "cnic", "nationality", "guardian_name", "guardian_cnic"} <= keys
+    assert "roll_number" not in keys
+    assert (await app_client.post(f"{P}/me", json={"values": {"cnic": "123"}})).status_code == 422
+    assert (await app_client.post(f"{P}/me", json={"values": {"date_of_birth": "2999-01-01"}})).status_code == 422
+    r = await app_client.post(f"{P}/me", json={"values": {"first_name": "Ayesha", "cnic": "9300100000111", "date_of_birth": "2004-05-06",
+                                                          "guardian_name": "Imran Khan", "guardian_cnic": "93001-0000012-1"},
+                                               "note": "My name and CNIC were typed wrong"})
+    assert r.status_code == 200, r.text
+    req_id = r.json()["id"]
+    assert {c["field"] for c in r.json()["changes"]} == {"first_name", "cnic", "date_of_birth", "guardian_name", "guardian_cnic"}
+    assert (await app_client.get("/api/v1/students/me")).json()["first_name"] != "Ayesha"         # nothing changes before approval
+
+    await _login_admin(app_client)
+    roll_before = (await app_client.get(f"/api/v1/students/{sid}")).json()["roll_number"]
+    ok = await app_client.post(f"{P}/{req_id}/approve", json={})
+    assert ok.status_code == 200, ok.text
+    st = (await app_client.get(f"/api/v1/students/{sid}")).json()
+    assert st["first_name"] == "Ayesha" and st["cnic"] == "93001-0000011-1" and st["date_of_birth"] == "2004-05-06"
+    assert st["roll_number"] == roll_before                                                      # the roll number is untouched
+
+    # a CNIC that belongs to another student is stopped at approval
+    await _login(app_client, username, STUDENT_PASSWORD)
+    other_cnic = "93001-0000010-1"
+    r2 = (await app_client.post(f"{P}/me", json={"values": {"cnic": other_cnic}})).json()
+    await _login_admin(app_client)
+    bad = await app_client.post(f"{P}/{r2['id']}/approve", json={})
+    assert bad.status_code == 422 and "Another student" in bad.text

@@ -35,9 +35,10 @@
         input = '<select class="select-input" data-key="' + esc(f.key) + '">' + (f.required ? "" : '<option value="">Not set</option>') +
           f.choices.map(function (c) { return "<option" + (c === val ? " selected" : "") + ">" + esc(c) + "</option>"; }).join("") + "</select>";
       } else {
-        const type = f.kind === "email" ? "email" : f.kind === "phone" ? "tel" : "text";
+        const type = f.kind === "email" ? "email" : f.kind === "phone" ? "tel" : f.kind === "date" ? "date" : "text";
         input = '<input class="text-input" data-key="' + esc(f.key) + '" type="' + type + '" maxlength="' + f.max_len + '" value="' + esc(val || "") + '"' +
-          (f.kind === "phone" ? ' inputmode="tel" placeholder="0300-1234567"' : f.kind === "iban" ? ' placeholder="PK36SCBL0000001123456702"' : "") + " />";
+          (f.kind === "phone" ? ' inputmode="tel" placeholder="0300-1234567"' : f.kind === "iban" ? ' placeholder="PK36SCBL0000001123456702"' :
+            f.kind === "cnic" ? ' inputmode="numeric" placeholder="35202-1234567-1"' : "") + " />";
       }
       return head + '<label class="' + (f.key === "address_line" ? "span-2" : "") + '">' + esc(f.label) + (f.required ? " *" : "") + input +
         (f.key in waiting ? '<small class="pc-wait">Waiting for approval</small>' : "") + "</label>";

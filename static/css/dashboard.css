@@ -3892,3 +3892,6 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
   color: var(--text-primary); font-size: .8rem; text-decoration: none; }
 .pg-sem b { color: var(--bold-blue); }
 .pg-sem:hover { border-color: var(--bold-blue); }
+.crs-sem li { position: relative; }
+.crs-li-actions { display: inline-flex; gap: 10px; margin-left: auto; padding-left: 10px; font-size: .78rem; }
+.crs-li-actions .danger-text { color: var(--bold-red); }

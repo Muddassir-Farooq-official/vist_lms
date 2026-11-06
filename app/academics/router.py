@@ -79,6 +79,7 @@ from app.academics.schemas import (
     TeacherPerformanceEntry,
     TeacherProgressEntry,
     TimetableSlotCreatedOut,
+    CurriculumMoveRequest,
     TimetableSlotChangeRequest,
     TimetableSlotCreateRequest,
     TimetableSlotOut,
@@ -367,8 +368,38 @@ async def update_course(
         kwargs["description"] = payload.description
     if payload.is_active is not None:
         kwargs["is_active"] = payload.is_active
-    course = await CourseService(db).update(course_id, **kwargs)
+    service = CourseService(db)
+    if payload.code:
+        await service.change_code(course_id, code=payload.code, actor_id=current_user.id)
+    course = await service.update(course_id, **kwargs)
     return CourseOut.model_validate(course)
+
+
+@router.delete("/courses/{course_id}", status_code=204, summary="Delete a course created by mistake (only if it was never offered in any term)")
+async def delete_course(
+    course_id: uuid.UUID,
+    current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_MANAGE)),
+    db=Depends(get_db),
+) -> None:
+    await CourseService(db).delete_course(course_id, actor_id=current_user.id)
+
+
+@router.patch("/courses/{course_id}/programs/{program_id}", response_model=CourseProgramOut,
+              summary="Move a course to another semester of a program's curriculum (classes already run are not touched)")
+async def move_course_in_program(
+    course_id: uuid.UUID,
+    program_id: uuid.UUID,
+    payload: CurriculumMoveRequest,
+    current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_MANAGE)),
+    db=Depends(get_db),
+) -> CourseProgramOut:
+    link = await CourseService(db).move_in_program(course_id, program_id, semester_number=payload.semester_number, actor_id=current_user.id)
+    course = await db.get(Course, course_id)
+    program = await db.get(Program, program_id)
+    return CourseProgramOut(
+        course_id=course_id, program_id=program_id, semester_number=link.semester_number,
+        course_code=course.code, course_title=course.title, credit_hours=course.credit_hours, program_name=program.name,
+    )
 
 
 @router.post(
@@ -470,9 +501,26 @@ async def unlink_course_from_program(
 # ---------------------------------------------------------------------------
 # Course offerings (term instances + teacher assignment)
 # ---------------------------------------------------------------------------
-@router.delete("/offerings/{offering_id}", status_code=204, summary="Delete an offering created by mistake (only while nobody has enrolled)")
-async def delete_offering(offering_id: uuid.UUID, current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_MANAGE)), db=Depends(get_db)) -> None:
-    await CourseOfferingService(db).delete_offering(offering_id, actor_id=current_user.id)
+@router.delete("/offerings/{offering_id}", status_code=204,
+               summary="Delete an offering created by mistake. With students enrolled, pass unenroll=true to take them out first "
+                       "(never when attendance, marks, results, submissions, a datesheet paper or a course fee exist)")
+async def delete_offering(offering_id: uuid.UUID, unenroll: bool = False,
+                          current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_MANAGE)), db=Depends(get_db)) -> None:
+    await CourseOfferingService(db).delete_offering(offering_id, actor_id=current_user.id, unenroll=unenroll)
+
+
+@router.get("/offerings/{offering_id}/delete-check", summary="Can this offering be deleted, and what would happen (nothing is changed)")
+async def offering_delete_check(offering_id: uuid.UUID, current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_MANAGE)),
+                                db=Depends(get_db)) -> dict:
+    from sqlalchemy import func as _f
+
+    from app.academics.models import Enrollment as _E
+
+    svc = CourseOfferingService(db)
+    await svc.get(offering_id)
+    enrolled = (await db.execute(select(_f.count()).select_from(_E).where(_E.course_offering_id == offering_id))).scalar_one()
+    blockers = await svc.deletion_blockers(offering_id)
+    return {"can_delete": not blockers, "enrolled": enrolled, "blockers": blockers}
 
 
 @router.post("/offerings", response_model=CourseOfferingOut, status_code=201, summary="Create a course offering for a term")

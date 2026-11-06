@@ -120,8 +120,64 @@ class CourseService:
         link = await self.program_link_repo.get(course_id, program_id)
         if link is None:
             raise ResourceNotFoundError("This course is not linked to that program.")
+        before = {"program_id": str(program_id), "semester_number": link.semester_number}
         await self.program_link_repo.delete(link)
-        await self.audit.log(actor_user_id=actor_id, action="course.unlinked_from_program", entity_type="course", entity_id=course_id)
+        await self.audit.log(actor_user_id=actor_id, action="course.unlinked_from_program", entity_type="course", entity_id=course_id, before=before)
+
+    async def move_in_program(self, course_id: uuid.UUID, program_id: uuid.UUID, *, semester_number: int, actor_id: uuid.UUID) -> CourseProgram:
+        """Move a course to another semester of a program's curriculum. Classes already run (offerings, enrolments,
+        results) are not touched -- this only changes the plan for the future."""
+        link = await self.program_link_repo.get(course_id, program_id)
+        if link is None:
+            raise ResourceNotFoundError("This course is not linked to that program.")
+        program = await self.session.get(Program, program_id)
+        if semester_number < 1 or semester_number > program.total_semesters:
+            raise BusinessRuleViolationError(f"This program has semesters 1 to {program.total_semesters}.")
+        if link.semester_number == semester_number:
+            raise BusinessRuleViolationError("It is already in that semester.")
+        before = link.semester_number
+        link.semester_number = semester_number
+        await self.session.flush()
+        await self.audit.log(actor_user_id=actor_id, action="course.moved_in_program", entity_type="course", entity_id=course_id,
+                             before={"program_id": str(program_id), "semester_number": before}, after={"semester_number": semester_number})
+        return link
+
+    async def offering_count(self, course_id: uuid.UUID) -> int:
+        return (await self.session.execute(select(func.count()).select_from(CourseOffering).where(CourseOffering.course_id == course_id))).scalar_one()
+
+    async def change_code(self, course_id: uuid.UUID, *, code: str, actor_id: uuid.UUID) -> Course:
+        """Fix a mistyped course code -- only while the course has never been offered (after that, transcripts,
+        results and challans carry the code, so it stays)."""
+        course = await self.get(course_id)
+        code = (code or "").strip().upper()
+        if not code or code == course.code:
+            return course
+        if await self.offering_count(course_id):
+            raise BusinessRuleViolationError("This course has already been offered, so its code is part of results and transcripts and cannot change.")
+        if await self.repo.get_by_code(code):
+            raise DuplicateResourceError(f"A course with code '{code}' already exists.")
+        before = course.code
+        course.code = code
+        await self.session.flush()
+        await self.audit.log(actor_user_id=actor_id, action="course.code_changed", entity_type="course", entity_id=course.id,
+                             before={"code": before}, after={"code": code})
+        return course
+
+    async def delete_course(self, course_id: uuid.UUID, *, actor_id: uuid.UUID) -> None:
+        """Delete a course created by mistake: only if it has never been offered in any term. It is also taken out of
+        every program's curriculum. A course that has been taught is kept; make it inactive instead."""
+        from sqlalchemy import delete
+
+        course = await self.get(course_id)
+        if await self.offering_count(course_id):
+            raise BusinessRuleViolationError("This course has been offered, so it is part of students' records. Make it inactive instead of deleting it.")
+        programs = (await self.session.execute(select(CourseProgram.program_id).where(CourseProgram.course_id == course_id))).scalars().all()
+        await self.session.execute(delete(CourseProgram).where(CourseProgram.course_id == course_id))
+        await self.session.delete(course)
+        await self.session.flush()
+        await self.audit.log(actor_user_id=actor_id, action="course.deleted", entity_type="course", entity_id=course_id,
+                             before={"code": course.code, "title": course.title, "credit_hours": course.credit_hours,
+                                     "programs": [str(p) for p in programs]})
 
 
 class CourseOfferingService:
@@ -276,27 +332,80 @@ class CourseOfferingService:
         )
         return {"term_label": term_label, "section_label": section_label, "created": created, "skipped": skipped}
 
-    async def delete_offering(self, offering_id: uuid.UUID, *, actor_id: uuid.UUID) -> None:
-        """Remove an offering created by mistake. Only while it is empty: no student has ever enrolled,
-        no attendance was taken and no exam paper refers to it. Anything with history stays (close it instead)."""
-        from app.academics.models import Enrollment as _E
+    async def deletion_blockers(self, offering_id: uuid.UUID) -> list[str]:
+        """What stops this offering from being deleted: anything that is part of a student's academic or fee record."""
+        from sqlalchemy import func as _f
+
+        from app.academics.models import Enrollment as _E, EnrollmentResult, StudentMark
+        from app.assignments.models import Assignment, AssignmentSubmission
         from app.attendance.models import AttendanceRecord
         from app.exams.models import ExamPaper
+        from app.fees.models import AssignmentStatus, FeeAssignment
+        from app.supplementary.models import SupplementaryAttempt
+
+        enr = select(_E.id).where(_E.course_offering_id == offering_id)
+
+        async def n(stmt) -> int:
+            return int((await self.session.execute(stmt)).scalar_one() or 0)
+
+        out = []
+        if (k := await n(select(_f.count()).select_from(AttendanceRecord).join(ClassSession, ClassSession.id == AttendanceRecord.class_session_id)
+                             .where(ClassSession.course_offering_id == offering_id))):
+            out.append(f"attendance was taken ({k} marks)")
+        if (k := await n(select(_f.count()).select_from(StudentMark).where(StudentMark.enrollment_id.in_(enr)))):
+            out.append(f"{k} assessment marks were entered")
+        if (k := await n(select(_f.count()).select_from(EnrollmentResult).where(EnrollmentResult.enrollment_id.in_(enr)))):
+            out.append(f"{k} results exist")
+        if (k := await n(select(_f.count()).select_from(SupplementaryAttempt).where(SupplementaryAttempt.enrollment_id.in_(enr)))):
+            out.append(f"{k} supplementary attempts exist")
+        if (k := await n(select(_f.count()).select_from(AssignmentSubmission).join(Assignment, Assignment.id == AssignmentSubmission.assignment_id)
+                             .where(Assignment.course_offering_id == offering_id))):
+            out.append(f"students handed in {k} assignments")
+        if (k := await n(select(_f.count()).select_from(ExamPaper).where(ExamPaper.course_offering_id == offering_id))):
+            out.append("an exam paper is on the datesheet (remove it from the datesheet first)")
+        if (k := await n(select(_f.count()).select_from(FeeAssignment).where(FeeAssignment.enrollment_id.in_(enr),
+                                                                           FeeAssignment.status == AssignmentStatus.ACTIVE))):
+            out.append(f"{k} course fee{'s are' if k != 1 else ' is'} charged for it (cancel them under Fees first)")
+        return out
+
+    async def delete_offering(self, offering_id: uuid.UUID, *, actor_id: uuid.UUID, unenroll: bool = False) -> dict:
+        """Remove an offering created by mistake (or cancelled before it really started). Never when anything of a
+        student's record hangs on it: attendance, marks, results, assignment submissions, a datesheet paper, a course fee.
+        With students enrolled, `unenroll` must be given: they are taken out of it first (each is told), then it is deleted.
+        Everything is kept in the activity log (who was enrolled)."""
+        from app.academics.models import Enrollment as _E
+        from app.notifications.models import NotificationCategory
+        from app.notifications.service import create_notification
+        from app.students.models import Student
 
         offering = await self.repo.get_by_id(offering_id)
         if offering is None:
             raise ResourceNotFoundError("Course offering not found.")
-        if (await self.session.execute(select(_E.id).where(_E.course_offering_id == offering_id).limit(1))).first():
-            raise BusinessRuleViolationError("Students have enrolled in this offering, so it cannot be deleted. Close it to enrollment instead.")
-        if (await self.session.execute(select(AttendanceRecord.id).join(ClassSession, ClassSession.id == AttendanceRecord.class_session_id)
-                                       .where(ClassSession.course_offering_id == offering_id).limit(1))).first():
-            raise BusinessRuleViolationError("Attendance was taken for this offering, so it cannot be deleted.")
-        if (await self.session.execute(select(ExamPaper.id).where(ExamPaper.course_offering_id == offering_id).limit(1))).first():
-            raise BusinessRuleViolationError("An exam paper is scheduled for this offering. Remove it from the datesheet first.")
+        blockers = await self.deletion_blockers(offering_id)
+        if blockers:
+            raise BusinessRuleViolationError("This offering cannot be deleted because " + "; ".join(blockers)
+                                             + ". That is part of students' records. Close it to enrolment instead.")
+        enrolled = (await self.session.execute(select(_E, Student).join(Student, Student.id == _E.student_id)
+                                               .where(_E.course_offering_id == offering_id))).all()
+        if enrolled and not unenroll:
+            raise BusinessRuleViolationError(f"{len(enrolled)} student{'s are' if len(enrolled) != 1 else ' is'} enrolled. "
+                                             "Choose \"unenroll them and delete\" to take them out first.")
+        course = await self.course_repo.get_by_id(offering.course_id)
+        for e, st in enrolled:
+            if st.user_id:
+                await create_notification(self.session, user_id=st.user_id, category=NotificationCategory.GENERAL,
+                                          title="Removed from a course",
+                                          message=f"{course.code if course else 'A course'} ({offering.term_label}, section {offering.section_label}) was "
+                                                  "cancelled by the administration, so you are no longer enrolled in it.")
+            await self.session.delete(e)
+        await self.session.flush()
         await self.session.delete(offering)
         await self.session.flush()
         await self.audit.log(actor_user_id=actor_id, action="course_offering.deleted", entity_type="course_offering", entity_id=offering_id,
-                             before={"term_label": offering.term_label, "section": offering.section_label, "course_id": str(offering.course_id)})
+                             before={"term_label": offering.term_label, "section": offering.section_label, "course_id": str(offering.course_id),
+                                     "course_code": course.code if course else None,
+                                     "unenrolled": [{"student_id": str(st.id), "roll_number": st.roll_number} for _e, st in enrolled]})
+        return {"unenrolled": len(enrolled)}
 
     async def update(
         self, offering_id: uuid.UUID, *, assigned_teacher_id: uuid.UUID | None = ..., is_open_for_enrollment: bool | None = None,

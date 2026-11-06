@@ -1,9 +1,10 @@
 """Students and employees ask to change their own contact details and photo; an administrator approves or rejects.
 
 Editable by the person (everything else stays office-only): phone, email, address, city, district, province, emergency
-contact, marital status, blood group, religion; for students the primary guardian's phone; for staff the bank details
-used for salary; plus the photo. Name, CNIC, date of birth and gender stay with the office (identity correction). A photo must pass the automatic face check (face_check.py) before it
-can even be sent for approval. Approving applies every change in one go and is kept in the activity log with before / after.
+contact, marital status, blood group, religion; for students also their name, date of birth, gender, nationality, CNIC
+and their guardian's name, relation, CNIC and phone (all checked by the office before they apply -- a CNIC must be free);
+for staff the bank details used for salary; plus the photo. The roll number never changes. A photo must pass the
+automatic face check (face_check.py) before it can even be sent for approval. Approving applies every change in one go and is kept in the activity log with before / after.
 """
 from __future__ import annotations
 
@@ -31,7 +32,7 @@ EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]+\.[A-Za-z]{2,}$")
 class Field:
     key: str
     label: str
-    kind: str          # phone | email | text | choice | iban
+    kind: str          # phone | email | text | choice | iban | date | cnic
     max_len: int
     required: bool = False
     choices: tuple = ()
@@ -46,8 +47,18 @@ _CONTACT = [
     Field("district", "District", "text", 100, group="Contact"), Field("province", "Province", "text", 100, group="Contact"),
     Field("emergency_contact_name", "Emergency contact: name", "text", 150), Field("emergency_contact_no", "Emergency contact: phone", "phone", 20),
 ]
-STUDENT_FIELDS = _CONTACT + [
-    Field("guardian_contact_no", "Guardian's phone", "phone", 20),
+_ID = "Identity (the office checks these against your CNIC / B-form)"
+STUDENT_FIELDS = [
+    Field("first_name", "First name", "text", 100, True, group=_ID), Field("last_name", "Last name", "text", 100, True, group=_ID),
+    Field("date_of_birth", "Date of birth", "date", 10, True, group=_ID),
+    Field("gender", "Gender", "choice", 10, True, ("Male", "Female", "Other"), _ID),
+    Field("cnic", "CNIC / B-form number", "cnic", 15, True, group=_ID),
+    Field("nationality", "Nationality", "text", 50, True, group=_ID),
+] + _CONTACT + [
+    Field("guardian_name", "Guardian's name", "text", 150, True, group="Guardian"),
+    Field("guardian_relation", "Guardian is my", "text", 50, True, group="Guardian"),
+    Field("guardian_cnic", "Guardian's CNIC", "cnic", 15, True, group="Guardian"),
+    Field("guardian_contact_no", "Guardian's phone", "phone", 20, group="Guardian"),
     Field("marital_status", "Marital status", "choice", 20, True, MARITAL, "Personal"),
     Field("blood_group", "Blood group", "choice", 5, False, BLOOD, "Personal"),
     Field("religion", "Religion", "text", 50, True, group="Personal"),
@@ -81,6 +92,21 @@ def _clean(f: Field, value: Any) -> str | None:
         if match is None:
             raise ValidationAppError(f"{f.label}: choose one of {', '.join(f.choices)}.")
         return match
+    if f.kind == "date":
+        from datetime import date as _date
+
+        try:
+            d = _date.fromisoformat(v)
+        except ValueError:
+            raise ValidationAppError(f"{f.label}: use the date picker (day, month, year).") from None
+        if not _date(1930, 1, 1) <= d <= _date.today():
+            raise ValidationAppError(f"{f.label} is not a real date of birth.")
+        return d.isoformat()
+    if f.kind == "cnic":
+        digits = re.sub(r"\D", "", v)
+        if len(digits) != 13:
+            raise ValidationAppError(f"{f.label}: 13 digits, written like 35202-1234567-1.")
+        return f"{digits[:5]}-{digits[5:12]}-{digits[12]}"
     if f.kind == "iban":
         v = "".join(v.split()).upper().replace("-", "")
         if v.startswith("PK"):
@@ -89,6 +115,11 @@ def _clean(f: Field, value: Any) -> str | None:
         elif not re.fullmatch(r"\d{6,20}", v):
             raise ValidationAppError("Enter the IBAN (PK...) or the account number (digits only).")
     return v
+
+
+def _fmt_cnic(v: str | None) -> str | None:
+    d = re.sub(r"\D", "", v or "")
+    return f"{d[:5]}-{d[5:12]}-{d[12]}" if len(d) == 13 else v
 
 
 class Subject:
@@ -126,12 +157,31 @@ class Subject:
                 "district": addr.district if addr else None, "province": addr.province if addr else None,
                 "emergency_contact_name": emer.name if emer else None, "emergency_contact_no": emer.contact_no if emer else None,
                 "guardian_contact_no": guard.contact_no if guard else None,
-                "marital_status": r.marital_status, "blood_group": r.blood_group, "religion": r.religion}
+                "guardian_name": guard.name if guard else None, "guardian_relation": guard.relation if guard else None,
+                "guardian_cnic": _fmt_cnic(guard.cnic) if guard else None,
+                "marital_status": r.marital_status, "blood_group": r.blood_group, "religion": r.religion,
+                "first_name": r.first_name, "last_name": r.last_name, "date_of_birth": r.date_of_birth.isoformat() if r.date_of_birth else None,
+                "gender": r.gender, "cnic": _fmt_cnic(r.cnic), "nationality": r.nationality}
 
     async def apply(self, key: str, value: str | None) -> None:
         r = self.row
-        if self.kind == "EMPLOYEE" or key in ("contact_no", "email", "marital_status", "blood_group", "religion"):
+        if self.kind == "EMPLOYEE" or key in ("contact_no", "email", "marital_status", "blood_group", "religion", "first_name", "last_name", "gender", "nationality"):
             setattr(r, key, value)
+            return
+        if key == "date_of_birth":
+            from datetime import date as _date
+
+            r.date_of_birth = _date.fromisoformat(value) if value else r.date_of_birth
+            return
+        if key == "cnic":
+            from app.students.models import Student
+
+            digits = re.sub(r"\D", "", value or "")
+            taken = (await self.session.execute(select(Student.id).where(
+                func.regexp_replace(Student.cnic, "[^0-9]", "", "g") == digits, Student.id != r.id))).first()
+            if taken:
+                raise BusinessRuleViolationError(f"Another student already has the CNIC {value}. Check it before approving.")
+            r.cnic = value                                                  # always 12345-1234567-1, as the database requires
             return
         from app.students.models import StudentAddress, StudentEmergencyContact
 
@@ -149,10 +199,20 @@ class Subject:
                 emer.name = value
             else:
                 emer.contact_no = value or ""
-        elif key == "guardian_contact_no":
+        elif key in ("guardian_contact_no", "guardian_name", "guardian_relation", "guardian_cnic"):
             if guard is None:
                 raise BusinessRuleViolationError("This student has no guardian on record; the office must add one first.")
-            guard.contact_no = value
+            if key == "guardian_cnic":
+                from sqlalchemy import delete
+
+                from app.parents.models import ParentStudentLink
+
+                if re.sub(r"\D", "", value or "") != re.sub(r"\D", "", guard.cnic or ""):
+                    # a different guardian: the old one's parent-portal access to this student ends (the office gives the new one a login)
+                    await self.session.execute(delete(ParentStudentLink).where(ParentStudentLink.student_id == r.id))
+                guard.cnic = value
+            else:
+                setattr(guard, {"guardian_contact_no": "contact_no", "guardian_name": "name", "guardian_relation": "relation"}[key], value)
 
 
 async def subject_for_user(session: AsyncSession, user_id: uuid.UUID) -> Subject:

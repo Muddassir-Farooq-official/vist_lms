@@ -4,9 +4,12 @@
     <div class="panel-header-left"><h2 id="pc-h">Update my details</h2></div>
     <span class="status-pill pending" id="pc-badge" hidden>Waiting for approval</span>
   </div>
-  <p class="panel-hint">Change your contact details, address, marital status, blood group{% if portal != "student" %} or the bank account your salary goes to{% endif %} here.
+  {% if portal == "student" %}<p class="panel-hint">Correct any of your details here: name, date of birth, CNIC / B-form, guardian, contact details, address and more.
+    The office checks every change against your documents before it appears on your record (a CNIC must not belong to another student).
+    Only your roll number and program cannot be changed here.</p>
+  {% else %}<p class="panel-hint">Change your contact details, address, marital status, blood group or the bank account your salary goes to here.
     The office checks every change before it appears on your record.
-    Your name, CNIC, date of birth{% if portal == "student" %}, roll number and program{% endif %} can only be corrected by the office.</p>
+    Your name, CNIC and date of birth can only be corrected by the office.</p>{% endif %}
 
   <div class="pc-pending" id="pc-pending" hidden>
     <h3 class="dash-sub-h">Sent for approval</h3>

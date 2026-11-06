@@ -175,6 +175,8 @@
     <h2>Edit Course</h2>
     <p id="ec-code-hint" class="panel-hint"></p>
     <form id="edit-course-form" class="form-grid">
+      <div class="form-field"><label for="ec-code">Code</label><input type="text" id="ec-code" class="text-input" maxlength="20" />
+        <small class="list-sub">Can be fixed only while the course has never been offered.</small></div>
       <div class="form-field"><label for="ec-title">Title</label><input type="text" id="ec-title" class="text-input" required maxlength="200" /></div>
       <div class="form-field"><label for="ec-credit-hours">Credit Hours</label><input type="number" id="ec-credit-hours" class="text-input" min="1" max="10" required /></div>
       <div class="form-field two-span"><label for="ec-description">Description (optional)</label><input type="text" id="ec-description" class="text-input" maxlength="1000" /></div>
@@ -185,7 +187,26 @@
       <div class="form-actions two-span"><button type="submit" class="role-btn" id="edit-course-submit">Save Changes</button></div>
     </form>
     <p id="edit-course-error" class="dash-alert error" hidden></p>
+    <div class="form-actions"><button type="button" class="danger-btn" id="delete-course-btn">Delete this course&hellip;</button></div>
+    <p class="panel-hint">Delete works only for a course that was never offered in any term; it is also taken out of every curriculum. A course that was taught stays &mdash; set it to Inactive instead.</p>
     <button id="close-edit-course-modal" class="back-link modal-close-btn" type="button">Close</button>
+  </div>
+</dialog>
+
+<dialog id="edit-offering-modal" class="modal">
+  <div class="modal-body">
+    <h2 id="eo-title">Edit offering</h2>
+    <p class="panel-hint">Changes this section only. Students, attendance, marks and results already recorded stay as they are.</p>
+    <form id="edit-offering-form" class="form-grid">
+      <div class="form-field"><label for="eo-section">Section / Shift</label><input type="text" id="eo-section" class="text-input" maxlength="30" required /></div>
+      <div class="form-field"><label for="eo-capacity">Seats (empty = unlimited)</label><input type="number" id="eo-capacity" class="text-input" min="1" max="2000" /></div>
+      <div class="form-field"><label for="eo-start">Term start</label><input type="date" id="eo-start" class="text-input" /></div>
+      <div class="form-field"><label for="eo-end">Term end</label><input type="date" id="eo-end" class="text-input" /></div>
+      <div class="form-field two-span"><label><input type="checkbox" id="eo-open" /> Open for student self-enrollment</label></div>
+      <div class="form-actions two-span"><button type="submit" class="role-btn" id="eo-submit">Save changes</button></div>
+    </form>
+    <p id="eo-error" class="dash-alert error" hidden></p>
+    <button id="close-edit-offering" class="back-link modal-close-btn" type="button">Close</button>
   </div>
 </dialog>
 

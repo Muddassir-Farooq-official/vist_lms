@@ -16,6 +16,7 @@ class CourseCreateRequest(BaseModel):
 
 
 class CourseUpdateRequest(BaseModel):
+    code: str | None = Field(default=None, min_length=2, max_length=20)        # only while the course has never been offered
     title: str | None = Field(default=None, min_length=1, max_length=200)
     credit_hours: int | None = Field(default=None, gt=0, le=10)
     description: str | None = Field(default=None, max_length=1000)
@@ -56,6 +57,10 @@ class CourseOfferingCreateRequest(BaseModel):
     term_end_date: date | None = None
     section_label: str = Field(default="A", min_length=1, max_length=30)
     capacity: int | None = Field(default=None, ge=1, le=2000)
+
+
+class CurriculumMoveRequest(BaseModel):
+    semester_number: int = Field(ge=1, le=20)
 
 
 class CourseOfferingUpdateRequest(BaseModel):

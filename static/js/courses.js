@@ -158,6 +158,37 @@
   });
 
   // -------------------------------------------------------------------
+  // Edit an offering: section, dates, seats, open for enrolment (PATCH /offerings/{id})
+  // -------------------------------------------------------------------
+  let editingOffering = null;
+  function openEditOffering(o) {
+    editingOffering = o;
+    $("eo-title").textContent = "Edit " + o.course_code + " \u2014 " + (o.term_label || "") + " section " + (o.section_label || "A");
+    $("eo-section").value = o.section_label || "";
+    $("eo-capacity").value = o.capacity == null ? "" : o.capacity;
+    $("eo-start").value = o.term_start_date || "";
+    $("eo-end").value = o.term_end_date || "";
+    $("eo-open").checked = !!o.is_open_for_enrollment;
+    $("eo-error").hidden = true;
+    $("edit-offering-modal").showModal();
+  }
+  $("close-edit-offering").addEventListener("click", function () { $("edit-offering-modal").close(); });
+  $("edit-offering-form").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    if (!editingOffering) return;
+    const cap = $("eo-capacity").value.trim();
+    const body = { section_label: $("eo-section").value.trim(), capacity: cap === "" ? null : parseInt(cap, 10),
+      term_start_date: $("eo-start").value || null, term_end_date: $("eo-end").value || null, is_open_for_enrollment: $("eo-open").checked };
+    $("eo-submit").disabled = true;
+    const r = await VA.fetchJson("/api/v1/academics/offerings/" + editingOffering.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    $("eo-submit").disabled = false;
+    if (!r.ok) { $("eo-error").textContent = extractErrorMessage(r.body, "Could not save."); $("eo-error").hidden = false; return; }
+    $("edit-offering-modal").close();
+    VA.toast("Offering updated.");
+    loadOfferings();
+  });
+
+  // -------------------------------------------------------------------
   // Edit Course
   // -------------------------------------------------------------------
   const editCourseModal = document.getElementById("edit-course-modal");
@@ -170,7 +201,8 @@
   function openEditCourseModal(course) {
     activeEditCourseId = course.id;
     editCourseError.hidden = true;
-    ecCodeHint.textContent = "Code: " + course.code + " (not editable)";
+    ecCodeHint.textContent = "";
+    document.getElementById("ec-code").value = course.code;
     document.getElementById("ec-title").value = course.title;
     document.getElementById("ec-credit-hours").value = course.credit_hours;
     document.getElementById("ec-description").value = course.description || "";
@@ -180,6 +212,17 @@
 
   document.getElementById("close-edit-course-modal").addEventListener("click", function () {
     editCourseModal.close();
+  });
+  document.getElementById("delete-course-btn").addEventListener("click", async function () {
+    if (!activeEditCourseId) return;
+    const c = coursesCache.find(function (x) { return x.id === activeEditCourseId; }) || {};
+    if (!(await VA.confirm("Delete " + (c.code || "this course") + "? It is taken out of every program's curriculum. This works only if it was never offered.", "Delete"))) return;
+    const r = await VA.fetchJson("/api/v1/academics/courses/" + activeEditCourseId, { method: "DELETE" });
+    if (!r.ok) { editCourseError.textContent = extractErrorMessage(r.body, "Could not delete it."); editCourseError.hidden = false; return; }
+    editCourseModal.close();
+    VA.toast("Course deleted.");
+    loadCourses();
+    if (selectedProgramId) loadCurriculum(selectedProgramId);
   });
 
   editCourseForm.addEventListener("submit", async function (event) {
@@ -192,6 +235,7 @@
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        code: document.getElementById("ec-code").value.trim().toUpperCase() || null,
         title: document.getElementById("ec-title").value.trim(),
         credit_hours: parseInt(document.getElementById("ec-credit-hours").value, 10),
         description: document.getElementById("ec-description").value.trim() || null,
@@ -269,10 +313,36 @@
     box.innerHTML = keys.map(function (k) {
       const list = sems[k], ch = list.reduce(function (n, l) { return n + (l.credit_hours || 0); }, 0);
       return '<section class="crs-sem"><header><strong>Semester ' + k + "</strong><small>" + list.length + " course" + (list.length === 1 ? "" : "s") + " · " + ch + " credit hours</small></header><ul>" +
-        list.map(function (l) { return '<li><span class="crs-code">' + esc(l.course_code) + "</span><span>" + esc(l.course_title) + '</span><b class="crs-ch">' + esc(l.credit_hours) + "</b></li>"; }).join("") +
+        list.map(function (l) {
+          return '<li><span class="crs-code">' + esc(l.course_code) + "</span><span>" + esc(l.course_title) + '</span><b class="crs-ch">' + esc(l.credit_hours) + "</b>" +
+            '<span class="crs-li-actions"><button type="button" class="link-btn" data-move="' + esc(l.course_id) + '" data-sem="' + l.semester_number + '" data-code="' + esc(l.course_code) + '">Move</button>' +
+            '<button type="button" class="link-btn danger-text" data-unlink="' + esc(l.course_id) + '" data-code="' + esc(l.course_code) + '">Remove</button></span></li>';
+        }).join("") +
         "</ul></section>";
     }).join("");
   }
+
+  // Move a course to another semester, or take it out of this program's curriculum. Classes already run are not touched.
+  $("curriculum-groups").addEventListener("click", async function (e) {
+    const mv = e.target.closest("[data-move]"), un = e.target.closest("[data-unlink]");
+    if (mv) {
+      const v = await VA.ask({ title: "Move " + mv.getAttribute("data-code") + " to another semester", label: "Semester", input: "number",
+        value: mv.getAttribute("data-sem"), ok: "Move", intro: "Only the plan changes: classes already run, enrolments and results stay as they are." });
+      if (v == null) return;
+      const r = await VA.fetchJson("/api/v1/academics/courses/" + mv.getAttribute("data-move") + "/programs/" + selectedProgramId, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ semester_number: parseInt(v, 10) }) });
+      if (!r.ok) return VA.showError(extractErrorMessage(r.body, "Could not move it."));
+      VA.toast(mv.getAttribute("data-code") + " is now in semester " + v + ".");
+      return loadCurriculum(selectedProgramId);
+    }
+    if (un) {
+      if (!(await VA.confirm("Remove " + un.getAttribute("data-code") + " from this program's curriculum? Classes already run, enrolments and results stay; it just stops being part of the plan.", "Remove"))) return;
+      const r = await VA.fetchJson("/api/v1/academics/courses/" + un.getAttribute("data-unlink") + "/programs/" + selectedProgramId, { method: "DELETE" });
+      if (!r.ok) return VA.showError(extractErrorMessage(r.body, "Could not remove it."));
+      VA.toast(un.getAttribute("data-code") + " removed from the curriculum.");
+      return loadCurriculum(selectedProgramId);
+    }
+  });
 
   curriculumProgramSelect.addEventListener("change", function () {
     selectedProgramId = curriculumProgramSelect.value;
@@ -371,20 +441,37 @@
       });
       tr.querySelector(".teacher-cell").appendChild(teacherBtn);
 
-      if (!o.enrolled_count) {
-        const delBtn = document.createElement("button");
-        delBtn.className = "danger";
-        delBtn.type = "button";
-        delBtn.setAttribute("role", "menuitem");
-        delBtn.textContent = "Delete (created by mistake)\u2026";
-        delBtn.addEventListener("click", async function () {
-          if (!(await VA.confirm("Delete " + o.course_code + " section " + (o.section_label || "A") + "? It was created by mistake and nobody has enrolled. Its timetable slots go with it.", "Delete"))) return;
-          const r = await VA.fetchJson("/api/v1/academics/offerings/" + o.id, { method: "DELETE" });
-          if (!r.ok) { VA.showError(extractErrorMessage(r.body, "Could not delete it.")); return; }
-          VA.toast("Offering deleted."); loadOfferings();
-        });
-        actionsCell.appendChild(delBtn);
-      }
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.setAttribute("role", "menuitem");
+      editBtn.textContent = "Edit section, dates, seats\u2026";
+      editBtn.addEventListener("click", function () { openEditOffering(o); });
+      actionsCell.appendChild(editBtn);
+
+      const delBtn = document.createElement("button");
+      delBtn.className = "danger";
+      delBtn.type = "button";
+      delBtn.setAttribute("role", "menuitem");
+      delBtn.textContent = o.enrolled_count ? "Unenroll students and delete\u2026" : "Delete (created by mistake)\u2026";
+      delBtn.addEventListener("click", async function () {
+        const chk = await VA.fetchJson("/api/v1/academics/offerings/" + o.id + "/delete-check");
+        if (!chk.ok) { VA.showError(extractErrorMessage(chk.body, "Could not check it.")); return; }
+        const name = o.course_code + " section " + (o.section_label || "A");
+        if (!chk.body.can_delete) {
+          VA.showError(name + " cannot be deleted because " + chk.body.blockers.join("; ") + ". That is part of students' records; close it to enrolment instead.");
+          return;
+        }
+        const n = chk.body.enrolled;
+        const msg = n
+          ? "Delete " + name + "? Its " + n + " student" + (n === 1 ? " is" : "s are") + " unenrolled first (each gets a notice), then the offering and its timetable slots are removed. No attendance, marks or results exist for it. The list of students is kept in the activity log."
+          : "Delete " + name + "? Nobody is enrolled. Its timetable slots go with it.";
+        if (!(await VA.confirm(msg, n ? "Unenroll and delete" : "Delete"))) return;
+        const r = await VA.fetchJson("/api/v1/academics/offerings/" + o.id + (n ? "?unenroll=true" : ""), { method: "DELETE" });
+        if (!r.ok) { VA.showError(extractErrorMessage(r.body, "Could not delete it.")); return; }
+        VA.toast(n ? n + " student" + (n === 1 ? "" : "s") + " unenrolled and the offering deleted." : "Offering deleted.");
+        loadOfferings();
+      });
+      actionsCell.appendChild(delBtn);
 
       const toggleBtn = document.createElement("button");
       toggleBtn.type = "button";
