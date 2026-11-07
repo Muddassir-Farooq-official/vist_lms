@@ -163,6 +163,8 @@
   function render(data) {
     lastData = data;
     els.title.textContent = data.title;
+    const noteEl = document.getElementById("tt-note");
+    if (noteEl) { noteEl.textContent = data.note || ""; noteEl.hidden = !data.note; }
     const todayName = JS_DAY[new Date().getDay()];
     if (!activeDay || data.days.indexOf(activeDay) === -1) activeDay = data.days.indexOf(todayName) !== -1 ? todayName : data.days[0];
 
@@ -247,6 +249,13 @@
     els.sheet.setAttribute("aria-busy", "true");
     const p = params();
     els.pdf.href = API + "/weekly.pdf" + (p.toString() ? "?" + p.toString() : "");
+    // Administrators: the whole term in one PDF, one page per class or per teacher.
+    const bookClass = document.getElementById("tt-book-class"), bookTeacher = document.getElementById("tt-book-teacher");
+    if (bookClass && options && options.allowed.indexOf("teacher") !== -1) {
+      const t = els.term.value ? "&term_label=" + encodeURIComponent(els.term.value) : "";
+      bookClass.href = API + "/book.pdf?by=class" + t; bookTeacher.href = API + "/book.pdf?by=teacher" + t;
+      bookClass.hidden = bookTeacher.hidden = false;
+    }
     // Never wait forever: after 25 seconds say so, and offer to try again.
     const controller = new AbortController();
     const timer = setTimeout(function () { controller.abort(); }, 25000);

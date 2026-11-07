@@ -19,6 +19,7 @@
       dot(!s.email.enabled || !s.email.failed_24h) + "Email " + (s.email.enabled ? "on · " + s.email.waiting + " waiting" : '<a href="/dashboard/admin/settings#email">off (set it up)</a>'),
       dot(!s.sms.waiting || (s.sms.oldest_minutes || 0) < 60) + "SMS " + (s.sms.provider_configured ? "" : "not connected · ") + s.sms.waiting + " waiting",
     ];
+    if (s.backup) items.push(dot(!s.backup.problem) + "Off-server backup " + (s.backup.failed ? "failed" : s.backup.last_ok_seconds_ago == null ? "not set up" : ago(s.backup.last_ok_seconds_ago)));
     box.innerHTML = '<div class="sh-row"><strong>' + (s.ok ? "Background services are working" : "Background services need attention") + "</strong>" +
       '<button type="button" class="link-btn" id="sh-refresh">Check again</button></div><div class="sh-items">' + items.map(function (x) { return "<span>" + x + "</span>"; }).join("") + "</div>" +
       (s.problems.length ? "<ul>" + s.problems.map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("") + "</ul>" : "");

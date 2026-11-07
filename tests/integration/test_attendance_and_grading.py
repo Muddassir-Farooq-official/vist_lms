@@ -236,6 +236,15 @@ class TestEarlyMarkingBlocked:
 
 
 class TestLockAttendance:
+    """The older rule (Settings -> Attendance -> "One fine per term"): lock fines once per term and drops automatically.
+    Fines by band are covered in test_attendance_bands.py."""
+
+    @pytest.fixture(autouse=True)
+    def _older_rule(self, monkeypatch):
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings, "attendance_fine_mode", 0)
+
     async def test_lock_stops_further_marking(self, app_client, admin_user, db_session):
         offering_id, _students = await _setup_offering_with_enrolled_students(app_client, code="LOCK1", n_students=1)
         session_id = (await _create_n_sessions(app_client, offering_id, 1))[0]

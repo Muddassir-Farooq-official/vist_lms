@@ -174,6 +174,19 @@ class Settings(BaseSettings):
     # the course entirely instead of just fining them — this check
     # takes priority over the fine threshold above (worse outcome wins).
     attendance_drop_threshold_percent: float = 40.0
+    # Graded attendance fines (attendance_fine_mode = 1): per subject, by band. From the minimum to pass down to band 1's
+    # lower edge = band 1, and so on; below band 3's lower edge the student is listed for an administrator's decision.
+    # Mode 0 = the older rule above (one fine per term at lock, automatic drop). Paying a graded fine (or a waiver)
+    # lifts the "minimum attendance to pass" condition for that subject: marks decide.
+    attendance_fine_mode: int = 1
+    attendance_band1_from: float = 65.0
+    attendance_band1_amount: float = 3000.0
+    attendance_band2_from: float = 55.0
+    attendance_band2_amount: float = 6000.0
+    attendance_band3_from: float = 45.0
+    attendance_band3_amount: float = 10000.0
+    attendance_weekly_warnings: int = 1             # tell students (and guardians) each week when a subject is in a fine band
+    attendance_warning_min_classes: int = 6         # ... once at least this many classes of the subject have been taken
     # --- Launch guards (Step 2). All default to the SAFE behaviour. ---
     # Results may only be published once the course's attendance is locked
     # (i.e. final). An ADMIN can override one sheet with a written reason.
@@ -227,6 +240,7 @@ class Settings(BaseSettings):
     sms_number_format: str = "92"
     # Which events send an SMS (1 = yes, 0 = no); editable in Settings -> Institute Policy.
     sms_on_attendance_fine: int = 1
+    sms_on_attendance_warning: int = 1
     sms_on_datesheet: int = 1
     sms_on_results: int = 1
     sms_on_fee_overdue: int = 1
@@ -248,6 +262,7 @@ class Settings(BaseSettings):
     payroll_default_working_days: int = 0           # 0 = each person's own working days in the month (from their timing); or one number for everyone, e.g. 26
     payroll_attendance_deductions: int = 1          # 1 = deduct absences and late / early marks from pay
     payroll_casual_leaves_staff: int = 2            # absences forgiven per month for non-teaching staff
+    payroll_sick_leaves_per_year: int = 8           # paid sick leave a year (approved leave applications, calendar year)
     payroll_casual_leaves_teacher: int = 0          # teachers: no casual leave
     payroll_late_marks_per_day: int = 4             # this many late arrivals / early leavings = one day's pay
     payroll_missing_checkout_counts: int = 1        # 1 = a day with no leaving mark counts as leaving early

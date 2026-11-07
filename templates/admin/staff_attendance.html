@@ -9,6 +9,7 @@
   <button class="portal-tab active" data-tab="daily" role="tab" aria-selected="true"><span>Daily</span></button>
   <button class="portal-tab" data-tab="month" role="tab" aria-selected="false"><span>Month</span></button>
   <button class="portal-tab" data-tab="timings" role="tab" aria-selected="false"><span>Timings</span></button>
+  <button class="portal-tab" data-tab="leave" role="tab" aria-selected="false" data-manage-only hidden><span>Leave requests</span> <span class="ss-count" id="lv-count"></span></button>
   <button class="portal-tab" data-tab="tools" role="tab" aria-selected="false" data-manage-only hidden><span>Holidays &amp; import</span></button>
 </div>
 
@@ -43,6 +44,19 @@
   </div>
   <div class="table-scroll"><table class="dash-table"><thead><tr><th>Employee</th><th>Timing</th><th>Days</th><th>Relaxation in / out</th><th></th></tr></thead><tbody id="tm-emps"></tbody></table></div>
   <p class="empty-state" id="tm-emps-empty" hidden>Nobody has a personal timing.</p>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="leave" hidden>
+<section class="sh-card" id="lv-panel">
+  <h2>Leave applications</h2>
+  <p class="panel-hint">Staff apply from their own <em>My pay &amp; attendance</em> page. Approving excuses those days (not absent, never late), and a teacher's classes on them show under Attendance &rarr; Teachers for a cover. Casual leave uses that month's casual-leave allowance; sick leave is paid up to the yearly allowance; unpaid leave is deducted on the payslip. Allowances are in Settings &rarr; Payroll.</p>
+  <div class="toolbar"><label for="lv-status">Show</label>
+    <select id="lv-status" class="select-input"><option value="REQUESTED" selected>Waiting for a decision</option><option value="APPROVED">Approved</option>
+      <option value="REJECTED">Refused</option><option value="CANCELLED">Withdrawn</option><option value="">Everything</option></select></div>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Who</th><th>Kind</th><th>Days</th><th>Reason</th><th>Left before this</th><th>Status</th><th></th></tr></thead>
+    <tbody id="lv-body"></tbody></table></div>
+  <p class="empty-state" id="lv-empty" hidden>Nothing here.</p>
 </section>
 </div>
 
@@ -98,4 +112,5 @@
 
 {% block extra_scripts %}
 <script src="/static/js/staff-attendance.js"></script>
+<script src="/static/js/staff-leave.js"></script>
 {% endblock %}

@@ -43,6 +43,20 @@ POLICY: tuple[Policy, ...] = (
     Policy("attendance_drop_threshold_percent", "Drop from course at or below (%)", "Attendance", float, 0, 100,
            "At attendance lock, a student at or below this is withdrawn from the course."),
     Policy("attendance_fine_amount", "Attendance fine (Rs.)", "Attendance", float, 0, 1_000_000, "Amount of each attendance fine."),
+    Policy("attendance_fine_mode", "How attendance fines work", "Attendance", int, 0, 1,
+           "Per subject by band: each short subject is fined by its band before final exams; paying lets marks decide; below the lowest band "
+           "an administrator decides. One per term: the older rule (one fine at lock, automatic drop)."),
+    Policy("attendance_band1_from", "Band 1 starts at (%)", "Attendance", float, 0, 100, "From here up to the minimum to pass."),
+    Policy("attendance_band1_amount", "Band 1 fine per subject (Rs.)", "Attendance", float, 0, 1_000_000, ""),
+    Policy("attendance_band2_from", "Band 2 starts at (%)", "Attendance", float, 0, 100, "From here up to band 1."),
+    Policy("attendance_band2_amount", "Band 2 fine per subject (Rs.)", "Attendance", float, 0, 1_000_000, ""),
+    Policy("attendance_band3_from", "Band 3 starts at (%)", "Attendance", float, 0, 100,
+           "From here up to band 2. Below it the student is listed for an administrator's decision (drop, allow with a fine, or excuse)."),
+    Policy("attendance_band3_amount", "Band 3 fine per subject (Rs.)", "Attendance", float, 0, 1_000_000, ""),
+    Policy("attendance_weekly_warnings", "Weekly warning when a subject is in a fine band", "Attendance", int, 0, 1,
+           "Every Monday: an app notification to the student (and an SMS if that is on under SMS messages) naming the subject, the attendance and the fine it would mean."),
+    Policy("attendance_warning_min_classes", "Warn only after this many classes", "Attendance", int, 1, 100,
+           "So one absence in the first week does not set off a warning."),
     Policy("attendance_marking_window_minutes", "Teacher marking window (minutes)", "Attendance", int, 5, 1440,
            "How long after a class starts the teacher can still mark it; after that it needs a correction request."),
     Policy("missed_class_alerts", "Alert when a teacher on campus misses a class", "Attendance", int, 0, 1,
@@ -58,6 +72,7 @@ POLICY: tuple[Policy, ...] = (
     Policy("supplementary_max_grade_points", "Supplementary: highest grade points a pass can earn (0 = no cap)", "Exams", float, 0, 4,
            "Many universities cap a supplementary pass, e.g. 2.0 means at most a C. With no cap the normal grade applies."),
     Policy("sms_on_attendance_fine", "SMS when an attendance fine is issued (1 = yes, 0 = no)", "SMS", int, 0, 1, "Each SMS costs money."),
+    Policy("sms_on_attendance_warning", "SMS the weekly attendance warning", "SMS", int, 0, 1, "At most one SMS a week per student, only while a subject is in a fine band."),
     Policy("sms_on_datesheet", "SMS when a datesheet is published (1 = yes, 0 = no)", "SMS", int, 0, 1, "Each SMS costs money."),
     Policy("sms_on_results", "SMS when results are published (1 = yes, 0 = no)", "SMS", int, 0, 1, "One SMS per student per course published."),
     Policy("sms_on_fee_overdue", "SMS weekly reminder for overdue fees (1 = yes, 0 = no)", "SMS", int, 0, 1, "At most once a week per student."),
@@ -95,6 +110,8 @@ POLICY: tuple[Policy, ...] = (
            "Uses Staff attendance. Someone with no attendance recorded in a month is never treated as absent."),
     Policy("payroll_casual_leaves_staff", "Casual leaves per month: non-teaching staff", "Payroll", int, 0, 10,
            "Absences up to this many in a month are not deducted."),
+    Policy("payroll_sick_leaves_per_year", "Sick leave a year", "Payroll", int, 0, 60,
+           "Paid sick leave per calendar year, given through leave applications. Beyond it, leave can be approved as unpaid."),
     Policy("payroll_casual_leaves_teacher", "Casual leaves per month: teachers", "Payroll", int, 0, 10,
            "Set it to 0 to deduct every absence."),
     Policy("payroll_late_marks_per_day", "Late arrivals / early leavings that equal one day's pay", "Payroll", int, 1, 31,
@@ -161,6 +178,11 @@ def _check_consistency(values: dict) -> None:
     if not (drop < fine <= elig):
         raise ValidationAppError(
             f"Attendance thresholds must satisfy drop ({drop:g}%) < fine ({fine:g}%) <= minimum to pass ({elig:g}%).")
+    b1, b2, b3 = values["attendance_band1_from"], values["attendance_band2_from"], values["attendance_band3_from"]
+    if not (b3 < b2 < b1 < elig):
+        raise ValidationAppError(
+            f"Attendance bands must go down in order: band 1 from {b1:g}% < minimum to pass ({elig:g}%), band 2 from {b2:g}% below that, "
+            f"band 3 from {b3:g}% below that.")
 
 
 async def apply_from_db(session: AsyncSession) -> None:

@@ -58,7 +58,8 @@ async def test_only_admin_can_see_or_change_policy(app_client, admin_user, db_se
 
 async def test_changed_fine_amount_is_what_attendance_lock_charges(app_client, admin_user, db_session):
     await _login_admin(app_client)
-    assert (await app_client.put(P, json={"values": {"attendance_fine_amount": 1750}})).status_code == 200
+    # the older rule (one fine per term at lock); fines by band have their own amounts per band
+    assert (await app_client.put(P, json={"values": {"attendance_fine_amount": 1750, "attendance_fine_mode": 0}})).status_code == 200
     offering_id, students = await _setup_offering_with_enrolled_students(app_client, code="P5A", n_students=1, cnic_base=6300)
     student_id = students[0][0]
     for i, sid in enumerate(await _create_n_sessions(app_client, offering_id, 5)):   # 60% -> fined

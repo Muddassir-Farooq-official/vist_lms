@@ -519,11 +519,20 @@ class EnrollmentService:
             raise BusinessRuleViolationError("This course's result is already approved or published, so nobody can join it now.")
 
     async def enroll(
-        self, *, student_id: uuid.UUID, course_offering_id: uuid.UUID, actor_id: uuid.UUID, by_admin: bool = False
+        self, *, student_id: uuid.UUID, course_offering_id: uuid.UUID, actor_id: uuid.UUID, by_admin: bool = False,
+        override_reason: str | None = None,
     ) -> Enrollment:
         """by_admin=True lets the registrar enroll a student even while the
         offering is closed for SELF-enrollment (every other rule -- curriculum,
-        credit cap, capacity, clashes -- still applies)."""
+        credit cap, capacity, clashes -- still applies).
+        override_reason (administrator only, at least 10 characters): enrol although a prerequisite is not passed or
+        the program's credit-hour limit would be exceeded (an overload). Kept in the activity log."""
+        override = (override_reason or "").strip() if by_admin else ""
+        if override_reason is not None and not by_admin:
+            raise BusinessRuleViolationError("Only an administrator can enrol past a prerequisite or the credit-hour limit.")
+        if override_reason is not None and len(override) < 10:
+            raise BusinessRuleViolationError("Give a reason of at least 10 characters for enrolling past the rule.")
+        overridden: list[str] = []
         offering = await self.offering_repo.get_by_id(course_offering_id)
         if offering is None:
             raise ResourceNotFoundError("Course offering not found.")
@@ -588,6 +597,20 @@ class EnrollmentService:
                     f"current semester's courses (or retake a course you've already attempted before, in any semester)."
                 )
 
+        # Prerequisites: a first attempt needs every required course passed (published result).
+        if not is_retake:
+            from app.academics.prerequisites import missing_for
+
+            missing = await missing_for(self.session, student_id, offering.course_id)
+            if missing:
+                names = ", ".join(c.code for c in missing)
+                if override:
+                    overridden.append(f"prerequisite not passed: {names}")
+                else:
+                    raise BusinessRuleViolationError(
+                        f"'{course.code}' needs {names} passed first." + (" An administrator can enrol the student anyway, with a reason." if by_admin else ""),
+                        details={"overridable": "PREREQUISITE", "missing": [c.code for c in missing]} if by_admin else None)
+
         # Section rule: a student who belongs to Section B attends Section B's
         # offerings (first attempts only -- a retake may join whichever
         # section suits their timetable).
@@ -637,11 +660,15 @@ class EnrollmentService:
         prospective_total = current_credit_total + course.credit_hours
 
         if prospective_total > program.max_credit_hours_per_semester:
-            raise BusinessRuleViolationError(
-                f"Enrolling in '{course.code}' ({course.credit_hours} credit hours) would bring your total for "
-                f"{offering.term_label} to {prospective_total}, exceeding your program's "
-                f"{program.max_credit_hours_per_semester}-hour limit."
-            )
+            if override:
+                overridden.append(f"credit hours {prospective_total} over the limit of {program.max_credit_hours_per_semester}")
+            else:
+                raise BusinessRuleViolationError(
+                    f"Enrolling in '{course.code}' ({course.credit_hours} credit hours) would bring your total for "
+                    f"{offering.term_label} to {prospective_total}, exceeding your program's "
+                    f"{program.max_credit_hours_per_semester}-hour limit." + (" An administrator can allow an overload, with a reason." if by_admin else ""),
+                    details={"overridable": "CREDIT_LIMIT", "total": prospective_total, "limit": program.max_credit_hours_per_semester} if by_admin else None,
+                )
 
         now = datetime.now(timezone.utc)
         if existing is not None:
@@ -661,6 +688,9 @@ class EnrollmentService:
             entity_type="enrollment", entity_id=enrollment.id,
             after={"course_offering_id": str(course_offering_id), "is_retake": is_retake},
         )
+        if overridden:
+            await self.audit.log(actor_user_id=actor_id, action="enrollment.rule_overridden", entity_type="enrollment", entity_id=enrollment.id,
+                                 metadata={"rules": overridden, "reason": override, "course": course.code})
 
         # Subject/course-level fees (approved decision: charged on
         # EVERY enrollment attempt, including retakes) — deferred import,
@@ -713,7 +743,8 @@ class EnrollmentService:
                     await self.enroll(student_id=st.id, course_offering_id=offering.id, actor_id=actor_id, by_admin=True)
                 enrolled += 1
             except (BusinessRuleViolationError, ResourceNotFoundError) as exc:
-                failed.append({"roll_number": st.roll_number, "name": f"{st.first_name} {st.last_name}", "reason": exc.message})
+                failed.append({"roll_number": st.roll_number, "name": f"{st.first_name} {st.last_name}", "reason": exc.message,
+                               "student_id": str(st.id), "overridable": (exc.details or {}).get("overridable") if isinstance(exc.details, dict) else None})
         await self.audit.log(
             actor_user_id=actor_id, action="enrollment.batch_enrolled", entity_type="course_offering", entity_id=offering.id,
             metadata={"enrolled": enrolled, "already_enrolled": already, "failed": len(failed)},

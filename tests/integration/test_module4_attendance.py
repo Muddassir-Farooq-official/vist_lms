@@ -148,7 +148,10 @@ async def test_lock_is_refused_while_held_classes_are_unrecorded_and_preview_exp
     assert (await app_client.get(f"/api/v1/attendance/offerings/{offering_id}/lock-preview")).json()["already_locked"] is True
 
 
-async def test_lock_preview_counts_who_would_be_dropped_or_fined(app_client, admin_user, db_session):
+async def test_lock_preview_counts_who_would_be_dropped_or_fined(app_client, admin_user, db_session, monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "attendance_fine_mode", 0)          # the older rule: one fine per term at lock, automatic drop
     offering_id, studs = await _setup_offering_with_enrolled_students(app_client, code="M4F", n_students=2)
     good, bad = studs[0][0], studs[1][0]
     sess = await _create_n_sessions(app_client, offering_id, 2)

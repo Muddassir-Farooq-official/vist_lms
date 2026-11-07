@@ -261,6 +261,11 @@ class GradingService:
 
         attendance = await AttendanceService(self.session).compute_percentage(enrollment.student_id, enrollment.course_offering_id)
         eligible = attendance["percentage"] >= settings.attendance_eligibility_threshold_percent
+        if not eligible:
+            # Graded attendance fines: once the fine for the student's band is paid (or waived), or they were excused, marks decide.
+            from app.attendance.shortfall import cleared
+
+            eligible = await cleared(self.session, enrollment.student_id, enrollment.course_offering_id, attendance["percentage"])
         outcome = EnrollmentOutcome.PASSED if eligible and final_percentage >= settings.marks_pass_threshold_percent else EnrollmentOutcome.FAILED
         return {"percentage": final_percentage, "total_obtained": total_obtained, "total_max": total_max, "attendance_percentage": attendance["percentage"],
                 "eligible": eligible, "outcome": outcome, "marks": {oa.id: float(marks_by_assessment[oa.id].obtained_marks) for oa in offering_assessments}}

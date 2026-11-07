@@ -6,8 +6,13 @@
       <h2>Weekly timetable</h2>
       <p id="tt-title" class="tt-title">Loading&hellip;</p>
     </div>
-    <a id="tt-pdf" class="role-btn secondary-btn tt-pdf" href="#" data-download="timetable.pdf" data-label="PDF">&#8595; Download PDF</a>
+    <div class="tt-downloads">
+      <a id="tt-pdf" class="role-btn secondary-btn tt-pdf" href="#" data-download="timetable.pdf" data-label="PDF">&#8595; Download PDF</a>
+      <a id="tt-book-class" class="role-btn secondary-btn tt-pdf" href="#" data-download="timetables-classes.pdf" data-label="PDF" hidden>&#8595; Every class (one PDF)</a>
+      <a id="tt-book-teacher" class="role-btn secondary-btn tt-pdf" href="#" data-download="timetables-teachers.pdf" data-label="PDF" hidden>&#8595; Every teacher (one PDF)</a>
+    </div>
   </div>
+  <p id="tt-note" class="tt-title" hidden></p>
 
   <details class="tt-filter-box" id="tt-filter-box" open>
   <summary>Filters <span id="tt-filter-count" class="tt-filter-count"></span></summary>

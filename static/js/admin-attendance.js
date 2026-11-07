@@ -358,13 +358,18 @@
       tile(p.enrolled_count, "Enrolled students") +
       tile(p.unmarked_overdue_sessions, "Held but not recorded" + (p.unmarked_overdue_sessions ? " \u2014 resolve in Needs attention" : ""), "bad") +
       tile(p.future_sessions_remaining, "Classes still to come" + (p.future_sessions_remaining ? " \u2014 can\u2019t be marked after locking" : ""), "warn") +
-      tile(p.below_eligibility, "Below " + p.eligibility_threshold + "% (cannot pass)", "warn") +
-      tile(p.would_fine, "Fined Rs. " + VA.escapeHtml(String(p.fine_amount)) + " (\u2264 " + p.fine_threshold + "%)", "warn") +
-      tile(p.would_drop, "Dropped (\u2264 " + p.drop_threshold + "%)", "bad") +
+      (p.graded_fines
+        ? tile(p.below_eligibility, "Below " + p.eligibility_threshold + "% (pass only after the fine)", "warn") +
+          tile(p.would_fine, "Fines still to charge (by band)", "warn") +
+          tile(p.would_review, "Below the lowest band: to decide", "bad")
+        : tile(p.below_eligibility, "Below " + p.eligibility_threshold + "% (cannot pass)", "warn") +
+          tile(p.would_fine, "Fined Rs. " + VA.escapeHtml(String(p.fine_amount)) + " (\u2264 " + p.fine_threshold + "%)", "warn") +
+          tile(p.would_drop, "Dropped (\u2264 " + p.drop_threshold + "%)", "bad")) +
       "</div>" +
       (p.early_reason ? '<p class="att-early"><strong>Not yet:</strong> ' + VA.escapeHtml(p.early_reason) + ". Lock at the end of term (an administrator can lock early with a reason).</p>" : "");
     lockBtn.disabled = p.unmarked_overdue_sessions > 0;   // early locks are allowed for admins with a reason (asked on click)
-    lockBtn.setAttribute("data-summary", p.would_fine + " fined, " + p.would_drop + " dropped");
+    lockBtn.setAttribute("data-summary", p.graded_fines ? p.would_fine + " fine(s) to charge, " + p.would_review + " to decide"
+      : p.would_fine + " fined, " + p.would_drop + " dropped");
   }
 
   lockBtn.addEventListener("click", async function () {
@@ -389,7 +394,8 @@
       loadLockPreview(offeringSelect.value);
       return;
     }
-    lockSuccess.textContent = "Locked. " + result.body.fined_count + " student(s) fined, " + result.body.dropped_count + " dropped.";
+    lockSuccess.textContent = "Locked. " + result.body.fined_count + " fine(s) charged, " + result.body.dropped_count + " dropped" +
+      (result.body.to_review_count ? ", " + result.body.to_review_count + " listed for a decision (Attendance fines tab)." : ".");
     lockSuccess.hidden = false;
     loadLockPreview(offeringSelect.value);
     lockSuccess.hidden = false;

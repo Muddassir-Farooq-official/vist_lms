@@ -4,7 +4,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base, TimestampMixin, UUIDPKMixin
@@ -67,3 +67,34 @@ class AttendanceCorrectionRequest(UUIDPKMixin, TimestampMixin, Base):
     decided_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     decision_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+class ShortfallStatus(str, enum.Enum):
+    FINED = "FINED"                          # charged the fine for its band; paying (or a waiver) lets the student pass on marks
+    AWAITING_DECISION = "AWAITING_DECISION"  # below the lowest band: an administrator decides (drop, allow with a fine, or excuse)
+    ALLOWED_WITH_FINE = "ALLOWED_WITH_FINE"  # decided: may continue once the fine is paid
+    EXCUSED = "EXCUSED"                      # decided: may continue, no fine (e.g. medical reasons)
+    DROPPED = "DROPPED"                      # decided: withdrawn from the course
+
+
+class AttendanceShortfall(UUIDPKMixin, TimestampMixin, Base):
+    """One student's attendance shortfall in one course (graded attendance fines). One row per student and course:
+    re-running the fines only charges the difference when attendance has fallen into a worse band. Fines charged for it
+    point back here (fines.related_entity_type = 'attendance_shortfall'). See migration b6d8f0a2c4e6."""
+
+    __tablename__ = "attendance_shortfalls"
+    __table_args__ = (
+        UniqueConstraint("student_id", "course_offering_id", name="uq_attendance_shortfall_student_offering"),
+        Index("ix_attendance_shortfalls_status", "status"),
+        Index("ix_attendance_shortfalls_term", "term_label"),
+    )
+
+    student_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
+    course_offering_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("course_offerings.id", ondelete="CASCADE"), nullable=False)
+    term_label: Mapped[str] = mapped_column(String(50), nullable=False)
+    percentage: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)        # when last evaluated
+    band: Mapped[int] = mapped_column(Integer, nullable=False)                       # 1..3 = fine bands, 4 = below the lowest band
+    amount_charged: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0, server_default="0")
+    status: Mapped[str] = mapped_column(String(20), nullable=False)                 # a ShortfallStatus value
+    decision_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    decided_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

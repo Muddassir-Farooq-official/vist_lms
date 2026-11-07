@@ -95,6 +95,8 @@ class GenerateOfferingsResponse(BaseModel):
 
 class AdminEnrollRequest(BaseModel):
     student_id: uuid.UUID
+    # Enrol although a prerequisite is not passed or the credit-hour limit would be exceeded (kept in the activity log).
+    override_reason: str | None = Field(default=None, max_length=300)
 
 
 class BatchEnrollRequest(BaseModel):
@@ -339,6 +341,7 @@ class WeeklyTimetableOut(BaseModel):
     rows: list[WeeklyRowOut]
     cells: list[WeeklyCellOut]
     entries_count: int
+    note: str | None = None        # e.g. a teacher's sections and credit hours this term
     # Which semesters have classes on the timetable for the OTHER filters currently chosen
     # (so the page can say "nothing in Semester 2 - this class's classes are in Semester 3").
     semester_counts: list[SemesterCountOut] = []

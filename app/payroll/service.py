@@ -307,7 +307,7 @@ class PayrollService:
         setting = await self.session.get(EmployeePayrollSetting, employee_id)
         return rules.q2(paid) + rules.q2(setting.security_opening if setting else 0)
 
-    def _apply_attendance(self, slip: Payslip, att: dict | None, teacher: bool) -> None:
+    def _apply_attendance(self, slip: Payslip, att: dict | None, teacher: bool, casual_on_leave: int = 0) -> None:
         """Absences and late / early marks from staff attendance, unless the administration overrode them."""
         if not slip.attendance_override:
             if settings.payroll_attendance_deductions and att and att.get("recorded", 0) > 0:
@@ -321,6 +321,8 @@ class PayrollService:
                 slip.absent_days, slip.late_marks = Decimal(0), 0
                 slip.attendance_note = ("No attendance recorded this month, so nothing is deducted for absence." if settings.payroll_attendance_deductions else None)
         allowed = Decimal(settings.payroll_casual_leaves_teacher if teacher else settings.payroll_casual_leaves_staff)
+        # Approved casual-leave applications (app/timekeeping/leave.py) are paid days already; they use up the allowance.
+        allowed = max(Decimal(0), allowed - Decimal(casual_on_leave))
         slip.casual_leaves = min(Decimal(str(slip.absent_days)), allowed)
 
     async def _late_absences(self, emp: Employee, run: PayrollRun, teacher: bool) -> tuple[str, Decimal, uuid.UUID] | None:
@@ -368,7 +370,11 @@ class PayrollService:
             teacher = emp.id in await self._teachers([emp])
         if att is None and not slip.attendance_override:
             att = (await self._attendance(run.month, [emp])).get(emp.id)
-        self._apply_attendance(slip, att, teacher)
+        from app.timekeeping.leave import approved_days_in_month
+
+        casual_on_leave = await approved_days_in_month(self.session, emp.id, "CASUAL", run.month)
+        unpaid_on_leave = await approved_days_in_month(self.session, emp.id, "UNPAID", run.month)
+        self._apply_attendance(slip, att, teacher, casual_on_leave)
         month, dim = run.month, rules.days_in(run.month)
         wd = int(slip.working_days or run.working_days or settings.payroll_default_working_days or rules.days_in(run.month))
         payable = rules.payable_days(emp.hire_date, month)
@@ -408,6 +414,9 @@ class PayrollService:
             ded.append((LineKind.DEDUCTION, "LATE_ABSENT", carried[0], carried[1], carried[2]))
         if Decimal(str(slip.unpaid_days)) > 0:
             ded.append((LineKind.DEDUCTION, "UNPAID", f"Unpaid leave ({float(slip.unpaid_days):g} day{'s' if float(slip.unpaid_days) != 1 else ''})", rules.unpaid_deduction(base, wd, slip.unpaid_days), None))
+        if unpaid_on_leave > 0:
+            ded.append((LineKind.DEDUCTION, "UNPAID_LEAVE", f"Unpaid leave, approved application ({unpaid_on_leave} day{'s' if unpaid_on_leave != 1 else ''}) at basic / {wd}",
+                        rules.unpaid_deduction(base, wd, Decimal(unpaid_on_leave)), None))
         if adj < 0:
             ded.append((LineKind.DEDUCTION, "ADJUSTMENT", slip.adjustment_note or "Adjustment", -adj, None))
         setting = await self.session.get(EmployeePayrollSetting, emp.id)

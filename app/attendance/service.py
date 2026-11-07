@@ -304,6 +304,18 @@ class AttendanceService:
 
         offering.attendance_locked_at = datetime.now(timezone.utc)
 
+        from app.attendance.shortfall import ShortfallService, graded
+
+        if graded():
+            # Fines by band, per subject (app/attendance/shortfall.py): the same check as the before-exams run, so a
+            # student charged then is not charged again; anyone below the lowest band waits for an administrator's decision.
+            ran = await ShortfallService(self.session).run(offering_id=course_offering_id, actor_id=actor_id, dry_run=False)
+            enrolled = len(await self.repo.list_enrolled_student_ids_for_offering(course_offering_id))
+            out = {"enrolled_count": enrolled, "dropped_count": 0, "fined_count": ran["new_fines"] + ran["top_ups"], "to_review_count": ran["to_review"]}
+            await self.audit.log(actor_user_id=actor_id, action="attendance.locked", entity_type="course_offering", entity_id=course_offering_id,
+                                 after={**out, "fines_amount": ran["amount"], "mode": "graded"})
+            return out
+
         enrolled_ids = await self.repo.list_enrolled_student_ids_for_offering(course_offering_id)
         dropped_count = 0
         fined_count = 0
@@ -428,7 +440,14 @@ class AttendanceService:
         unmarked = await self.list_overdue_unmarked_sessions(course_offering_id)
         future = await self.repo.count_future_sessions(course_offering_id, institute_now())
         enrolled_ids = await self.repo.list_enrolled_student_ids_for_offering(course_offering_id)
-        would_drop = would_fine = below_eligibility = 0
+        would_drop = would_fine = below_eligibility = would_review = 0
+        from app.attendance.shortfall import ShortfallService, graded
+
+        if graded():
+            pre = await ShortfallService(self.session).run(offering_id=course_offering_id, actor_id=None, dry_run=True)
+            would_fine, would_review = pre["new_fines"] + pre["top_ups"], pre["to_review"]
+            below_eligibility = len(pre["items"])
+            enrolled_ids = []                                               # counted above
         for student_id in enrolled_ids:
             pct = (await self.compute_percentage(student_id, course_offering_id))["percentage"]
             if pct < settings.attendance_eligibility_threshold_percent:
@@ -441,8 +460,9 @@ class AttendanceService:
         return {
             "early_reason": early, "term_end_date": offering.term_end_date,
             "course_offering_id": course_offering_id, "already_locked": offering.attendance_locked_at is not None,
-            "enrolled_count": len(enrolled_ids), "unmarked_overdue_sessions": len(unmarked),
-            "future_sessions_remaining": future, "would_drop": would_drop, "would_fine": would_fine,
+            "enrolled_count": len(await self.repo.list_enrolled_student_ids_for_offering(course_offering_id)), "unmarked_overdue_sessions": len(unmarked),
+            "future_sessions_remaining": future, "would_drop": would_drop, "would_fine": would_fine, "would_review": would_review,
+            "graded_fines": graded(),
             "below_eligibility": below_eligibility, "can_lock": not unmarked and offering.attendance_locked_at is None and early is None,
             "eligibility_threshold": settings.attendance_eligibility_threshold_percent,
             "fine_threshold": settings.attendance_fine_threshold_percent,

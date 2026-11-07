@@ -3967,3 +3967,25 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
   .st-card > h3 { padding: 14px 16px; }
 }
 @media (max-width: 899px) { [data-tab-panel="look"] .st-grid, .st-panel.st-grid { grid-template-columns: 1fr; } }
+
+/* Attendance -> Attendance fines: the band legend above the preview */
+.af-legend { display: flex; flex-wrap: wrap; gap: 6px 8px; margin: 0 0 12px; }
+.af-legend span { font-size: 0.82rem; padding: 4px 10px; border-radius: 999px; background: var(--surface-alt); color: var(--text-secondary); }
+#af-preview .att-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 640px) { #af-preview .att-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+#sf-body .small-btn { margin: 2px 0; }
+
+/* Courses -> Edit course: prerequisites */
+.ec-prereq { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ec-prereq legend { font-weight: 600; padding: 0 6px; }
+.ec-prereq-chosen { display: flex; flex-wrap: wrap; gap: 6px; }
+.ec-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border-radius: 999px; background: var(--surface-alt); border: 1px solid var(--border); font-size: 0.85rem; max-width: 100%; }
+.ec-chip button { border: 0; background: transparent; color: var(--text-secondary); font-size: 1.05rem; line-height: 1; cursor: pointer; min-width: 28px; min-height: 28px; }
+.ec-prereq-list { display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; }
+.ec-pick { text-align: left; border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 8px 10px; cursor: pointer; color: var(--text-primary); }
+.ec-pick:hover, .ec-pick:focus-visible { border-color: var(--border-strong); background: var(--surface-alt); }
+
+/* Weekly timetable: the download buttons wrap on a phone */
+.tt-downloads { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 640px) { .tt-downloads { width: 100%; } .tt-downloads .tt-pdf { flex: 1 1 100%; text-align: center; } }
+#tt-note { margin: -6px 0 12px; }

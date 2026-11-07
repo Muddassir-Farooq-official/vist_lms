@@ -55,6 +55,9 @@ async def send_due(session: AsyncSession, *, time_budget: float = 20) -> dict:
     except Exception as exc:  # noqa: BLE001 - a reminder problem must not stop sending
         logger.warning("todo_reminder_failed", error=str(exc)[:300])
     await missed_class_round(session)
+    from app.attendance.shortfall import weekly_warnings
+
+    await weekly_warnings(session)                                       # Mondays from 10 AM, once a week; never raises
     sms = await SmsService(session).send_pending(limit=100, time_budget=time_budget)
     emails = await send_emails(session, limit=100, time_budget=time_budget)
     pushed = await push_round(session)
@@ -176,7 +179,11 @@ async def status(session: AsyncSession) -> dict:
         problems.append(f"{stuck} CSV upload(s) never started (upload the same file again to retry).")
     if cfg.enabled and not cfg.ready:
         problems.append("Email is turned on but the mail server or From address is missing (Settings → Email).")
+    backup = await backup_status(session)
+    if backup["problem"]:
+        problems.append(backup["problem"])
     return {
+        "backup": backup,
         "ok": not problems,
         "problems": problems,
         "import_worker": {"running": workers > 0, "workers": workers},
@@ -188,3 +195,28 @@ async def status(session: AsyncSession) -> dict:
                   "oldest_minutes": int((now - em_oldest).total_seconds() // 60) if em_oldest else None, "failed_24h": em_failed},
         "imports_not_started": stuck,
     }
+
+
+BACKUP_STALE = timedelta(hours=36)
+
+
+async def backup_status(session: AsyncSession) -> dict:
+    """The nightly off-server backup (scripts/server/backup.sh records "backup" when a copy reached the remote, and
+    "backup-failed" with the reason when it did not)."""
+    from app.notifications.email_models import ServiceHeartbeat
+
+    rows = {r.name: r for r in (await session.execute(select(ServiceHeartbeat).where(
+        ServiceHeartbeat.name.in_(["backup", "backup-failed"])))).scalars().all()}
+    ok, bad = rows.get("backup"), rows.get("backup-failed")
+    now = datetime.now(timezone.utc)
+    failed_last = bad is not None and (ok is None or bad.last_seen_at > ok.last_seen_at)
+    problem = None
+    if failed_last:
+        problem = f"The last off-server backup FAILED: {bad.detail or 'see backups/backup.log on the server'}."
+    elif ok is None:
+        if settings.app_env == "production":
+            problem = "No off-server backup has run yet (scripts/server/backup.sh, see docs/server-safety.md)."
+    elif now - ok.last_seen_at > BACKUP_STALE:
+        problem = f"The last off-server backup was {int((now - ok.last_seen_at).total_seconds() // 3600)} hours ago (it should run every night)."
+    return {"last_ok_seconds_ago": _ago(ok.last_seen_at) if ok else None, "detail": ok.detail if ok else None,
+            "failed": failed_last, "problem": problem}

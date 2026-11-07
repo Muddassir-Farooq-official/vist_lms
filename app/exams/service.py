@@ -292,9 +292,13 @@ class ExamScheduleService:
         for r in rows:
             pct = await att.compute_percentage(student_id, r["course_offering_id"])
             ok = pct["total_sessions_taken"] == 0 or pct["percentage"] >= minimum
+            if not ok:
+                from app.attendance.shortfall import cleared, not_cleared_reason
+
+                ok = await cleared(self.session, student_id, r["course_offering_id"], pct["percentage"])
             r["attendance_percent"] = pct["percentage"]
             r["eligible"] = ok
-            r["reason"] = None if ok else f"attendance {pct['percentage']:g}% (minimum {minimum:g}%)"
+            r["reason"] = None if ok else await not_cleared_reason(self.session, student_id, r["course_offering_id"], pct["percentage"])
 
         withheld = []
         n_fines, fine_total = await unpaid_attendance_fines(self.session, student_id)
