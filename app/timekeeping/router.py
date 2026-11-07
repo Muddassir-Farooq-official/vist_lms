@@ -130,3 +130,53 @@ async def set_emp(employee_id: uuid.UUID, payload: TimingIn, current_user: Curre
 @router.delete("/timings/employees/{employee_id}", status_code=204, summary="Remove an employee's own timing (their job role's applies)")
 async def clear_emp(employee_id: uuid.UUID, current_user: CurrentUser = Depends(manage_perm), db=Depends(get_db)) -> None:
     await TimekeepingService(db).set_timing("EMPLOYEE", employee_id, None, actor_id=current_user.id)
+
+# ---------------------------------------------------------------------------
+# Leave applications (app/timekeeping/leave.py)
+# ---------------------------------------------------------------------------
+class LeaveApplyIn(BaseModel):
+    kind: str = Field(pattern="^(CASUAL|SICK|UNPAID)$")
+    first_day: date
+    last_day: date
+    reason: str = Field(min_length=5, max_length=500)
+
+
+class LeaveDecideIn(BaseModel):
+    approve: bool
+    note: str | None = Field(default=None, max_length=300)
+    as_kind: str | None = Field(default=None, pattern="^(CASUAL|SICK|UNPAID)$")
+
+
+@router.get("/leave/me", summary="My leave applications and what is left of my casual (this month) and sick (this year) leave")
+async def my_leave(current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    from app.timekeeping.leave import LeaveService
+
+    return await LeaveService(db).mine(current_user.id)
+
+
+@router.post("/leave", status_code=201, summary="Apply for leave (casual, sick or unpaid); the administration decides")
+async def apply_leave(payload: LeaveApplyIn, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    from app.timekeeping.leave import LeaveService
+
+    return await LeaveService(db).apply(user_id=current_user.id, kind=payload.kind, first=payload.first_day, last=payload.last_day, reason=payload.reason)
+
+
+@router.post("/leave/{request_id}/cancel", summary="Withdraw my own application while it is still waiting")
+async def cancel_leave(request_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    from app.timekeeping.leave import LeaveService
+
+    return await LeaveService(db).cancel(request_id, user_id=current_user.id)
+
+
+@router.get("/leave", summary="Leave applications (the waiting ones first) -- administration")
+async def list_leave(status: str | None = None, current_user: CurrentUser = Depends(manage_perm), db=Depends(get_db)) -> list[dict]:
+    from app.timekeeping.leave import LeaveService
+
+    return await LeaveService(db).listing(status=status)
+
+
+@router.post("/leave/{request_id}/decide", summary="Approve (optionally as another kind) or refuse a leave application -- administration")
+async def decide_leave(request_id: uuid.UUID, payload: LeaveDecideIn, current_user: CurrentUser = Depends(manage_perm), db=Depends(get_db)) -> dict:
+    from app.timekeeping.leave import LeaveService
+
+    return await LeaveService(db).decide(request_id, approve=payload.approve, note=payload.note, as_kind=payload.as_kind, actor_id=current_user.id)

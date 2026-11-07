@@ -20,7 +20,8 @@ async def test_every_rule_has_a_real_control_section_and_plain_label(app_client,
         for bad in ("1 = yes", "0 = no", "(0 =", "(1 ="):
             assert bad not in u["label"], (r["key"], u["label"])
         if (r["min"], r["max"]) == (0, 1):
-            assert u["control"] == "switch", r["key"]                      # an on/off rule is a switch
+            # an on/off rule is a switch, unless its two values are named choices (e.g. how attendance fines work)
+            assert u["control"] == "switch" or (u["control"] == "choice" and len(u["choices"]) == 2), r["key"]
         if u["control"] == "choice":
             assert u["choices"] and all(isinstance(c[1], str) for c in u["choices"])
         if u["control"] == "optional":

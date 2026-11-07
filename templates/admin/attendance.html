@@ -10,6 +10,7 @@
   <button class="portal-tab" data-tab="corrections" role="tab" aria-selected="false"><span>Correction requests</span> <span class="ss-count" id="att-corr-count"></span></button>
   {% if not hod_view %}<button class="portal-tab" data-tab="teachers" role="tab" aria-selected="false"><span>Teachers</span> <span class="ss-count" id="att-teach-count"></span></button>{% endif %}
   {% if not hod_view %}<button class="portal-tab" data-tab="mark" role="tab" aria-selected="false"><span>Mark attendance</span></button>{% endif %}
+  {% if not hod_view %}<button class="portal-tab" data-tab="fines" role="tab" aria-selected="false"><span>Attendance fines</span> <span class="ss-count" id="att-fines-count"></span></button>{% endif %}
   {% if not hod_view %}<button class="portal-tab" data-tab="lock" role="tab" aria-selected="false"><span>Lock the term</span></button>{% endif %}
   {% if not hod_view %}<button class="portal-tab" data-tab="holiday" role="tab" aria-selected="false"><span>Holidays</span></button>{% endif %}
 </div>
@@ -151,10 +152,39 @@
 </section>
 </div>
 
+{% if not hod_view %}
+<div class="portal-tab-panel" data-tab-panel="fines" hidden>
+<section class="panel" id="af-panel">
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("attendance") }}</div><h2>Charge attendance fines (before final exams)</h2></div></div>
+  <p class="panel-hint">Each subject below the minimum to pass is fined by its band. Check first: nothing is charged until you press Charge. Running it again never charges twice; if a student has fallen into a worse band since, only the difference is charged. Bands and amounts are in Settings &rarr; Attendance.</p>
+  <div class="ar-form">
+    <label>Term<select id="af-term" class="select-input"></select></label>
+    <div class="ar-go"><button type="button" class="role-btn" id="af-check">Check this term</button></div>
+  </div>
+  <div id="af-preview" class="att-lock-box"></div>
+  <div class="form-actions"><button type="button" class="danger-btn" id="af-charge" hidden>Charge</button></div>
+  <p id="af-error" class="dash-alert error" role="alert" hidden></p>
+</section>
+<section class="panel" id="sf-panel">
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("attendance") }}</div><h2>Below the lowest band: decisions, and every fine charged</h2></div></div>
+  <p class="panel-hint">Students below the lowest band are not fined or dropped automatically. Decide for each: allow with a fine (they continue once it is paid), excuse (e.g. medical), or drop from the course. Once a fine is paid or waived, the exam marks decide the result.</p>
+  <div class="ar-form">
+    <label>Term<select id="sf-term" class="select-input"><option value="">Every term</option></select></label>
+    <label>Show<select id="sf-status" class="select-input">
+      <option value="AWAITING_DECISION" selected>Awaiting a decision</option><option value="FINED">Fined</option><option value="ALLOWED_WITH_FINE">Allowed with a fine</option>
+      <option value="EXCUSED">Excused</option><option value="DROPPED">Dropped</option><option value="">Everything</option></select></label>
+  </div>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Roll no.</th><th>Student</th><th>Subject</th><th>Attendance</th><th>Status</th><th>Fine</th><th>Decision</th></tr></thead>
+    <tbody id="sf-body"></tbody></table></div>
+  <p id="sf-error" class="dash-alert error" role="alert" hidden></p>
+</section>
+</div>
+{% endif %}
+
 <div class="portal-tab-panel" data-tab-panel="lock" hidden>
 <section class="panel" id="lock-panel">
   <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("attendance") }}</div><h2>Lock Attendance (end of term)</h2></div></div>
-  <p class="panel-hint">Locking freezes this course's attendance, then automatically drops or fines students below the thresholds. It cannot be undone. Every held class must first be marked (Needs Attention) or cancelled.</p>
+  <p class="panel-hint">Locking freezes this course's attendance for good. With fines by band (Settings &rarr; Attendance), it also charges any fine not charged yet and lists anyone below the lowest band for a decision; with the older rule it fines or drops students below the thresholds. It cannot be undone. Every held class must first be marked (Needs Attention) or cancelled.</p>
   <div id="lock-preview" class="att-lock-box"><p class="empty-state">Choose a term and course on the <a href="#mark" data-goto-tab="mark">Mark attendance</a> tab first; its lock check shows here.</p></div>
   <div class="form-actions"><button type="button" class="danger-btn" id="lock-attendance-btn" disabled hidden>Lock Attendance</button></div>
   <p id="lock-error" class="dash-alert error" hidden></p>
@@ -193,5 +223,6 @@
 {% block extra_scripts %}
 <script src="/static/js/attendance-common.js"></script>
 <script src="/static/js/admin-attendance.js"></script>
-{% if not hod_view %}<script src="/static/js/admin-teachers.js"></script>{% endif %}
+{% if not hod_view %}<script src="/static/js/admin-teachers.js"></script>
+<script src="/static/js/attendance-fines.js"></script>{% endif %}
 {% endblock %}

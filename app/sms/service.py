@@ -39,7 +39,7 @@ from app.sms.models import SmsMessage, SmsStatus
 
 MAX_ATTEMPTS = 3
 MAX_BODY = 300
-EVENT_SWITCH = {"ATTENDANCE_FINE": "sms_on_attendance_fine", "DATESHEET": "sms_on_datesheet",
+EVENT_SWITCH = {"ATTENDANCE_FINE": "sms_on_attendance_fine", "ATTENDANCE_WARNING": "sms_on_attendance_warning", "DATESHEET": "sms_on_datesheet",
                 "RESULTS": "sms_on_results", "FEE_OVERDUE": "sms_on_fee_overdue", "ADMISSION": "sms_on_admission",
                 "SECURITY": "sms_on_security_alert"}
 

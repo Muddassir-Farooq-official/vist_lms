@@ -269,8 +269,12 @@ class ScholarshipService:
         changed = [k for k in self.EDITABLE if new[k] != old[k]]
         if not changed:
             raise BusinessRuleViolationError("Nothing was changed.")
+        # From "every fee" to one fee or one kind of fee only takes away (e.g. tuition only, chosen as every fee by mistake);
+        # any other change of what it applies to can reach fees it did not cover, so it is treated as giving more.
+        was_every_fee = old["fee_structure_id"] is None and old["fee_type_id"] is None
+        scope_changed = new["fee_structure_id"] != old["fee_structure_id"] or new["fee_type_id"] != old["fee_type_id"]
         gives_more = (new["kind"] != old["kind"] or new["value"] > old["value"]
-                      or new["fee_structure_id"] != old["fee_structure_id"] or new["fee_type_id"] != old["fee_type_id"]
+                      or (scope_changed and not was_every_fee)
                       or new["valid_from"] < old["valid_from"]
                       or (old["valid_until"] is not None and (new["valid_until"] is None or new["valid_until"] > old["valid_until"]))
                       or (new["auto_apply"] and not old["auto_apply"]))

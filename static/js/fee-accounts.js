@@ -219,7 +219,7 @@
     }
     return fixed
       ? { text: money(v) + " off EACH fee this student is charged (tuition, exam, library… each one gets " + money(v) + " off). For tuition only, choose “Tuition … only (every semester)” under Applies to.", warn: true }
-      : { text: v + "% off every fee this student is charged (tuition, exam, library…).", warn: false };
+      : { text: v + "% off EVERY fee this student is charged (tuition, exam, card, library…), not only tuition. For tuition only, choose “Tuition … only (every semester)” under Applies to.", warn: true };
   }
   function paintPreview(pre) {
     const out = $(pre + "-preview");
@@ -275,8 +275,13 @@
       '<optgroup label="One fee only">' + r.body.filter(function (s) { return s.status !== "DRAFT"; }).map(function (s) {
         return '<option value="fee:' + s.id + '">Only: ' + esc(s.name) + " (" + esc(s.term_label) + ")</option>";
       }).join("") + "</optgroup>";
+    tuitionScope = "";
+    const tuition = types.find(function (x) { return /^TUI/i.test(x.code || ""); }) || types.find(function (x) { return /tuition/i.test(x.name || ""); });
+    if (tuition) tuitionScope = "type:" + tuition.id;
+    sel.value = tuitionScope;                // a discount is normally on tuition only; "Every fee" must be chosen on purpose
     paintPreview("sc");
   }
+  let tuitionScope = "";
   wireKind("sc"); wireKind("se");
   function appliesTo(s) {
     if (s.fee_type_id) return (feeTypeNames[s.fee_type_id] || "One kind of fee") + " only, every semester";
@@ -307,7 +312,8 @@
     else VA.toast(r.body.applied && r.body.applied.total_concession > 0
       ? "Saved: " + money(r.body.applied.total_concession) + " taken off " + r.body.applied.assignments_updated + " fee(s)."
       : "Saved. Nothing was due inside its dates yet; it will apply to installments due between those dates.");
-    ["sc-student", "sc-name", "sc-value", "sc-reason", "sc-until"].forEach(function (id) { $(id).value = ""; }); scStudent = null; paintPreview("sc");
+    ["sc-student", "sc-name", "sc-value", "sc-reason", "sc-until"].forEach(function (id) { $(id).value = ""; }); scStudent = null;
+    $("sc-structure").value = tuitionScope; paintPreview("sc");
     loadScholarships(); refresh();
   });
   let scRows = {}, canProposeSc = false;

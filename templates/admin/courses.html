@@ -184,6 +184,13 @@
         <label for="ec-active">Status</label>
         <select id="ec-active" class="select-input"><option value="true">Active</option><option value="false">Inactive</option></select>
       </div>
+      <fieldset class="form-field two-span ec-prereq">
+        <legend>Must be passed first (prerequisites)</legend>
+        <p class="list-sub">A student can take this course for the first time only after passing these. An administrator can still enrol someone with a reason.</p>
+        <div id="ec-prereq-chosen" class="ec-prereq-chosen"></div>
+        <input type="search" id="ec-prereq-find" class="text-input" placeholder="Find a course to add (code or title)" autocomplete="off" />
+        <div id="ec-prereq-list" class="ec-prereq-list" role="listbox" aria-label="Courses"></div>
+      </fieldset>
       <div class="form-actions two-span"><button type="submit" class="role-btn" id="edit-course-submit">Save Changes</button></div>
     </form>
     <p id="edit-course-error" class="dash-alert error" hidden></p>

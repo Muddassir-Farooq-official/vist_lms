@@ -477,3 +477,19 @@ class EnrollmentResult(UUIDPKMixin, TimestampMixin, Base):
     # True when this pass was earned in a supplementary (reappear) exam; shown as (S) on the result card.
     supplementary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+class CoursePrerequisite(UUIDPKMixin, Base):
+    """Course `course_id` may only be taken (first attempt) after passing `requires_course_id` (a published pass).
+    An administrator can still enrol a student with a written reason. See migration c7e9f1a3b5d7."""
+
+    __tablename__ = "course_prerequisites"
+    __table_args__ = (
+        UniqueConstraint("course_id", "requires_course_id", name="uq_course_prerequisite_pair"),
+        CheckConstraint("course_id <> requires_course_id", name="not_itself"),
+        Index("ix_course_prerequisites_course", "course_id"),
+    )
+
+    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    requires_course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

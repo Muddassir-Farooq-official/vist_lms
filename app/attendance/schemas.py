@@ -54,6 +54,7 @@ class LockAttendanceResultOut(BaseModel):
     enrolled_count: int
     dropped_count: int
     fined_count: int
+    to_review_count: int = 0          # graded fines: below the lowest band, waiting for an administrator's decision
 
 
 class OverdueSessionOut(BaseModel):
@@ -85,6 +86,8 @@ class LockPreviewOut(BaseModel):
     future_sessions_remaining: int
     would_drop: int
     would_fine: int
+    would_review: int = 0
+    graded_fines: bool = False
     below_eligibility: int
     eligibility_threshold: float
     fine_threshold: float

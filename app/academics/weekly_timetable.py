@@ -198,18 +198,52 @@ class WeeklyTimetableService:
             parts.append(f"Semester {semester_number}")
         if section_label:
             parts.append(f"Section {section_label}")
+        note = None
         if teacher_id is not None:
             teacher = await self.session.get(Employee, teacher_id)
             if teacher:
                 parts.append(f"{teacher.first_name} {teacher.last_name}")
+            mine = [o for o in candidates if o.assigned_teacher_id == teacher_id]
+            hours = sum(int(course_cache[o.course_id].credit_hours) for o in mine if course_cache.get(o.course_id))
+            note = f"Teaching {len(mine)} course section(s), {hours} credit hours in {term}" if term else None
         if room:
             parts.append(f"Room {room}")
         return {
             "term_label": term, "title": " \u00b7 ".join(parts) if parts else "Weekly timetable",
             "scope": scope, "generated_on": institute_today(), "days": days, "rows": ordered_rows,
-            "cells": cells, "entries_count": count,
+            "cells": cells, "entries_count": count, "note": note,
             "semester_counts": [{"semester": sem, "courses": len(ids)} for sem, ids in sorted(semester_courses.items())],
         }
+
+    async def book(self, *, term_label: str | None, by: str) -> list[dict]:
+        """Every class (program, semester, section) or every teacher of a term, each as its own timetable, for one
+        printable PDF (admin)."""
+        term = await self.offering_repo.canonical_term_label(term_label) if term_label else (await self.term_options(None))[1]
+        if not term:
+            return []
+        offerings = await self.offering_repo.list_by_term(term)
+        with_slots = set((await self.session.execute(select(TimetableSlot.course_offering_id).where(
+            TimetableSlot.course_offering_id.in_([o.id for o in offerings] or [uuid.uuid4()])))).scalars())
+        offerings = [o for o in offerings if o.id in with_slots]
+        pages: list[dict] = []
+        if by == "teacher":
+            teachers = await load_by_ids(self.session, Employee, [o.assigned_teacher_id for o in offerings if o.assigned_teacher_id])
+            for tid, t in sorted(teachers.items(), key=lambda kv: (kv[1].first_name, kv[1].last_name)):
+                pages.append(await self.build(scope="admin", term_label=term, teacher_id=tid))
+            return pages
+        programs = {p.id: p.code for p in await self.program_repo.list_all()}
+        keys: set[tuple] = set()
+        course_ids = {o.course_id for o in offerings}
+        links: dict = {}
+        if course_ids:
+            for link in (await self.session.execute(select(CourseProgram).where(CourseProgram.course_id.in_(course_ids)))).scalars():
+                links.setdefault(link.course_id, []).append(link)
+        for o in offerings:
+            for link in links.get(o.course_id, []):
+                keys.add((link.program_id, link.semester_number, o.section_label))
+        for program_id, sem, section in sorted(keys, key=lambda k: (programs.get(k[0], ""), k[1], k[2])):
+            pages.append(await self.build(scope="admin", term_label=term, program_id=program_id, semester_number=sem, section_label=section))
+        return pages
 
     # ------------------------------------------------------------ filter lists
     async def filter_options(
@@ -326,6 +360,7 @@ def _render_pdf(data: dict, institute_name: str, density: int) -> bytes:
         Paragraph("Weekly Timetable", h_title),
         Paragraph(escape(data["title"]) or "&nbsp;", h_sub),
         Paragraph(f"{escape(institute_name)} &nbsp;|&nbsp; Generated {data['generated_on'].strftime('%d %b %Y')}", h_sub),
+        *([Paragraph(escape(data["note"]), h_sub)] if data.get("note") else []),
         Spacer(1, 5 * mm),
     ]
 
@@ -383,3 +418,15 @@ def _render_pdf(data: dict, institute_name: str, density: int) -> bytes:
 
     doc.build(story, onFirstPage=footer, onLaterPages=footer)
     return buffer.getvalue()
+
+def render_book(pages: list[dict]) -> bytes:
+    """Several timetables in one PDF, each starting on its own page (whole institute by class, or every teacher)."""
+    from pypdf import PdfReader, PdfWriter
+
+    out = PdfWriter()
+    for data in pages:
+        for page in PdfReader(io.BytesIO(render_pdf(data))).pages:
+            out.add_page(page)
+    buf = io.BytesIO()
+    out.write(buf)
+    return buf.getvalue()

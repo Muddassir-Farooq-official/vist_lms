@@ -456,3 +456,40 @@ class LeaveIn(_BaseModel):
 async def grant_leave(student_id: uuid.UUID, payload: LeaveIn,
                       current_user: CurrentUser = Depends(require_permission(Permissions.ATTENDANCE_LOCK)), db=Depends(get_db)) -> dict:
     return await AttendanceService(db).grant_leave(student_id, from_date=payload.from_date, to_date=payload.to_date, reason=payload.reason, actor_id=current_user.id)
+
+# ---------------------------------------------------------------------------
+# Graded attendance fines (app/attendance/shortfall.py)
+# ---------------------------------------------------------------------------
+class FinesRunIn(_BaseModel):
+    term_label: str = _Field(min_length=1, max_length=50)
+    confirm: bool = False                  # False = preview only
+
+
+class ShortfallDecisionIn(_BaseModel):
+    decision: str = _Field(pattern="^(DROP|FINE|EXCUSE)$")
+    note: str = _Field(min_length=5, max_length=500)
+    amount: float | None = _Field(default=None, gt=0, le=1_000_000)
+
+
+@router.post("/fines/run", summary="Attendance fines for a term, by band: preview (confirm=false) or charge (confirm=true) -- admin only")
+async def run_attendance_fines(payload: FinesRunIn, current_user: CurrentUser = Depends(require_permission(Permissions.ATTENDANCE_LOCK)),
+                               db=Depends(get_db)) -> dict:
+    from app.attendance.shortfall import ShortfallService
+
+    return await ShortfallService(db).run(term_label=payload.term_label.strip(), actor_id=current_user.id, dry_run=not payload.confirm)
+
+
+@router.get("/shortfalls", summary="Students short of attendance per subject (charged, awaiting a decision, decided) -- admin only")
+async def list_shortfalls(term_label: str | None = None, status: str | None = None,
+                          current_user: CurrentUser = Depends(require_permission(Permissions.ATTENDANCE_LOCK)), db=Depends(get_db)) -> list[dict]:
+    from app.attendance.shortfall import ShortfallService
+
+    return await ShortfallService(db).listing(term_label=term_label, status=status)
+
+
+@router.post("/shortfalls/{shortfall_id}/decide", summary="Below the lowest band: drop from the course, allow with a fine, or excuse -- admin only")
+async def decide_shortfall(shortfall_id: uuid.UUID, payload: ShortfallDecisionIn,
+                           current_user: CurrentUser = Depends(require_permission(Permissions.ATTENDANCE_LOCK)), db=Depends(get_db)) -> dict:
+    from app.attendance.shortfall import ShortfallService
+
+    return await ShortfallService(db).decide(shortfall_id, decision=payload.decision, note=payload.note, amount=payload.amount, actor_id=current_user.id)

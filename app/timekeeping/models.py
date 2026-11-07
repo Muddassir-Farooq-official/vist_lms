@@ -58,3 +58,24 @@ class StaffAttendance(UUIDPKMixin, TimestampMixin, Base):
     in_marked_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     out_marked_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     note: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
+class LeaveRequest(UUIDPKMixin, TimestampMixin, Base):
+    """A member of staff asks for leave; an administrator approves or refuses it (app/timekeeping/leave.py).
+    kind: CASUAL (uses the monthly casual-leave allowance, paid), SICK (paid, a yearly allowance), UNPAID (deducted).
+    status: REQUESTED, APPROVED, REJECTED, CANCELLED. Approving marks the days as excused in staff attendance, so the
+    person is not counted absent and their classes show in the cover list. See migration d8f0a2b4c6e8."""
+
+    __tablename__ = "leave_requests"
+    __table_args__ = (Index("ix_leave_requests_employee", "employee_id"), Index("ix_leave_requests_status", "status"))
+
+    employee_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("employees.id", ondelete="CASCADE"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(10), nullable=False)
+    first_day: Mapped[date] = mapped_column(Date, nullable=False)
+    last_day: Mapped[date] = mapped_column(Date, nullable=False)
+    days: Mapped[int] = mapped_column(Integer, nullable=False)                         # working days in the range
+    reason: Mapped[str] = mapped_column(String(500), nullable=False)
+    status: Mapped[str] = mapped_column(String(10), nullable=False, default="REQUESTED")
+    requested_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    decided_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    decision_note: Mapped[str | None] = mapped_column(String(300), nullable=True)

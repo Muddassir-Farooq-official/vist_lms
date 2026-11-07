@@ -207,8 +207,32 @@
     document.getElementById("ec-credit-hours").value = course.credit_hours;
     document.getElementById("ec-description").value = course.description || "";
     document.getElementById("ec-active").value = String(course.is_active);
+    loadPrereqs(course.id);
     editCourseModal.showModal();
   }
+
+  // Prerequisites: chosen courses as removable chips, and a search list to add more.
+  let prereqChosen = [], prereqLoaded = [];
+  const prChosenEl = document.getElementById("ec-prereq-chosen"), prFind = document.getElementById("ec-prereq-find"), prList = document.getElementById("ec-prereq-list");
+  function paintPrereqs() {
+    prChosenEl.innerHTML = prereqChosen.length ? prereqChosen.map(function (id) {
+      const c = coursesCache.find(function (x) { return x.id === id; }) || { code: "?", title: "" };
+      return '<span class="ec-chip">' + esc(c.code) + " " + esc(c.title) + ' <button type="button" data-pr-remove="' + esc(id) + '" aria-label="Remove ' + esc(c.code) + '">\u00d7</button></span>';
+    }).join("") : '<span class="list-sub">None: anyone in the right semester can take it.</span>';
+    const q = prFind.value.trim().toLowerCase();
+    const pool = coursesCache.filter(function (c) {
+      return c.id !== activeEditCourseId && prereqChosen.indexOf(c.id) < 0 && (!q || (c.code + " " + c.title).toLowerCase().indexOf(q) >= 0);
+    }).slice(0, q ? 12 : 0);
+    prList.innerHTML = pool.map(function (c) { return '<button type="button" class="ec-pick" data-pr-add="' + esc(c.id) + '">+ ' + esc(c.code) + " " + esc(c.title) + "</button>"; }).join("");
+  }
+  async function loadPrereqs(courseId) {
+    prereqChosen = []; prereqLoaded = []; prFind.value = ""; paintPrereqs();
+    const r = await VA.fetchJson("/api/v1/academics/courses/" + courseId + "/prerequisites", { quiet: true });
+    if (r.ok && activeEditCourseId === courseId) { prereqChosen = r.body.map(function (c) { return c.id; }); prereqLoaded = prereqChosen.slice(); paintPrereqs(); }
+  }
+  prFind.addEventListener("input", paintPrereqs);
+  prList.addEventListener("click", function (e) { const b = e.target.closest("[data-pr-add]"); if (!b) return; prereqChosen.push(b.getAttribute("data-pr-add")); prFind.value = ""; paintPrereqs(); prFind.focus(); });
+  prChosenEl.addEventListener("click", function (e) { const b = e.target.closest("[data-pr-remove]"); if (!b) return; const id = b.getAttribute("data-pr-remove"); prereqChosen = prereqChosen.filter(function (x) { return x !== id; }); paintPrereqs(); });
 
   document.getElementById("close-edit-course-modal").addEventListener("click", function () {
     editCourseModal.close();
@@ -249,6 +273,16 @@
       editCourseError.textContent = extractErrorMessage(result.body, "Could not save changes.");
       editCourseError.hidden = false;
       return;
+    }
+    if (prereqChosen.slice().sort().join() !== prereqLoaded.slice().sort().join()) {
+      const pr = await VA.fetchJson("/api/v1/academics/courses/" + activeEditCourseId + "/prerequisites", {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requires_course_ids: prereqChosen }) });
+      if (!pr.ok) {
+        editCourseError.textContent = "Saved the course, but not its prerequisites: " + extractErrorMessage(pr.body, "please try again.");
+        editCourseError.hidden = false;
+        loadCourses();
+        return;
+      }
     }
 
     editCourseModal.close();
@@ -820,11 +854,28 @@
     let html = "<strong>Enrolled " + r.enrolled + " student(s)</strong>; already enrolled: " + r.already_enrolled + "; could not enroll: " + r.failed_count + ".";
     if (r.failed.length) {
       html += "<ul>" + r.failed.map(function (f) {
-        return "<li>" + VA.escapeHtml((f.roll_number || "?") + " " + f.name + " \u2014 " + f.reason) + "</li>";
+        return "<li>" + VA.escapeHtml((f.roll_number || "?") + " " + f.name + " \u2014 " + f.reason) +
+          (f.overridable && f.student_id ? ' <button type="button" class="secondary-btn small-btn" data-override="' + VA.escapeHtml(f.student_id) + '" data-rule="' +
+            VA.escapeHtml(f.overridable) + '">Enrol anyway\u2026</button>' : "") + "</li>";
       }).join("") + "</ul>";
     }
     box.innerHTML = html;
     box.hidden = false;
+  });
+  // A prerequisite not passed, or an overload above the program's credit-hour limit: an administrator may enrol anyway, with a reason.
+  document.getElementById("be-result").addEventListener("click", async function (e) {
+    const b = e.target.closest("[data-override]");
+    if (!b || !batchOfferingId) return;
+    const what = b.getAttribute("data-rule") === "CREDIT_LIMIT" ? "an overload above the credit-hour limit" : "a prerequisite that is not passed";
+    const why = await VA.ask({ title: "Enrol anyway", intro: "This allows " + what + ". The reason is kept in the activity log.",
+      label: "Reason", input: "textarea", min: 10, ok: "Enrol" });
+    if (why == null) return;
+    b.disabled = true;
+    const r = await VA.fetchJson("/api/v1/academics/offerings/" + batchOfferingId + "/enroll-student", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ student_id: b.getAttribute("data-override"), override_reason: why }) });
+    if (!r.ok) { b.disabled = false; VA.toast(extractErrorMessage(r.body, "Could not enrol."), "error"); return; }
+    b.replaceWith(document.createTextNode(" \u2714 enrolled"));
+    VA.toast("Enrolled.");
   });
 
   // ---- Whole-term timetable tools ---------------------------------------------

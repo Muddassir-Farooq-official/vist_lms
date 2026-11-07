@@ -187,3 +187,58 @@ async def test_remove_all_discounts_from_the_page_previews_first_then_needs_rese
     assert (await _listed(app_client, sid, scid))["status"] == "ENDED"
     await _create_accounts_officer(app_client, db_session, code="ACC9")
     assert (await app_client.post(f"{SC}/reset", json={"confirm": "RESET", "note": "Not allowed here"})).status_code == 403
+
+
+async def _with_student_card(client, cnic):
+    """Tuition (4 x Rs 2,000) plus a one-off Student Card fee of Rs 500 for the same student."""
+    sid, _ = await _create_and_activate_student(client, cnic=cnic)
+    await _create_active_fee_structure(client, total_amount=8000, installment_count=4)
+    card_type = await client.post("/api/v1/fees/types", json={"code": "CARD", "name": "Student Card"})
+    assert card_type.status_code == 201, card_type.text
+    card = await client.post("/api/v1/fees/structures", json={"fee_type_id": card_type.json()["id"], "name": "Student Card", "term_label": "Fall 2026",
+                                                             "total_amount": 500, "installment_count": 1, "effective_from": "2026-09-01"})
+    assert card.status_code == 201, card.text
+    assert (await client.post(f"/api/v1/fees/structures/{card.json()['id']}/activate")).status_code == 200
+    mine = [a for a in (await client.get("/api/v1/fees/assignments")).json() if a["payer_id"] == sid]
+    tuition = next(a["id"] for a in mine if a["fee_structure_id"] != card.json()["id"])
+    card_fee = next(a["id"] for a in mine if a["fee_structure_id"] == card.json()["id"])
+    types = {t["code"]: t["id"] for t in (await client.get("/api/v1/fees/types")).json()}
+    return sid, tuition, card_fee, types
+
+
+@pytest.mark.parametrize("kind,value,tuition_off", [("FIXED", 2000, 2000.0), ("PERCENT", 100, 8000.0), ("PERCENT", 50, 4000.0)])
+async def test_a_discount_given_on_every_fee_by_mistake_can_be_narrowed_to_tuition(app_client, admin_user, db_session, kind, value, tuition_off):
+    """The accounts office meant tuition only but chose every fee, so the Student Card fee was discounted too. Changing
+    "Applies to" to Tuition puts the card back to its full Rs 500 and leaves the tuition discount as it was. Narrowing
+    gives the student less, so it does not wait for a second administrator."""
+    cnic = {"FIXED": "74001-0000011-1", 100: "74001-0000012-2", 50: "74001-0000013-3"}[kind if kind == "FIXED" else value]
+    sid, tuition, card, types = await _with_student_card(app_client, cnic)
+    r = await app_client.post(SC, json={"student_id": sid, "name": "Need based", "kind": kind, "value": value, "valid_from": "2026-01-01",
+                                        "reason": "Given on every fee by mistake"})
+    assert r.status_code == 201, r.text
+    scid = r.json()["id"]
+    card_off = 500.0 if kind == "FIXED" or value == 100 else 250.0
+    assert (await _fee(app_client, card))["total_concession"] == card_off
+    assert (await _fee(app_client, tuition))["total_concession"] == tuition_off
+
+    await _second_admin(db_session)                                                   # someone else could approve, yet narrowing needs nobody
+    await _login_admin(app_client)
+    r = await app_client.patch(f"{SC}/{scid}", json={"fee_type_id": types["TUI"], "note": "Meant for tuition only"})
+    assert r.status_code == 200, r.text
+    assert (await _fee(app_client, card))["total_concession"] == 0.0
+    assert (await _fee(app_client, card))["total_payable"] == 500.0
+    assert (await _fee(app_client, tuition))["total_concession"] == tuition_off
+    lines = (await app_client.get(f"/api/v1/fees/assignments/{card}/statement")).json()["lines"]
+    assert [x["amount"] for x in lines if x["what"] == "Discount withdrawn"] == [card_off]   # on record, nothing deleted
+
+
+async def test_widening_a_tuition_discount_to_every_fee_still_waits_for_approval(app_client, admin_user, db_session):
+    sid, tuition, card, types = await _with_student_card(app_client, "74001-0000014-4")
+    r = await app_client.post(SC, json={"student_id": sid, "name": "Tuition 50", "kind": "PERCENT", "value": 50, "fee_type_id": types["TUI"],
+                                        "valid_from": "2026-01-01", "reason": "Tuition only"})
+    assert r.status_code == 201, r.text
+    await _second_admin(db_session)
+    await _login_admin(app_client)
+    r2 = await app_client.patch(f"{SC}/{r.json()['id']}", json={"fee_type_id": None, "note": "Every fee please"})
+    assert r2.status_code == 202, r2.text
+    assert (await _fee(app_client, card))["total_concession"] == 0.0

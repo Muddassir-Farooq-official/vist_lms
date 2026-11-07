@@ -905,7 +905,8 @@ async def admin_enroll_student(
     db=Depends(get_db),
 ) -> EnrollmentOut:
     enrollment = await EnrollmentService(db).enroll(
-        student_id=payload.student_id, course_offering_id=offering_id, actor_id=current_user.id, by_admin=True
+        student_id=payload.student_id, course_offering_id=offering_id, actor_id=current_user.id, by_admin=True,
+        override_reason=payload.override_reason,
     )
     return await _to_enrollment_out(db, enrollment)
 
@@ -1493,6 +1494,33 @@ async def weekly_timetable_pdf(
         content=pdf, media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="timetable-{slug}.pdf"'},
     )
+
+
+@router.get(
+    "/timetable/book.pdf",
+    summary="Every class (by=class) or every teacher (by=teacher) of a term, one timetable per page, in one PDF -- admin",
+)
+async def timetable_book_pdf(
+    term_label: str | None = None, by: str = "class",
+    current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_OFFERING_MANAGE)), db=Depends(get_db),
+) -> Response:
+    from app.academics.weekly_timetable import render_book
+
+    if by not in ("class", "teacher"):
+        raise BusinessRuleViolationError("Choose by class or by teacher.")
+    pages = await WeeklyTimetableService(db).book(term_label=term_label, by=by)
+    if not pages:
+        raise BusinessRuleViolationError("No class of this term has a timetable yet.")
+    try:
+        pdf = await run_in_threadpool(render_book, pages)
+    except Exception:
+        logger.exception("timetable_book_pdf_failed")
+        return JSONResponse(status_code=500, content={"error": {
+            "code": "PDF_FAILED", "message": "The PDF could not be created. Please try again, or tell the administrator.",
+        }})
+    term = (pages[0].get("term_label") or "term").replace(" ", "-").lower()
+    return Response(content=pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="timetables-{"classes" if by == "class" else "teachers"}-{term}.pdf"'})
 
 
 @router.get(
@@ -2091,3 +2119,33 @@ async def teacher_performance(
 
     entries.sort(key=lambda e: e.teacher_name)
     return entries
+
+
+# ---------------------------------------------------------------------------
+# Course prerequisites (app/academics/prerequisites.py)
+# ---------------------------------------------------------------------------
+class PrerequisitesIn(BaseModel):
+    requires_course_ids: list[uuid.UUID] = Field(default_factory=list, max_length=10)
+
+
+@router.get("/courses/{course_id}/prerequisites", summary="Courses that must be passed before this one")
+async def get_prerequisites(course_id: uuid.UUID, current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_VIEW)),
+                            db=Depends(get_db)) -> list[dict]:
+    from app.academics.prerequisites import PrerequisiteService
+
+    return await PrerequisiteService(db).listing(course_id)
+
+
+@router.get("/prerequisites", summary="Every prerequisite pair (course -> required course)")
+async def all_prerequisites(current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_VIEW)), db=Depends(get_db)) -> list[dict]:
+    from app.academics.prerequisites import PrerequisiteService
+
+    return await PrerequisiteService(db).all_pairs()
+
+
+@router.put("/courses/{course_id}/prerequisites", summary="Set the courses that must be passed before this one (replaces the list)")
+async def set_prerequisites(course_id: uuid.UUID, payload: PrerequisitesIn,
+                            current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_MANAGE)), db=Depends(get_db)) -> list[dict]:
+    from app.academics.prerequisites import PrerequisiteService
+
+    return await PrerequisiteService(db).replace(course_id, payload.requires_course_ids, actor_id=current_user.id)

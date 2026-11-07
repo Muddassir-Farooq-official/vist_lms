@@ -37,3 +37,22 @@
   </div>
   <p class="empty-state" id="ma-empty" hidden>No attendance has been recorded for you this month.</p>
 </section>
+
+
+<section class="sh-card" id="my-leave" hidden aria-labelledby="ml-h">
+  <h2 class="panel-title" id="ml-h">Leave</h2>
+  <p class="panel-hint">Apply for leave here; the administration approves or refuses it and you are told. Approved leave days are never counted as absent.</p>
+  <div class="kpi-grid" id="ml-balances"></div>
+  <form id="ml-form" class="form-grid two-col" novalidate>
+    <div class="form-field"><label for="ml-kind">Kind of leave</label>
+      <select id="ml-kind" class="select-input"><option value="CASUAL">Casual (paid)</option><option value="SICK">Sick (paid)</option><option value="UNPAID">Unpaid (deducted)</option></select>
+      <small class="list-sub">Casual uses this month's allowance, sick this year's; unpaid is deducted from pay.</small></div>
+    <div class="form-field"><label for="ml-reason">Reason</label><input id="ml-reason" class="text-input" maxlength="500" placeholder="e.g. family wedding, fever" /></div>
+    <div class="form-field"><label for="ml-from">First day</label><input id="ml-from" class="text-input" type="date" /></div>
+    <div class="form-field"><label for="ml-to">Last day</label><input id="ml-to" class="text-input" type="date" /></div>
+    <p id="ml-error" class="dash-alert error two-span" role="alert" hidden></p>
+    <div class="form-actions two-span"><button type="submit" class="role-btn" id="ml-apply">Apply</button></div>
+  </form>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Days</th><th>Kind</th><th>Reason</th><th>Status</th><th></th></tr></thead><tbody id="ml-mine"></tbody></table></div>
+</section>
+<script defer src="/static/js/my-leave.js"></script>
