@@ -26,7 +26,8 @@
       const left = b ? (x.kind === "CASUAL" ? b.casual_left_month + " casual this month" : x.kind === "SICK" ? b.sick_left_year + " sick this year" : "—") : "";
       return "<tr><td><strong>" + esc(x.employee_name) + "</strong><div class=\"cc-meta\">" + esc(x.employee_code || "") + "</div></td><td>" + esc(KIND[x.kind] || x.kind) +
         "</td><td>" + esc(day(x.first_day)) + (x.last_day !== x.first_day ? " – " + esc(day(x.last_day)) : "") + "<div class=\"cc-meta\">" + x.days + " working day(s)</div></td><td>" +
-        esc(x.reason) + "</td><td>" + esc(left) + "</td><td>" + esc(STATUS[x.status] || x.status) + (x.decision_note ? "<div class=\"cc-meta\">" + esc(x.decision_note) + "</div>" : "") +
+        esc(x.reason) + (x.note_url ? '<div><a class="link-btn" href="' + esc(x.note_url) + '" target="_blank" rel="noopener">Open medical note</a></div>'
+          : x.kind === "SICK" ? '<div class="cc-meta">No medical note</div>' : "") + "</td><td>" + esc(left) + "</td><td>" + esc(STATUS[x.status] || x.status) + (x.decision_note ? "<div class=\"cc-meta\">" + esc(x.decision_note) + "</div>" : "") +
         "</td><td>" + (x.status === "REQUESTED" ? '<button type="button" class="role-btn small-btn" data-ok="' + esc(x.id) + '">Approve</button> ' +
           '<button type="button" class="secondary-btn small-btn" data-other="' + esc(x.id) + '">Approve as…</button> ' +
           '<button type="button" class="danger-btn small-btn" data-no="' + esc(x.id) + '">Refuse</button>' : "") + "</td></tr>";

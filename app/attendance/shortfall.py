@@ -427,3 +427,130 @@ async def _warn(session: AsyncSession) -> int:
             guardian_body=f"{settings.app_name}: {st.first_name}'s attendance is low: {short}. A fine applies if it stays low.")
         warned += 1
     return warned
+
+
+# ---------------------------------------------------------------------- what a student (or parent) sees
+def _n(n: int, word: str = "class") -> str:
+    return f"{n} {word}{'' if n == 1 else 'es' if word.endswith('s') else 's'}"
+
+
+def classes_to_reach(present: int, taken: int, target: float) -> int:
+    """Classes to attend in a row (from now) to bring attendance up to `target` %."""
+    if taken == 0 or pct_of(present, taken) >= target or target >= 100:
+        return 0
+    x = max(0, int((target * taken - 100 * present) // (100 - target)))
+    while pct_of(present + x, taken + x) < target:
+        x += 1
+    return x
+
+
+def classes_can_miss(present: int, taken: int, floor_pct: float) -> int:
+    """Classes that can still be missed (with no more absences after) while staying at or above `floor_pct`."""
+    if floor_pct <= 0:
+        return 0
+    y = max(0, int(100 * present / floor_pct) - taken)
+    while y > 0 and pct_of(present, taken + y) < floor_pct:
+        y -= 1
+    return y
+
+
+async def _remaining_classes(session: AsyncSession, student_id: uuid.UUID, offering_ids: list) -> dict:
+    """Classes still to come this term for each course (scheduled, from today, not yet marked for this student)."""
+    from app.academics.models import ClassSession, ClassSessionStatus
+    from app.attendance.models import AttendanceRecord
+    from app.core.clock import institute_today
+
+    if not offering_ids:
+        return {}
+    marked = select(AttendanceRecord.class_session_id).where(AttendanceRecord.student_id == student_id)
+    rows = (await session.execute(
+        select(ClassSession.course_offering_id, func.count()).where(
+            ClassSession.course_offering_id.in_(offering_ids), ClassSession.status == ClassSessionStatus.SCHEDULED,
+            ClassSession.session_date >= institute_today(), ClassSession.id.not_in(marked))
+        .group_by(ClassSession.course_offering_id))).all()
+    return {oid: int(n) for oid, n in rows}
+
+
+async def risk_for_student(session: AsyncSession, student_id: uuid.UUID, items: list[dict]) -> dict:
+    """items: [{"offering_id", "present", "taken"}] -> {offering_id: what the student should know about that course}:
+    the band and fine it means now, a fine already charged, and how many classes in a row bring it to the next level."""
+    from app.attendance.models import AttendanceShortfall
+
+    ids = [i["offering_id"] for i in items]
+    remaining = await _remaining_classes(session, student_id, ids)
+    charged = {r.course_offering_id: r for r in (await session.execute(select(AttendanceShortfall).where(
+        AttendanceShortfall.student_id == student_id, AttendanceShortfall.course_offering_id.in_(ids or [uuid.uuid4()])))).scalars()}
+    fines = await _linked_fines(session, [r.id for r in charged.values()])
+    minimum = settings.attendance_eligibility_threshold_percent
+    out = {}
+    for i in items:
+        present, taken, oid = int(i["present"]), int(i["taken"]), i["offering_id"]
+        pct = pct_of(present, taken)
+        left = remaining.get(oid, 0)
+        row = charged.get(oid)
+        r = {"percentage": pct, "graded": graded(), "minimum": minimum, "classes_left": left, "band": 0, "fine": 0.0,
+             "review": False, "charged": None, "status": None, "next": None, "can_miss": 0, "message": ""}
+        if taken == 0:
+            r["message"] = ""                                # the card already says no classes have been held
+            out[oid] = r
+            continue
+        if pct >= minimum:
+            r["can_miss"] = classes_can_miss(present, taken, minimum)
+            r["message"] = (f"Above {minimum:g}%. You can miss {r['can_miss']} more {'class' if r['can_miss'] == 1 else 'classes'} and stay above it."
+                            if r["can_miss"] else f"Above {minimum:g}%, but missing the next class takes you below it.")
+            out[oid] = r
+            continue
+        if not graded():
+            need = classes_to_reach(present, taken, minimum)
+            r["next"] = {"to": minimum, "label": f"{minimum:g}% (needed to pass)", "classes": need, "reachable": need <= left}
+            r["message"] = (f"Below {minimum:g}%: attend the next {_n(need)} in a row to reach it." if need <= left
+                            else f"Below {minimum:g}%: it can no longer be reached with the {_n(left)} left this term.")
+            out[oid] = r
+            continue
+        band = band_for(pct)
+        r["band"], r["review"] = band, band == REVIEW
+        r["fine"] = 0.0 if band == REVIEW else float(amount_for(band))
+        target = {REVIEW: settings.attendance_band3_from, 3: settings.attendance_band2_from, 2: settings.attendance_band1_from, 1: minimum}[band]
+        nxt_band = band_for(target)
+        nxt_label = ("no fine" if nxt_band == 0 else f"a fine of Rs. {amount_for(nxt_band):,.0f}")
+        need = classes_to_reach(present, taken, target)
+        r["next"] = {"to": target, "label": nxt_label, "classes": need, "reachable": need <= left}
+        if row is not None:
+            fs = fines.get(row.id, [])
+            unpaid = sum(float(f.amount) for f in fs if f.status.value in ("PENDING", "PENDING_APPROVAL"))
+            r["charged"], r["status"] = {"amount": float(row.amount_charged), "unpaid": unpaid}, row.status
+        now = ("the administration will decide whether you can continue" if band == REVIEW
+               else f"the fine is Rs. {r['fine']:,.0f}")
+        if row is not None and row.status in ("FINED", "ALLOWED_WITH_FINE") and band <= row.band:
+            now = (f"a fine of Rs. {float(row.amount_charged):,.0f} has been charged"
+                   + (f" (Rs. {r['charged']['unpaid']:,.0f} unpaid; once paid, your marks decide)" if r["charged"]["unpaid"] else " and paid; your marks decide"))
+        elif row is not None and row.status in ("FINED", "ALLOWED_WITH_FINE") and band < REVIEW:
+            now = (f"the fine for this level is Rs. {r['fine']:,.0f}; Rs. {float(row.amount_charged):,.0f} has been charged so far "
+                   "and the difference will be added")
+        elif row is not None and row.status == "EXCUSED":
+            now = "the administration has excused it"
+        elif row is not None and row.status == "DROPPED":
+            now = "you were withdrawn from this course"
+        step = (f" Attend the next {_n(need)} in a row to reach {target:g}% ({nxt_label})." if need <= left
+                else f" {target:g}% ({nxt_label}) can no longer be reached with the {_n(left)} left.")
+        r["message"] = f"{pct:g}%: {now}." + ("" if row is not None and row.status in ("EXCUSED", "DROPPED") else step)
+        out[oid] = r
+    return out
+
+
+async def student_risk(session: AsyncSession, student_id: uuid.UUID) -> list[dict]:
+    """risk_for_student for every course the student is currently enrolled in."""
+    from app.academics.models import Course, CourseOffering, Enrollment, EnrollmentStatus
+    from app.attendance.service import AttendanceService
+
+    rows = (await session.execute(select(Enrollment, CourseOffering, Course).join(CourseOffering, CourseOffering.id == Enrollment.course_offering_id)
+                                  .join(Course, Course.id == CourseOffering.course_id)
+                                  .where(Enrollment.student_id == student_id, Enrollment.status == EnrollmentStatus.ENROLLED))).all()
+    att = AttendanceService(session)
+    items, meta = [], {}
+    for _e, off, course in rows:
+        p = await att.compute_percentage(student_id, off.id)
+        items.append({"offering_id": off.id, "present": p["present_count"], "taken": p["total_sessions_taken"]})
+        meta[off.id] = {"offering_id": off.id, "course_code": course.code, "course_title": course.title, "term_label": off.term_label}
+    risk = await risk_for_student(session, student_id, items)
+    return [meta[oid] | risk[oid] for oid in sorted(meta, key=lambda o: meta[o]["course_code"])]

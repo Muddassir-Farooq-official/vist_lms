@@ -79,3 +79,7 @@ class LeaveRequest(UUIDPKMixin, TimestampMixin, Base):
     decided_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     decision_note: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # Medical note for sick leave (PDF or photo), stored like application attachments. Migration e9a1b3c5d7f9.
+    note_key: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    note_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    note_type: Mapped[str | None] = mapped_column(String(100), nullable=True)

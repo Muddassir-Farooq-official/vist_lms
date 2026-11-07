@@ -87,6 +87,8 @@
     if (d.complaints) add(d.complaints.kpis.open + d.complaints.kpis.under_review, "complaints still open", "/dashboard/admin/complaints");
     if (d.corrections) add(d.corrections.length, "attendance corrections to decide", "/dashboard/admin/attendance");
     if (d.unmarked) add(d.unmarked.length, "classes whose attendance was never taken", "/dashboard/admin/attendance", "red");
+    if (d.leave) add(d.leave.waiting, "staff leave applications to decide", "/dashboard/admin/staff-attendance#leave");
+    if (d.shortfalls) add(d.shortfalls.waiting, "students below the lowest attendance band wait for your decision", "/dashboard/admin/attendance#fines", "red");
     const sheets = (d.overview && d.overview.results && d.overview.results.sheets_by_status) || {};
     add(sheets.SUBMITTED || 0, "result sheets waiting for approval", "/dashboard/admin/result-sheets");
     add(sheets.APPROVED || 0, "approved results not published yet", "/dashboard/admin/result-sheets", "blue");
@@ -261,12 +263,13 @@
   async function load(me) {
     const now = new Date(), in14 = new Date(now.getTime() + 14 * 864e5);
     const keys = ["profileChanges", "dash", "overview", "accounts", "approvals", "applications", "complaints", "corrections", "unmarked", "purchases", "tasks",
-      "inventory", "library", "assets", "staff", "gate", "hostel", "calendar", "announcements"];
+      "inventory", "library", "assets", "staff", "gate", "hostel", "calendar", "announcements", "leave", "shortfalls"];
     const urls = ["/api/v1/profile-changes/count", "/api/v1/reports/admin-dashboard", "/api/v1/reports/institute-overview", "/api/v1/accounts/summary", "/api/v1/approvals/count",
       "/api/v1/applications/overview", "/api/v1/complaints/analytics/overview", "/api/v1/attendance/correction-requests?status=PENDING",
       "/api/v1/attendance/needs-attention", "/api/v1/purchases/summary", "/api/v1/tasks/summary", "/api/v1/inventory/summary",
       "/api/v1/library/dashboard", "/api/v1/assets/summary", "/api/v1/staff-attendance/board", "/api/v1/gate/summary", "/api/v1/hostel/summary",
-      "/api/v1/calendar?start=" + iso(now) + "&end=" + iso(in14), "/api/v1/announcements?limit=3"];
+      "/api/v1/calendar?start=" + iso(now) + "&end=" + iso(in14), "/api/v1/announcements?limit=3",
+      "/api/v1/staff-attendance/leave/count", "/api/v1/attendance/shortfalls/count"];
     const values = await Promise.all(urls.map(get));
     const d = {};
     keys.forEach(function (k, i) { d[k] = values[i]; });

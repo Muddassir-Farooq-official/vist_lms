@@ -50,6 +50,9 @@
     <div class="form-field"><label for="ml-reason">Reason</label><input id="ml-reason" class="text-input" maxlength="500" placeholder="e.g. family wedding, fever" /></div>
     <div class="form-field"><label for="ml-from">First day</label><input id="ml-from" class="text-input" type="date" /></div>
     <div class="form-field"><label for="ml-to">Last day</label><input id="ml-to" class="text-input" type="date" /></div>
+    <div class="form-field two-span" id="ml-note-field" hidden><label for="ml-note">Medical note (required for sick leave)</label>
+      <input id="ml-note" class="text-input" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" />
+      <small class="list-sub">A doctor's note or prescription: a PDF or a clear photo, up to 15 MB.</small></div>
     <p id="ml-error" class="dash-alert error two-span" role="alert" hidden></p>
     <div class="form-actions two-span"><button type="submit" class="role-btn" id="ml-apply">Apply</button></div>
   </form>

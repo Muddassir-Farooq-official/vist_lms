@@ -24,6 +24,28 @@ from app.core.config import settings
 from app.core.exceptions import BusinessRuleViolationError, ResourceNotFoundError
 
 KINDS = {"CASUAL": "Casual leave", "SICK": "Sick leave", "UNPAID": "Unpaid leave"}
+NOTE_TYPES = {"application/pdf", "image/jpeg", "image/png", "image/webp"}       # a medical note: a PDF or a photo
+NOTE_HELP = "a PDF or a photo (JPG, PNG)"
+
+
+def _check_note(note: tuple[str, bytes, str | None] | None) -> None:
+    """A medical note must be a real PDF or photo, at most 15 MB (the same checks as application attachments)."""
+    from app.core.storage import FileTooLargeError, UnsupportedFileTypeError, validate_attachment
+
+    if note is None:
+        return
+    name, content, ctype = note
+    from pathlib import Path
+
+    suffix = Path(name or "").suffix.lower()
+    if ctype not in NOTE_TYPES and suffix not in (".pdf", ".jpg", ".jpeg", ".png", ".webp"):
+        raise BusinessRuleViolationError(f"Attach the medical note as {NOTE_HELP}.")
+    try:
+        content_type, _ext = validate_attachment(content=content, original_filename=name, declared_content_type=ctype)
+    except (UnsupportedFileTypeError, FileTooLargeError) as exc:
+        raise BusinessRuleViolationError(f"Medical note: {exc}") from exc
+    if content_type not in NOTE_TYPES:
+        raise BusinessRuleViolationError(f"Attach the medical note as {NOTE_HELP}.")
 
 
 def _overlap(first: date, last: date, a: date, b: date) -> tuple[date, date] | None:
@@ -124,7 +146,8 @@ class LeaveService:
                         "The extra days can be approved as unpaid leave.")
 
     # ------------------------------------------------------------------ applying
-    async def apply(self, *, user_id: uuid.UUID, kind: str, first: date, last: date, reason: str) -> dict:
+    async def apply(self, *, user_id: uuid.UUID, kind: str, first: date, last: date, reason: str,
+                    note: tuple[str, bytes, str | None] | None = None) -> dict:
         from app.notifications.models import NotificationCategory
         from app.notifications.service import create_notification
         from app.timekeeping.models import LeaveRequest
@@ -139,6 +162,9 @@ class LeaveService:
             raise BusinessRuleViolationError("Apply for at most 90 days at a time.")
         if len((reason or "").strip()) < 5:
             raise BusinessRuleViolationError("Write the reason (a few words).")
+        if kind == "SICK" and note is None:
+            raise BusinessRuleViolationError(f"Sick leave needs a medical note: attach {NOTE_HELP}.")
+        _check_note(note)
         from app.core.clock import institute_today
 
         if first < institute_today() - timedelta(days=30):
@@ -156,6 +182,8 @@ class LeaveService:
                          status="REQUESTED", requested_by=user_id)
         self.session.add(r)
         await self.session.flush()
+        if note is not None:
+            await self._store_note(r, note)
         await self.audit.log(actor_user_id=user_id, action="leave.requested", entity_type="leave_request", entity_id=r.id,
                              after={"kind": kind, "from": str(first), "to": str(last), "days": len(days)})
         from app.approvals.service import _users_with_permission
@@ -166,6 +194,27 @@ class LeaveService:
                                       message=f"{emp.first_name} {emp.last_name}: {KINDS[kind].lower()}, {first:%d %b} to {last:%d %b} ({len(days)} day(s)).",
                                       link="/dashboard/admin/staff-attendance#leave")
         return self.out(r, emp)
+
+    async def _store_note(self, r, note: tuple[str, bytes, str | None]) -> None:
+        from app.core.storage import save_attachment
+
+        name, content, ctype = note
+        key, display, content_type = save_attachment(entity_id=r.id, content=content, original_filename=name, declared_content_type=ctype,
+                                                     folder="leave-notes")
+        r.note_key, r.note_name, r.note_type = key, display, content_type
+
+    async def note_file(self, request_id: uuid.UUID, *, user_id: uuid.UUID, can_manage: bool):
+        """The medical note, for the applicant or the administration only."""
+        from app.timekeeping.models import LeaveRequest
+
+        r = await self.session.get(LeaveRequest, request_id)
+        if r is None or not r.note_key:
+            raise ResourceNotFoundError("No medical note.")
+        if not can_manage:
+            emp = await self._employee_for_user(user_id)
+            if emp.id != r.employee_id:
+                raise ResourceNotFoundError("No medical note.")
+        return r
 
     async def cancel(self, request_id: uuid.UUID, *, user_id: uuid.UUID) -> dict:
         r = await self._get(request_id)
@@ -205,6 +254,8 @@ class LeaveService:
                 as_kind = as_kind.upper()
                 if as_kind not in KINDS:
                     raise BusinessRuleViolationError("Choose casual, sick or unpaid leave.")
+                if as_kind == "SICK" and not r.note_key:
+                    raise BusinessRuleViolationError("Sick leave needs a medical note, and this application has none. Approve it as casual or unpaid.")
                 if as_kind != r.kind:
                     note = (f"Approved as {KINDS[as_kind].lower()} (asked: {KINDS[r.kind].lower()}). " + note).strip()
                     r.kind = as_kind
@@ -249,7 +300,8 @@ class LeaveService:
         return {"id": r.id, "employee_id": r.employee_id, "employee_name": f"{emp.first_name} {emp.last_name}" if emp else None,
                 "employee_code": getattr(emp, "employee_code", None) if emp else None, "kind": r.kind, "kind_label": KINDS.get(r.kind, r.kind),
                 "first_day": r.first_day, "last_day": r.last_day, "days": r.days, "reason": r.reason, "status": r.status,
-                "decision_note": r.decision_note, "decided_at": r.decided_at, "created_at": r.created_at}
+                "decision_note": r.decision_note, "decided_at": r.decided_at, "created_at": r.created_at,
+                "note_name": r.note_name, "note_url": f"/api/v1/staff-attendance/leave/{r.id}/note" if r.note_key else None}
 
     async def mine(self, user_id: uuid.UUID) -> dict:
         from app.core.clock import institute_today

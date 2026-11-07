@@ -75,16 +75,31 @@
       const tone = !a.total_sessions_taken ? "grey" : a.below_minimum ? "red" : pct < min + 5 ? "amber" : "green";
       return '<li><div class="prog-head"><strong>' + esc(a.course_code) + " · " + esc(a.course_title) + "</strong><b class=\"" + (tone === "red" ? "bad" : "") + '">' +
         (a.total_sessions_taken ? pct + "%" : "—") + '</b></div><div class="att-track"><span class="seg seg-' + tone + '" style="width:' + pct + '%"></span><i style="left:' + min + '%"></i></div>' +
-        "<small>" + D.num(a.present_count) + " present · " + D.num(a.absent_count) + " absent" + (a.leave_count ? " · " + D.num(a.leave_count) + " on leave" : "") + " · of " + D.num(a.total_sessions_taken) + " classes</small></li>";
+        "<small>" + D.num(a.present_count) + " present · " + D.num(a.absent_count) + " absent" + (a.leave_count ? " · " + D.num(a.leave_count) + " on leave" : "") + " · of " + D.num(a.total_sessions_taken) + " classes</small>" +
+        riskNote(a.risk) + "</li>";
     }).join("") || '<li class="dash-empty">No current courses.</li>';
     D.set("att-note", "The line on each bar is the " + min + "% attendance needed to sit the final exam.");
+  }
+
+  // For a parent, in the third person: the fine this attendance means and what brings it down.
+  function riskNote(r) {
+    if (!r || !r.band && !r.review) return "";
+    let now = r.review ? "Below " + r.next.to + "%: the administration will decide whether your child can continue in this course."
+      : "At this level the attendance fine is " + D.money(r.fine) + ".";
+    if (r.charged && r.status !== "EXCUSED" && r.status !== "DROPPED") now = "An attendance fine of " + D.money(r.charged.amount) + " has been charged" + (r.charged.unpaid ? " (" + D.money(r.charged.unpaid) + " unpaid)." : " and paid.");
+    if (r.status === "EXCUSED") now = "The administration has excused the low attendance.";
+    const step = r.next && r.status !== "EXCUSED" && r.status !== "DROPPED"
+      ? (r.next.reachable ? " Attending the next " + r.next.classes + (r.next.classes === 1 ? " class" : " classes") + " in a row brings it to " + r.next.to + "% (" + r.next.label + ")."
+        : " " + r.next.to + "% can no longer be reached this term.") : "";
+    return '<p class="att-risk ' + (r.review ? "bad" : "warn") + '">' + esc(now + step) + "</p>";
   }
 
   function things(d, papers, name) {
     const first = name.split(" ")[0];
     const items = [];
     (d.attendance || []).filter(function (a) { return a.below_minimum; }).forEach(function (a) {
-      items.push({ count: Math.round(a.percentage) + "%", text: first + "'s attendance in " + a.course_code + " is below " + d.attendance_minimum + "%. Please talk to the teacher.", href: "#pr-att-h", tone: "red" });
+      const fine = a.risk && a.risk.fine && !a.risk.charged ? " If it stays this low, the attendance fine is " + D.money(a.risk.fine) + "." : "";
+      items.push({ count: Math.round(a.percentage) + "%", text: first + "'s attendance in " + a.course_code + " is below " + d.attendance_minimum + "%." + fine + " Please talk to the teacher.", href: "#pr-att-h", tone: "red" });
     });
     const f = d.fees.summary;
     if (f.overdue > 0) items.push({ count: "!", text: D.money(f.overdue) + " of fees is overdue" + (f.late_fee_accrued ? " (late fee so far " + D.money(f.late_fee_accrued) + ")" : "") + ". Pay with the challan at any bank.", href: "#pr-fee-h", tone: "red" });
