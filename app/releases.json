@@ -1,5 +1,18 @@
 [
   {
+    "version": "1.6.1",
+    "date": "2026-11-08",
+    "title": "Fix: link previews on WhatsApp",
+    "summary": "Shared links to the portal now show the picture card on WhatsApp and other apps.",
+    "changes": [
+      {
+        "kind": "fixed",
+        "for": "Everyone",
+        "text": "When the portal's link or the \"what's new\" link was shared on WhatsApp, the preview picture did not appear. It now does."
+      }
+    ]
+  },
+  {
     "version": "1.6.0",
     "date": "2026-11-08",
     "title": "Pay fees online with 1Bill (ready for the bank)",

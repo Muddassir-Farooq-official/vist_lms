@@ -88,10 +88,11 @@ async def test_shared_links_show_a_preview_picture(app_client, monkeypatch):
     from app.core.config import settings
 
     monkeypatch.setattr(settings, "public_url", "https://lms.example.edu.pk")
-    login = (await app_client.get("/", headers={"accept": "text/html"})).text
+    via = {"accept": "text/html", "host": "lms.example.edu.pk", "x-forwarded-proto": "https"}   # as nginx passes it on
+    login = (await app_client.get("/", headers=via)).text
     assert '<meta property="og:image" content="https://lms.example.edu.pk/share/preview.png?kind=portal' in login
     assert 'property="og:title"' in login and 'name="twitter:card" content="summary_large_image"' in login
-    health = (await app_client.get("/health", headers={"accept": "text/html"})).text
+    health = (await app_client.get("/health", headers=via)).text
     assert "share/preview.png?kind=version" in health and f'og:url" content="https://lms.example.edu.pk/health?v={rel.current_version()}"' in health
     assert "data-share-url" in health
     for kind in ("portal", "version"):
@@ -105,3 +106,29 @@ async def test_shared_links_show_a_preview_picture(app_client, monkeypatch):
 async def test_staff_menu_has_a_share_button_for_the_version(app_client):
     page = (await app_client.get("/dashboard/faculty", headers={"accept": "text/html"})).text
     assert f'data-share-path="/health?v={rel.current_version()}"' in page and "drawer-version-top" in page
+
+
+async def test_preview_uses_the_address_people_came_in_on_when_public_url_is_not_set(app_client, monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "public_url", "")
+    monkeypatch.setattr(settings, "cors_origins", "http://localhost:8000")
+    page = (await app_client.get("/", headers={"accept": "text/html", "host": "lms.vist.edu.pk", "x-forwarded-proto": "https"})).text
+    assert '<meta property="og:image" content="https://lms.vist.edu.pk/share/preview.png?kind=portal' in page
+    assert "localhost" not in page.split('og:image" content="')[1].split('"')[0]
+
+
+async def test_previews_use_the_address_the_link_was_opened_with_and_answer_head(app_client, monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "public_url", "")
+    monkeypatch.setattr(settings, "cors_origins", "http://localhost:8000")     # a typical leftover: must not be used
+    h = {"host": "lms.vist.edu.pk", "x-forwarded-proto": "https", "user-agent": "WhatsApp/2.23.20.0 A", "accept": "text/html"}
+    page = (await app_client.get("/", headers=h)).text
+    assert '<meta property="og:image" content="https://lms.vist.edu.pk/share/preview.png?kind=portal' in page
+    assert '<meta property="og:url" content="https://lms.vist.edu.pk/"' in page and "localhost" not in page.split("og:url")[1][:80]
+    for url in ("/", "/share/preview.png?kind=portal", "/health"):
+        r = await app_client.head(url, headers=h)
+        assert r.status_code == 200 and r.content == b"", url
+    img = await app_client.head("/share/preview.png?kind=version", headers=h)
+    assert img.headers["content-type"] == "image/png" and int(img.headers["content-length"]) > 1000
