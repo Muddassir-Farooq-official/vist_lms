@@ -61,6 +61,13 @@ services:
     image: vist-lms:latest
     restart: unless-stopped
     command: ["rq", "worker", "--url", "redis://redis:6379/0", "imports"]
+    # The image's own health check asks the web app on port 8000, which this container does not run, so Docker
+    # called it "unhealthy" although it worked. Check what it really needs instead: Redis answers.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, redis; redis.Redis.from_url(os.environ['REDIS_URL'], socket_timeout=3).ping()"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
     env_file: .env
     environment:
       REDIS_URL: redis://redis:6379/0
@@ -77,6 +84,13 @@ services:
     image: vist-lms:latest
     restart: unless-stopped
     command: ["python", "scripts/sms_sender.py"]
+    # The image's own health check asks the web app on port 8000, which this container does not run, so Docker
+    # called it "unhealthy" although it worked. Check what it really needs instead: Redis answers.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, redis; redis.Redis.from_url(os.environ['REDIS_URL'], socket_timeout=3).ping()"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
     env_file: .env
     environment:
       REDIS_URL: redis://redis:6379/0

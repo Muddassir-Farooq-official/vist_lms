@@ -10,6 +10,7 @@
       {"kind": "new", "for": "Everyone", "text": "The status page (/health) now shows whether the system is working, its version and when it was last updated."},
       {"kind": "improved", "for": "Everyone", "text": "Photos are saved at a sensible size: profile pictures about 20 times smaller, document photos still sharp enough to read. PDFs and Word/Excel files are kept exactly as uploaded."},
       {"kind": "improved", "for": "Admins", "text": "Each update now clears the leftover files it creates, so the server's disk no longer fills up over time. System logs are capped too."},
+      {"kind": "fixed", "for": "Admins", "text": "The server no longer reports the notification and import helpers as \"unhealthy\" when they are working normally."},
       {"kind": "improved", "for": "Admins", "text": "One guided command sets up the server's safety: off-site backups to Google Drive, a closed database port and new passwords and keys, each step asking before it changes anything."}
     ]
   },
