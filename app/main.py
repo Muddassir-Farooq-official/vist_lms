@@ -206,6 +206,7 @@ ADMIN_NAV_ITEMS = [
     _nav("timetable", "Timetable", "clock", "/dashboard/admin/timetable", group="Academics"),
     _nav("attendance", "Attendance", "attendance", "/dashboard/admin/attendance", group="Academics", mobile=True),
     _nav("progress", "Teacher Progress", "exams", "/dashboard/admin/progress", group="Academics"),
+    _nav("feedback", "Course feedback", "check-circle", "/dashboard/admin/feedback", group="Academics"),
     _nav("overview", "Institute Overview", "dashboard", "/dashboard/admin/overview", group="Academics"),
     _nav("results", "Result Types", "exams", "/dashboard/admin/results", group="Academics"),
     _nav("result-sheets", "Result Approval", "tasks", "/dashboard/admin/result-sheets", group="Academics"),
@@ -300,6 +301,7 @@ PARENT_NAV_ITEMS = [
 PRINCIPAL_NAV_ITEMS = [
     _nav("overview", "Institute overview", "dashboard", "/dashboard/principal", mobile=True, short="Home"),
     _nav("progress", "Teacher progress", "exams", "/dashboard/principal/progress", mobile=True, short="Progress"),
+    _nav("feedback", "Course feedback", "check-circle", "/dashboard/principal/feedback"),
     _nav("students", "Student lookup", "students", "/dashboard/principal/students", mobile=True, short="Students"),
     _nav("reports", "Reports", "exams", "/dashboard/principal/reports"),
     _nav("staff-attendance", "Staff attendance", "clock", "/dashboard/principal/staff-attendance"),
@@ -312,6 +314,7 @@ PRINCIPAL_NAV_ITEMS = [
 HOD_NAV_ITEMS = [
     _nav("attendance", "Attendance oversight", "attendance", "/dashboard/hod", mobile=True, short="Attendance"),
     _nav("progress", "Teacher progress", "exams", "/dashboard/hod/progress", mobile=True, short="Progress"),
+    _nav("feedback", "Course feedback", "check-circle", "/dashboard/hod/feedback"),
     _nav("students", "Student lookup", "students", "/dashboard/hod/students", mobile=True, short="Students"),
     _nav("reports", "Reports", "exams", "/dashboard/hod/reports"),
     _nav("calendar", "Calendar", "clock", "/dashboard/hod/calendar"),
@@ -377,6 +380,7 @@ STUDENT_NAV_ITEMS = [
     _nav("attendance", "My Attendance", "attendance", "/dashboard/student/attendance", group="Study", mobile=True, short="Attendance"),
     _nav("exams", "My Exams", "clock", "/dashboard/student/exams", group="Study"),
     _nav("results", "My Results", "exams", "/dashboard/student/results", group="Study"),
+    _nav("feedback", "Course feedback", "check-circle", "/dashboard/student/feedback", group="Study"),
     _nav("records", "Degree progress & documents", "graduation-cap", "/dashboard/student/records", group="Study"),
     _nav("library", "Library", "library", "/dashboard/student/library", group="Services"),
     _nav("applications", "Applications", "file", "/dashboard/student/applications", group="Services"),
@@ -395,6 +399,8 @@ FACULTY_NAV_ITEMS = [
     _nav("courses", "My Courses", "graduation-cap", "/dashboard/faculty/courses", group="Teaching", mobile=True, short="Courses"),
     _nav("attendance", "Attendance", "attendance", "/dashboard/faculty/attendance", group="Teaching", mobile=True),
     _nav("grading", "Grading", "exams", "/dashboard/faculty/grading", group="Teaching", mobile=True),
+    _nav("watch", "Students to watch", "students", "/dashboard/faculty/watch", group="Teaching"),
+    _nav("feedback", "Student feedback", "check-circle", "/dashboard/faculty/feedback", group="Teaching"),
     _nav("timetable", "My Timetable", "clock", "/dashboard/faculty/timetable", group="Teaching"),
     _nav("exams", "Exam duties", "exams", "/dashboard/faculty/exams", group="Teaching"),
     _nav("library", "Library", "library", "/dashboard/faculty/library", group="Services"),
@@ -611,6 +617,9 @@ app.include_router(system_status_router, prefix=settings.api_v1_prefix)
 from app.core.release_router import router as release_router  # noqa: E402
 
 app.include_router(release_router, prefix=settings.api_v1_prefix)
+from app.feedback.router import router as feedback_router  # noqa: E402
+
+app.include_router(feedback_router, prefix=settings.api_v1_prefix)
 app.include_router(exams_router, prefix=settings.api_v1_prefix)
 app.include_router(sms_router, prefix=settings.api_v1_prefix)
 from app.reports.finance_router import router as finance_reports_router  # noqa: E402
@@ -1717,6 +1726,31 @@ async def student_results_page(request: Request):
     return templates.TemplateResponse(
         request, "student/results.html", {"nav_items": STUDENT_NAV_ITEMS, "active_nav": "results"}
     )
+
+
+@app.get("/dashboard/student/feedback", include_in_schema=False)
+async def student_feedback_page(request: Request):
+    return templates.TemplateResponse(request, "student/feedback.html", {"nav_items": STUDENT_NAV_ITEMS, "active_nav": "feedback"})
+
+
+@app.get("/dashboard/faculty/feedback", include_in_schema=False)
+async def faculty_feedback_page(request: Request):
+    return templates.TemplateResponse(request, "faculty/feedback.html", {"nav_items": FACULTY_NAV_ITEMS, "active_nav": "feedback"})
+
+
+@app.get("/dashboard/{portal}/feedback", include_in_schema=False)
+async def oversight_feedback_page(request: Request, portal: str):
+    nav, roles = {"admin": (ADMIN_NAV_ITEMS, "ADMIN"), "principal": (PRINCIPAL_NAV_ITEMS, "ADMIN,PRINCIPAL"),
+                  "hod": (HOD_NAV_ITEMS, "ADMIN,HOD")}.get(portal, (None, None))
+    if nav is None:
+        raise HTTPException(status_code=404)
+    return templates.TemplateResponse(request, "shared/feedback_overview.html", {"nav_items": nav, "active_nav": "feedback", "allowed_roles": roles,
+                                                                                 "can_edit_questions": portal == "admin"})
+
+
+@app.get("/dashboard/faculty/watch", include_in_schema=False)
+async def faculty_watch_page(request: Request):
+    return templates.TemplateResponse(request, "faculty/watch.html", {"nav_items": FACULTY_NAV_ITEMS, "active_nav": "watch"})
 
 
 @app.get("/dashboard/faculty/courses", include_in_schema=False)

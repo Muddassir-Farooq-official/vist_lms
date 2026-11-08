@@ -1,0 +1,16 @@
+{% extends "faculty/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Student feedback{% endblock %}
+{% block page_title %}Student feedback{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">What your students said about your courses. Anonymous, and shown once a course's results are published.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/feedback.css?v={{ app_version() }}" />{% endblock %}
+
+{% block content %}
+<div id="fb-list" aria-live="polite"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
+<p class="fb-none panel fb-panel" id="fb-none" hidden>No feedback yet. Students are asked in the last two weeks of each term.</p>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/feedback-view.js?v={{ app_version() }}"></script>
+<script src="/static/js/faculty-feedback.js?v={{ app_version() }}"></script>
+{% endblock %}

@@ -70,3 +70,20 @@
 /* version line in the side menu */
 .drawer-version { display: block; padding: 8px 14px 2px; font-size: .75rem; color: var(--sidebar-text); opacity: .75; text-decoration: none; }
 .drawer-version:hover { opacity: 1; text-decoration: underline; }
+
+/* version label under the logo in the staff menus */
+.drawer-version-top { display: flex; align-items: center; gap: 8px; margin: -4px 12px 10px; padding: 7px 12px; border-radius: 10px;
+  background: rgba(255, 255, 255, .08); color: var(--sidebar-text); font-size: .78rem; text-decoration: none; }
+.drawer-version-top:hover { background: rgba(255, 255, 255, .14); color: var(--sidebar-text-active); }
+.drawer-version-top b { margin-left: auto; font-weight: 600; color: var(--sidebar-text-active); }
+.dvt-dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 0 3px rgba(74, 222, 128, .2); }
+
+/* "A new version is here" card */
+.wn-celebrate { max-width: 380px; text-align: center; }
+.wn-celebrate .wn-body { padding: 30px 24px 8px; }
+.wn-emoji { font-size: 2.6rem; line-height: 1; margin: 0 0 10px; }
+.wn-celebrate h2 { margin: 0 0 6px; font-size: 1.35rem; color: var(--text-primary); }
+.wn-celebrate .wn-ver { margin: 0; color: var(--text-secondary); }
+.wn-celebrate .wn-actions { justify-content: center; border-top: 0; padding: 18px 24px 24px; gap: 10px; flex-wrap: wrap; }
+.wn-celebrate .wn-actions a { border: 1px solid var(--border-strong); border-radius: 10px; padding: 9px 16px; }
+.wn-confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 2147483647; }

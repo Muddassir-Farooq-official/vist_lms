@@ -84,34 +84,78 @@
     });
   }
 
-  // ---------------------------------------------------------------- card in the portals, once per version
+  // ---------------------------------------------------------------- "A new version is here", once per version
+  // A short burst of confetti (about 2.5 seconds). Nothing for people who asked their device for less motion.
+  function confetti(host) {
+    try { if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return; } catch (e) { return; }
+    const c = document.createElement("canvas");
+    c.className = "wn-confetti";
+    c.setAttribute("aria-hidden", "true");
+    (host || document.body).appendChild(c);
+    const ctx = c.getContext("2d");
+    if (!ctx) { c.remove(); return; }
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    function size() { c.width = innerWidth * dpr; c.height = innerHeight * dpr; }
+    size();
+    const colors = ["#2454d6", "#f5b400", "#16a34a", "#ea8c1f", "#7c3aed", "#dc2626", "#0ea5e9"];
+    const parts = [];
+    const n = innerWidth < 600 ? 90 : 160;
+    for (let i = 0; i < n; i++) {
+      const fromLeft = i % 2 === 0;
+      parts.push({
+        x: (fromLeft ? 0.15 : 0.85) * innerWidth, y: innerHeight * 0.55,
+        vx: (fromLeft ? 1 : -1) * (3 + Math.random() * 7), vy: -(9 + Math.random() * 9),
+        w: 6 + Math.random() * 6, h: 3 + Math.random() * 5, r: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.3,
+        color: colors[i % colors.length],
+      });
+    }
+    const start = performance.now();
+    function frame(t) {
+      const age = t - start;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, innerWidth, innerHeight);
+      parts.forEach(function (p) {
+        p.vy += 0.35; p.vx *= 0.99; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, 1 - Math.max(0, age - 1800) / 700);
+        ctx.translate(p.x, p.y); ctx.rotate(p.r);
+        ctx.fillStyle = p.color; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx.restore();
+      });
+      if (age < 2500) requestAnimationFrame(frame); else c.remove();
+    }
+    requestAnimationFrame(frame);
+  }
+
   function popupOnce(current) {
-    var seen = null;
+    let seen = null;
     try { seen = localStorage.getItem(SEEN_KEY); } catch (e) { return; }
     if (seen === current) return;
-    load(1).then(function (d) {
-      if (!d.releases.length || d.version !== current) return;
-      var dlg = el("dialog", "wn-modal");
-      dlg.setAttribute("aria-labelledby", "wn-modal-title");
-      var body = el("div", "wn-body");
-      body.appendChild(el("p", "wn-eyebrow", "What's new"));
-      var ol = el("ol", "hs-releases");
-      var li = renderRelease(d.releases[0], true, "");
-      li.querySelector("h3").id = "wn-modal-title";
-      ol.appendChild(li);
-      body.appendChild(ol);
-      var actions = el("div", "wn-actions");
-      var all = el("a", null, "All updates"); all.href = "/health#whats-new";
-      var ok = el("button", null, "Got it"); ok.type = "button";
-      actions.appendChild(all); actions.appendChild(ok);
-      dlg.appendChild(body); dlg.appendChild(actions);
-      document.body.appendChild(dlg);
-      function done() { try { localStorage.setItem(SEEN_KEY, current); } catch (e) { /* ignore */ } }
-      ok.addEventListener("click", function () { done(); dlg.close(); });
-      all.addEventListener("click", done);
-      dlg.addEventListener("cancel", done);
-      if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
-    }).catch(function () { /* not signed in yet: try again next page */ });
+    function done() { try { localStorage.setItem(SEEN_KEY, current); } catch (e) { /* ignore */ } }
+    fetch("/api/v1/system/version", { credentials: "include", headers: { Accept: "application/json" } })
+      .then(function (r) { if (!r.ok) throw r.status; return r.json(); })
+      .then(function (v) {
+        if (v.version !== current) return;
+        const dlg = el("dialog", "wn-modal wn-celebrate");
+        dlg.setAttribute("aria-labelledby", "wn-modal-title");
+        const body = el("div", "wn-body");
+        body.appendChild(el("p", "wn-emoji", "\uD83C\uDF89"));
+        const h = el("h2", null, "A new version is here!"); h.id = "wn-modal-title";
+        body.appendChild(h);
+        body.appendChild(el("p", "wn-ver", "Version " + v.version + (v.released_on_text ? " \u00b7 " + v.released_on_text : "")));
+        const actions = el("div", "wn-actions");
+        const all = el("a", null, "See what's new"); all.href = "/health#whats-new";
+        const ok = el("button", null, "OK"); ok.type = "button";
+        actions.appendChild(all); actions.appendChild(ok);
+        dlg.appendChild(body); dlg.appendChild(actions);
+        document.body.appendChild(dlg);
+        ok.addEventListener("click", function () { done(); dlg.close(); });
+        all.addEventListener("click", done);
+        dlg.addEventListener("cancel", done);
+        dlg.addEventListener("close", function () { setTimeout(function () { dlg.remove(); }, 50); });
+        if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
+        confetti(dlg.open ? dlg : document.body);
+      }).catch(function () { /* try again on the next page */ });
   }
 
   function start() {

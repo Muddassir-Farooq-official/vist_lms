@@ -1,0 +1,73 @@
+/* Course feedback: student form, teacher summary, oversight table */
+.fb-panel { padding: 20px; margin-bottom: 16px; }
+.fb-panel h2 { margin: 0 0 12px; font-size: 1.05rem; color: var(--text-primary); }
+.fb-anon { display: flex; gap: 10px; align-items: flex-start; margin: 0 0 16px; padding: 12px 14px; border-radius: 12px; background: var(--blue-50); color: var(--text-primary); font-size: .92rem; line-height: 1.5; }
+.fb-anon svg { width: 20px; height: 20px; flex: none; color: var(--blue-600); margin-top: 1px; }
+.fb-none { color: var(--text-muted); margin: 0; }
+.fb-note { color: var(--text-secondary); font-size: .88rem; margin: 10px 0 0; }
+.fb-mini { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.fb-mini li { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 10px; background: var(--surface-alt); }
+.fb-mini small { color: var(--text-muted); }
+
+/* the course card a student fills in */
+.fb-course { border: 1px solid var(--border); border-radius: 14px; margin-bottom: 12px; overflow: hidden; }
+.fb-course > button { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; border: 0; background: var(--surface); font: inherit; text-align: left; cursor: pointer; }
+.fb-course > button strong { display: block; color: var(--text-primary); }
+.fb-course > button small { color: var(--text-muted); }
+.fb-course > button .fb-go { color: var(--blue-600); font-weight: 600; white-space: nowrap; }
+.fb-course.open > button { background: var(--blue-50); }
+.fb-form { padding: 6px 16px 16px; }
+.fb-q { padding: 14px 0; border-top: 1px solid var(--border); }
+.fb-q:first-child { border-top: 0; }
+.fb-q p { margin: 0 0 10px; color: var(--text-primary); font-weight: 500; }
+.fb-scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; border: 0; padding: 0; margin: 0; }
+.fb-scale label { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; border: 1px solid var(--border-strong); border-radius: 10px; cursor: pointer; font-size: .74rem; color: var(--text-secondary); text-align: center; line-height: 1.2; }
+.fb-scale label b { font-size: 1rem; color: var(--text-primary); }
+.fb-scale input { position: absolute; opacity: 0; pointer-events: none; }
+.fb-scale input:focus-visible + label { box-shadow: 0 0 0 3px var(--blue-100); }
+.fb-scale input:checked + label { background: var(--blue-600); border-color: var(--blue-600); color: var(--white); }
+.fb-scale input:checked + label b { color: var(--white); }
+.fb-comment { width: 100%; min-height: 90px; margin-top: 6px; box-sizing: border-box; }
+.fb-submit { display: flex; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+.fb-btn { border: 0; background: var(--blue-600); color: var(--white); border-radius: 10px; padding: 10px 20px; font: inherit; font-weight: 600; cursor: pointer; }
+.fb-btn:disabled { opacity: .6; cursor: default; }
+.fb-left { color: var(--text-muted); font-size: .88rem; }
+@media (max-width: 480px) { .fb-scale label span { display: none; } }
+
+/* a course's summary (teacher view and the oversight dialog) */
+.fs-card { padding: 20px; margin-bottom: 16px; }
+.fs-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.fs-head h2 { margin: 0; font-size: 1.05rem; color: var(--text-primary); }
+.fs-head small { color: var(--text-muted); }
+.fs-overall { display: flex; align-items: baseline; gap: 8px; margin: 10px 0 6px; }
+.fs-overall b { font-size: 1.9rem; color: var(--blue-700); }
+.fs-overall span { color: var(--text-secondary); }
+.fs-q { display: grid; grid-template-columns: 1fr 150px 48px; gap: 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--border); font-size: .92rem; color: var(--text-primary); }
+.fs-bar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: var(--surface-alt); }
+.fs-bar span { display: block; height: 100%; }
+.fs-bar .s1, .fs-legend .s1 { background: #dc2626; } .fs-bar .s2, .fs-legend .s2 { background: #f59e0b; } .fs-bar .s3, .fs-legend .s3 { background: #cbd5e1; }
+.fs-bar .s4, .fs-legend .s4 { background: #60a5fa; } .fs-bar .s5, .fs-legend .s5 { background: #2454d6; }
+.fs-avg { font-weight: 700; text-align: right; }
+.fs-avg.low { color: var(--danger); }
+.fs-legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; font-size: .76rem; color: var(--text-muted); }
+.fs-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+.fs-comments { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.fs-comments li { padding: 10px 12px; border-radius: 10px; background: var(--surface-alt); color: var(--text-primary); font-size: .92rem; line-height: 1.5; white-space: pre-wrap; }
+.fs-hidden { margin: 10px 0 0; padding: 12px; border-radius: 10px; background: var(--surface-alt); color: var(--text-secondary); }
+@media (max-width: 560px) { .fs-q { grid-template-columns: 1fr 48px; } .fs-bar { grid-column: 1 / -1; order: 3; } }
+
+/* oversight */
+.fb-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.fb-kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; }
+.fb-kpi small { display: block; color: var(--text-secondary); font-size: .8rem; }
+.fb-kpi b { font-size: 1.5rem; color: var(--text-primary); }
+.fb-toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.fb-rate { display: flex; align-items: center; gap: 8px; min-width: 120px; }
+.fb-rate .fs-bar { flex: 1; min-width: 50px; }
+.fb-rate .fs-bar span { background: var(--success); }
+.fb-rate.low .fs-bar span { background: var(--yellow-500); }
+.fb-table td small { display: block; color: var(--text-muted); }
+.fb-link { border: 0; background: none; color: var(--blue-600); font: inherit; font-weight: 600; cursor: pointer; padding: 0; }
+.fq-text { width: 100%; box-sizing: border-box; font: inherit; line-height: 1.6; }
+.fq-actions { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.fb-dialog-actions { padding: 0 26px 20px; justify-content: flex-end; }

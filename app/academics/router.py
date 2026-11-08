@@ -608,6 +608,20 @@ async def list_eligible_offerings_for_me(
     return await _to_offering_out_many(db, list(rows))
 
 
+@router.get("/offerings/me/watchlist", summary="Students to watch in the courses I teach this term (teacher)")
+async def my_watchlist(
+    offering_id: uuid.UUID | None = None,
+    current_user: CurrentUser = Depends(get_current_user),
+    db=Depends(get_db),
+) -> dict:
+    from app.academics.watchlist import for_teacher
+
+    teacher_id = await _resolve_own_teacher_id(db, current_user)
+    if teacher_id is None:
+        raise AuthorizationError("This account is not linked to an employee record.")
+    return await for_teacher(db, teacher_id, offering_id)
+
+
 @router.get("/offerings/me", response_model=list[CourseOfferingOut], summary="My assigned course offerings (teacher)")
 async def my_offerings(
     current_user: CurrentUser = Depends(get_current_user),
