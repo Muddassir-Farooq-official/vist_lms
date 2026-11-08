@@ -1,0 +1,27 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}{{ allowed_roles|default("ADMIN") }}{% endblock %}
+{% block title %}1Bill payments{% endblock %}
+{% block page_title %}1Bill payments{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Fees paid online through 1Bill (bank apps, JazzCash, Easypaisa, ATMs). Match each day's total with the bank's settlement.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/feedback.css?v={{ app_version() }}" />{% endblock %}
+
+{% block content %}
+<p class="dash-alert" id="ob-off" hidden>1Bill is not switched on yet. Payments will appear here once the bank's details are added and it is switched on.</p>
+<div class="fb-kpis" id="ob-kpis"></div>
+<section class="panel fb-panel">
+  <div class="fb-toolbar">
+    <label class="fb-note" for="ob-day" style="margin:0;align-self:center">Day</label>
+    <input type="date" id="ob-day" class="text-input" style="flex:0 0 auto;min-width:0" />
+    <span class="fb-note" id="ob-banks" style="margin:0;align-self:center"></span>
+  </div>
+  <div class="table-scroll"><table class="dash-table">
+    <thead><tr><th>Time</th><th>Consumer no.</th><th>Bank · ref</th><th>Paid</th><th>Fee</th><th>Late fee</th><th>Charge</th><th>Receipt</th></tr></thead>
+    <tbody id="ob-rows"><tr><td colspan="8">Loading&hellip;</td></tr></tbody>
+  </table></div>
+  <p class="fb-note">"Charge" is the online payment charge added for the bank (Settings → Fees → Online payment); it is not a fee. A row marked <b>Check</b> received more than the fee, late fee and charge add up to: look at it with the accounts office.</p>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/onebill-report.js?v={{ app_version() }}"></script>
+{% endblock %}

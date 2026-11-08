@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.6.0",
+    "date": "2026-11-08",
+    "title": "Pay fees online with 1Bill (ready for the bank)",
+    "summary": "Everything is ready for students and parents to pay fees from any bank app, JazzCash or Easypaisa. It starts working as soon as the bank switches it on.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Students & parents",
+        "text": "Pay a fee challan through 1Bill from any bank app, JazzCash, Easypaisa, an ATM or a bank counter, using the consumer number on the challan. A late fee, if any, is included, so one payment settles everything."
+      },
+      {
+        "kind": "new",
+        "for": "Students & parents",
+        "text": "The receipt appears straight away, with a message in the app and by SMS."
+      },
+      {
+        "kind": "new",
+        "for": "Accounts",
+        "text": "1Bill payments: every online payment of the day, with totals per bank, to match with the bank's statement."
+      },
+      {
+        "kind": "new",
+        "for": "Admins",
+        "text": "Settings → Fees → Online payment: choose a charge added to each online payment to cover the bank's fee."
+      }
+    ]
+  },
+  {
     "version": "1.5.0",
     "date": "2026-11-08",
     "title": "Students to watch, and course feedback from students",

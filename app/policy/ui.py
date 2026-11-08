@@ -38,6 +38,10 @@ UI: dict[str, dict] = {
                                  "control": "number", "after": "days"},
     "fee_late_fee_auto_post": {"section": "Fees & fines", "sub": "Collecting", "label": "Add the late fee to Fines when a late instalment is paid",
                                "control": "switch"},
+    "one_bill_convenience_fixed": {"section": "Fees & fines", "sub": "Online payment (1Bill)", "label": "Charge added to each online payment",
+                                   "control": "number", "before": "Rs."},
+    "one_bill_convenience_percent": {"section": "Fees & fines", "sub": "Online payment (1Bill)", "label": "Plus a percentage of the challan",
+                                     "control": "number", "after": "%"},
     "fee_payment_max_backdate_days": {"section": "Fees & fines", "sub": "Collecting", "label": "Payments may be dated back at most",
                                       "control": "number", "after": "days"},
     # ---------------------------------------------------------------- sign-in security
