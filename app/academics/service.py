@@ -391,6 +391,13 @@ class CourseOfferingService:
             raise BusinessRuleViolationError(f"{len(enrolled)} student{'s are' if len(enrolled) != 1 else ' is'} enrolled. "
                                              "Choose \"unenroll them and delete\" to take them out first.")
         course = await self.course_repo.get_by_id(offering.course_id)
+        if enrolled:
+            # Enrolments are history: the database refuses to delete them (trigger vist_keep_history, migration
+            # a6c2d3e4f567). Here nothing was recorded for any of them (checked just above), the list is kept in the
+            # activity log below, and the switch is on for THIS transaction only (SET LOCAL ends with it).
+            from sqlalchemy import text as _text
+
+            await self.session.execute(_text("SET LOCAL vist.allow_delete = 'on'"))
         for e, st in enrolled:
             if st.user_id:
                 await create_notification(self.session, user_id=st.user_id, category=NotificationCategory.GENERAL,
@@ -401,6 +408,10 @@ class CourseOfferingService:
         await self.session.flush()
         await self.session.delete(offering)
         await self.session.flush()
+        if enrolled:
+            from sqlalchemy import text as _text
+
+            await self.session.execute(_text("SET LOCAL vist.allow_delete = 'off'"))   # protected again for the rest of the request
         await self.audit.log(actor_user_id=actor_id, action="course_offering.deleted", entity_type="course_offering", entity_id=offering_id,
                              before={"term_label": offering.term_label, "section": offering.section_label, "course_id": str(offering.course_id),
                                      "course_code": course.code if course else None,
