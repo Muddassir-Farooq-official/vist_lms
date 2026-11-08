@@ -15,6 +15,10 @@ from app.auth.permissions import ROLE_PERMISSION_SEED, Roles
 from app.core import database as db_module
 from app.core import sequence_models as _sequence_models  # noqa: F401
 from app.core.config import settings
+
+# Two-step sign-in is required for administrators in production (the default). Most tests sign in as an administrator
+# to test something else, so it is off here; tests/integration/test_two_factor.py turns it on.
+settings.two_factor_required_for_admins = 0
 from app.core.security import hash_password
 from app.employees import models as _employees_models  # noqa: F401
 from app.notifications import models as _notifications_models  # noqa: F401

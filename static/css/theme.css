@@ -553,3 +553,15 @@ a:hover { color: var(--blue-700); }
   .signin-main { align-items: flex-start; padding: 28px 20px max(24px, env(safe-area-inset-bottom)); }
   .signin-card h1 { font-size: 1.65rem; }
 }
+/* Sign-in: the second step for administrators (code from an authenticator app, or setting it up) */
+.tfa-step { display: flex; flex-direction: column; gap: 4px; }
+.tfa-step[hidden] { display: none; }
+.signin-card .link-btn { background: none; border: 0; padding: 0; color: var(--blue-600); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; }
+.tfa-code { font-size: 1.5rem; letter-spacing: 0.35em; text-align: center; font-variant-numeric: tabular-nums; }
+.tfa-remember { display: flex; align-items: center; gap: 10px; margin: 6px 0 14px; font-size: 0.92rem; color: var(--text-secondary); min-height: 44px; cursor: pointer; }
+.tfa-remember input { width: 20px; height: 20px; accent-color: var(--blue-600); margin: 0; }
+.tfa-steps { margin: 0 0 14px; padding-left: 20px; color: var(--text-primary); font-size: 0.93rem; line-height: 1.5; display: flex; flex-direction: column; gap: 10px; }
+.tfa-qr { margin: 10px 0 6px; width: 188px; max-width: 100%; aspect-ratio: 1; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 6px; }
+.tfa-qr svg { width: 100%; height: 100%; display: block; }
+.tfa-key summary { cursor: pointer; color: var(--blue-600); font-weight: 600; font-size: 0.88rem; }
+.tfa-key code { display: block; margin-top: 6px; padding: 8px 10px; border-radius: 8px; background: var(--surface-alt); font-size: 0.95rem; letter-spacing: 0.06em; word-break: break-all; }

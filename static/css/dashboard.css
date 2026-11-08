@@ -3996,3 +3996,21 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 .att-risk.good { background: var(--success-bg); border-color: var(--success-border); }
 .att-risk.warn { background: var(--amber-50); border-color: #fde68a; }
 .att-risk.bad { background: var(--danger-bg); border-color: var(--danger-border); }
+
+/* Activity -> Money changes */
+.mr-days { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0 0 14px; }
+.mr-days-label { font-size: 0.85rem; color: var(--text-secondary); margin-right: 4px; }
+.mr-day { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 6px 12px; min-height: 36px; cursor: pointer; font: inherit; font-size: 0.85rem; color: var(--text-primary); }
+.mr-day b { color: var(--danger); margin-left: 4px; }
+.mr-day:hover, .mr-day:focus-visible { border-color: var(--border-strong); background: var(--surface-alt); }
+.mr-only { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.mr-groups { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.mr-group { font-size: 0.82rem; padding: 4px 10px; border-radius: 999px; background: var(--surface-alt); color: var(--text-secondary); }
+.mr-tick { width: 40px; text-align: center; }
+.mr-tick input { width: 18px; height: 18px; }
+.mr-table tr.mr-done td { color: var(--text-secondary); }
+#mr-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 16px; }
+#mr-form > label:first-child { flex: 0 1 220px; }
+#mr-form .mr-only { flex-direction: row; font-weight: 500; }
+#mr-form .mr-only input { width: 18px; height: 18px; margin: 0; }
+#mr-form button { flex: 0 0 auto; min-width: 110px; }

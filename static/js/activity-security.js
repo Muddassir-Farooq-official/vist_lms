@@ -57,7 +57,34 @@
     $("sec-count").textContent = r.body.length + (r.body.length === 200 ? "+ (newest 200)" : "") + " attempt" + (r.body.length === 1 ? "" : "s");
   }
 
-  function loadAll() { loaded = true; loadSummary(); loadEvents(); }
+  function loadAll() { loaded = true; loadSummary(); loadEvents(); loadTwoFactor(); }
+
+  // Two-step sign-in: which administrators have set it up, and a reset for a lost phone.
+  async function loadTwoFactor() {
+    const r = await VA.fetchJson(API + "/two-factor", { quiet: true });
+    if (!r.ok) return;
+    const d = r.body;
+    $("tfa-state").textContent = d.required ? "Required for every administrator" : "Not required (Settings \u2192 Sign-in security)";
+    $("tfa-body").innerHTML = d.accounts.map(function (a) {
+      const state = a.set_up ? '<span class="status-pill active">Set up</span> <small class="cc-meta">since ' + esc(when(a.set_up_at)) + "</small>"
+        : '<span class="status-pill pending">Not set up yet</span> <small class="cc-meta">' + (d.required ? "asked at the next sign-in" : "") + "</small>";
+      const action = a.set_up && d.can_reset && !a.is_me ? '<button type="button" class="secondary-btn small-btn" data-tfa-reset="' + esc(a.user_id) + '" data-name="' + esc(a.username) + '">Reset (lost phone)\u2026</button>' : "";
+      return "<tr><td><strong>" + esc(a.username) + "</strong>" + (a.is_me ? ' <small class="cc-meta">(you)</small>' : "") + (a.active ? "" : ' <small class="cc-meta">inactive</small>') +
+        "</td><td>" + state + "</td><td>" + (a.last_login_at ? esc(when(a.last_login_at)) : "\u2014") + "</td><td>" + action + "</td></tr>";
+    }).join("");
+  }
+  $("tfa-body").addEventListener("click", async function (e) {
+    const b = e.target.closest("[data-tfa-reset]");
+    if (!b) return;
+    const why = await VA.ask({ title: "Reset two-step sign-in for " + b.getAttribute("data-name"), danger: true, ok: "Reset",
+      intro: "Do this only when you are sure it is really them (e.g. they lost or changed their phone). They are signed out everywhere and set it up again at their next sign-in. This is kept in the activity log.",
+      label: "Reason", input: "textarea", min: 5 });
+    if (why == null) return;
+    const r = await VA.fetchJson(API + "/two-factor/" + b.getAttribute("data-tfa-reset") + "/reset", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason: why }) });
+    if (!r.ok) return VA.toast((r.body && r.body.error && r.body.error.message) || "Could not reset it.", "error");
+    VA.toast("Reset. " + b.getAttribute("data-name") + " sets it up again at the next sign-in.");
+    loadTwoFactor();
+  });
 
   const panel = document.querySelector('[data-tab-panel="security"]');
   if (!panel) return;

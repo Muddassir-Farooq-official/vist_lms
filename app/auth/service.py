@@ -121,6 +121,12 @@ class AuthService:
     async def login(
         self, *, username: str, password: str, ip: str | None, user_agent: str | None
     ) -> tuple[User, AuthTokens]:
+        user = await self.check_password(username=username, password=password, ip=ip, user_agent=user_agent)
+        return user, await self.start_session(user, ip=ip, user_agent=user_agent)
+
+    async def check_password(self, *, username: str, password: str, ip: str | None, user_agent: str | None) -> User:
+        """Username and password only (rate limits, lock-out reasons, rehash). Issues nothing: start_session() does,
+        straight away or after the two-step code (app/auth/two_factor.py)."""
         await self._check_rate_limit(username=username, ip=ip)
 
         user = await self.repo.get_user_by_username(username)
@@ -178,7 +184,10 @@ class AuthService:
         await self._clear_failures(username=username, ip=ip)
         if needs_rehash(user.password_hash):
             user.password_hash = hash_password(password)
+        return user
 
+    async def start_session(self, user: User, *, ip: str | None, user_agent: str | None) -> AuthTokens:
+        """Access + refresh tokens for a person whose sign-in is complete."""
         roles, perms = self._roles_and_permissions(user)
         access_token = create_access_token(
             user_id=user.id,
@@ -212,7 +221,7 @@ class AuthService:
             user_agent=user_agent,
         )
 
-        return user, AuthTokens(
+        return AuthTokens(
             access_token=access_token,
             refresh_token=raw_refresh,
             expires_in_minutes=settings.jwt_access_token_expire_minutes,

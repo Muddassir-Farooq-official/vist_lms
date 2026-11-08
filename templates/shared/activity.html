@@ -9,6 +9,7 @@
 <div class="portal-tabs" role="tablist" data-auto-tabs>
   <button class="portal-tab active" data-tab="activity" role="tab">{{ nav_icon("file") }}<span>Activity</span></button>
   <button class="portal-tab" data-tab="security" role="tab">{{ nav_icon("shield") }}<span>Security</span></button>
+  {% if portal == "admin" %}<button class="portal-tab" data-tab="money" role="tab">{{ nav_icon("fees") }}<span>Money changes</span> <span class="ss-count" id="mr-count"></span></button>{% endif %}
 </div>
 
 <div class="dash" id="activity-page" data-tab-panel="activity">
@@ -57,6 +58,12 @@
     <div class="sec-tiles" id="sec-tiles"></div>
   </section>
 
+  <section class="panel dash-panel" aria-labelledby="tfa-h">
+    <div class="dash-panel-head"><h2 id="tfa-h">Two-step sign-in for administrators</h2><small class="al-count" id="tfa-state"></small></div>
+    <p class="panel-hint">After their password, administrators type a 6-digit code from an authenticator app on their phone. Someone who lost their phone can be reset here by another administrator; they set it up again at their next sign-in. If no other administrator can, it is reset on the server (<code>scripts/reset_2fa.py</code>). Turn the requirement on or off in Settings &rarr; Sign-in security.</p>
+    <div class="table-scroll"><table class="dash-table"><thead><tr><th>Administrator</th><th>Two-step sign-in</th><th>Last signed in</th><th></th></tr></thead><tbody id="tfa-body"></tbody></table></div>
+  </section>
+
   <div class="sec-grid">
     <section class="panel dash-panel" aria-labelledby="sec-ip-h">
       <div class="dash-panel-head"><h2 id="sec-ip-h">Addresses behind the most attempts</h2></div>
@@ -83,6 +90,27 @@
   </section>
 </div>
 
+{% if portal == "admin" %}
+<div class="dash" data-tab-panel="money" hidden>
+  <section class="panel dash-panel" aria-labelledby="mr-h">
+    <div class="dash-panel-head"><h2 id="mr-h">Money changes to review</h2><small class="al-count" id="mr-summary"></small></div>
+    <p class="panel-hint">Everything that moved money outside a normal fee payment: discounts given, changed or ended; fines waived; payments reversed; due dates moved; payments dated before the day they were entered; refunds; voided entries. Look through each day and tick what you have checked. Every morning you get a notice when yesterday has something to review.</p>
+    <div class="mr-days" id="mr-days" aria-label="Days with changes nobody has checked"></div>
+    <form class="al-filters" id="mr-form">
+      <label>Day<input id="mr-day" class="text-input" type="date" /></label>
+      <label class="mr-only"><input type="checkbox" id="mr-unchecked" /> Only not checked yet</label>
+      <button type="submit" class="role-btn">Show</button>
+    </form>
+    <div class="mr-groups" id="mr-groups"></div>
+    <div class="table-scroll"><table class="dash-table mr-table"><thead><tr>
+      <th class="mr-tick"><input type="checkbox" id="mr-all" aria-label="Select every change not checked yet" /></th>
+      <th>When</th><th>What</th><th>Student</th><th>Details</th><th>By</th><th>Checked</th></tr></thead><tbody id="mr-body"></tbody></table></div>
+    <p class="empty-state" id="mr-empty" hidden>No money changes on this day.</p>
+    <div class="form-actions"><button type="button" class="role-btn" id="mr-mark" disabled>Mark selected as checked</button></div>
+  </section>
+</div>
+{% endif %}
+
 <dialog id="al-dialog" class="modal modal-wide" aria-labelledby="al-d-title">
   <div class="modal-body">
     <h2 id="al-d-title">Activity</h2>
@@ -100,4 +128,5 @@
 {% block extra_scripts %}
 <script src="/static/js/activity.js"></script>
 <script src="/static/js/activity-security.js"></script>
+{% if portal == "admin" %}<script src="/static/js/money-review.js"></script>{% endif %}
 {% endblock %}

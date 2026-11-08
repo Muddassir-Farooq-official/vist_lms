@@ -30,6 +30,10 @@ class User(UUIDPKMixin, TimestampMixin, Base):
     email_notifications: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")   # also email my notifications
     # When the person proved they own `email` with a one-time code (app/auth/email_verify.py). Cleared when the address changes.
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Two-step sign-in (app/auth/two_factor.py). Secrets are encrypted (app/core/secretbox). Migration f0b2c4d6e8a1.
+    totp_secret_enc: Mapped[str | None] = mapped_column(String(300), nullable=True)      # in use
+    totp_pending_enc: Mapped[str | None] = mapped_column(String(300), nullable=True)     # being set up, not confirmed yet
+    totp_enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user_roles: Mapped[list["UserRole"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
@@ -132,3 +136,19 @@ class LoginAttempt(Base):
     user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
     success: Mapped[bool] = mapped_column(Boolean, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class TrustedDevice(UUIDPKMixin, Base):
+    """A browser / phone where two-step sign-in was passed with "remember this device": the code is not asked there
+    again until expires_at. Only a hash of the cookie value is stored. Migration f0b2c4d6e8a1."""
+
+    __tablename__ = "trusted_devices"
+    __table_args__ = (Index("ix_trusted_devices_user", "user_id"),)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

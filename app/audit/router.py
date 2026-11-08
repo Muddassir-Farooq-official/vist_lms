@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel, Field
 
 from app.audit.repository import AuditLogRepository
 from app.audit.schemas import AuditLogDetail, AuditLogOut
@@ -11,7 +12,7 @@ from app.auth.permissions import Permissions
 from app.auth.repository import AuthRepository
 from app.auth.schemas import CurrentUser
 from app.core.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, require_permission
 from app.core.exceptions import AuthorizationError
 from app.core.pagination import Page, page_params, PageParams
 
@@ -78,3 +79,34 @@ async def list_audit_logs(
         detailed.append(AuditLogDetail(**base, actor_username=actor_username))
 
     return Page[AuditLogDetail](items=detailed, total=total, page=page.page, page_size=page.page_size)
+
+# ---------------------------------------------------------------------------
+# Daily review of money changes (app/audit/money_review.py) -- administrators
+# ---------------------------------------------------------------------------
+class _CheckIn(BaseModel):
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    note: str | None = Field(default=None, max_length=300)
+
+
+@router.get("/money-review", summary="Money changes on one day (default yesterday): discounts, waivers, reversals, back-dated payments ...")
+async def money_review(day: date | None = None, unchecked_only: bool = False,
+                       current_user: CurrentUser = Depends(require_permission(Permissions.ROLE_MANAGE)), db=Depends(get_db)) -> dict:
+    from app.audit import money_review as mr
+    from app.core.clock import institute_today
+
+    return await mr.listing(db, day=day or (institute_today() - timedelta(days=1)), unchecked_only=unchecked_only)
+
+
+@router.get("/money-review/days", summary="Recent days that still have money changes nobody has checked")
+async def money_review_days(current_user: CurrentUser = Depends(require_permission(Permissions.ROLE_MANAGE)), db=Depends(get_db)) -> list[dict]:
+    from app.audit import money_review as mr
+
+    return await mr.unchecked_days(db, days=14)
+
+
+@router.post("/money-review/check", summary="Mark money changes as checked")
+async def money_review_check(payload: _CheckIn, current_user: CurrentUser = Depends(require_permission(Permissions.ROLE_MANAGE)),
+                             db=Depends(get_db)) -> dict:
+    from app.audit import money_review as mr
+
+    return {"checked": await mr.mark_checked(db, payload.ids, actor_id=current_user.id, note=payload.note)}

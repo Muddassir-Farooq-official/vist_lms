@@ -256,3 +256,24 @@ bash scripts/server/harden.sh rename-db
   ```
 
 - Run `bash scripts/server/harden.sh check` again. Everything should show **OK**.
+
+---
+
+## Two-step sign-in for administrators
+
+After their password, administrators type a 6-digit code from an authenticator app (Google Authenticator or
+Microsoft Authenticator) on their phone. The first time, the sign-in page shows a QR code to scan.
+
+- **Lost or changed phone:** another administrator opens **Activity log → Security → Two-step sign-in** and clicks
+  **Reset (lost phone)**. The person sets it up again at their next sign-in.
+- **No other administrator can do it** (e.g. the only administrator lost their phone): on the server,
+
+  ```bash
+  cd /opt/vist-lms
+  docker compose -f docker-compose.prod.yml exec app python scripts/reset_2fa.py <username>
+  ```
+
+- **Turn the requirement off for a while:** Settings → Sign-in security → "Administrators must use two-step sign-in".
+  Everyone's set-up is kept for when it is turned back on.
+
+Every set-up, wrong code and reset is in the activity log.
