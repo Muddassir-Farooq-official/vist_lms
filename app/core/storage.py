@@ -98,6 +98,49 @@ def _verify_file_signature(content: bytes, content_type: str) -> None:
         )
 
 
+# --------------------------------------------------------------------------
+# Smaller pictures. Phone cameras send 3-5 MB photos; nobody needs that on a profile picture or a scanned slip.
+# Pictures are scaled down and re-saved in the SAME format (so stored types, extensions and links never change), with
+# the phone's rotation applied and its hidden details (location, camera) dropped. If anything goes wrong, or the result
+# would not be smaller, the original is kept: a picture is never refused because of this.
+# --------------------------------------------------------------------------
+PROFILE_PHOTO_MAX_SIDE = 600     # student / staff pictures
+DOCUMENT_IMAGE_MAX_SIDE = 1600   # scans and photos of documents: text stays readable
+IMAGE_QUALITY = 80
+_SHRINK_FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG", "image/webp": "WEBP"}
+
+
+def max_side_for(category: str) -> int:
+    return PROFILE_PHOTO_MAX_SIDE if category.endswith("photos") else DOCUMENT_IMAGE_MAX_SIDE
+
+
+def shrink_image(content: bytes, content_type: str, max_side: int) -> bytes:
+    fmt = _SHRINK_FORMATS.get(content_type)
+    if fmt is None or not content:
+        return content
+    try:
+        from PIL import Image, ImageOps
+
+        with Image.open(io.BytesIO(content)) as im:
+            if getattr(im, "is_animated", False) or im.format != fmt:
+                return content
+            img = ImageOps.exif_transpose(im)
+            img.thumbnail((max_side, max_side), Image.LANCZOS)
+            out = io.BytesIO()
+            if fmt == "JPEG":
+                if img.mode not in ("RGB", "L"):
+                    img = img.convert("RGB")
+                img.save(out, format="JPEG", quality=IMAGE_QUALITY, optimize=True, progressive=True)
+            elif fmt == "WEBP":
+                img.save(out, format="WEBP", quality=IMAGE_QUALITY, method=6)
+            else:
+                img.save(out, format="PNG", optimize=True)
+        data = out.getvalue()
+    except Exception:  # noqa: BLE001 - a damaged or unusual picture is stored as it came
+        return content
+    return data if 0 < len(data) < len(content) else content
+
+
 def save_uploaded_file(
     *, category: str, entity_id: uuid.UUID, content: bytes, original_filename: str, content_type: str,
     allowed_content_types: set[str], max_bytes: int,
@@ -118,6 +161,7 @@ def save_uploaded_file(
         raise FileTooLargeError(f"File is too large — max {max_bytes // (1024 * 1024)} MB.")
     # Bytes must actually match the declared type — see _verify_file_signature above.
     _verify_file_signature(content, content_type)
+    content = shrink_image(content, content_type, max_side_for(category))
 
     ext = _extension_for(original_filename, content_type)
     storage_key = f"{category}/{entity_id}/{uuid.uuid4().hex}{ext}"
@@ -246,6 +290,7 @@ def save_attachment(
 ) -> tuple[str, str, str]:
     """Stores an attachment (announcements, applications...). Returns (storage_key, display_name, content_type)."""
     content_type, ext = validate_attachment(content=content, original_filename=original_filename, declared_content_type=declared_content_type)
+    content = shrink_image(content, content_type, DOCUMENT_IMAGE_MAX_SIDE)
     storage_key = f"{folder}/{entity_id}/{uuid.uuid4().hex}{ext}"
     full_path = Path(settings.storage_local_path) / storage_key
     full_path.parent.mkdir(parents=True, exist_ok=True)

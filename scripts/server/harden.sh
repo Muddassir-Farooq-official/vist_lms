@@ -11,6 +11,7 @@
 #   bash scripts/server/harden.sh rotate-jwt            new JWT_SECRET: everyone signs in again once; SMTP password kept
 #   bash scripts/server/harden.sh rotate-vapid          new push keys: phones re-subscribe by themselves on next open
 #   bash scripts/server/harden.sh rename-db [new_name]  rename the database (default vist_lms); about 1 minute offline
+#   bash scripts/server/harden.sh disk                  free disk space: Docker build leftovers + cap system logs at 200 MB
 set -uo pipefail
 cd "$(dirname "$0")/../.." || exit 1
 
@@ -286,6 +287,21 @@ A safety copy of the database is made first."
   fi
 }
 
+# ------------------------------------------------------------------ disk space
+disk() {
+  need_root
+  say "Disk now"; df -h / | tail -1; docker system df 2>/dev/null || true
+  confirm "This deletes Docker build leftovers (not the running app, not data, not uploads) and caps the system journal
+at 200 MB (older system log lines are dropped). The app keeps running."
+  docker builder prune -af || warn "could not clear the build cache"
+  docker image prune -f >/dev/null 2>&1 || true
+  mkdir -p /etc/systemd/journald.conf.d
+  printf '[Journal]\nSystemMaxUse=200M\n' > /etc/systemd/journald.conf.d/vist-size.conf
+  systemctl restart systemd-journald && journalctl --vacuum-size=200M >/dev/null 2>&1 || warn "journal cap not applied"
+  say "Disk after"; df -h / | tail -1
+  healthy && ok "app is healthy" || warn "app health check failed: run '$COMPOSE ps'"
+}
+
 case "${1:-}" in
   check) check ;;
   firewall) shift; firewall "$@" ;;
@@ -294,5 +310,6 @@ case "${1:-}" in
   rotate-jwt) rotate_jwt ;;
   rotate-vapid) rotate_vapid ;;
   rename-db) shift; rename_db "$@" ;;
-  *) sed -n '2,15p' "$0"; exit 2 ;;
+  disk) disk ;;
+  *) sed -n '2,16p' "$0"; exit 2 ;;
 esac

@@ -50,6 +50,9 @@ for i in $(seq 1 30); do
   if curl -fsS http://127.0.0.1:8000/health/ready >/dev/null 2>&1; then
     echo "Healthy after ~$((i*2))s"
     docker image prune -f >/dev/null 2>&1 || true
+    # Leftover build layers grow by hundreds of MB per deploy (8 GB seen on the VPS). The running app does not use
+    # them; the next build only takes a little longer.
+    docker builder prune -af >/dev/null 2>&1 || true
     curl -s http://127.0.0.1:8000/health/ready; echo
     log "Deploy finished OK"
     exit 0
