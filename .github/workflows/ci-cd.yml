@@ -176,6 +176,12 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
 
+      - name: Record which version is being deployed
+        # Read by the status page (/health) and the version line in the portals (app/core/releases.py).
+        run: |
+          printf '{"commit": "%s", "built_at": "%s", "run": %s}\n' "$GITHUB_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GITHUB_RUN_NUMBER" > app/build_info.json
+          cat app/build_info.json
+
       - name: Copy code to the VPS
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
