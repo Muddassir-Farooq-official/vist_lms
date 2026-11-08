@@ -19,7 +19,17 @@ _FONT = Path(__file__).resolve().parents[2] / "static" / "fonts" / "outfit-latin
 
 
 def site_url(request=None) -> str:
-    """The address people use, without a trailing slash: PUBLIC_URL, else the first CORS origin, else this request's."""
+    """The address the page was opened with (what a robot fetching a shared link used), without a trailing slash.
+
+    Behind nginx the Host and X-Forwarded-Proto headers carry it. Only when that is a local address (a developer's
+    machine) does it fall back to PUBLIC_URL, then the first CORS origin. Earlier the CORS origin came first, and on a
+    server where that is not the public https address the picture link pointed nowhere."""
+    if request is not None:
+        host = (request.headers.get("x-forwarded-host") or request.headers.get("host") or "").split(",")[0].strip()
+        name = host.split(":")[0].lower()
+        if host and name not in ("localhost", "127.0.0.1", "0.0.0.0", "app", "testserver") and not name.startswith("172."):
+            proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "https").split(",")[0].strip().lower()
+            return f"{'https' if proto == 'https' else 'http'}://{host}"
     url = (settings.public_url or "").strip() or next((o.strip() for o in (settings.cors_origins or "").split(",") if o.strip()), "")
     if not url and request is not None:
         url = str(request.base_url)

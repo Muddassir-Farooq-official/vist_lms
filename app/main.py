@@ -1824,3 +1824,27 @@ async def faculty_grading_page(request: Request):
 from app.security.middleware import SecurityWatch  # noqa: E402
 
 app.add_middleware(SecurityWatch)
+
+class HeadLikeGet:
+    """Answer HEAD like GET, without the body. WhatsApp, Facebook and other link-preview robots often ask with HEAD
+    first (is the page / picture there?); without this every page answered 405 and no preview was shown.
+    Outermost, so the routes, the security checks and the logging all see an ordinary GET."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") != "http" or scope.get("method") != "HEAD":
+            await self.app(scope, receive, send)
+            return
+        scope = dict(scope, method="GET")
+
+        async def no_body(message):
+            if message["type"] == "http.response.body":
+                message = {"type": "http.response.body", "body": b"", "more_body": message.get("more_body", False)}
+            await send(message)
+
+        await self.app(scope, receive, no_body)
+
+
+app.add_middleware(HeadLikeGet)
