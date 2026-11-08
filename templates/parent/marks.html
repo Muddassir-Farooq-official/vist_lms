@@ -1,0 +1,17 @@
+{% extends "parent/_base.html" %}
+{% block title %}Marks{% endblock %}
+{% block page_title %}Marks{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Quiz, assignment and exam marks in each subject, as the teachers enter them. The final grade comes when results are published.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/parent.css?v={{ app_version() }}" />{% endblock %}
+{% block content %}
+{% include "parent/_child_bar.html" %}
+<div id="pm-view" hidden>
+  <div class="pp-cards" id="pm-list"></div>
+  <p class="pp-empty panel pp-panel" id="pm-none" hidden>No current subjects.</p>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script src="/static/js/dash-common.js"></script>
+<script src="/static/js/parent-child.js?v={{ app_version() }}"></script>
+<script src="/static/js/parent-marks.js?v={{ app_version() }}"></script>
+{% endblock %}

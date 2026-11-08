@@ -1307,13 +1307,8 @@ async def get_marks_for_enrollment(
     if not is_own and not await _can_manage_marks_for_offering(db, offering, current_user):
         raise AuthorizationError("You do not have access to this enrollment's marks.")
 
-    # A student sees their marks only once the course's results are PUBLISHED; the teacher and the administration always see them.
-    if is_own and not await _can_manage_marks_for_offering(db, offering, current_user):
-        from app.academics.result_sheet_service import ResultSheetService
-
-        sheet = await ResultSheetService(db).get(enrollment.course_offering_id)
-        if sheet is None or sheet.status != ResultSheetStatus.PUBLISHED:
-            return []
+    # Students (and their parents) see each mark as soon as the teacher enters it: the institute's choice (Nov 2026).
+    # Grades and the GPA still appear only when the result is published.
     marks = await GradingService(db).get_marks_for_enrollment(enrollment_id)
     return [await _to_student_mark_detail(db, mark) for mark in marks]
 

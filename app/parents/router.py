@@ -47,3 +47,23 @@ async def grant_parent_access(student_id: uuid.UUID, payload: GrantIn | None = N
 async def revoke_parent_access(student_id: uuid.UUID, current_user: CurrentUser = Depends(require_permission(Permissions.PARENT_ACCESS_MANAGE)),
                                db=Depends(get_db)) -> None:
     await ParentService(db).revoke(student_id, actor_id=current_user.id)
+
+@router.get("/me/children/{student_id}/fees", summary="One child's fee account: challans to download, payments with receipts, what is due")
+async def child_fees(student_id: uuid.UUID, current_user: CurrentUser = Depends(require_permission(Permissions.PARENT_VIEW)), db=Depends(get_db)) -> dict:
+    return await ParentService(db).fees(current_user.id, student_id)
+
+
+@router.get("/me/children/{student_id}/timetable", summary="One child's classes for the next two weeks and published datesheets")
+async def child_timetable(student_id: uuid.UUID, current_user: CurrentUser = Depends(require_permission(Permissions.PARENT_VIEW)), db=Depends(get_db)) -> dict:
+    return await ParentService(db).timetable(current_user.id, student_id)
+
+
+@router.get("/me/children/{student_id}/marks", summary="One child's marks entered so far in each current subject")
+async def child_marks(student_id: uuid.UUID, current_user: CurrentUser = Depends(require_permission(Permissions.PARENT_VIEW)), db=Depends(get_db)) -> list[dict]:
+    return await ParentService(db).marks(current_user.id, student_id)
+
+
+@router.get("/me/children/{student_id}/announcements", summary="What the institute announced to the child's students")
+async def child_announcements(student_id: uuid.UUID, current_user: CurrentUser = Depends(require_permission(Permissions.PARENT_VIEW)),
+                              db=Depends(get_db)) -> list[dict]:
+    return await ParentService(db).announcements(current_user.id, student_id)

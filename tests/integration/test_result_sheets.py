@@ -85,7 +85,7 @@ async def test_a_sheet_cannot_be_submitted_without_assessments_or_by_someone_els
     assert (await app_client.get(f"{R}/offerings/{other_offering}/sheet")).status_code == 403
 
 
-async def test_students_see_no_marks_and_no_result_until_it_is_published(app_client, admin_user, db_session):
+async def test_students_see_marks_as_entered_but_no_result_until_it_is_published(app_client, admin_user, db_session):
     offering, students, (c1, c2), teacher = await _class(app_client, db_session)
     await _as_teacher(app_client, teacher)
     await _fill(app_client, students, (c1, c2))
@@ -94,19 +94,19 @@ async def test_students_see_no_marks_and_no_result_until_it_is_published(app_cli
         await _login(app_client, username, SP)
         marks = (await app_client.get(f"{A}/enrollments/{enrollment_id}/marks")).json()
         mine = [e for e in (await app_client.get(f"{A}/enrollments/me")).json() if e["id"] == enrollment_id][0]
-        return marks, mine["outcome"], mine["status"]
-    assert await what_the_student_sees() == ([], None, "ENROLLED")                                                       # entered, but still a draft
+        return sorted(m["obtained_marks"] for m in marks), mine["outcome"], mine["status"]
+    assert await what_the_student_sees() == ([18.0, 70.0], None, "ENROLLED")                                             # marks show as entered; no result yet
     await _as_teacher(app_client, teacher)
     assert len((await app_client.get(f"{A}/enrollments/{enrollment_id}/marks")).json()) == 2                              # the teacher sees them throughout
     await app_client.post(f"{R}/offerings/{offering}/submit")
-    assert await what_the_student_sees() == ([], None, "ENROLLED")                                                       # submitted
+    assert await what_the_student_sees() == ([18.0, 70.0], None, "ENROLLED")                                             # submitted
     await _login_admin(app_client)
     await app_client.post(f"{R}/sheets/{offering}/approve")
-    assert await what_the_student_sees() == ([], None, "ENROLLED")                                                       # approved, not yet published
+    assert await what_the_student_sees() == ([18.0, 70.0], None, "ENROLLED")                                             # approved, not yet published
     await _login_admin(app_client)
     assert (await app_client.post(f"{R}/sheets/{offering}/publish")).json()["status"] == "PUBLISHED"
     marks, outcome, status = await what_the_student_sees()
-    assert [m["obtained_marks"] for m in marks] == [18.0, 70.0] and outcome == "PASSED" and status == "COMPLETED"        # (18+70)/120 = 73%
+    assert marks == [18.0, 70.0] and outcome == "PASSED" and status == "COMPLETED"        # (18+70)/120 = 73%
     # a classmate still cannot read someone else's marks
     await _login(app_client, students[1][1], SP)
     assert (await app_client.get(f"{A}/enrollments/{enrollment_id}/marks")).status_code == 403
@@ -239,7 +239,7 @@ async def test_the_list_by_status_and_publishing_everything_approved_on_result_d
     await _login(app_client, s1[0][1], SP)
     assert len((await app_client.get(f"{A}/enrollments/{s1[0][2]}/marks")).json()) == 2                                                    # RA1's students can see theirs
     await _login(app_client, s3[1][1], SP)
-    assert (await app_client.get(f"{A}/enrollments/{s3[1][2]}/marks")).json() == []                                                        # RA3's cannot
+    assert len((await app_client.get(f"{A}/enrollments/{s3[1][2]}/marks")).json()) >= 1                                                    # marks show as entered (the result itself waits)
 
 
 async def test_a_student_who_withdraws_does_not_hold_up_the_sheet(app_client, admin_user, db_session):
@@ -260,7 +260,7 @@ async def test_results_that_already_existed_before_the_workflow_stay_visible(app
     await _login_admin(app_client)
     await _fill(app_client, students, (c1, c2), scores=((18, 70),))
     await _login(app_client, students[0][1], SP)
-    assert (await app_client.get(f"{A}/enrollments/{students[0][2]}/marks")).json() == []                                 # no sheet row: a draft
+    assert len((await app_client.get(f"{A}/enrollments/{students[0][2]}/marks")).json()) == 2                            # marks show as entered, sheet or not
     db_session.add(ResultSheet(course_offering_id=offering, status=ResultSheetStatus.PUBLISHED))                         # what the migration does for old results
     await db_session.commit()
     assert len((await app_client.get(f"{A}/enrollments/{students[0][2]}/marks")).json()) == 2
