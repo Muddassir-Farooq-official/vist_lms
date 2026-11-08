@@ -34,49 +34,54 @@
         "kind": "new",
         "for": "Students & parents",
         "text": "Students get a reminder in the app when the survey opens and two days before it closes."
+      },
+      {
+        "kind": "improved",
+        "for": "Staff",
+        "text": "The version number now sits right under the logo in the menu, so it is easy to find, and new versions are celebrated with a little confetti."
       }
     ]
   },
   {
     "version": "1.4.0",
     "date": "2026-11-08",
-    "title": "Version number, What's new, and a lighter server",
-    "summary": "You can now see which version of the system is running and read what changed in each update. Pictures take far less space, and the server cleans up after itself.",
+    "title": "Version number, What's new, and faster photos",
+    "summary": "You can now see which version of the system you are using and what changed in each update. Photos load faster.",
     "changes": [
       {
         "kind": "new",
         "for": "Staff",
-        "text": "The version number is shown at the bottom of the menu in every staff portal. Click it to see what's new."
+        "text": "The version number is shown in the menu of every staff portal. Click it to see what's new."
       },
       {
         "kind": "new",
         "for": "Staff",
-        "text": "After each update, a short \"What's new\" card appears once, explaining the changes in plain words."
+        "text": "After each update, a short \"A new version is here!\" message appears once."
       },
       {
         "kind": "new",
         "for": "Everyone",
-        "text": "The status page (/health) now shows whether the system is working, its version and when it was last updated."
+        "text": "A status page shows whether everything is working and which version you are using."
       },
       {
         "kind": "improved",
         "for": "Everyone",
-        "text": "Photos are saved at a sensible size: profile pictures about 20 times smaller, document photos still sharp enough to read. PDFs and Word/Excel files are kept exactly as uploaded."
+        "text": "Photos you upload now load faster and take less space, and still look sharp. PDFs and Word or Excel files stay exactly as uploaded."
       },
       {
         "kind": "improved",
         "for": "Admins",
-        "text": "Each update now clears the leftover files it creates, so the server's disk no longer fills up over time. System logs are capped too."
+        "text": "The system now tidies up after each update, so it keeps running smoothly over time."
       },
       {
         "kind": "fixed",
         "for": "Admins",
-        "text": "The server no longer reports the notification and import helpers as \"unhealthy\" when they are working normally."
+        "text": "Fixed a false warning that made parts of the system look like they had a problem when they were working fine."
       },
       {
         "kind": "improved",
         "for": "Admins",
-        "text": "One guided command sets up the server's safety: off-site backups to Google Drive, a closed database port and new passwords and keys, each step asking before it changes anything."
+        "text": "Stronger protection for the institute's records, with copies kept safely in a second place every night."
       }
     ]
   },
@@ -158,7 +163,7 @@
     "version": "1.1.0",
     "date": "2026-11-07",
     "title": "Attendance fines, course rules, staff leave and timetables",
-    "summary": "A large update: attendance fines by band, rules for which courses a student may take, staff leave requests, printable timetables, safer discounts and nightly backups.",
+    "summary": "A large update: attendance fines by band, rules for which courses a student may take, staff leave requests, printable timetables, safer discounts and a safe nightly copy of all records.",
     "changes": [
       {
         "kind": "new",
@@ -198,7 +203,7 @@
       {
         "kind": "security",
         "for": "Admins",
-        "text": "Nightly backups to Google Drive and a guide to secure the server."
+        "text": "Every night, a safe copy of the institute's records is kept in a second place."
       }
     ]
   },

@@ -23,6 +23,7 @@
         {{ brand_mark({"principal": "Principal", "hod": "Head of department", "exam": "Exams", "accounts": "Accounts", "library": "Library", "warden": "Hostel", "gate": "Gate"}.get(_seg, "Admin")) }}
         <button id="drawer-close" class="drawer-close" type="button" aria-label="Close menu">{{ nav_icon("close") }}</button>
       </div>
+      {% include "_version_top.html" %}
 
       {{ drawer_nav(nav_items, active_nav, "Admin navigation", admin_back|default(False)) }}
 
