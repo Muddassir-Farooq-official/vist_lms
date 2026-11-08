@@ -62,3 +62,32 @@ class PaymentChallan(UUIDPKMixin, TimestampMixin, Base):
     )
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+class OneBillTransaction(UUIDPKMixin, Base):
+    """Every payment the bank network (1LINK 1Bill) told us about, kept as it arrived (migration c4e6a8b0d2f4).
+
+    It is the record accounts match against the bank's settlement each day. The money itself is recorded the usual way:
+    a fee payment with a receipt (and the late fee as a paid fine); this row links to it and keeps the bank's own
+    reference, the split of the amount and the convenience charge (which is not a fee payment)."""
+
+    __tablename__ = "one_bill_transactions"
+    __table_args__ = (
+        UniqueConstraint("bank_mnemonic", "tran_auth_id", "consumer_number", name="uq_one_bill_tx_bank_auth_consumer"),
+        Index("ix_one_bill_tx_received_on", "received_on"),
+        CheckConstraint("amount > 0", name="positive_amount"),
+    )
+
+    consumer_number: Mapped[str] = mapped_column(String(30), nullable=False)
+    tran_auth_id: Mapped[str] = mapped_column(String(30), nullable=False)
+    bank_mnemonic: Mapped[str] = mapped_column(String(20), nullable=False, default="", server_default="")
+    amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)              # what the payer paid
+    fee_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)          # part that paid the challan
+    late_fee_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0, server_default="0")
+    convenience_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0, server_default="0")
+    tran_date: Mapped[date | None] = mapped_column(Date, nullable=True)                # the bank's date
+    tran_time: Mapped[str | None] = mapped_column(String(6), nullable=True)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    received_on: Mapped[date] = mapped_column(Date, nullable=False)                     # institute's day it arrived
+    challan_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("payment_challans.id", ondelete="RESTRICT"), nullable=False)
+    receipt_number: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    fine_receipt_numbers: Mapped[str | None] = mapped_column(String(200), nullable=True)

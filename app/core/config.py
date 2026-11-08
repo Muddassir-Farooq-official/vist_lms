@@ -200,6 +200,13 @@ class Settings(BaseSettings):
     fee_late_fee_auto_post: int = 1                 # 1 = when a late instalment is paid, its late fee becomes a Fine to collect
     fee_late_fee_double_every_days: int = 0         # the daily late fee doubles after every this many late days (0 = never, flat rate)
     fee_late_fee_max_per_day: float = 0.0           # the daily late fee never goes above this (Rs.); 0 = no limit
+    # 1Bill (1LINK) bill payment. Off until the bank's details arrive: ONE_BILL_ENABLED=1 and a username/password in .env.
+    one_bill_enabled: int = 0
+    one_bill_username: str | None = None
+    one_bill_password: str | None = None
+    one_bill_allowed_ips: str = ""                   # comma-separated; empty = any address (the username/password still apply)
+    one_bill_convenience_fixed: float = 0.0          # Rs. added to every 1Bill payment (Settings -> Fees)
+    one_bill_convenience_percent: float = 0.0        # % of the challan added to every 1Bill payment
     purchase_second_approval_above: float = 50000.0  # purchase orders / payments above this need a second administrator (0 = never)
     require_attendance_lock_before_publish: bool = True
     # End Semester only after every course with students has locked attendance and a published result

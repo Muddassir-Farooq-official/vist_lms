@@ -82,3 +82,26 @@ async def test_staff_menus_show_the_version_and_student_menus_do_not(app_client)
     assert "/static/js/releases-ui.js" in staff.text
     student = await app_client.get("/dashboard/student", headers={"accept": "text/html"})
     assert student.status_code == 200 and 'id="app-version"' not in student.text
+
+
+async def test_shared_links_show_a_preview_picture(app_client, monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "public_url", "https://lms.example.edu.pk")
+    login = (await app_client.get("/", headers={"accept": "text/html"})).text
+    assert '<meta property="og:image" content="https://lms.example.edu.pk/share/preview.png?kind=portal' in login
+    assert 'property="og:title"' in login and 'name="twitter:card" content="summary_large_image"' in login
+    health = (await app_client.get("/health", headers={"accept": "text/html"})).text
+    assert "share/preview.png?kind=version" in health and f'og:url" content="https://lms.example.edu.pk/health?v={rel.current_version()}"' in health
+    assert "data-share-url" in health
+    for kind in ("portal", "version"):
+        img = await app_client.get("/share/preview.png", params={"kind": kind})
+        assert img.status_code == 200 and img.headers["content-type"] == "image/png" and len(img.content) < 300_000   # WhatsApp's limit
+        from PIL import Image
+        import io
+        assert Image.open(io.BytesIO(img.content)).size == (1200, 630)
+
+
+async def test_staff_menu_has_a_share_button_for_the_version(app_client):
+    page = (await app_client.get("/dashboard/faculty", headers={"accept": "text/html"})).text
+    assert f'data-share-path="/health?v={rel.current_version()}"' in page and "drawer-version-top" in page

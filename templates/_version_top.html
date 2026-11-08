@@ -1,3 +1,7 @@
-{# Version label right under the logo in the staff menus, always visible. Opens What's new. #}
-{% from "_icons.html" import nav_icon as _vi %}
-<a class="drawer-version-top" href="/health#whats-new" title="See what's new in this version"><span class="dvt-dot" aria-hidden="true"></span><span>Version {{ app_version() }}</span><b>What's new &rsaquo;</b></a>
+{# Version label right under the logo in the staff menus, always visible. Opens What's new; the arrow shares it. #}
+<div class="drawer-version-row">
+  <a class="drawer-version-top" href="/health#whats-new" title="See what's new in this version"><span class="dvt-dot" aria-hidden="true"></span><span>Version {{ app_version() }}</span><b>What's new &rsaquo;</b></a>
+  <button type="button" class="dvt-share" data-share-path="/health?v={{ app_version() }}" data-share-title="{{ brand.short_name }} version {{ app_version() }}" data-share-text="{{ brand.short_name }} has a new version ({{ app_version() }}). See what's new:" aria-label="Share this version" title="Share">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+  </button>
+</div>

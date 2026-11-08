@@ -221,6 +221,7 @@ ADMIN_NAV_ITEMS = [
     _nav("finance", "Accounts", "tasks", "/dashboard/admin/finance", group="Finance"),
     _nav("reports", "Reports", "exams", "/dashboard/admin/reports", group="Reports"),
     _nav("finance-reports", "Finance reports", "exams", "/dashboard/admin/finance-reports", group="Finance"),
+    _nav("onebill", "1Bill payments", "fees", "/dashboard/admin/onebill", group="Finance"),
     _nav("payroll", "Payroll", "fees", "/dashboard/admin/payroll", group="Finance"),
     _nav("staff-attendance", "Staff attendance", "clock", "/dashboard/admin/staff-attendance", group="Finance"),
     _nav("fines", "Fines", "ban", "/dashboard/admin/fines", group="Finance"),
@@ -357,6 +358,7 @@ ACCOUNTS_NAV_ITEMS = [
     _nav("reports", "Reports", "exams", "/dashboard/accounts/reports", mobile=False),
     _nav("finance-reports", "Finance reports", "exams", "/dashboard/accounts/finance-reports"),
     _nav("refunds", "Refunds", "fees", "/dashboard/accounts/refunds"),
+    _nav("onebill", "1Bill payments", "fees", "/dashboard/accounts/onebill"),
     _nav("inventory", "Inventory / Store", "tasks", "/dashboard/accounts/inventory"),
     _nav("assets", "Fixed assets", "tasks", "/dashboard/accounts/assets"),
     _nav("approvals", "My approval requests", "tasks", "/dashboard/accounts/approvals"),
@@ -620,6 +622,10 @@ app.include_router(release_router, prefix=settings.api_v1_prefix)
 from app.feedback.router import router as feedback_router  # noqa: E402
 
 app.include_router(feedback_router, prefix=settings.api_v1_prefix)
+from app.fees.onebill_router import report_router as onebill_report_router, router as onebill_router  # noqa: E402
+
+app.include_router(onebill_router, prefix=settings.api_v1_prefix)
+app.include_router(onebill_report_router, prefix=settings.api_v1_prefix)
 app.include_router(exams_router, prefix=settings.api_v1_prefix)
 app.include_router(sms_router, prefix=settings.api_v1_prefix)
 from app.reports.finance_router import router as finance_reports_router  # noqa: E402
@@ -723,9 +729,27 @@ async def health(request: Request):
     redis_ok = await check_redis_connection()
     from app.core.releases import version_info
 
-    response = templates.TemplateResponse(request, "health.html", {"db_ok": db_ok, "redis_ok": redis_ok, "info": version_info()})
+    from app.core import brand
+    from app.core.share import meta as share_meta
+
+    info = version_info()
+    share = share_meta(request, kind="version", title=f"{brand.short_name()} — version {info['version']}",
+                       description="See what's new in this version.", path=f"/health?v={info['version']}")
+    response = templates.TemplateResponse(request, "health.html", {"db_ok": db_ok, "redis_ok": redis_ok, "info": info, "share": share})
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+@app.get("/share/preview.png", include_in_schema=False)
+async def share_preview(kind: str = "portal", v: str | None = None):
+    """The picture shown when the portal's or the "what's new" address is shared (WhatsApp, Facebook, email...)."""
+    from fastapi.responses import Response as _R
+
+    from app.core.releases import current_version
+    from app.core.share import preview_png
+
+    body = preview_png("version" if kind == "version" else "portal", current_version(), str(settings.brand_version))
+    return _R(content=body, media_type="image/png", headers={"Cache-Control": "public, max-age=86400", "X-Content-Type-Options": "nosniff"})
 
 
 @app.get("/health/live", tags=["health"], summary="Liveness probe")
@@ -780,7 +804,12 @@ async def landing_page(request: Request, reauth: int = 0):
     from urllib.parse import urlparse
 
     host = urlparse(settings.public_url or "").hostname or request.url.hostname   # behind a proxy, the address people actually use
-    response = templates.TemplateResponse(request, "login.html", {"site_host": host})
+    from app.core import brand
+    from app.core.share import meta as share_meta
+
+    share = share_meta(request, kind="portal", title=f"{brand.short_name()} — student & staff portal",
+                       description=f"Sign in to {brand.name()}: classes, attendance, results, fees and more.", path="/")
+    response = templates.TemplateResponse(request, "login.html", {"site_host": host, "share": share})
     response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -1021,6 +1050,16 @@ async def admin_admissions_page(request: Request):
 @app.get("/dashboard/admin/refunds", include_in_schema=False)
 async def admin_refunds_page(request: Request):
     return templates.TemplateResponse(request, "admin/refunds.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "refunds"})
+
+
+@app.get("/dashboard/accounts/onebill", include_in_schema=False)
+async def accounts_onebill_page(request: Request):
+    return templates.TemplateResponse(request, "shared/onebill.html", {"nav_items": ACCOUNTS_NAV_ITEMS, "active_nav": "onebill", "allowed_roles": "ADMIN,ACCOUNTS_OFFICER"})
+
+
+@app.get("/dashboard/admin/onebill", include_in_schema=False)
+async def admin_onebill_page(request: Request):
+    return templates.TemplateResponse(request, "shared/onebill.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "onebill", "allowed_roles": "ADMIN"})
 
 
 @app.get("/dashboard/accounts/refunds", include_in_schema=False)

@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="/static/css/theme.css" />
   <link rel="stylesheet" href="/static/css/releases.css?v={{ info.version }}" />
   {% from "_brand.html" import brand_head %}{{ brand_head() }}
+  {% include "_share_meta.html" %}
 </head>
 {%- set all_ok = db_ok and redis_ok -%}
 <body class="auth-body hs-body">
@@ -40,7 +41,13 @@
       </div>
       <div class="hs-card hs-version">
         <h2>Version</h2>
-        <p class="hs-vnum">v{{ info.version }}</p>
+        <div class="hs-vrow">
+          <p class="hs-vnum">v{{ info.version }}</p>
+          <button type="button" class="hs-share" data-share-url="{{ share.url }}" data-share-title="{{ share.title }}" data-share-text="{{ brand.short_name }} version {{ info.version }}. See what's new:">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+            <span>Share</span>
+          </button>
+        </div>
         <dl>
           {% if info.released_on_text %}<dt>Released</dt><dd>{{ info.released_on_text }}</dd>{% endif %}
           {% if info.updated_on_text %}<dt>Installed on server</dt><dd>{{ info.updated_on_text }}</dd>{% endif %}
