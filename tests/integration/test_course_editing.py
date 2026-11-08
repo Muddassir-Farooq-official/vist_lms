@@ -95,3 +95,43 @@ async def test_an_offering_with_attendance_is_never_deleted(app_client, admin_us
     assert chk["can_delete"] is False and "attendance" in chk["blockers"][0]
     d = await app_client.delete(f"{A}/offerings/{off}", params={"unenroll": "true"})
     assert d.status_code == 422 and "attendance" in d.text
+
+async def test_unenrol_and_delete_works_with_the_live_databases_no_delete_rule(app_client, admin_user, db_session):
+    """The live database refuses to delete enrolments (trigger vist_keep_history, migration a6c2d3e4f567); the test
+    database is built without it, which is how "unexpected error" slipped through. Install the real rule here."""
+    import uuid as _u
+
+    from sqlalchemy import select, text
+
+    from app.academics.models import Enrollment
+    from tests.integration.test_attendance_and_grading import _create_n_sessions
+
+    rule_sql = """
+        CREATE OR REPLACE FUNCTION vist_keep_history() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF coalesce(current_setting('vist.allow_delete', true), '') = 'on' THEN RETURN OLD; END IF;
+            RAISE EXCEPTION 'Rows in % are history and cannot be deleted (close or reverse them instead).', TG_TABLE_NAME
+                USING ERRCODE = 'restrict_violation';
+        END $$;"""
+    await db_session.execute(text(rule_sql))
+    await db_session.execute(text("DROP TRIGGER IF EXISTS trg_enrollments_keep_history ON enrollments"))
+    await db_session.execute(text("CREATE TRIGGER trg_enrollments_keep_history BEFORE DELETE ON enrollments FOR EACH ROW EXECUTE FUNCTION vist_keep_history()"))
+    await db_session.commit()
+    try:
+        off, studs = await _setup_offering_with_enrolled_students(app_client, code="CE9", n_students=3, cnic_base=5900)
+        await _create_n_sessions(app_client, off, 4)                                  # a timetable and classes, nothing marked
+        other, others = await _setup_offering_with_enrolled_students(app_client, code="CE8", n_students=1, cnic_base=5950)
+
+        yes = await app_client.delete(f"{A}/offerings/{off}", params={"unenroll": "true"})
+        assert yes.status_code == 204, yes.text
+        assert (await db_session.execute(select(Enrollment).where(Enrollment.course_offering_id == _u.UUID(off)))).first() is None
+
+        # everywhere else enrolments are still protected
+        keep = (await db_session.execute(select(Enrollment).where(Enrollment.course_offering_id == _u.UUID(other)))).scalars().first()
+        with pytest.raises(Exception, match="history"):
+            await db_session.execute(text("DELETE FROM enrollments WHERE id = :i"), {"i": keep.id})
+        await db_session.rollback()
+    finally:
+        await db_session.execute(text("DROP TRIGGER IF EXISTS trg_enrollments_keep_history ON enrollments"))
+        await db_session.execute(text("DROP FUNCTION IF EXISTS vist_keep_history()"))
+        await db_session.commit()
