@@ -1,0 +1,32 @@
+/* Faculty -> Students to watch */
+.wl-panel { padding: 20px; }
+.wl-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.wl-head h2 { margin: 0; font-size: 1.05rem; color: var(--text-primary); }
+.wl-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.wl-chips button { border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-secondary); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: .84rem; cursor: pointer; }
+.wl-chips button b { margin-left: 4px; color: var(--danger); }
+.wl-chips button.active { background: var(--blue-600); border-color: var(--blue-600); color: var(--white); }
+.wl-chips button.active b { color: var(--white); }
+.wl-summary { margin: 10px 0 14px; color: var(--text-secondary); }
+.wl-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.wl-item { display: grid; grid-template-columns: 44px 1fr; gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+.wl-item.many { border-left: 4px solid var(--danger); }
+.wl-avatar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--blue-50); color: var(--blue-700); font-weight: 700; }
+.wl-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.wl-top strong { color: var(--text-primary); }
+.wl-top small { color: var(--text-muted); }
+.wl-course { font-size: .78rem; font-weight: 600; color: var(--blue-700); background: var(--blue-50); border-radius: 6px; padding: 2px 8px; }
+.wl-reasons { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.wl-reasons li { font-size: .84rem; border-radius: 8px; padding: 4px 10px; line-height: 1.4; }
+.wl-reasons .r-attendance { background: var(--accent-orange-bg); color: #9a4d00; }
+.wl-reasons .r-marks { background: var(--danger-bg); color: #a61b1b; }
+.wl-reasons .r-assignments { background: var(--accent-purple-bg); color: #5b21b6; }
+.wl-reasons .r-fees { background: var(--surface-alt); color: var(--text-secondary); border: 1px solid var(--border); }
+.wl-empty { display: flex; gap: 12px; align-items: center; padding: 18px; border-radius: 14px; background: var(--success-bg); color: var(--success); }
+.wl-empty svg { width: 28px; height: 28px; flex: none; }
+.wl-empty p { margin: 0; color: var(--text-primary); }
+.wl-rules { margin-top: 16px; color: var(--text-secondary); font-size: .9rem; }
+.wl-rules summary { cursor: pointer; color: var(--blue-600); font-weight: 600; }
+.wl-rules ul { margin: 8px 0; padding-left: 20px; }
+.wl-rules p { margin: 0; }
+@media (max-width: 480px) { .wl-item { grid-template-columns: 1fr; } .wl-avatar { display: none; } }

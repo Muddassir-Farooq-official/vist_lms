@@ -90,6 +90,7 @@
 
   function alerts(d) {
     const items = [], thr = (d.cfg && d.cfg.eligibility_threshold) || 75;
+    if (d.feedback && d.feedback.open && d.feedback.open.length) items.push({ count: d.feedback.open.length, text: "course" + (d.feedback.open.length > 1 ? "s" : "") + " waiting for your feedback (anonymous, 2 minutes each)", href: "/dashboard/student/feedback", tone: "blue" });
     (d.overview || []).forEach(function (c) {
       if (!c.classes_held || c.attendance_percentage == null) return;
       if (c.attendance_percentage < thr) items.push({ count: Math.round(c.attendance_percentage) + "%", text: c.course_code + ": attendance is below the " + thr + "% needed to pass. Speak to your teacher.", href: "/dashboard/student/attendance", tone: "red" });
@@ -199,6 +200,7 @@
       overview: "/api/v1/academics/enrollments/me/overview",
       schedule: "/api/v1/academics/enrollments/me/schedule",
       cfg: "/api/v1/attendance/config",
+      feedback: "/api/v1/feedback/me",
       assignments: "/api/v1/assignments/mine",
       transcript: "/api/v1/results/me/transcript",
       fees: "/api/v1/fees/assignments/me",

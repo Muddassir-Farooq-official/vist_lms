@@ -1,0 +1,46 @@
+{% extends "admin/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block allowed_roles %}{{ allowed_roles|default("ADMIN") }}{% endblock %}
+{% block title %}Course feedback{% endblock %}
+{% block page_title %}Course feedback{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Students' anonymous feedback on each course and teacher. Open in the last two weeks of each term; scores appear once the term has ended.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/feedback.css?v={{ app_version() }}" />{% endblock %}
+
+{% block content %}
+{% if can_edit_questions %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="results" role="tab" aria-selected="true"><span>Courses</span></button>
+  <button class="portal-tab" data-tab="questions" role="tab" aria-selected="false"><span>Questions</span></button>
+</div>
+{% endif %}
+<div data-tab-panel="results">
+  <div class="fb-kpis" id="fb-kpis"></div>
+  <section class="panel fb-panel">
+    <div class="fb-toolbar">
+      <select id="fb-term" class="select-input" aria-label="Term"></select>
+      <input type="search" id="fb-q" class="text-input" placeholder="Search teacher or course" aria-label="Search teacher or course" />
+    </div>
+    <div class="table-scroll"><table class="dash-table fb-table">
+      <thead><tr><th>Teacher</th><th>Course</th><th>Answered</th><th>Overall</th><th></th></tr></thead>
+      <tbody id="fb-rows"><tr><td colspan="5">Loading&hellip;</td></tr></tbody>
+    </table></div>
+    <p class="fb-note" id="fb-note"></p>
+  </section>
+</div>
+{% if can_edit_questions %}
+<div data-tab-panel="questions" hidden>
+  <section class="panel fb-panel" aria-labelledby="fq-h">
+    <h2 id="fq-h">Survey questions</h2>
+    <p class="fb-note">One question per line. Students answer each from 1 (strongly disagree) to 5 (strongly agree) and can add a comment. Changing a question's wording starts it fresh; answers already given stay with the old wording.</p>
+    <textarea id="fq-text" class="text-input fq-text" rows="10" aria-label="Questions, one per line"></textarea>
+    <div class="fq-actions"><button type="button" class="role-btn" id="fq-save">Save questions</button><span id="fq-msg" class="fb-note" role="status"></span></div>
+  </section>
+</div>
+{% endif %}
+<dialog id="fb-dialog" class="modal modal-wide"><div class="modal-body" id="fb-dialog-body"></div><div class="fq-actions fb-dialog-actions"><button type="button" class="role-btn secondary-btn" id="fb-dialog-close">Close</button></div></dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/feedback-view.js?v={{ app_version() }}"></script>
+<script src="/static/js/feedback-overview.js?v={{ app_version() }}"></script>
+{% endblock %}

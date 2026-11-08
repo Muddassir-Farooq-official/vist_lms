@@ -1,0 +1,28 @@
+{% extends "student/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Course feedback{% endblock %}
+{% block page_title %}Course feedback{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Tell us how each course went. It takes about two minutes per course.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/feedback.css?v={{ app_version() }}" />{% endblock %}
+
+{% block content %}
+<p class="fb-anon">{{ nav_icon("shield") }}<span><strong>Your answers are anonymous.</strong> They are saved without your name, and teachers only see totals from several students, after results are out.</span></p>
+<p class="dash-alert error" id="fb-error" hidden></p>
+<section class="panel fb-panel" aria-labelledby="fb-open-h">
+  <h2 id="fb-open-h">Waiting for your feedback</h2>
+  <div id="fb-open" aria-live="polite"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
+  <p class="fb-none" id="fb-open-none" hidden>Nothing to answer right now.</p>
+</section>
+<section class="panel fb-panel" id="fb-later-panel" hidden aria-labelledby="fb-later-h">
+  <h2 id="fb-later-h">Opens later</h2>
+  <ul class="fb-mini" id="fb-later"></ul>
+</section>
+<section class="panel fb-panel" id="fb-done-panel" hidden aria-labelledby="fb-done-h">
+  <h2 id="fb-done-h">Done. Thank you!</h2>
+  <ul class="fb-mini" id="fb-done"></ul>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/student-feedback.js?v={{ app_version() }}"></script>
+{% endblock %}

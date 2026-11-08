@@ -49,6 +49,7 @@ from app.approvals import models as approvals_models  # noqa: F401
 from app.branding import models as branding_models  # noqa: F401
 from app.selfservice import models as selfservice_models  # noqa: F401
 from app.timekeeping import models as timekeeping_models  # noqa: F401
+from app.feedback import models as feedback_models  # noqa: F401
 from app.calendar import models as calendar_models  # noqa: F401
 from app.records import models as records_models  # noqa: F401
 from app.hostel import models as hostel_models  # noqa: F401

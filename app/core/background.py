@@ -61,6 +61,9 @@ async def send_due(session: AsyncSession, *, time_budget: float = 20) -> dict:
     from app.audit.money_review import morning_notice
 
     await morning_notice(session)                                        # from 8 AM, once a day; never raises
+    from app.feedback.service import remind as feedback_remind
+
+    await feedback_remind(session)                                       # from 9 AM, once a day; never raises
     sms = await SmsService(session).send_pending(limit=100, time_budget=time_budget)
     emails = await send_emails(session, limit=100, time_budget=time_budget)
     pushed = await push_round(session)

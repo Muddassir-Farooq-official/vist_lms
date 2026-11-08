@@ -1,17 +1,83 @@
 [
   {
+    "version": "1.5.0",
+    "date": "2026-11-08",
+    "title": "Students to watch, and course feedback from students",
+    "summary": "Teachers see early which students may need help, and students can say anonymously how each course went.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "Students to watch: a list of students in your courses whose attendance is below 75%, who have less than half of the marks given so far, who missed 2 or more assignments, or whose fee is overdue for 30 days or more. Each shows why, so you know what to talk about."
+      },
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "Your home page tells you how many students need attention, with a link to the list."
+      },
+      {
+        "kind": "new",
+        "for": "Students & parents",
+        "text": "Course feedback: in the last two weeks of each term, students rate each course and teacher from 1 to 5 and can add a comment. It takes about two minutes and is anonymous: answers are saved without names."
+      },
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "Student feedback: see the averages and comments for your courses once their results are published, when at least 3 students answered."
+      },
+      {
+        "kind": "new",
+        "for": "Admins",
+        "text": "Course feedback overview for the principal, HOD and admin: response rates while the survey is open, and scores for every teacher and course after the term. Admins can change the questions."
+      },
+      {
+        "kind": "new",
+        "for": "Students & parents",
+        "text": "Students get a reminder in the app when the survey opens and two days before it closes."
+      }
+    ]
+  },
+  {
     "version": "1.4.0",
     "date": "2026-11-08",
     "title": "Version number, What's new, and a lighter server",
     "summary": "You can now see which version of the system is running and read what changed in each update. Pictures take far less space, and the server cleans up after itself.",
     "changes": [
-      {"kind": "new", "for": "Staff", "text": "The version number is shown at the bottom of the menu in every staff portal. Click it to see what's new."},
-      {"kind": "new", "for": "Staff", "text": "After each update, a short \"What's new\" card appears once, explaining the changes in plain words."},
-      {"kind": "new", "for": "Everyone", "text": "The status page (/health) now shows whether the system is working, its version and when it was last updated."},
-      {"kind": "improved", "for": "Everyone", "text": "Photos are saved at a sensible size: profile pictures about 20 times smaller, document photos still sharp enough to read. PDFs and Word/Excel files are kept exactly as uploaded."},
-      {"kind": "improved", "for": "Admins", "text": "Each update now clears the leftover files it creates, so the server's disk no longer fills up over time. System logs are capped too."},
-      {"kind": "fixed", "for": "Admins", "text": "The server no longer reports the notification and import helpers as \"unhealthy\" when they are working normally."},
-      {"kind": "improved", "for": "Admins", "text": "One guided command sets up the server's safety: off-site backups to Google Drive, a closed database port and new passwords and keys, each step asking before it changes anything."}
+      {
+        "kind": "new",
+        "for": "Staff",
+        "text": "The version number is shown at the bottom of the menu in every staff portal. Click it to see what's new."
+      },
+      {
+        "kind": "new",
+        "for": "Staff",
+        "text": "After each update, a short \"What's new\" card appears once, explaining the changes in plain words."
+      },
+      {
+        "kind": "new",
+        "for": "Everyone",
+        "text": "The status page (/health) now shows whether the system is working, its version and when it was last updated."
+      },
+      {
+        "kind": "improved",
+        "for": "Everyone",
+        "text": "Photos are saved at a sensible size: profile pictures about 20 times smaller, document photos still sharp enough to read. PDFs and Word/Excel files are kept exactly as uploaded."
+      },
+      {
+        "kind": "improved",
+        "for": "Admins",
+        "text": "Each update now clears the leftover files it creates, so the server's disk no longer fills up over time. System logs are capped too."
+      },
+      {
+        "kind": "fixed",
+        "for": "Admins",
+        "text": "The server no longer reports the notification and import helpers as \"unhealthy\" when they are working normally."
+      },
+      {
+        "kind": "improved",
+        "for": "Admins",
+        "text": "One guided command sets up the server's safety: off-site backups to Google Drive, a closed database port and new passwords and keys, each step asking before it changes anything."
+      }
     ]
   },
   {
@@ -20,7 +86,11 @@
     "title": "Fix: removing a course offering",
     "summary": "Deleting a course offering by unenrolling its students works again.",
     "changes": [
-      {"kind": "fixed", "for": "Admins", "text": "Deleting an offering and unenrolling its students showed \"An unexpected error occurred\", even when no attendance or marks had been entered. It now works. Offerings that already have attendance or marks are still protected and cannot be deleted."}
+      {
+        "kind": "fixed",
+        "for": "Admins",
+        "text": "Deleting an offering and unenrolling its students showed \"An unexpected error occurred\", even when no attendance or marks had been entered. It now works. Offerings that already have attendance or marks are still protected and cannot be deleted."
+      }
     ]
   },
   {
@@ -29,11 +99,31 @@
     "title": "Two-step sign-in for administrators, daily money review",
     "summary": "Administrator accounts are now protected by a code from a phone app, and every change to money is listed for a daily check.",
     "changes": [
-      {"kind": "security", "for": "Admins", "text": "Administrators sign in with their password plus a 6-digit code from an authenticator app (Google Authenticator, Microsoft Authenticator). A trusted device is remembered for 30 days."},
-      {"kind": "new", "for": "Admins", "text": "If an administrator loses their phone, another administrator can reset their two-step sign-in from Activity → Security."},
-      {"kind": "new", "for": "Admins", "text": "Activity → Money changes lists every discount, refund, cancelled receipt and fee change, so they can be checked day by day and marked as checked."},
-      {"kind": "new", "for": "Admins", "text": "A reminder appears at 8 AM when there are money changes from earlier days that nobody has checked yet."},
-      {"kind": "fixed", "for": "Everyone", "text": "Links in notifications now open the right tab of a page (for example the leave or fines tab)."}
+      {
+        "kind": "security",
+        "for": "Admins",
+        "text": "Administrators sign in with their password plus a 6-digit code from an authenticator app (Google Authenticator, Microsoft Authenticator). A trusted device is remembered for 30 days."
+      },
+      {
+        "kind": "new",
+        "for": "Admins",
+        "text": "If an administrator loses their phone, another administrator can reset their two-step sign-in from Activity → Security."
+      },
+      {
+        "kind": "new",
+        "for": "Admins",
+        "text": "Activity → Money changes lists every discount, refund, cancelled receipt and fee change, so they can be checked day by day and marked as checked."
+      },
+      {
+        "kind": "new",
+        "for": "Admins",
+        "text": "A reminder appears at 8 AM when there are money changes from earlier days that nobody has checked yet."
+      },
+      {
+        "kind": "fixed",
+        "for": "Everyone",
+        "text": "Links in notifications now open the right tab of a page (for example the leave or fines tab)."
+      }
     ]
   },
   {
@@ -42,10 +132,26 @@
     "title": "Attendance fine warnings for students and parents",
     "summary": "Students and parents can see early whether low attendance will lead to a fine, and how many classes are needed to avoid it.",
     "changes": [
-      {"kind": "new", "for": "Students & parents", "text": "For each subject, students and parents see the attendance band they are in, the fine it would bring, and how many more classes are needed to get back to a safe level."},
-      {"kind": "new", "for": "Admins", "text": "The admin dashboard shows how many leave requests are waiting and how many students are at risk of an attendance fine."},
-      {"kind": "improved", "for": "Staff", "text": "Sick leave requests need a medical note attached."},
-      {"kind": "fixed", "for": "Staff", "text": "The Apply button for leave no longer stays greyed out after a missing-note message."}
+      {
+        "kind": "new",
+        "for": "Students & parents",
+        "text": "For each subject, students and parents see the attendance band they are in, the fine it would bring, and how many more classes are needed to get back to a safe level."
+      },
+      {
+        "kind": "new",
+        "for": "Admins",
+        "text": "The admin dashboard shows how many leave requests are waiting and how many students are at risk of an attendance fine."
+      },
+      {
+        "kind": "improved",
+        "for": "Staff",
+        "text": "Sick leave requests need a medical note attached."
+      },
+      {
+        "kind": "fixed",
+        "for": "Staff",
+        "text": "The Apply button for leave no longer stays greyed out after a missing-note message."
+      }
     ]
   },
   {
@@ -54,14 +160,46 @@
     "title": "Attendance fines, course rules, staff leave and timetables",
     "summary": "A large update: attendance fines by band, rules for which courses a student may take, staff leave requests, printable timetables, safer discounts and nightly backups.",
     "changes": [
-      {"kind": "new", "for": "Admins", "text": "Attendance fines per subject by band: 75% and above no fine; 65–74% Rs 3,000; 55–64% Rs 6,000; 45–54% Rs 10,000; below 45% is sent to an administrator to decide. Fines are charged before final exams."},
-      {"kind": "new", "for": "Students & parents", "text": "Every Monday, an app message (and SMS if switched on) warns students whose attendance in a subject is in a fine band, with the fine it would mean."},
-      {"kind": "new", "for": "Admins", "text": "Courses can require earlier courses to be passed first. An administrator can allow an exception."},
-      {"kind": "new", "for": "Admins", "text": "Each programme has a limit on credit hours per semester (for example 21). An administrator can allow a student to take more."},
-      {"kind": "new", "for": "Staff", "text": "Staff apply for leave in the app; an administrator approves it and payroll takes it into account. Sick leave is paid up to the yearly allowance set in Settings → Payroll."},
-      {"kind": "new", "for": "Staff", "text": "Timetables can be printed per class, for the whole institute and per teacher."},
-      {"kind": "improved", "for": "Accounts", "text": "Discounts now apply to tuition fee only by default, so other charges (like the student card) are no longer discounted by mistake."},
-      {"kind": "security", "for": "Admins", "text": "Nightly backups to Google Drive and a guide to secure the server."}
+      {
+        "kind": "new",
+        "for": "Admins",
+        "text": "Attendance fines per subject by band: 75% and above no fine; 65–74% Rs 3,000; 55–64% Rs 6,000; 45–54% Rs 10,000; below 45% is sent to an administrator to decide. Fines are charged before final exams."
+      },
+      {
+        "kind": "new",
+        "for": "Students & parents",
+        "text": "Every Monday, an app message (and SMS if switched on) warns students whose attendance in a subject is in a fine band, with the fine it would mean."
+      },
+      {
+        "kind": "new",
+        "for": "Admins",
+        "text": "Courses can require earlier courses to be passed first. An administrator can allow an exception."
+      },
+      {
+        "kind": "new",
+        "for": "Admins",
+        "text": "Each programme has a limit on credit hours per semester (for example 21). An administrator can allow a student to take more."
+      },
+      {
+        "kind": "new",
+        "for": "Staff",
+        "text": "Staff apply for leave in the app; an administrator approves it and payroll takes it into account. Sick leave is paid up to the yearly allowance set in Settings → Payroll."
+      },
+      {
+        "kind": "new",
+        "for": "Staff",
+        "text": "Timetables can be printed per class, for the whole institute and per teacher."
+      },
+      {
+        "kind": "improved",
+        "for": "Accounts",
+        "text": "Discounts now apply to tuition fee only by default, so other charges (like the student card) are no longer discounted by mistake."
+      },
+      {
+        "kind": "security",
+        "for": "Admins",
+        "text": "Nightly backups to Google Drive and a guide to secure the server."
+      }
     ]
   },
   {
@@ -70,7 +208,11 @@
     "title": "Starting point",
     "summary": "The system as it was before release notes were kept: admissions, students, staff, courses and results, attendance, fees and receipts, payroll, library, hostel, gate, announcements and the student and parent portals.",
     "changes": [
-      {"kind": "new", "for": "Everyone", "text": "Email address verification, copies of important emails to administrators, and a friendly \"Page not found\" page."}
+      {
+        "kind": "new",
+        "for": "Everyone",
+        "text": "Email address verification, copies of important emails to administrators, and a friendly \"Page not found\" page."
+      }
     ]
   }
 ]

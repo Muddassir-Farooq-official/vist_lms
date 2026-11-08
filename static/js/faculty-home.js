@@ -84,6 +84,7 @@
       if (c.unmarked_past_classes) items.push({ count: c.unmarked_past_classes, text: c.course_code + ": classes never marked (ask the office for a correction)", href: "/dashboard/faculty/attendance#requests", tone: "red" });
       if (c.average_attendance != null && c.average_attendance < 75) items.push({ count: Math.round(c.average_attendance) + "%", text: c.course_code + ": class attendance is low", href: "/dashboard/faculty/attendance" });
     });
+    if (d.watch && d.watch.students && d.watch.students.length) items.push({ count: new Set(d.watch.students.map(function (s) { return s.student_id; })).size, text: "students may need help (attendance, marks or missed work)", href: "/dashboard/faculty/watch", tone: "red" });
     const soon = D.iso(D.addDays(7));
     const noTopic = (rows || []).filter(function (e) { return e.session_date >= today && e.session_date <= soon && !(e.title || "").trim(); }).length;
     items.push({ count: noTopic, text: "classes in the next 7 days have no topic yet", href: "/dashboard/faculty/courses", tone: "blue" });
@@ -142,6 +143,7 @@
     D.greet("fh-greet", "fh-date", me);
     const d = await D.getAll({
       overview: "/api/v1/academics/offerings/me/overview",
+      watch: "/api/v1/academics/offerings/me/watchlist",
       schedule: "/api/v1/academics/offerings/me/schedule",
       assignments: "/api/v1/assignments/teaching",
       tasks: "/api/v1/tasks/summary",

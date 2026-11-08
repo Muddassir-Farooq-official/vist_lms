@@ -1,0 +1,30 @@
+{% extends "faculty/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Students to watch{% endblock %}
+{% block page_title %}Students to watch{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Students in your courses this term who may need help. A word from you early often makes the difference.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/watch.css?v={{ app_version() }}" />{% endblock %}
+
+{% block content %}
+<section class="panel wl-panel" aria-labelledby="wl-h">
+  <div class="wl-head">
+    <h2 id="wl-h">This term</h2>
+    <div class="wl-chips" id="wl-courses" role="group" aria-label="Course"></div>
+  </div>
+  <p class="wl-summary" id="wl-summary" aria-live="polite"></p>
+  <ul class="wl-list" id="wl-list"><li class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div></li></ul>
+  <div class="wl-empty" id="wl-empty" hidden>
+    {{ nav_icon("check-circle") }}
+    <p><strong>No one needs attention right now.</strong><br />Students appear here as soon as one of the signs below shows.</p>
+  </div>
+  <details class="wl-rules">
+    <summary>Why a student is listed</summary>
+    <ul id="wl-rules"></ul>
+    <p>The list is worked out each time you open this page from attendance, marks and assignments you have entered. Fee details stay with the accounts office.</p>
+  </details>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/faculty-watch.js?v={{ app_version() }}"></script>
+{% endblock %}
