@@ -27,7 +27,7 @@ def _known_page(link: str | None) -> str | None:
             _PAGE_PATHS = {r.path for r in app.routes if getattr(r, "path", None) and "GET" in getattr(r, "methods", set())}
         except Exception:
             return link
-    return link if link.split("?")[0] in _PAGE_PATHS else None
+    return link if link.split("#")[0].split("?")[0] in _PAGE_PATHS else None      # "#tab" opens a tab of that page
 
 
 async def create_notification(

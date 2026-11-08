@@ -73,7 +73,41 @@
           </button>
         </form>
 
-        <p class="signin-note">First time here? Use the one-time password the office gave you; you will choose your own right after. Forgot it? <a href="/forgot-password">Get a reset code by SMS</a>, or ask the administration office.</p>
+        <!-- Two-step sign-in (administrators): shown by login.js after the right password. -->
+        <form id="tfa-code-form" class="tfa-step" novalidate hidden>
+          <p class="auth-sub">Open the authenticator app on your phone and type the 6-digit code for this account.</p>
+          <div class="auth-field">
+            <label for="tfa-code">Code from your authenticator app</label>
+            <input class="auth-input tfa-code" type="text" id="tfa-code" inputmode="numeric" autocomplete="one-time-code"
+                   pattern="[0-9 ]*" maxlength="7" enterkeyhint="go" aria-describedby="tfa-code-error" />
+          </div>
+          <label class="tfa-remember"><input type="checkbox" id="tfa-remember" /> Remember this device for <span class="tfa-days">30</span> days</label>
+          <p class="auth-error" id="tfa-code-error" role="alert" hidden></p>
+          <button type="submit" class="auth-submit" id="tfa-code-btn"><span class="auth-spinner" aria-hidden="true"></span><span>Verify and sign in</span></button>
+          <p class="signin-note">Lost your phone? Ask another administrator to reset your two-step sign-in (Activity &rarr; Security). <button type="button" class="link-btn tfa-back">Use a different account</button></p>
+        </form>
+
+        <form id="tfa-setup-form" class="tfa-step" novalidate hidden>
+          <p class="auth-sub">Your account needs a second step: a code from an authenticator app on your phone. Set it up once:</p>
+          <ol class="tfa-steps">
+            <li>Install <strong>Google Authenticator</strong> or <strong>Microsoft Authenticator</strong> on your phone (free).</li>
+            <li>In the app, tap <strong>+</strong> and scan this code:
+              <div class="tfa-qr" id="tfa-qr" aria-label="QR code for the authenticator app"></div>
+              <details class="tfa-key"><summary>Can't scan? Type this key instead</summary><code id="tfa-key"></code></details></li>
+            <li>Type the 6-digit code the app shows:</li>
+          </ol>
+          <div class="auth-field">
+            <label for="tfa-setup-code">Code from your authenticator app</label>
+            <input class="auth-input tfa-code" type="text" id="tfa-setup-code" inputmode="numeric" autocomplete="one-time-code"
+                   pattern="[0-9 ]*" maxlength="7" enterkeyhint="go" />
+          </div>
+          <label class="tfa-remember"><input type="checkbox" id="tfa-setup-remember" /> Remember this device for <span class="tfa-days">30</span> days</label>
+          <p class="auth-error" id="tfa-setup-error" role="alert" hidden></p>
+          <button type="submit" class="auth-submit" id="tfa-setup-btn"><span class="auth-spinner" aria-hidden="true"></span><span>Turn on and sign in</span></button>
+          <p class="signin-note"><button type="button" class="link-btn tfa-back">Use a different account</button></p>
+        </form>
+
+        <p class="signin-note" id="signin-first-note">First time here? Use the one-time password the office gave you; you will choose your own right after. Forgot it? <a href="/forgot-password">Get a reset code by SMS</a>, or ask the administration office.</p>
         <p class="signin-foot">&copy; {{ brand.name }}</p>
       </section>
     </main>

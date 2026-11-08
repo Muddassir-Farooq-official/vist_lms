@@ -673,6 +673,12 @@ window.VistAdmin = (function () {
       });
       const fromUrl = (location.hash || "").replace("#", "");
       if (fromUrl && bar.querySelector('[data-tab="' + fromUrl + '"]')) showTab(fromUrl);
+      // A link to another tab of the page already open (e.g. a notification) changes only the #part: follow it.
+      window.addEventListener("hashchange", function () {
+        const name = (location.hash || "").replace("#", "").split("/")[0];
+        const btn = name && bar.querySelector('[data-tab="' + name + '"]');
+        if (btn) btn.click();
+      });
     });
   }
 

@@ -178,6 +178,10 @@ class Settings(BaseSettings):
     # lower edge = band 1, and so on; below band 3's lower edge the student is listed for an administrator's decision.
     # Mode 0 = the older rule above (one fine per term at lock, automatic drop). Paying a graded fine (or a waiver)
     # lifts the "minimum attendance to pass" condition for that subject: marks decide.
+    # Two-step sign-in (app/auth/two_factor.py): administrators must use an authenticator app code; a browser can be
+    # remembered for this many days.
+    two_factor_required_for_admins: int = 1
+    two_factor_remember_days: int = 30
     attendance_fine_mode: int = 1
     attendance_band1_from: float = 65.0
     attendance_band1_amount: float = 3000.0

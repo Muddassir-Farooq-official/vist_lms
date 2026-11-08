@@ -27,6 +27,10 @@ class TokenResponse(BaseModel):
     must_change_password: bool | None = None
     email_verification_required: bool | None = None
     redirect_to: str | None = None
+    # Two-step sign-in: "code" or "setup" when the password was right but the code is still needed (nothing issued yet).
+    two_factor: str | None = None
+    challenge: str | None = None
+    remember_days: int | None = None
 
 
 class ChangePasswordRequest(BaseModel):

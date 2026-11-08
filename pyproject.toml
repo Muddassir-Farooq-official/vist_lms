@@ -28,6 +28,7 @@ dependencies = [
     "gunicorn>=23.0.0",
     "httpx>=0.27.0",
     "cryptography>=44.0",   # phone / browser push notifications: VAPID signing and message encryption (app/push)
+    "segno==1.6.6",   # QR code for setting up two-step sign-in in an authenticator app (app/auth/two_factor.py); pure Python, no dependencies
     "numpy==2.1.3",
     "opencv-python-headless==4.10.0.84",   # offline face check for profile photos (app/selfservice/face_check.py)
 ]

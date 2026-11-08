@@ -25,7 +25,7 @@ TABBED = {
     "/dashboard/library/tasks": ["inbox", "todo", "sent", "new", "mine", "covers"],
     "/dashboard/accounts/tasks": ["inbox", "todo", "sent", "new", "mine", "covers"],
     "/dashboard/admin/tasks": ["inbox", "todo", "sent", "new", "mine", "covers", "flags", "staff", "all", "todo-report"],
-    "/dashboard/admin/activity": ["activity", "security"],
+    "/dashboard/admin/activity": ["activity", "security", "money"],
     "/dashboard/student/applications": ["mine", "new"],
     "/dashboard/faculty/applications": ["mine", "new", "dept"],
     "/dashboard/library/applications": ["mine", "new", "dept"],

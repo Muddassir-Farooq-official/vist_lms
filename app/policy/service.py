@@ -43,6 +43,11 @@ POLICY: tuple[Policy, ...] = (
     Policy("attendance_drop_threshold_percent", "Drop from course at or below (%)", "Attendance", float, 0, 100,
            "At attendance lock, a student at or below this is withdrawn from the course."),
     Policy("attendance_fine_amount", "Attendance fine (Rs.)", "Attendance", float, 0, 1_000_000, "Amount of each attendance fine."),
+    Policy("two_factor_required_for_admins", "Administrators must use two-step sign-in", "Sign-in security", int, 0, 1,
+           "After the password, a 6-digit code from an authenticator app on their phone. Turning this off lets administrators sign in with "
+           "the password alone; their set-up is kept for when it is turned back on."),
+    Policy("two_factor_remember_days", "Remember a device for", "Sign-in security", int, 1, 90,
+           "When 'remember this device' is ticked, the code is not asked again on that browser or phone for this many days. A new device always asks."),
     Policy("attendance_fine_mode", "How attendance fines work", "Attendance", int, 0, 1,
            "Per subject by band: each short subject is fined by its band before final exams; paying lets marks decide; below the lowest band "
            "an administrator decides. One per term: the older rule (one fine at lock, automatic drop)."),

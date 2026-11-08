@@ -10,6 +10,7 @@ from __future__ import annotations
 
 SECTIONS: tuple[tuple[str, str], ...] = (
     ("Fees & fines", "Late fees, how they grow, and when they become fines to collect."),
+    ("Sign-in security", "The code from an authenticator app that administrators type after their password."),
     ("Attendance", "Marking classes, alerts for teachers, and the limits that affect students."),
     ("Exams & results", "Admit cards, graduation and supplementary exams."),
     ("Promotion", "What a student needs to move to the next semester."),
@@ -39,6 +40,10 @@ UI: dict[str, dict] = {
                                "control": "switch"},
     "fee_payment_max_backdate_days": {"section": "Fees & fines", "sub": "Collecting", "label": "Payments may be dated back at most",
                                       "control": "number", "after": "days"},
+    # ---------------------------------------------------------------- sign-in security
+    "two_factor_required_for_admins": {"section": "Sign-in security", "label": "Administrators must use two-step sign-in", "control": "switch"},
+    "two_factor_remember_days": {"section": "Sign-in security", "label": "Remember a device for", "control": "choice",
+                                 "choices": [[1, "1 day"], [7, "7 days"], [30, "30 days"], [90, "90 days"]]},
     # ---------------------------------------------------------------- attendance
     "attendance_marking_window_minutes": {"section": "Attendance", "sub": "Teachers", "label": "Time a teacher has to mark a class",
                                           "control": "number", "after": "minutes"},
