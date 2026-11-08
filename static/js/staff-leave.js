@@ -15,6 +15,8 @@
   }
 
   async function load() {
+    const tab = document.querySelector('[data-tab="leave"]');
+    if (tab && tab.hidden) return;                       // the tab is for those who decide on leave
     const st = $("lv-status").value;
     const r = await VA.fetchJson("/api/v1/staff-attendance/leave" + (st ? "?status=" + st : ""), { quiet: true });
     if (!r.ok) return;

@@ -42,7 +42,8 @@ class FinanceReportService:
         self.session = session
 
     # ------------------------------------------------------------------ defaulters with aging
-    async def defaulters(self, *, program_id: uuid.UUID | None = None, semester: int | None = None, min_amount: float | None = None) -> dict:
+    async def defaulters(self, *, program_id: uuid.UUID | None = None, semester: int | None = None, min_amount: float | None = None,
+                         student_ids: set | None = None) -> dict:
         today = institute_today()
         stmt = (select(FeeAssignment, FeeStructure.late_fee_per_day, Student, Program.code)
                 .join(FeeStructure, FeeStructure.id == FeeAssignment.fee_structure_id)
@@ -53,6 +54,8 @@ class FinanceReportService:
             stmt = stmt.where(Student.program_id == program_id)
         if semester:
             stmt = stmt.where(Student.current_semester == semester)
+        if student_ids is not None:                       # only these students (a teacher's classes): much less to work out
+            stmt = stmt.where(Student.id.in_(student_ids or {uuid.uuid4()}))
         found = (await self.session.execute(stmt)).all()
         entries: dict[uuid.UUID, list[FeeLedgerEntry]] = {}
         ids = [a.id for a, *_ in found]
