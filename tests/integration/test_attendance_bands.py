@@ -154,3 +154,48 @@ async def test_the_older_rule_keeps_the_run_switched_off(app_client, admin_user,
     monkeypatch.setattr(settings, "attendance_fine_mode", 0)
     r = await app_client.post(RUN, json={"term_label": "Fall 2026"})
     assert r.status_code == 422 and "older rule" in r.text
+
+
+def test_classes_needed_to_reach_a_level_and_classes_that_can_still_be_missed():
+    from app.attendance.shortfall import classes_can_miss, classes_to_reach, pct_of
+
+    assert classes_to_reach(6, 10, 65) == 2                     # 8 of 12 = 66.7%; 7 of 11 = 63.6% is not enough
+    assert classes_to_reach(6, 10, 75) == 6                     # 12 of 16 = 75%
+    assert classes_to_reach(8, 10, 75) == 0
+    for p, t, target in [(3, 10, 45), (13, 20, 75), (1, 7, 55), (44, 60, 75)]:
+        n = classes_to_reach(p, t, target)
+        assert pct_of(p + n, t + n) >= target and (n == 0 or pct_of(p + n - 1, t + n - 1) < target)
+    assert classes_can_miss(9, 10, 75) == 2                      # 9 of 12 = 75%; 9 of 13 is below
+    assert classes_can_miss(3, 4, 75) == 0
+
+
+async def test_a_student_sees_the_fine_and_the_classes_that_bring_it_down(app_client, admin_user, db_session):
+    from tests.integration.test_attendance_and_grading import _login, _login_admin
+
+    offering_id, ids, _ = await _class(app_client, "BND7", [6, 9], cnic_base=6700)
+    from app.students.models import Student
+
+    st = await db_session.get(Student, __import__("uuid").UUID(ids[0]))
+    from app.auth.models import User
+
+    user = await db_session.get(User, st.user_id)
+    await _login(app_client, user.username, "StudentPass123!")
+    (r,) = (await app_client.get("/api/v1/attendance/me/risk")).json()
+    assert r["course_code"] == "BND7-C1" and r["percentage"] == 60.0 and r["band"] == 2 and r["fine"] == 6000.0
+    assert r["next"]["to"] == 65.0 and r["next"]["classes"] == 2 and r["next"]["label"] == "a fine of Rs. 3,000"
+    assert r["message"].startswith("60%: the fine is Rs. 6,000.")
+    await _login_admin(app_client)
+    await app_client.post(RUN, json={"term_label": "Fall 2026", "confirm": True})
+    assert (await app_client.get("/api/v1/attendance/shortfalls/count")).json() == {"waiting": 0}
+    await _login(app_client, user.username, "StudentPass123!")
+    (r,) = (await app_client.get("/api/v1/attendance/me/risk")).json()
+    assert r["charged"] == {"amount": 6000.0, "unpaid": 6000.0} and "has been charged" in r["message"]
+
+
+async def test_the_dashboard_counts_students_waiting_for_a_decision(app_client, admin_user, db_session):
+    from tests.integration.test_attendance_and_grading import _login_admin
+
+    await _class(app_client, "BND8", [4, 3], cnic_base=6800)
+    await _login_admin(app_client)
+    await app_client.post(RUN, json={"term_label": "Fall 2026", "confirm": True})
+    assert (await app_client.get("/api/v1/attendance/shortfalls/count")).json() == {"waiting": 2}

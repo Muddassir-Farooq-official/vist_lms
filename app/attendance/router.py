@@ -493,3 +493,24 @@ async def decide_shortfall(shortfall_id: uuid.UUID, payload: ShortfallDecisionIn
     from app.attendance.shortfall import ShortfallService
 
     return await ShortfallService(db).decide(shortfall_id, decision=payload.decision, note=payload.note, amount=payload.amount, actor_id=current_user.id)
+
+
+@router.get("/me/risk", summary="For each of my current courses: the attendance fine it means now and how many classes bring it up")
+async def my_attendance_risk(current_user: CurrentUser = Depends(require_permission(Permissions.ATTENDANCE_VIEW)), db=Depends(get_db)) -> list[dict]:
+    from app.attendance.shortfall import student_risk
+
+    own_student_id = await _resolve_own_student_id(db, current_user)
+    if own_student_id is None:
+        raise AuthorizationError("This account is not linked to a student record.")
+    return await student_risk(db, own_student_id)
+
+
+@router.get("/shortfalls/count", summary="Students below the lowest fine band waiting for the administration's decision (dashboard)")
+async def shortfalls_waiting_count(current_user: CurrentUser = Depends(require_permission(Permissions.ATTENDANCE_LOCK)), db=Depends(get_db)) -> dict:
+    from sqlalchemy import func, select
+
+    from app.attendance.models import AttendanceShortfall, ShortfallStatus
+
+    n = (await db.execute(select(func.count()).select_from(AttendanceShortfall)
+                          .where(AttendanceShortfall.status == ShortfallStatus.AWAITING_DECISION.value))).scalar_one()
+    return {"waiting": int(n)}

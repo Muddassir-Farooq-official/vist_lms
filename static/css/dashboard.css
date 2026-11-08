@@ -3989,3 +3989,10 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 .tt-downloads { display: flex; flex-wrap: wrap; gap: 8px; }
 @media (max-width: 640px) { .tt-downloads { width: 100%; } .tt-downloads .tt-pdf { flex: 1 1 100%; text-align: center; } }
 #tt-note { margin: -6px 0 12px; }
+
+/* Student / parent attendance: the fine a course's attendance means and the classes that bring it up */
+.att-risk { margin: 10px 0 0; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-alt); font-size: 0.86rem; line-height: 1.45; }
+.att-risk p { margin: 0; }
+.att-risk.good { background: var(--success-bg); border-color: var(--success-border); }
+.att-risk.warn { background: var(--amber-50); border-color: #fde68a; }
+.att-risk.bad { background: var(--danger-bg); border-color: var(--danger-border); }

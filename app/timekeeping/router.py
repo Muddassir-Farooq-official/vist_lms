@@ -3,14 +3,14 @@ from __future__ import annotations
 import uuid
 from datetime import date, time
 
-from fastapi import APIRouter, Depends, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
 from pydantic import BaseModel, Field
 
 from app.auth.permissions import Permissions
 from app.auth.schemas import CurrentUser
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_any_permission, require_permission
-from app.core.exceptions import BusinessRuleViolationError
+from app.core.exceptions import BusinessRuleViolationError, ResourceNotFoundError
 from app.timekeeping.service import TimekeepingService, now_local
 
 router = APIRouter(prefix="/staff-attendance", tags=["staff attendance"])
@@ -134,13 +134,6 @@ async def clear_emp(employee_id: uuid.UUID, current_user: CurrentUser = Depends(
 # ---------------------------------------------------------------------------
 # Leave applications (app/timekeeping/leave.py)
 # ---------------------------------------------------------------------------
-class LeaveApplyIn(BaseModel):
-    kind: str = Field(pattern="^(CASUAL|SICK|UNPAID)$")
-    first_day: date
-    last_day: date
-    reason: str = Field(min_length=5, max_length=500)
-
-
 class LeaveDecideIn(BaseModel):
     approve: bool
     note: str | None = Field(default=None, max_length=300)
@@ -154,11 +147,33 @@ async def my_leave(current_user: CurrentUser = Depends(get_current_user), db=Dep
     return await LeaveService(db).mine(current_user.id)
 
 
-@router.post("/leave", status_code=201, summary="Apply for leave (casual, sick or unpaid); the administration decides")
-async def apply_leave(payload: LeaveApplyIn, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+@router.post("/leave", status_code=201, summary="Apply for leave (casual, sick or unpaid; sick needs a medical note); the administration decides")
+async def apply_leave(kind: str = Form(..., pattern="^(CASUAL|SICK|UNPAID)$"), first_day: date = Form(...), last_day: date = Form(...),
+                      reason: str = Form(..., min_length=5, max_length=500), note: UploadFile | None = File(default=None),
+                      current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    from app.core.storage import MAX_ATTACHMENT_BYTES
     from app.timekeeping.leave import LeaveService
 
-    return await LeaveService(db).apply(user_id=current_user.id, kind=payload.kind, first=payload.first_day, last=payload.last_day, reason=payload.reason)
+    file = None
+    if note is not None and (note.filename or "").strip():
+        file = (note.filename, await note.read(MAX_ATTACHMENT_BYTES + 1), note.content_type)
+    return await LeaveService(db).apply(user_id=current_user.id, kind=kind, first=first_day, last=last_day, reason=reason, note=file)
+
+
+@router.get("/leave/{request_id}/note", summary="Open the medical note of a leave application (the applicant or the administration)")
+async def leave_note(request_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> Response:
+    from app.auth.permissions import Permissions as P
+    from app.core.storage import SAFE_SERVE_HEADERS, attachment_is_inline, get_file_path
+    from app.timekeeping.leave import LeaveService
+
+    can_manage = P.STAFF_ATTENDANCE_MANAGE in (current_user.permissions or [])
+    r = await LeaveService(db).note_file(request_id, user_id=current_user.id, can_manage=can_manage)
+    path = get_file_path(r.note_key)
+    if path is None:
+        raise ResourceNotFoundError("The file is no longer available.")
+    return Response(content=path.read_bytes(), media_type=r.note_type,
+                    headers={"Content-Disposition": f'{"inline" if attachment_is_inline(r.note_type) else "attachment"}; filename="{r.note_name}"',
+                             **SAFE_SERVE_HEADERS})
 
 
 @router.post("/leave/{request_id}/cancel", summary="Withdraw my own application while it is still waiting")
@@ -180,3 +195,10 @@ async def decide_leave(request_id: uuid.UUID, payload: LeaveDecideIn, current_us
     from app.timekeeping.leave import LeaveService
 
     return await LeaveService(db).decide(request_id, approve=payload.approve, note=payload.note, as_kind=payload.as_kind, actor_id=current_user.id)
+
+
+@router.get("/leave/count", summary="How many leave applications wait for a decision (dashboard)")
+async def leave_waiting_count(current_user: CurrentUser = Depends(manage_perm), db=Depends(get_db)) -> dict:
+    from app.timekeeping.leave import LeaveService
+
+    return {"waiting": await LeaveService(db).waiting_count()}

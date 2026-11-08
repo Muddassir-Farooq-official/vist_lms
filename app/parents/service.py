@@ -151,6 +151,13 @@ class ParentService:
             p = await att.compute_percentage(student.id, off.id)
             attendance.append({"course_code": course.code, "course_title": course.title, "term_label": off.term_label, **p,
                                "below_minimum": p["total_sessions_taken"] > 0 and p["percentage"] < settings.attendance_eligibility_threshold_percent})
+        from app.attendance.shortfall import risk_for_student
+
+        risk = await risk_for_student(self.session, student.id, [
+            {"offering_id": off.id, "present": a["present_count"], "taken": a["total_sessions_taken"]}
+            for (_e, off, _c), a in zip(sorted(current, key=lambda r: r[2].code), attendance)])
+        for (_e, off, _c), a in zip(sorted(current, key=lambda r: r[2].code), attendance):
+            a["risk"] = risk.get(off.id)
         transcript = await TranscriptService(self.session).build(student.id)
         fees = await AccountService(self.session).build(PayerType.STUDENT, student.id, staff_view=False)
         return {"student": (await self.children(user_id)) and next(c for c in await self.children(user_id) if c["id"] == student.id),

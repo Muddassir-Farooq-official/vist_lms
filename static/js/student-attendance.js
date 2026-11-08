@@ -15,10 +15,13 @@
   }
 
   async function loadAttendance() {
-    const [overview, cfg] = await Promise.all([
+    const [overview, cfg, riskRes] = await Promise.all([
       VA.fetchJson("/api/v1/academics/enrollments/me/overview"),
       VA.fetchJson("/api/v1/attendance/config"),
+      VA.fetchJson("/api/v1/attendance/me/risk", { quiet: true }),
     ]);
+    const risk = {};
+    (riskRes.ok ? riskRes.body : []).forEach(function (r) { risk[r.offering_id] = r; });
     const grid = document.getElementById("att-grid");
     const overall = document.getElementById("att-overall");
     const empty = document.getElementById("attendance-empty");
@@ -29,7 +32,6 @@
       return;
     }
     const threshold = cfg.ok ? cfg.body.eligibility_threshold : 75;
-    const fineLine = cfg.ok ? cfg.body.fine_threshold : 65;
     const courses = overview.body;
     empty.hidden = courses.length > 0;
 
@@ -60,18 +62,29 @@
             '<div class="att-nums"><strong>' + c.classes_attended + " of " + c.classes_held + '</strong><span>classes attended</span>' +
             '<span class="att-miss">' + (c.classes_held - c.classes_attended) + " missed</span></div></div>"
           : '<p class="home-empty">No classes have been held yet.</p>') +
+        riskLine(risk[c.offering_id]) +
         '<div class="course-actions"><button type="button" class="role-btn small-btn secondary-btn att-history">Class by class</button></div>';
       card.querySelector(".att-history").addEventListener("click", function () { showHistory(c); });
       grid.appendChild(card);
     });
 
     if (atRisk.length) {
-      notice.innerHTML = "<strong>Attendance warning:</strong> you are below the " + threshold + "% needed to pass in " + esc(atRisk.join(", ")) +
-        ". At the end of term, " + fineLine + "% or less means a fine and a blocked account.";
+      const fines = courses.map(function (c) { return risk[c.offering_id]; }).filter(function (r) { return r && r.fine > 0 && !r.charged; });
+      const total = fines.reduce(function (n, r) { return n + r.fine; }, 0);
+      notice.innerHTML = "<strong>Attendance warning:</strong> you are below the " + threshold + "% needed to pass in " + esc(atRisk.join(", ")) + "." +
+        (total ? " As things stand, the attendance fine would be <strong>" + esc(VA.formatMoney(total)) + "</strong>, charged before the final exams. " +
+          "Paying it lets your exam marks decide the result. Each course below shows how many classes bring the fine down." : "");
       notice.hidden = false;
     } else {
       notice.hidden = true;
     }
+  }
+
+  // One line per course: the fine it means now and the classes in a row that bring it to the next level.
+  function riskLine(r) {
+    if (!r || !r.message) return "";
+    const tone = r.review || (r.charged && r.charged.unpaid) ? "bad" : r.band || (r.percentage < r.minimum) || !r.can_miss ? "warn" : "good";
+    return '<div class="att-risk ' + tone + '"><p>' + esc(r.message) + "</p></div>";
   }
 
   async function showHistory(course) {
