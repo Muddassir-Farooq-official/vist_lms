@@ -24,6 +24,11 @@
         "kind": "new",
         "for": "Admins",
         "text": "Settings → Fees → Online payment: choose a charge added to each online payment to cover the bank's fee."
+      },
+      {
+        "kind": "new",
+        "for": "Everyone",
+        "text": "Share button next to the version: send the link on WhatsApp or anywhere else. Links to the portal and to \"what's new\" now show a preview picture with the institute's name."
       }
     ]
   },

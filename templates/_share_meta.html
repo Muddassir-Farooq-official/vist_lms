@@ -1,0 +1,19 @@
+{# Link preview for WhatsApp, Facebook, email... (app/core/share.py). Needs `share` from the page's route. #}
+{% if share %}
+  <meta name="description" content="{{ share.description }}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="{{ share.site_name }}" />
+  <meta property="og:title" content="{{ share.title }}" />
+  <meta property="og:description" content="{{ share.description }}" />
+  <meta property="og:url" content="{{ share.url }}" />
+  <meta property="og:image" content="{{ share.image }}" />
+  <meta property="og:image:secure_url" content="{{ share.image }}" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="{{ share.title }}" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="{{ share.title }}" />
+  <meta name="twitter:description" content="{{ share.description }}" />
+  <meta name="twitter:image" content="{{ share.image }}" />
+{% endif %}

@@ -158,6 +158,43 @@
       }).catch(function () { /* try again on the next page */ });
   }
 
+  // ---------------------------------------------------------------- share (phone share sheet, or WhatsApp / copy link)
+  function toast(text) {
+    const t = el("div", "sh-toast", text); t.setAttribute("role", "status");
+    document.body.appendChild(t); setTimeout(function () { t.remove(); }, 2200);
+  }
+  function copy(url) {
+    const done = function () { toast("Link copied"); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, function () { window.prompt("Copy this link:", url); });
+    else window.prompt("Copy this link:", url);
+  }
+  function menu(btn, url, text) {
+    const old = document.querySelector(".sh-menu"); if (old) old.remove();
+    const m = el("div", "sh-menu"); m.setAttribute("role", "menu");
+    const wa = el("a"); wa.href = "https://wa.me/?text=" + encodeURIComponent(text + " " + url); wa.target = "_blank"; wa.rel = "noopener";
+    const dot = el("i"); dot.style.background = "#25d366"; wa.appendChild(dot); wa.appendChild(document.createTextNode("Share on WhatsApp"));
+    const cp = el("button"); cp.type = "button";
+    const dot2 = el("i"); dot2.style.background = "#2454d6"; cp.appendChild(dot2); cp.appendChild(document.createTextNode("Copy link"));
+    cp.addEventListener("click", function () { copy(url); m.remove(); });
+    m.appendChild(wa); m.appendChild(cp);
+    document.body.appendChild(m);
+    const r = btn.getBoundingClientRect();
+    m.style.top = Math.min(r.bottom + 6, window.innerHeight - m.offsetHeight - 8) + "px";
+    m.style.left = Math.max(8, Math.min(r.left, window.innerWidth - m.offsetWidth - 8)) + "px";
+    setTimeout(function () {
+      document.addEventListener("click", function off(e) { if (!m.contains(e.target)) { m.remove(); document.removeEventListener("click", off); } });
+    }, 0);
+  }
+  document.addEventListener("click", function (e) {
+    const btn = e.target.closest && e.target.closest("[data-share-url],[data-share-path]");
+    if (!btn) return;
+    e.preventDefault();
+    const url = btn.dataset.shareUrl || (location.origin + btn.dataset.sharePath);
+    const title = btn.dataset.shareTitle || document.title, text = btn.dataset.shareText || title;
+    if (navigator.share) { navigator.share({ title: title, text: text, url: url }).catch(function () { /* closed */ }); return; }
+    menu(btn, url, text);
+  });
+
   function start() {
     var list = document.getElementById("wn-list");
     if (list) { statusPage(list); return; }

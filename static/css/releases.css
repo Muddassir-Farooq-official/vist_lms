@@ -72,7 +72,8 @@
 .drawer-version:hover { opacity: 1; text-decoration: underline; }
 
 /* version label under the logo in the staff menus */
-.drawer-version-top { display: flex; align-items: center; gap: 8px; margin: -4px 12px 10px; padding: 7px 12px; border-radius: 10px;
+.drawer-version-row { display: flex; gap: 6px; margin: -4px 12px 10px; }
+.drawer-version-top { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; margin: 0; padding: 7px 12px; border-radius: 10px;
   background: rgba(255, 255, 255, .08); color: var(--sidebar-text); font-size: .78rem; text-decoration: none; }
 .drawer-version-top:hover { background: rgba(255, 255, 255, .14); color: var(--sidebar-text-active); }
 .drawer-version-top b { margin-left: auto; font-weight: 600; color: var(--sidebar-text-active); }
@@ -87,3 +88,20 @@
 .wn-celebrate .wn-actions { justify-content: center; border-top: 0; padding: 18px 24px 24px; gap: 10px; flex-wrap: wrap; }
 .wn-celebrate .wn-actions a { border: 1px solid var(--border-strong); border-radius: 10px; padding: 9px 16px; }
 .wn-confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 2147483647; }
+
+.dvt-share { flex: none; width: 34px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, .08); color: var(--sidebar-text-active); cursor: pointer; display: grid; place-items: center; }
+.dvt-share:hover { background: rgba(255, 255, 255, .16); }
+.hs-vrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.hs-vrow .hs-vnum { margin: 0; }
+.hs-share { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--blue-600);
+  border-radius: 999px; padding: 7px 14px; font: inherit; font-weight: 600; font-size: .88rem; cursor: pointer; }
+.hs-share:hover { background: var(--blue-50); }
+/* share menu (when the device has no share sheet) */
+.sh-menu { position: fixed; z-index: 2147483000; min-width: 220px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(15, 31, 61, .2); padding: 6px; }
+.sh-menu a, .sh-menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 0; background: none; border-radius: 10px;
+  color: var(--text-primary); font: inherit; font-size: .92rem; text-decoration: none; cursor: pointer; text-align: left; }
+.sh-menu a:hover, .sh-menu button:hover { background: var(--surface-alt); }
+.sh-menu i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.sh-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 2147483001; background: #0f1f3d; color: #fff;
+  padding: 10px 16px; border-radius: 10px; font-size: .9rem; }
