@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#2454d6" />
+  <meta name="robots" content="noindex" />
+  <title>System status &mdash; {{ brand.short_name }}</title>
+  <link rel="stylesheet" href="/static/css/theme.css" />
+  <link rel="stylesheet" href="/static/css/releases.css?v={{ info.version }}" />
+  {% from "_brand.html" import brand_head %}{{ brand_head() }}
+</head>
+{%- set all_ok = db_ok and redis_ok -%}
+<body class="auth-body hs-body">
+  <main class="hs-shell">
+    <header class="hs-top">
+      <a class="hs-brand" href="/">
+        <span class="auth-logo{% if brand.has_logo %} has-logo{% endif %}" aria-hidden="true">{% if brand.has_logo %}<img src="{{ brand.logo_url }}" alt="" />{% else %}{{ brand.initials }}{% endif %}</span>
+        <span class="auth-brand-text"><strong>{{ brand.short_name }}</strong><small>{{ brand.name }}</small></span>
+      </a>
+      <a class="hs-portal" href="/">Open my portal &rarr;</a>
+    </header>
+
+    <section class="hs-card hs-status {{ 'is-ok' if all_ok else 'is-warn' }}" aria-labelledby="hs-status-title">
+      <span class="hs-dot" aria-hidden="true"></span>
+      <div>
+        <h1 id="hs-status-title">{{ "Everything is working" if all_ok else "Some parts are having trouble" }}</h1>
+        <p>{{ "The system is up and answering normally." if all_ok else "You may see errors or slow pages. Please try again in a few minutes; if it continues, tell the office." }}</p>
+      </div>
+    </section>
+
+    <section class="hs-grid">
+      <div class="hs-card">
+        <h2>Parts of the system</h2>
+        <ul class="hs-parts">
+          <li><span>Website</span><b class="ok">Working</b></li>
+          <li><span>Records (database)</span>{% if db_ok %}<b class="ok">Working</b>{% else %}<b class="bad">Not reachable</b>{% endif %}</li>
+          <li><span>Notifications &amp; background tasks</span>{% if redis_ok %}<b class="ok">Working</b>{% else %}<b class="bad">Not reachable</b>{% endif %}</li>
+        </ul>
+      </div>
+      <div class="hs-card hs-version">
+        <h2>Version</h2>
+        <p class="hs-vnum">v{{ info.version }}</p>
+        <dl>
+          {% if info.released_on_text %}<dt>Released</dt><dd>{{ info.released_on_text }}</dd>{% endif %}
+          {% if info.updated_on_text %}<dt>Installed on server</dt><dd>{{ info.updated_on_text }}</dd>{% endif %}
+          {% if info.build %}<dt>Build</dt><dd><code>{{ info.build }}</code></dd>{% endif %}
+        </dl>
+      </div>
+    </section>
+
+    <section class="hs-card" id="whats-new" aria-labelledby="wn-title">
+      <div class="hs-head">
+        <h2 id="wn-title">What's new</h2>
+        <div class="hs-filter" id="wn-filter" hidden role="group" aria-label="Show changes for">
+          <button type="button" class="active" data-for="">All</button>
+        </div>
+      </div>
+      <p class="hs-muted" id="wn-loading">Loading&hellip;</p>
+      <div class="hs-signin" id="wn-signin" hidden>
+        <p>Sign in to read what changed in each update, in plain words.</p>
+        <a class="auth-submit hs-btn" href="/">Sign in</a>
+      </div>
+      <ol class="hs-releases" id="wn-list"></ol>
+      <button type="button" class="hs-more" id="wn-more" hidden>Show older updates</button>
+    </section>
+
+    <p class="auth-foot">&copy; {{ brand.name }}</p>
+  </main>
+  <script src="/static/js/releases-ui.js?v={{ info.version }}"></script>
+</body>
+</html>

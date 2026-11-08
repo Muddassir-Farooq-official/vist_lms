@@ -132,6 +132,9 @@ templates = Jinja2Templates(directory="templates")
 from app.core.brand import BrandView  # noqa: E402
 
 templates.env.globals["brand"] = BrandView()
+from app.core.releases import current_version  # noqa: E402
+
+templates.env.globals["app_version"] = current_version
 
 # Role cards shown on the landing page (Section 18 roles). Purely
 # presentational — actual authorization is still enforced entirely by the
@@ -605,6 +608,9 @@ app.include_router(policy_router, prefix=settings.api_v1_prefix)
 app.include_router(email_settings_router, prefix=settings.api_v1_prefix)
 app.include_router(email_me_router, prefix=settings.api_v1_prefix)
 app.include_router(system_status_router, prefix=settings.api_v1_prefix)
+from app.core.release_router import router as release_router  # noqa: E402
+
+app.include_router(release_router, prefix=settings.api_v1_prefix)
 app.include_router(exams_router, prefix=settings.api_v1_prefix)
 app.include_router(sms_router, prefix=settings.api_v1_prefix)
 from app.reports.finance_router import router as finance_reports_router  # noqa: E402
@@ -699,9 +705,18 @@ app.include_router(app_shell_router)            # /manifest.webmanifest, /sw.js,
 # credentials exist AND payment_webhook() has a signature check added.
 
 
-@app.get("/health", tags=["health"], summary="Liveness — is the process up")
-async def health() -> dict:
-    return {"status": "ok"}
+@app.get("/health", tags=["health"], summary="Liveness — is the process up (a browser gets the status page)")
+async def health(request: Request):
+    # Monitors, Docker and scripts get the same tiny JSON as always; a person opening it in a browser gets a page.
+    if "text/html" not in request.headers.get("accept", ""):
+        return {"status": "ok"}
+    db_ok = await check_db_connection()
+    redis_ok = await check_redis_connection()
+    from app.core.releases import version_info
+
+    response = templates.TemplateResponse(request, "health.html", {"db_ok": db_ok, "redis_ok": redis_ok, "info": version_info()})
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.get("/health/live", tags=["health"], summary="Liveness probe")

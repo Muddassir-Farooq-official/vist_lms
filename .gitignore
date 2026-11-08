@@ -13,3 +13,5 @@ backups/
 # Local data
 dump.rdb
 deploy_key*
+# written by the deploy job
+app/build_info.json

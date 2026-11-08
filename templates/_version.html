@@ -1,0 +1,5 @@
+{# Version line at the bottom of the staff menus. Opens the status page's "What's new"; after an update the
+   "What's new" card is shown once (static/js/releases-ui.js). #}
+<link rel="stylesheet" href="/static/css/releases.css?v={{ app_version() }}" />
+<a id="app-version" class="drawer-version" href="/health#whats-new" data-version="{{ app_version() }}" title="See what's new">Version {{ app_version() }} &middot; What's new</a>
+<script src="/static/js/releases-ui.js?v={{ app_version() }}" defer></script>
