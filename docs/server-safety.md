@@ -10,6 +10,23 @@ ssh root@<your-server>
 cd /opt/vist-lms
 ```
 
+## The easy way: one guided command
+
+```bash
+sudo bash scripts/server/harden.sh all
+```
+
+It goes through every step below in a safe order: check, free disk space, Google Drive backups (first, so there is a
+fresh off-server copy before anything changes), close the database port, new database password, new push keys, and
+**last** the new JWT secret (signs everyone out once, so run `all` late at night, or type anything but YES at that step
+and run `all` again later). Typing anything other than `YES` skips a step; running `all` again skips steps already done.
+If a step fails it puts things back and the run stops.
+
+Have ready: your Windows PC with rclone for the Google Drive token (step 2a, point 1), signed in with the
+**institute's** Google account; pen and paper for the two backup passwords it shows once.
+
+The sections below describe each step, and each one can still be run on its own.
+
 ---
 
 ## Step 1: See what is open now (changes nothing)
