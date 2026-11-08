@@ -10,6 +10,23 @@ ssh root@<your-server>
 cd /opt/vist-lms
 ```
 
+## The easy way: one guided command
+
+```bash
+sudo bash scripts/server/harden.sh all
+```
+
+It goes through every step below in a safe order: check, free disk space, Google Drive backups (first, so there is a
+fresh off-server copy before anything changes), close the database port, new database password, new push keys, and
+**last** the new JWT secret (signs everyone out once, so run `all` late at night, or type anything but YES at that step
+and run `all` again later). Typing anything other than `YES` skips a step; running `all` again skips steps already done.
+If a step fails it puts things back and the run stops.
+
+Have ready: your Windows PC with rclone for the Google Drive token (step 2a, point 1), signed in with the
+**institute's** Google account; pen and paper for the two backup passwords it shows once.
+
+The sections below describe each step, and each one can still be run on its own.
+
 ---
 
 ## Step 1: See what is open now (changes nothing)
@@ -277,3 +294,35 @@ Microsoft Authenticator) on their phone. The first time, the sign-in page shows 
   Everyone's set-up is kept for when it is turned back on.
 
 Every set-up, wrong code and reset is in the activity log.
+
+## Disk space
+
+Where the space goes on a small install (measured on the VPS, Nov 2026): Docker build leftovers ~8 GB, the app image
+~3.5 GB (face-recognition libraries), uploaded files ~420 MB, logs ~110 MB, database backups ~20 MB. The operating
+system itself is several GB more.
+
+**Once, now** (frees the ~8 GB of build leftovers and caps system logs at 200 MB; the app keeps running):
+
+```
+cd /opt/vist-lms && sudo bash scripts/server/harden.sh disk
+```
+
+**From now on, by itself:**
+- every deploy clears the build leftovers after the new version is healthy;
+- each container keeps at most 30 MB of logs (takes effect at the next deploy);
+- new pictures are saved small: profile pictures at 600 px, pictures of documents at 1600 px, same format as uploaded.
+  PDFs and Office files are stored as they are.
+
+**Make the pictures already uploaded smaller** (once, after the deploy that brings this change):
+
+```
+cd /opt/vist-lms
+mkdir -p var/storage-originals && chown 1000:1000 var/storage-originals
+# look first: says how many pictures and how much it saves, changes nothing
+docker compose -f docker-compose.prod.yml run --rm --no-deps -v ./var/storage-originals:/app/var/storage-originals app python scripts/shrink_stored_images.py
+# do it
+docker compose -f docker-compose.prod.yml run --rm --no-deps -v ./var/storage-originals:/app/var/storage-originals app python scripts/shrink_stored_images.py --apply
+```
+
+Open a few student pictures and document scans in the app. If they look fine: `rm -rf var/storage-originals`.
+To undo instead: `cp -a var/storage-originals/<date>/. var/storage/`.

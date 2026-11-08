@@ -2,8 +2,17 @@
 # Postgres named in the server's .env (the REAL database).
 name: vist-lms
 
+# Each container keeps at most 3 x 10 MB of logs (Docker's default keeps them forever).
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
 services:
   redis:
+    <<: *logging
     image: redis:7-alpine
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
@@ -18,6 +27,7 @@ services:
   # Runs "alembic upgrade head" against the REAL database, then exits.
   # scripts/deploy.sh runs it explicitly before restarting the app.
   migrate:
+    <<: *logging
     image: vist-lms:latest
     command: ["alembic", "upgrade", "head"]
     env_file: .env
@@ -25,6 +35,7 @@ services:
     profiles: ["tools"]
 
   app:
+    <<: *logging
     image: vist-lms:latest
     build: .
     restart: unless-stopped
@@ -46,6 +57,7 @@ services:
 
   # Background worker for CSV imports (jobs queue in Redis).
   worker:
+    <<: *logging
     image: vist-lms:latest
     restart: unless-stopped
     command: ["rq", "worker", "--url", "redis://redis:6379/0", "imports"]
@@ -61,6 +73,7 @@ services:
   # SMS sender (audit OPS-03): sends queued SMS (password reset codes, fee reminders, results) every 30 seconds and
   # queues the daily overdue-fee reminders. Without SMS_PROVIDER_URL in .env messages are only logged, never sent.
   sms:
+    <<: *logging
     image: vist-lms:latest
     restart: unless-stopped
     command: ["python", "scripts/sms_sender.py"]

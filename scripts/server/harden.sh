@@ -11,6 +11,9 @@
 #   bash scripts/server/harden.sh rotate-jwt            new JWT_SECRET: everyone signs in again once; SMTP password kept
 #   bash scripts/server/harden.sh rotate-vapid          new push keys: phones re-subscribe by themselves on next open
 #   bash scripts/server/harden.sh rename-db [new_name]  rename the database (default vist_lms); about 1 minute offline
+#   bash scripts/server/harden.sh disk                  free disk space: Docker build leftovers + cap system logs at 200 MB
+#   bash scripts/server/harden.sh backups               nightly encrypted backups to Google Drive (asks for the token from your PC)
+#   bash scripts/server/harden.sh all                   ALL of the above in a safe order, one step at a time (YES each, or skip)
 set -uo pipefail
 cd "$(dirname "$0")/../.." || exit 1
 
@@ -26,7 +29,12 @@ ok()   { printf '\033[1;32mOK\033[0m  %s\n' "$*"; }
 warn() { printf '\033[1;33m!!\033[0m  %s\n' "$*"; }
 die()  { printf '\n\033[1;31mSTOPPED: %s\033[0m\n' "$*" >&2; exit 1; }
 envval() { grep -E "^$1=" "$ENV_FILE" | tail -1 | cut -d= -f2- | sed -e 's/^["'\'']//' -e 's/["'\'']$//'; }
-confirm() { printf '\n%s\nType YES to go ahead: ' "$1"; read -r a; [ "$a" = "YES" ] || die "Nothing was changed."; }
+confirm() {
+  printf '\n%s\nType YES to go ahead%s: ' "$1" "${IN_ALL:+ (anything else skips this step)}"; read -r a
+  [ "$a" = "YES" ] && return 0
+  [ -n "${IN_ALL:-}" ] && { printf 'Skipped. Nothing was changed.\n'; exit 3; }
+  die "Nothing was changed."
+}
 need_root() { [ "$(id -u)" = "0" ] || die "Run as root (sudo)."; }
 
 [ -f "$ENV_FILE" ] || die ".env not found. Run from /opt/vist-lms."
@@ -286,6 +294,96 @@ A safety copy of the database is made first."
   fi
 }
 
+# ------------------------------------------------------------------ disk space
+disk() {
+  need_root
+  say "Disk now"; df -h / | tail -1; docker system df 2>/dev/null || true
+  confirm "This deletes Docker build leftovers (not the running app, not data, not uploads) and caps the system journal
+at 200 MB (older system log lines are dropped). The app keeps running."
+  docker builder prune -af || warn "could not clear the build cache"
+  docker image prune -f >/dev/null 2>&1 || true
+  mkdir -p /etc/systemd/journald.conf.d
+  printf '[Journal]\nSystemMaxUse=200M\n' > /etc/systemd/journald.conf.d/vist-size.conf
+  systemctl restart systemd-journald && journalctl --vacuum-size=200M >/dev/null 2>&1 || warn "journal cap not applied"
+  say "Disk after"; df -h / | tail -1
+  healthy && ok "app is healthy" || warn "app health check failed: run '$COMPOSE ps'"
+}
+
+# ------------------------------------------------------------------ off-server backups (Google Drive, encrypted)
+RCLONE_IMAGE="rclone/rclone:1.68"
+RCLONE_DIR="/root/.config/rclone"
+rclone_run() { docker run --rm -i -v "$RCLONE_DIR:/config/rclone" "$RCLONE_IMAGE" "$@"; }
+backups() {
+  need_root
+  mkdir -p "$RCLONE_DIR"; chmod 700 "$RCLONE_DIR"
+  if rclone_run listremotes 2>/dev/null | grep -qx "vistbackup:"; then
+    ok "the encrypted Google Drive backup is already set up"
+  else
+    confirm "Set up nightly backups to Google Drive, ENCRYPTED (Google sees only scrambled files).
+Before typing YES, on your Windows PC: download rclone from https://rclone.org/downloads/ , unzip it, open
+PowerShell in that folder and run:   .\rclone.exe authorize \"drive\"
+Sign in with the INSTITUTE's Google account. Copy the text between ---> and <--- (it starts with {\"access_token\")."
+    printf '\nPaste that text here and press Enter (it is not shown): '
+    local token; read -rs token; echo
+    case "$token" in *access_token*refresh_token*) ;; *) die "That does not look like the token (it should start with {\"access_token\"). Nothing was changed.";; esac
+    rclone_run config create gdrive drive scope=drive config_is_local=false "token=$token" --non-interactive >/dev/null \
+      || die "Could not save the Google Drive connection. Nothing else was changed."
+    rclone_run lsd gdrive: >/dev/null 2>&1 || { rclone_run config delete gdrive >/dev/null 2>&1; die "Google Drive did not accept the token (it may have expired: run authorize again). Nothing was kept."; }
+    ok "Google Drive is connected"
+    local p1 p2
+    p1="$(openssl rand -base64 33 | tr -d '/+=\n' | cut -c1-32)"; p2="$(openssl rand -base64 33 | tr -d '/+=\n' | cut -c1-32)"
+    rclone_run config create vistbackup crypt remote=gdrive:VIST-LMS-backups filename_encryption=standard \
+      directory_name_encryption=true "password=$p1" "password2=$p2" --obscure --non-interactive >/dev/null \
+      || die "Could not set up encryption. Google Drive stays connected; run 'backups' again."
+    printf '\n\033[1;33m%s\033[0m\n' "WRITE THESE TWO PASSWORDS DOWN NOW and keep them OFF this server (password manager, or paper in the office safe)."
+    printf 'Without them the backups CANNOT be opened, not even by you. They are shown only this once.\n\n'
+    printf '    backup password 1:  %s\n    backup password 2:  %s\n\n' "$p1" "$p2"
+    local w=""; while [ "$w" != "WROTE" ]; do printf 'Type WROTE when you have written both down: '; read -r w; done
+    clear 2>/dev/null || true
+    ok "encryption is set up"
+  fi
+  say "First backup now (database + uploaded files)"
+  bash scripts/server/backup.sh || die "The backup failed: see backups/backup.log (send me the last lines)."
+  say "Checking the copy on Drive can really be restored"
+  bash scripts/server/backup.sh verify || die "The copy could not be restored: see backups/backup.log."
+  local line tz
+  tz="$(timedatectl show -p Timezone --value 2>/dev/null || echo Etc/UTC)"
+  case "$tz" in Asia/Karachi) line="30 2 * * * cd $PWD && bash scripts/server/backup.sh >/dev/null 2>&1" ;;
+                Etc/UTC|UTC)  line="30 21 * * * cd $PWD && bash scripts/server/backup.sh >/dev/null 2>&1" ;;
+                *) warn "server time zone is $tz: add the nightly line by hand (docs/server-safety.md 2c)"; return 0 ;; esac
+  if crontab -l 2>/dev/null | grep -q "scripts/server/backup.sh"; then ok "nightly backup was already scheduled"
+  else (crontab -l 2>/dev/null; echo "$line") | crontab - && ok "nightly backup scheduled for 2:30 AM Pakistan time"; fi
+}
+
+# ------------------------------------------------------------------ everything, in a safe order
+STATE="backups/harden-done"
+all() {
+  need_root
+  touch "$STATE"; chmod 600 "$STATE"
+  say "Guided set-up. Each step explains itself and waits for YES; anything else skips it. Safe to run again:
+finished steps are skipped. If a step fails it puts things back and the run stops there."
+  check
+  local step rc
+  # backups first, so everything after has a fresh off-server copy; the JWT change (signs everyone out) last
+  for step in disk backups firewall rotate_db_password rotate_vapid rotate_jwt; do
+    if grep -qx "$step" "$STATE"; then ok "$step: done before"; continue; fi
+    say "Step: $step"
+    if [ "$step" = firewall ]; then
+      printf 'Do you use pgAdmin (or anything else) from your office/home PC on port 5432? Type its public IP to keep it\nallowed, or just press Enter: '
+      local ip; read -r ip
+      ( IN_ALL=1; firewall ${ip:+--allow-ip "$ip"} ); rc=$?
+    else
+      ( IN_ALL=1; "$step" ); rc=$?
+    fi
+    case $rc in
+      0) echo "$step" >> "$STATE" ;;
+      3) warn "$step skipped; run 'all' again later to do it" ;;
+      *) die "Stopped at $step (see above). The earlier steps stay done; fix this and run 'all' again." ;;
+    esac
+  done
+  say "Finished"; check
+}
+
 case "${1:-}" in
   check) check ;;
   firewall) shift; firewall "$@" ;;
@@ -294,5 +392,8 @@ case "${1:-}" in
   rotate-jwt) rotate_jwt ;;
   rotate-vapid) rotate_vapid ;;
   rename-db) shift; rename_db "$@" ;;
-  *) sed -n '2,15p' "$0"; exit 2 ;;
+  disk) disk ;;
+  backups) backups ;;
+  all) all ;;
+  *) sed -n '2,18p' "$0"; exit 2 ;;
 esac
