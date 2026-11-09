@@ -734,6 +734,28 @@ async def my_schedule(
     return entries
 
 
+@router.get("/enrollments/me/recent-marks", summary="My latest marks, newest first (for the home page)")
+async def my_recent_marks(
+    limit: int = 5,
+    current_user: CurrentUser = Depends(require_permission(Permissions.ENROLLMENT_SELF)),
+    db=Depends(get_db),
+) -> list[dict]:
+    from app.academics.models import AssessmentType, Course, CourseOffering, Enrollment, OfferingAssessment, StudentMark
+
+    student_id = await _resolve_own_student_id(db, current_user)
+    rows = (await db.execute(
+        select(StudentMark.obtained_marks, StudentMark.entered_at, AssessmentType.name, AssessmentType.max_marks, Course.code, Course.title)
+        .join(Enrollment, Enrollment.id == StudentMark.enrollment_id)
+        .join(OfferingAssessment, OfferingAssessment.id == StudentMark.offering_assessment_id)
+        .join(AssessmentType, AssessmentType.id == OfferingAssessment.assessment_type_id)
+        .join(CourseOffering, CourseOffering.id == Enrollment.course_offering_id)
+        .join(Course, Course.id == CourseOffering.course_id)
+        .where(Enrollment.student_id == student_id)
+        .order_by(StudentMark.entered_at.desc()).limit(max(1, min(limit, 20))))).all()
+    return [{"obtained": float(got), "max": float(mx), "assessment": name, "course_code": code, "course_title": title, "entered_at": at,
+             "percentage": round(100 * float(got) / float(mx), 1) if mx else None} for got, at, name, mx, code, title in rows]
+
+
 @router.get(
     "/enrollments/me/overview", response_model=list[CourseOverviewOut],
     summary="My current courses at a glance: teacher, attendance and how much has been taught -- in one call",

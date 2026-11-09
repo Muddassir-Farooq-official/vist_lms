@@ -19,3 +19,4 @@ html:not([lang="ur"]) .lang-toggle { font-family: "Noto Nastaliq Urdu", system-u
 /* the phone's bottom bar has very little height: Nastaliq needs a smaller size there */
 html[lang="ur"] .bottom-link span { font-size: .64rem; line-height: 1.7; overflow: visible; padding-bottom: 2px; }
 html[lang="ur"] .content-subtitle { line-height: 1.9; }
+.lang-toggle { white-space: nowrap; min-width: 56px; flex: none; }

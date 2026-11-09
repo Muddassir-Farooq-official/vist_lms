@@ -2,6 +2,7 @@
 {% from "_icons.html" import nav_icon %}
 {% block title %}Home{% endblock %}
 {% block page_title %}Home{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/student-home.css?v={{ app_version() }}" />{% endblock %}
 
 {% block content %}
 {% set skeleton %}<div class="skeleton-stack" aria-label="Loading"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>{% endset %}
@@ -21,7 +22,25 @@
     </nav>
   </section>
 
-  <section class="kpi-row" aria-label="Key numbers">
+  <section class="panel dash-panel today" aria-labelledby="st-today-h">
+    <div class="dash-panel-head"><h2 id="st-today-h">Today</h2><span class="today-date" id="today-date"></span></div>
+    <div class="today-grid">
+      <div class="today-col">
+        <h3 class="today-h">{{ nav_icon("clock") }} Classes today</h3>
+        <ul class="today-list" id="today-classes"><li class="skeleton-line"></li></ul>
+      </div>
+      <div class="today-col">
+        <h3 class="today-h">{{ nav_icon("file") }} Due this week</h3>
+        <ul class="today-list" id="today-due"><li class="skeleton-line"></li></ul>
+      </div>
+      <div class="today-col">
+        <h3 class="today-h">{{ nav_icon("graduation-cap") }} Latest marks</h3>
+        <ul class="today-list" id="today-marks"><li class="skeleton-line"></li></ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="kpi-row kpi-row--compact" aria-label="Key numbers">
     <a class="kpi" href="/dashboard/student/attendance" data-tone="purple">
       <span class="kpi-icon">{{ nav_icon("attendance") }}</span>
       <span class="kpi-label">My attendance</span>

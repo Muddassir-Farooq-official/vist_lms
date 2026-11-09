@@ -65,14 +65,15 @@
 
   function classes(rows) {
     if (!rows) { D.hide("class-list"); return; }
-    const list = upcomingClasses(rows).slice(0, 5), now = nowHM();
+    const list = upcomingClasses(rows).slice(0, window.innerWidth < 700 ? 3 : 5), now = nowHM();
     $("class-empty").hidden = list.length > 0;
     $("class-list").innerHTML = list.map(function (e) {
       const live = e.session_date === today && e.start_time.slice(0, 5) <= now && e.end_time.slice(0, 5) > now;
       return '<li class="' + (live ? "live" : "") + '"><span class="ag-time"><b>' + esc(dayName(e.session_date)) + "</b>" + esc(t(e.start_time)).replace(/\s?[AP]M$/i, "") +
         '</span><span class="ag-body"><strong>' + esc(e.course_code) + " · " + esc(e.course_title) + (live ? ' <span class="ev-kind kind-holiday">Now</span>' : "") +
         "</strong><small>" + esc(t(e.start_time)) + "–" + esc(t(e.end_time)) + " · Room " + esc(e.room) + (e.teacher_name ? " · " + esc(e.teacher_name) : "") + (e.title ? " · " + esc(e.title) : "") + "</small></span>" +
-        '<button type="button" class="role-btn small-btn secondary-btn" data-ics="' + esc(e.id) + '" data-name="' + esc(e.course_code + "-" + e.session_date) + '">Add to calendar</button></li>';
+        '<button type="button" class="icon-btn ag-ics" data-ics="' + esc(e.id) + '" data-name="' + esc(e.course_code + "-" + e.session_date) + '" aria-label="Add to calendar" title="Add to calendar">' +
+        '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M12 14v4M10 16h4"/></svg></button></li>';
     }).join("");
     $("class-list").querySelectorAll("[data-ics]").forEach(function (b) {
       b.addEventListener("click", function () { VA.downloadFile("/api/v1/academics/class-sessions/" + b.getAttribute("data-ics") + "/calendar.ics", b.getAttribute("data-name") + ".ics", "calendar file"); });
@@ -193,6 +194,54 @@
     }));
   }
 
+  function todayPanel(d) {
+    const now = nowHM(), ur = document.documentElement.lang === "ur";
+    $("today-date").textContent = new Date().toLocaleDateString(ur ? "ur-PK" : "en-GB", { weekday: "long", day: "numeric", month: "long" });
+    const li = function (main, sub, cls, href) {
+      const tag = href ? 'a href="' + esc(href) + '"' : "div";
+      return '<li class="' + (cls || "") + '"><' + tag + ' class="today-item"><strong>' + main + "</strong>" + (sub ? "<small>" + sub + "</small>" : "") + "</" + (href ? "a" : "div") + "></li>";
+    };
+    // classes today
+    const todays = (d.schedule || []).filter(function (e) { return e.session_date === today; }).sort(function (a, b) { return a.start_time.localeCompare(b.start_time); });
+    let html = todays.map(function (e) {
+      const live = e.start_time.slice(0, 5) <= now && e.end_time.slice(0, 5) > now, past = e.end_time.slice(0, 5) <= now;
+      return li(esc(t(e.start_time)) + " · " + esc(e.course_code) + (live ? ' <span class="ev-kind kind-holiday">Now</span>' : ""), "Room " + esc(e.room) + (e.teacher_name ? " · " + esc(e.teacher_name) : ""), live ? "live" : past ? "past" : "", "/dashboard/student/timetable");
+    }).join("");
+    if (!html) {
+      const nxt = upcomingClasses(d.schedule)[0];
+      html = li("No classes today.", nxt ? "Next: " + esc(dayName(nxt.session_date)) + " " + esc(t(nxt.start_time)) + " · " + esc(nxt.course_code) : "", "empty");
+    }
+    $("today-classes").innerHTML = html;
+    // due in the next 7 days: assignments, fee instalments, exam papers
+    const due = [];
+    (d.assignments || []).forEach(function (a) {
+      if (!a.is_open || !(a.state === "NOT_SUBMITTED" || a.state === "REJECTED")) return;
+      const day = String(a.deadline).slice(0, 10), n = daysTo(day);
+      if (n >= 0 && n <= 7) due.push({ n: n, html: li(esc(a.title), esc(a.course_code || "") + " · " + (n === 0 ? "due today" : n === 1 ? "due tomorrow" : "due in " + n + " days"), n <= 1 ? "urgent" : "", "/dashboard/student/assignments") });
+    });
+    ((d.account && d.account.assignments) || []).forEach(function (f) {
+      (f.installments || []).forEach(function (i) {
+        if (!(i.remaining > 0) || !i.due_date) return;
+        const n = daysTo(i.due_date);
+        if (n >= 0 && n <= 7) due.push({ n: n, html: li("Fee " + D.money(i.remaining), (n === 0 ? "due today" : "due in " + n + " days") + (i.challan && i.challan.consumer_number ? " · consumer no. " + esc(i.challan.consumer_number) : ""), n <= 1 ? "urgent" : "", "/dashboard/student/fees") });
+      });
+    });
+    (d.exams || []).forEach(function (sh) {
+      (sh.papers || []).forEach(function (p) {
+        const n = daysTo(p.exam_date);
+        if (n >= 0 && n <= 7) due.push({ n: n, html: li("Exam: " + esc(p.course_code), esc(dayName(p.exam_date)) + " " + esc(t(p.start_time)) + (p.room ? " · Room " + esc(p.room) : ""), n <= 1 ? "urgent" : "", "/dashboard/student/exams") });
+      });
+    });
+    due.sort(function (a, b) { return a.n - b.n; });
+    $("today-due").innerHTML = due.length ? due.slice(0, 5).map(function (x) { return x.html; }).join("") : li("Nothing due this week.", "", "empty");
+    // latest marks
+    const marks = d.marks || [];
+    $("today-marks").innerHTML = marks.length ? marks.slice(0, 4).map(function (m) {
+      const low = m.percentage != null && m.percentage < 50;
+      return li(esc(m.course_code) + " · " + esc(m.assessment), '<span class="mk' + (low ? " low" : "") + '" dir="ltr">' + esc(String(m.obtained)) + " / " + esc(String(m.max)) + "</span>", "", "/dashboard/student/results");
+    }).join("") : li("No marks yet.", "They appear here as teachers enter them.", "empty");
+  }
+
   async function load(me) {
     D.greet("st-greet", "st-date", me);
     const d = await D.getAll({
@@ -210,7 +259,10 @@
       exams: "/api/v1/exams/me/datesheets",
       calendar: D.upcoming(),
       announcements: "/api/v1/announcements?limit=3",
+      marks: "/api/v1/academics/enrollments/me/recent-marks?limit=4",
+      account: "/api/v1/fees/accounts/me",
     });
+    D.run(function () { todayPanel(d); });
     D.run(function () { hero(d); });
     D.run(function () { kpis(d); });
     D.run(function () { classes(d.schedule); });
