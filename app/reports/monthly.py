@@ -210,6 +210,8 @@ def render_pdf(r: dict) -> bytes:
     from reportlab.lib.units import mm
     from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+    from xml.sax.saxutils import escape
+
     from app.core import brand
 
     ink, muted, line = colors.HexColor("#0f1b3d"), colors.HexColor("#5b6785"), colors.HexColor("#d5dbe8")
@@ -228,14 +230,14 @@ def render_pdf(r: dict) -> bytes:
         story.append(Paragraph(f"The month is not over yet: figures up to {r['to_date']:%d %b %Y}.", ParagraphStyle("c", parent=small, alignment=1)))
 
     def kpis(items: list[tuple[str, str]]) -> Table:
-        t = Table([[Paragraph(f"<font size=7 color='#5b6785'>{k.upper()}</font><br/><b>{v}</b>", cell) for k, v in items]],
+        t = Table([[Paragraph(f"<font size=7 color='#5b6785'>{k.upper()}</font><br/><b>{escape(v)}</b>", cell) for k, v in items]],
                   colWidths=[width / len(items)] * len(items))
         t.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.6, line), ("INNERGRID", (0, 0), (-1, -1), 0.6, line),
                                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f6f8fc")), ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5)]))
         return t
 
     def grid(head: list[str], rows: list[list], widths: list[float], right_from: int = 1) -> Table:
-        data = [head] + [[Paragraph(str(v), cell) if i < right_from else str(v) for i, v in enumerate(row)] for row in rows]
+        data = [head] + [[Paragraph(escape(str(v)), cell) if i < right_from else str(v) for i, v in enumerate(row)] for row in rows]
         t = Table(data, colWidths=[w * mm for w in widths], repeatRows=1)
         t.setStyle(TableStyle([("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 7.5), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white), ("BACKGROUND", (0, 0), (-1, 0), accent),
                                ("FONT", (0, 1), (-1, -1), "Helvetica", 8), ("TEXTCOLOR", (0, 1), (-1, -1), ink), ("ALIGN", (right_from, 0), (-1, -1), "RIGHT"),
@@ -289,7 +291,7 @@ def render_pdf(r: dict) -> bytes:
                     ("Leave days", str(s["leave_days"]))])]
     if s["leave_by_kind"] or s["leave_pending"]:
         txt = "; ".join(f"{k['kind']}: {k['requests']} request(s), {k['days']} day(s)" for k in s["leave_by_kind"]) or "No leave approved"
-        story.append(Paragraph(f"Leave approved: {txt}." + (f" Waiting for a decision: {s['leave_pending']}." if s["leave_pending"] else ""), small))
+        story.append(Paragraph(escape(f"Leave approved: {txt}." + (f" Waiting for a decision: {s['leave_pending']}." if s["leave_pending"] else "")), small))
     if s["people"]:
         story += [Spacer(1, 5), grid(["Name", "Job", "Working days", "Present", "Leave", "Absent", "Late", "Left early"],
                                      [[p["name"], p["job"], p["working_days"], p["present"], p["leave"], p["absent"], p["late"], p["early"]] for p in s["people"]],
