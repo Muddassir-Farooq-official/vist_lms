@@ -212,6 +212,7 @@ ADMIN_NAV_ITEMS = [
     _nav("employees", "Employees", "employees", "/dashboard/admin/employees", group="People"),
     _nav("hostel", "Hostel", "students", "/dashboard/admin/hostel", group="People"),
     _nav("profile-changes", "Profile changes", "user", "/dashboard/admin/profile-changes", group="People"),
+    _nav("certificates", "Certificate requests", "file", "/dashboard/admin/certificates", group="People"),
     _nav("programs", "Programs", "programs", "/dashboard/admin/programs", group="Academics"),
     _nav("courses", "Courses", "graduation-cap", "/dashboard/admin/courses", group="Academics", mobile=True),
     _nav("timetable", "Timetable", "clock", "/dashboard/admin/timetable", group="Academics"),
@@ -231,6 +232,7 @@ ADMIN_NAV_ITEMS = [
     _nav("approvals", "Approvals", "tasks", "/dashboard/admin/approvals", group="Finance"),
     _nav("finance", "Accounts", "tasks", "/dashboard/admin/finance", group="Finance"),
     _nav("reports", "Reports", "exams", "/dashboard/admin/reports", group="Reports"),
+    _nav("monthly", "Monthly report", "exams", "/dashboard/admin/monthly", group="Reports"),
     _nav("finance-reports", "Finance reports", "exams", "/dashboard/admin/finance-reports", group="Finance"),
     _nav("onebill", "1Bill payments", "fees", "/dashboard/admin/onebill", group="Finance"),
     _nav("payroll", "Payroll", "fees", "/dashboard/admin/payroll", group="Finance"),
@@ -319,6 +321,7 @@ PRINCIPAL_NAV_ITEMS = [
     _nav("progress", "Teacher progress", "exams", "/dashboard/principal/progress", mobile=True, short="Progress"),
     _nav("feedback", "Course feedback", "check-circle", "/dashboard/principal/feedback"),
     _nav("students", "Student lookup", "students", "/dashboard/principal/students", mobile=True, short="Students"),
+    _nav("monthly", "Monthly report", "exams", "/dashboard/principal/monthly"),
     _nav("reports", "Reports", "exams", "/dashboard/principal/reports"),
     _nav("staff-attendance", "Staff attendance", "clock", "/dashboard/principal/staff-attendance"),
     _nav("calendar", "Calendar", "clock", "/dashboard/principal/calendar"),
@@ -401,6 +404,7 @@ STUDENT_NAV_ITEMS = [
     _nav("records", "Degree progress & documents", "graduation-cap", "/dashboard/student/records", group="Study"),
     _nav("library", "Library", "library", "/dashboard/student/library", group="Services"),
     _nav("applications", "Applications", "file", "/dashboard/student/applications", group="Services"),
+    _nav("certificates", "Certificates", "file", "/dashboard/student/certificates", group="Services"),
     _nav("fees", "My Fees", "fees", "/dashboard/student/fees", group="Services"),
     _nav("fines", "My Fines", "fees", "/dashboard/student/fines", group="Services"),
     _nav("complaints", "Feedback & Complaints", "ban", "/dashboard/student/complaints", group="Services"),
@@ -645,8 +649,10 @@ app.include_router(exams_router, prefix=settings.api_v1_prefix)
 app.include_router(sms_router, prefix=settings.api_v1_prefix)
 from app.reports.finance_router import router as finance_reports_router  # noqa: E402
 from app.reports.center_router import router as report_center_router  # noqa: E402
+from app.reports.monthly_router import router as monthly_report_router  # noqa: E402
 
 app.include_router(report_center_router, prefix=settings.api_v1_prefix)
+app.include_router(monthly_report_router, prefix=settings.api_v1_prefix)
 
 app.include_router(finance_reports_router, prefix=settings.api_v1_prefix)
 from app.calendar.router import router as calendar_router  # noqa: E402
@@ -1821,6 +1827,26 @@ async def oversight_feedback_page(request: Request, portal: str):
         raise HTTPException(status_code=404)
     return templates.TemplateResponse(request, "shared/feedback_overview.html", {"nav_items": nav, "active_nav": "feedback", "allowed_roles": roles,
                                                                                  "can_edit_questions": portal == "admin"})
+
+
+@app.get("/dashboard/student/certificates", include_in_schema=False)
+async def student_certificates_page(request: Request):
+    return templates.TemplateResponse(request, "student/certificates.html", {"nav_items": STUDENT_NAV_ITEMS, "active_nav": "certificates"})
+
+
+@app.get("/dashboard/admin/certificates", include_in_schema=False)
+async def admin_certificates_page(request: Request):
+    return templates.TemplateResponse(request, "admin/certificates.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "certificates"})
+
+
+@app.get("/dashboard/admin/monthly", include_in_schema=False)
+async def admin_monthly_page(request: Request):
+    return templates.TemplateResponse(request, "shared/monthly_report.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "monthly"})
+
+
+@app.get("/dashboard/principal/monthly", include_in_schema=False)
+async def principal_monthly_page(request: Request):
+    return templates.TemplateResponse(request, "shared/monthly_report.html", {"nav_items": PRINCIPAL_NAV_ITEMS, "active_nav": "monthly"})
 
 
 @app.get("/dashboard/faculty/watch", include_in_schema=False)

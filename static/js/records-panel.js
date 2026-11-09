@@ -93,7 +93,9 @@
     const stu = current.type === "students";
     p.innerHTML = '<div class="form-actions" style="flex-wrap:wrap;gap:8px">' +
       (stu ? '<button type="button" class="role-btn" data-c="BONAFIDE">Bonafide certificate</button><button type="button" class="role-btn" data-c="CHARACTER">Character certificate</button>' +
-        '<button type="button" class="role-btn" data-c="COMPLETION">Completion certificate</button>' : '<button type="button" class="role-btn" data-c="EXPERIENCE">Experience certificate</button>') +
+        '<button type="button" class="role-btn" data-c="COMPLETION">Completion certificate</button>' +
+        '<button type="button" class="role-btn" data-c="PROVISIONAL">Provisional certificate</button><button type="button" class="role-btn" data-c="MIGRATION">Migration / NOC</button>' +
+        '<button type="button" class="role-btn" data-c="FEE_CLEARANCE">Fee clearance letter</button>' : '<button type="button" class="role-btn" data-c="EXPERIENCE">Experience certificate</button>') +
       '<button type="button" class="role-btn secondary-btn" data-c="CARD">ID card</button></div>' +
       '<p class="panel-hint">Each certificate and card gets a number and a QR code that anyone can check online. Issued ones are listed below and can be cancelled.</p><div id="rp-issued"><p class="cc-meta">Loading…</p></div>';
     p.querySelectorAll("[data-c]").forEach(function (b) {

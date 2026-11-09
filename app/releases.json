@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.10.0",
+    "date": "2026-11-09",
+    "title": "Certificates on request and a monthly report",
+    "summary": "Students ask for certificates from their portal and download them once approved and paid. The principal gets a monthly report on the 1st.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Students & parents",
+        "text": "Certificates: ask for a bonafide, character, completion, provisional (result), migration / NOC certificate or a fee clearance letter. Once the office approves it and the fee is paid, download it from the portal. Anyone can check it with the QR code."
+      },
+      {
+        "kind": "new",
+        "for": "Admins",
+        "text": "Certificate requests: approve (with the fee from Settings, or change or waive it) or refuse with a reason. Anything still outstanding is shown before approving."
+      },
+      {
+        "kind": "new",
+        "for": "Principal",
+        "text": "Monthly report: fees received and still owed, class attendance by teacher and class, results and pass rates, and staff attendance and leave. A message on the 1st of every month, with a PDF to download; any month can be opened at any time."
+      },
+      {
+        "kind": "improved",
+        "for": "Admins",
+        "text": "Settings has a new Certificates section with the fee for each certificate."
+      }
+    ]
+  },
+  {
     "version": "1.9.0",
     "date": "2026-11-09",
     "title": "A \"Today\" view for students",

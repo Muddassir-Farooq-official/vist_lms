@@ -256,6 +256,14 @@ class Settings(BaseSettings):
     sms_on_results: int = 1
     sms_on_fee_overdue: int = 1
     sms_on_fee_reminder: int = 1             # 7 and 3 days before a challan is due, and on the day
+    # Certificates on request (app/records/requests.py): fee per kind, Rs. 0 = free. Editable in Settings.
+    certificate_fee_bonafide: float = 300.0
+    certificate_fee_character: float = 300.0
+    certificate_fee_completion: float = 500.0
+    certificate_fee_provisional: float = 1000.0
+    certificate_fee_migration: float = 2000.0
+    certificate_fee_fee_clearance: float = 0.0
+    monthly_report_notice: int = 1          # the 1st of each month: tell the principal last month's report is ready
     sms_on_parent_weekly: int = 1            # Monday note to parents when a child needs attention
     sms_to_guardian: int = 1
     sms_on_admission: int = 1

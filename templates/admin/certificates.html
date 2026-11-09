@@ -1,0 +1,37 @@
+{% extends "admin/_base.html" %}
+{% block title %}Certificate requests{% endblock %}
+{% block page_title %}Certificate requests{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Certificates students asked for from their portal. Approve with the fee (or waive it); the student downloads the certificate once it is paid. Fees per certificate are in Settings &rarr; Certificates.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/certificates.css?v={{ app_version() }}" />{% endblock %}
+
+{% block content %}
+<div class="portal-tabs cr-tabs" role="tablist" id="cr-tabs">
+  <button class="portal-tab active" data-status="OPEN" role="tab" aria-selected="true"><span>To do</span> <b class="cr-count" id="cr-c-OPEN"></b></button>
+  <button class="portal-tab" data-status="READY" role="tab" aria-selected="false"><span>Issued</span> <b class="cr-count" id="cr-c-READY"></b></button>
+  <button class="portal-tab" data-status="" role="tab" aria-selected="false"><span>All</span></button>
+</div>
+<section class="panel">
+  <div id="cr-office" class="cr-list"><p class="cc-meta">Loading&hellip;</p></div>
+  <p class="empty-state" id="cr-office-empty" hidden>Nothing here.</p>
+</section>
+
+<dialog class="modal" id="cr-dialog" aria-labelledby="cr-d-title">
+  <form method="dialog" id="cr-d-form" class="modal-body form-grid" novalidate>
+    <h2 id="cr-d-title">Approve</h2>
+    <p class="cr-meta" id="cr-d-who"></p>
+    <div id="cr-d-problems" class="cr-problems" hidden></div>
+    <label id="cr-d-fee-l">Fee (Rs.) <input type="number" min="0" step="1" class="text-input" id="cr-d-fee" /></label>
+    <label id="cr-d-override-l" hidden>Reason to approve anyway <input type="text" class="text-input" id="cr-d-override" maxlength="300" /></label>
+    <label id="cr-d-note-l">Note to the student <input type="text" class="text-input" id="cr-d-note" maxlength="300" /></label>
+    <p class="form-error" id="cr-d-error" role="alert" hidden></p>
+    <div class="form-actions">
+      <button type="button" class="role-btn secondary-btn" id="cr-d-cancel">Back</button>
+      <button type="submit" class="role-btn" id="cr-d-ok">Approve</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/certificate-requests.js?v={{ app_version() }}"></script>
+{% endblock %}
