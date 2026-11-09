@@ -15,8 +15,13 @@ from app.core.exceptions import BusinessRuleViolationError, ResourceNotFoundErro
 from app.records.models import IssuedDocument, PersonDocument
 
 CERTIFICATES = {"BONAFIDE": "Bonafide certificate", "CHARACTER": "Character certificate", "COMPLETION": "Completion certificate",
+                "PROVISIONAL": "Provisional certificate (result)", "MIGRATION": "Migration certificate / NOC", "FEE_CLEARANCE": "Fee clearance letter",
                 "EXPERIENCE": "Experience certificate", "CARD": "ID card"}
-PREFIX = {"BONAFIDE": "BF", "CHARACTER": "CH", "COMPLETION": "CM", "EXPERIENCE": "EX", "CARD": "ID"}
+PREFIX = {"BONAFIDE": "BF", "CHARACTER": "CH", "COMPLETION": "CM", "PROVISIONAL": "PV", "MIGRATION": "MG", "FEE_CLEARANCE": "FC", "EXPERIENCE": "EX", "CARD": "ID"}
+STUDENT_CERTIFICATES = ("BONAFIDE", "CHARACTER", "COMPLETION", "PROVISIONAL", "MIGRATION", "FEE_CLEARANCE")
+# What has to be settled first: CLEAR = nothing outstanding (fees, fines, library, store); DEGREE = every course passed and the CGPA met.
+CERTIFICATE_CHECKS = {"BONAFIDE": (), "CHARACTER": ("CLEAR",), "COMPLETION": ("CLEAR", "DEGREE"), "PROVISIONAL": ("DEGREE",),
+                      "MIGRATION": ("CLEAR",), "FEE_CLEARANCE": ("FEES",)}
 DOCUMENTS = {"CNIC": "CNIC / B-Form", "PHOTO": "Photograph", "MATRIC": "Matric certificate", "INTERMEDIATE": "Intermediate certificate",
              "DEGREE": "Degree / transcript", "DOMICILE": "Domicile", "TRANSFER": "Transfer / leaving certificate", "CONTRACT": "Contract / appointment letter",
              "EXPERIENCE": "Experience letter", "OTHER": "Other"}
@@ -216,39 +221,76 @@ class RecordsService:
         await self.audit.log(actor_user_id=actor_id, action=f"records.{kind.lower()}_issued", entity_type="issued_document", entity_id=doc.id, metadata={"owner": name, **details})
         return doc
 
-    async def issue_student_certificate(self, student_id: uuid.UUID, kind: str, *, actor_id, override_reason: str | None = None) -> dict:
+    async def certificate_problems(self, student_id: uuid.UUID, kind: str) -> list[str]:
+        """What stands in the way of this certificate (empty = it can be issued)."""
+        problems: list[str] = []
+        checks = CERTIFICATE_CHECKS.get(kind, ())
+        if "CLEAR" in checks:
+            problems += (await self.clearance("STUDENT", student_id))["problems"]
+        if "FEES" in checks:
+            problems += await self._student_fee_problems(student_id)
+        if "DEGREE" in checks:
+            problems += (await self.degree_audit(student_id))["problems"]
+        return problems
+
+    async def certificate_paragraphs(self, student_id: uuid.UUID, kind: str) -> list[str]:
+        from app.programs.models import Program
+
+        s = await self._student(student_id)
+        name = f"{s.first_name} {s.last_name}"
+        program = await self.session.get(Program, s.program_id) if s.program_id else None
+        prog = program.name if program else "the institute"
+        inst = settings.institute_name
+        today = institute_today()
+        if kind == "BONAFIDE":
+            who = f"{name}, {'son' if (s.gender or '').lower().startswith('m') else 'daughter' if (s.gender or '').lower().startswith('f') else 'child'} of the guardian on record"
+            return [f"This is to certify that {who}, holding roll number {s.roll_number}, is a bonafide student of {inst}, enrolled in {prog}"
+                    + (f" and currently studying in semester {s.current_semester}" if s.current_semester else "") + ".",
+                    "This certificate is issued on the student's request for whatever purpose it may serve."]
+        if kind == "CHARACTER":
+            return [f"This is to certify that {name}, roll number {s.roll_number}, was a student of {prog} at {inst}.",
+                    "During this time the student's conduct and character were found satisfactory, and nothing is recorded against them in the institute's disciplinary or accounts records."]
+        if kind == "COMPLETION":
+            return [f"This is to certify that {name}, roll number {s.roll_number}, has completed all the requirements of {prog} at {inst}.",
+                    "The degree itself is awarded separately by the competent authority."]
+        if kind == "PROVISIONAL":
+            a = await self.degree_audit(student_id)
+            return [f"This is to certify that {name}, roll number {s.roll_number}, has passed the examinations of {prog} at {inst}, "
+                    f"earning {a['credits_passed']:g} credit hours with a CGPA of {a['cgpa']:.2f}.",
+                    "This provisional certificate is valid until the degree or final transcript is issued by the competent authority."]
+        if kind == "MIGRATION":
+            return [f"This is to certify that {name}, roll number {s.roll_number}, has been a student of {prog} at {inst}"
+                    + (f" up to semester {s.current_semester}" if s.current_semester else "") + ".",
+                    "Nothing is outstanding against the student in the institute's accounts, library or store, and the institute has "
+                    "no objection to the student migrating to another institution."]
+        if kind == "FEE_CLEARANCE":
+            return [f"This is to certify that {name}, roll number {s.roll_number}, a student of {prog} at {inst}, has paid all the fees "
+                    f"charged by the institute up to {today:%d %B %Y}.",
+                    "Nothing is outstanding in the student's fee account on this date."]
+        raise ValidationAppError("Unknown certificate.")
+
+    async def issue_student_certificate(self, student_id: uuid.UUID, kind: str, *, actor_id, override_reason: str | None = None,
+                                        checked: bool = False, extra: dict | None = None) -> dict:
+        """checked=True: the checks were already made (a request approved earlier), so they are not made again now."""
         kind = kind.upper()
-        if kind not in ("BONAFIDE", "CHARACTER", "COMPLETION"):
-            raise ValidationAppError("Unknown certificate. Choose bonafide, character or completion.")
+        if kind not in STUDENT_CERTIFICATES:
+            raise ValidationAppError("Unknown certificate. Choose one from the list.")
         from app.programs.models import Program
 
         s = await self._student(student_id)
         name = f"{s.first_name} {s.last_name}"
         program = await self.session.get(Program, s.program_id) if s.program_id else None
         override = (override_reason or "").strip() or None
-        if kind in ("CHARACTER", "COMPLETION"):
-            clear = await self.clearance("STUDENT", student_id)
-            problems = list(clear["problems"])
-            if kind == "COMPLETION":
-                problems += (await self.degree_audit(student_id))["problems"]
+        if not checked:
+            problems = await self.certificate_problems(student_id, kind)
             if problems and not override:
                 raise BusinessRuleViolationError("Not cleared: " + " ".join(problems) + " To issue it anyway, give a reason.")
             if problems and len(override) < 10:
                 raise BusinessRuleViolationError("Please give a reason of at least 10 characters.")
-        doc = await self._register(kind, "STUDENT", student_id, name, {"roll_number": s.roll_number, "program": program.name if program else None, "override_reason": override}, actor_id)
-        today = institute_today()
-        prog = program.name if program else "the institute"
-        who = f"{name}, {'son' if (s.gender or '').lower().startswith('m') else 'daughter' if (s.gender or '').lower().startswith('f') else 'child'} of the guardian on record"
-        text = {
-            "BONAFIDE": [f"This is to certify that {who}, holding roll number {s.roll_number}, is a bonafide student of {settings.institute_name}, enrolled in {prog}"
-                         + (f" and currently studying in semester {s.current_semester}" if s.current_semester else "") + ".",
-                         "This certificate is issued on the student's request for whatever purpose it may serve."],
-            "CHARACTER": [f"This is to certify that {name}, roll number {s.roll_number}, was a student of {prog} at {settings.institute_name}.",
-                          "During this time the student's conduct and character were found satisfactory, and nothing is recorded against them in the institute's disciplinary or accounts records."],
-            "COMPLETION": [f"This is to certify that {name}, roll number {s.roll_number}, has completed all the requirements of {prog} at {settings.institute_name}.",
-                           "The degree itself is awarded separately by the competent authority."],
-        }[kind]
-        return {"doc": doc, "paragraphs": text, "institute": settings.institute_name, "issued_on": today}
+        paragraphs = await self.certificate_paragraphs(student_id, kind)
+        doc = await self._register(kind, "STUDENT", student_id, name, {"roll_number": s.roll_number, "program": program.name if program else None,
+                                                                         "override_reason": override, **(extra or {})}, actor_id)
+        return {"doc": doc, "paragraphs": paragraphs, "institute": settings.institute_name, "issued_on": institute_today()}
 
     async def issue_experience_certificate(self, employee_id: uuid.UUID, *, actor_id, override_reason: str | None = None) -> dict:
         from app.employees.models import JobRole

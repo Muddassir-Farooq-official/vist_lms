@@ -68,6 +68,10 @@ async def send_due(session: AsyncSession, *, time_budget: float = 20) -> dict:
 
     await fee_reminders(session)                                         # from 9 AM, once a day; never raises
     await parent_weekly(session)                                         # Mondays from 9 AM; never raises
+    await certificate_round(session)                                     # paid certificate fees -> certificate ready; never raises
+    from app.reports.monthly import send_on_the_first
+
+    await send_on_the_first(session)                                     # the 1st from 8 AM: last month's report is ready; never raises
     sms = await SmsService(session).send_pending(limit=100, time_budget=time_budget)
     emails = await send_emails(session, limit=100, time_budget=time_budget)
     pushed = await push_round(session)
@@ -83,6 +87,18 @@ async def missed_class_round(session: AsyncSession) -> int:
             return await TeachingService(session).alert_missed_classes()
     except Exception as exc:  # noqa: BLE001 - an alert problem must not stop sending
         logger.warning("missed_class_alert_failed", error=str(exc)[:300])
+        return 0
+
+
+async def certificate_round(session: AsyncSession) -> int:
+    """Requested certificates whose fee has just been paid are issued, and the student is told. Never raises."""
+    try:
+        from app.records.requests import sweep_paid
+
+        async with session.begin_nested():
+            return await sweep_paid(session)
+    except Exception as exc:  # noqa: BLE001 - must not stop sending
+        logger.warning("certificate_round_failed", error=str(exc)[:300])
         return 0
 
 

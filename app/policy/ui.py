@@ -17,6 +17,8 @@ SECTIONS: tuple[tuple[str, str], ...] = (
     ("Payroll", "Leaves, late marks and deductions on monthly pay."),
     ("Purchases", "Approvals for buying."),
     ("SMS messages", "Which events send a text message."),
+    ("Certificates", "Fees for certificates students ask for from their portal."),
+    ("Reports", "The monthly report for the principal."),
     ("Staff tasks", "Reminders for daily to-do lists."),
     ("Dashboard display", "How amounts appear on dashboard cards."),
 )
@@ -107,6 +109,13 @@ UI: dict[str, dict] = {
     "purchase_over_estimate_percent": {"section": "Purchases", "label": "Re-approve when the price is more than the estimate by",
                                        "control": "number", "after": "%"},
     # ---------------------------------------------------------------- sms
+    "certificate_fee_bonafide": {"section": "Certificates", "label": "Bonafide certificate", "control": "number", "before": "Rs."},
+    "certificate_fee_character": {"section": "Certificates", "label": "Character certificate", "control": "number", "before": "Rs."},
+    "certificate_fee_completion": {"section": "Certificates", "label": "Completion certificate", "control": "number", "before": "Rs."},
+    "certificate_fee_provisional": {"section": "Certificates", "label": "Provisional certificate (result)", "control": "number", "before": "Rs."},
+    "certificate_fee_migration": {"section": "Certificates", "label": "Migration certificate / NOC", "control": "number", "before": "Rs."},
+    "certificate_fee_fee_clearance": {"section": "Certificates", "label": "Fee clearance letter", "control": "number", "before": "Rs."},
+    "monthly_report_notice": {"section": "Reports", "label": "Tell the principal on the 1st that last month's report is ready", "control": "switch"},
     "sms_on_fee_overdue": {"section": "SMS messages", "label": "Weekly reminder for overdue fees", "control": "switch"},
     "sms_on_fee_reminder": {"section": "SMS messages", "label": "Fee reminder before the due date", "control": "switch"},
     "sms_on_parent_weekly": {"section": "SMS messages", "label": "Monday note to parents when a child needs attention", "control": "switch"},

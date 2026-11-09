@@ -1,0 +1,62 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN,PRINCIPAL{% endblock %}
+{% block title %}Monthly report{% endblock %}
+{% block page_title %}Monthly report{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">One month at a glance: fees, class attendance, results, and staff attendance and leave. Sent to you on the 1st of every month.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/monthly.css?v={{ app_version() }}" />{% endblock %}
+
+{% block content %}
+<div class="mr-toolbar">
+  <label class="mr-month">Month <input type="month" id="mr-month" class="text-input" /></label>
+  <a class="role-btn" id="mr-pdf" href="#" target="_blank" rel="noopener">Download PDF</a>
+</div>
+<p class="dash-alert" id="mr-partial" hidden></p>
+<p class="dash-alert error" id="mr-error" hidden></p>
+
+<section class="panel" aria-labelledby="mr-fees-h">
+  <h2 class="panel-title" id="mr-fees-h">1. Fees</h2>
+  <div class="stat-grid" id="mr-fees-kpis"></div>
+  <p class="cc-meta" id="mr-fees-note"></p>
+  <div class="table-scroll"><table class="dash-table" id="mr-heads">
+    <thead><tr><th>Fee</th><th class="num">Students</th><th class="num">Payable</th><th class="num">Paid</th><th class="num">Still owed</th><th class="num">Overdue</th><th class="num">Collected</th></tr></thead>
+    <tbody></tbody></table></div>
+  <h3 class="dash-sub-h">Largest overdue amounts</h3>
+  <div class="table-scroll"><table class="dash-table" id="mr-defaulters">
+    <thead><tr><th>Student</th><th>Roll no.</th><th class="num">Overdue</th><th class="num">Days overdue</th></tr></thead>
+    <tbody></tbody></table></div>
+</section>
+
+<section class="panel" aria-labelledby="mr-classes-h">
+  <h2 class="panel-title" id="mr-classes-h">2. Class attendance</h2>
+  <div class="stat-grid" id="mr-classes-kpis"></div>
+  <h3 class="dash-sub-h">By teacher</h3>
+  <div class="table-scroll"><table class="dash-table" id="mr-teachers">
+    <thead><tr><th>Teacher</th><th class="num">Classes</th><th class="num">Held</th><th class="num">Average</th><th class="num">Below 75%</th></tr></thead>
+    <tbody></tbody></table></div>
+  <h3 class="dash-sub-h">By class (lowest attendance first)</h3>
+  <div class="table-scroll"><table class="dash-table" id="mr-classes">
+    <thead><tr><th>Class</th><th>Section</th><th>Teacher</th><th class="num">Held</th><th class="num">Average</th><th class="num">Below 75%</th></tr></thead>
+    <tbody></tbody></table></div>
+</section>
+
+<section class="panel" aria-labelledby="mr-results-h">
+  <h2 class="panel-title" id="mr-results-h">3. Results</h2>
+  <div class="stat-grid" id="mr-results-kpis"></div>
+  <div class="table-scroll"><table class="dash-table" id="mr-results">
+    <thead><tr><th>Course</th><th>Section</th><th class="num">Results</th><th class="num">Passed</th><th class="num">Failed</th><th class="num">Pass rate</th><th class="num">Average</th></tr></thead>
+    <tbody></tbody></table></div>
+</section>
+
+<section class="panel" aria-labelledby="mr-staff-h">
+  <h2 class="panel-title" id="mr-staff-h">4. Staff attendance and leave</h2>
+  <div class="stat-grid" id="mr-staff-kpis"></div>
+  <p class="cc-meta" id="mr-leave"></p>
+  <div class="table-scroll"><table class="dash-table" id="mr-staff">
+    <thead><tr><th>Name</th><th>Job</th><th class="num">Working days</th><th class="num">Present</th><th class="num">Leave</th><th class="num">Absent</th><th class="num">Late</th><th class="num">Left early</th></tr></thead>
+    <tbody></tbody></table></div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/monthly-report.js?v={{ app_version() }}"></script>
+{% endblock %}

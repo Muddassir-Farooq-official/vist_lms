@@ -20,3 +20,21 @@ html:not([lang="ur"]) .lang-toggle { font-family: "Noto Nastaliq Urdu", system-u
 html[lang="ur"] .bottom-link span { font-size: .64rem; line-height: 1.7; overflow: visible; padding-bottom: 2px; }
 html[lang="ur"] .content-subtitle { line-height: 1.9; }
 .lang-toggle { white-space: nowrap; min-width: 56px; flex: none; }
+
+/* ---- sign-in page: "English | اردو" switch beside the heading ---- */
+.signin-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.signin-card-top h1 { margin: 0; }
+.lang-switch { display: inline-flex; align-items: center; gap: 2px; padding: 3px; flex: none;
+  border: 1px solid var(--border, #dfe4ef); border-radius: 999px; background: var(--surface-alt, #f4f6fb); }
+.lang-switch-icon { color: var(--text-muted, #64748b); margin: 0 4px 0 6px; flex: none; }
+.lang-switch button { border: 0; background: transparent; color: var(--text-secondary, #475569); cursor: pointer; border-radius: 999px;
+  padding: 0 12px; height: 30px; font: inherit; font-size: .85rem; font-weight: 600; white-space: nowrap; transition: background .15s, color .15s, box-shadow .15s; }
+.lang-switch button[lang="en"] { font-family: "Outfit", system-ui, sans-serif; line-height: 30px; }
+.lang-switch button[lang="ur"] { font-family: "Noto Nastaliq Urdu", system-ui, sans-serif; font-size: .9rem; line-height: 1; padding-bottom: 3px; }
+.lang-switch button:hover { color: var(--text-primary, #0f172a); }
+.lang-switch button[aria-pressed="true"] { background: var(--surface, #fff); color: var(--blue-600, #2454d6); box-shadow: 0 1px 3px rgba(15, 31, 61, .14); cursor: default; }
+.lang-switch button:focus-visible { outline: 2px solid var(--blue-500, #3b6ef5); outline-offset: 1px; }
+.lang-switch[aria-busy="true"] { opacity: .7; pointer-events: none; }
+html[lang="ur"] .lang-switch button { line-height: 1; }
+html[lang="ur"] .lang-switch button[lang="en"] { line-height: 30px; }
+@media (max-width: 360px) { .lang-switch-icon { display: none; } .lang-switch button { padding: 0 9px; } }

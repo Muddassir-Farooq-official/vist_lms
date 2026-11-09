@@ -1,0 +1,32 @@
+{% extends "student/_base.html" %}
+{% block title %}Certificates{% endblock %}
+{% block page_title %}Certificates{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Ask the office for a certificate. Once it is approved (and the fee, if any, is paid) you can download it here.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/certificates.css?v={{ app_version() }}" />{% endblock %}
+
+{% block content %}
+<section class="panel" aria-labelledby="cr-ask-h">
+  <h2 class="panel-title" id="cr-ask-h">Ask for a certificate</h2>
+  <form id="cr-form" class="form-grid cr-form" novalidate>
+    <label>Certificate
+      <select id="cr-kind" class="text-input" required></select>
+    </label>
+    <label>What do you need it for?
+      <input id="cr-purpose" class="text-input" type="text" maxlength="300" placeholder="For example: bank account, scholarship, visa" required />
+    </label>
+    <p class="cr-fee" id="cr-fee" aria-live="polite"></p>
+    <p class="form-error" id="cr-error" role="alert" hidden></p>
+    <button type="submit" class="role-btn" id="cr-send">Send request</button>
+  </form>
+</section>
+
+<section class="panel" aria-labelledby="cr-list-h">
+  <h2 class="panel-title" id="cr-list-h">My requests</h2>
+  <div id="cr-list" class="cr-list"><p class="cc-meta">Loading&hellip;</p></div>
+  <p class="empty-state" id="cr-empty" hidden>You have not asked for a certificate yet.</p>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/my-certificates.js?v={{ app_version() }}"></script>
+{% endblock %}

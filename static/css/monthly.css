@@ -1,0 +1,9 @@
+/* Monthly report page. */
+.mr-toolbar { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.mr-month { display: grid; gap: 4px; font-size: 0.85rem; color: var(--text-muted); }
+.mr-toolbar .role-btn { text-decoration: none; }
+#mr-heads td:first-child, #mr-classes td:first-child { min-width: 160px; }
+@media (max-width: 600px) {
+  .mr-toolbar > * { flex: 1 1 100%; }
+  .mr-toolbar .role-btn { text-align: center; }
+}

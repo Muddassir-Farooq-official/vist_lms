@@ -1,0 +1,18 @@
+/* Certificates on request (student and office pages). */
+.cr-list { display: grid; gap: 12px; }
+.cr-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; background: var(--surface); }
+.cr-card p { margin: 6px 0 0; }
+.cr-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.cr-meta { color: var(--text-muted); font-size: 0.84rem; }
+.cr-note { font-size: 0.86rem; color: var(--yellow-600); }
+.cr-fee { margin: 0; color: var(--text-muted); font-size: 0.88rem; }
+.cr-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.cr-count { display: inline-block; min-width: 1.2em; font-size: 0.75rem; }
+.cr-count:empty { display: none; }
+.cr-problems { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; background: var(--surface-alt); font-size: 0.86rem; }
+.cr-problems ul { margin: 4px 0 0; padding-inline-start: 18px; }
+#cr-dialog .form-actions { display: flex; gap: 10px; justify-content: flex-end; grid-column: 1 / -1; }
+#cr-dialog h2, #cr-dialog .cr-meta, #cr-dialog .cr-problems, #cr-dialog .form-error { grid-column: 1 / -1; margin: 0; }
+@media (max-width: 600px) {
+  .cr-actions .role-btn { flex: 1 1 auto; text-align: center; }
+}

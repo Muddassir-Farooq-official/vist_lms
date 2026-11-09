@@ -226,3 +226,90 @@ async def verify_document(document_id: uuid.UUID, current_user: CurrentUser = De
 @router.post("/documents/{document_id}/archive", summary="Archive a document (kept on record)")
 async def archive_document(document_id: uuid.UUID, payload: ReasonIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
     return await RecordsService(db).archive_document(document_id, payload.reason, actor_id=current_user.id)
+
+# ------------------------------------------------------------------ certificates on request (app/records/requests.py)
+class CertificateAskIn(BaseModel):
+    kind: str = Field(min_length=3, max_length=20)
+    purpose: str = Field(min_length=4, max_length=300)
+
+
+class CertificateApproveIn(BaseModel):
+    fee: float | None = Field(default=None, ge=0, le=1_000_000)
+    override_reason: str | None = Field(default=None, max_length=300)
+    note: str | None = Field(default=None, max_length=300)
+
+
+class CertificateNoteIn(BaseModel):
+    note: str = Field(min_length=4, max_length=300)
+
+
+@router.get("/me/certificate-requests", summary="My certificate requests, and the certificates I can ask for (students)")
+async def my_certificate_requests(current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    from app.records.requests import CertificateRequestService, kinds as cert_kinds
+
+    s = await _me(current_user, db)
+    return {"requests": await CertificateRequestService(db).mine(s.id), "kinds": cert_kinds()}
+
+
+@router.post("/me/certificate-requests", status_code=201, summary="Ask the office for a certificate (students)")
+async def ask_certificate(payload: CertificateAskIn, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    from app.records.requests import CertificateRequestService
+
+    s = await _me(current_user, db)
+    r = await CertificateRequestService(db).ask(s.id, kind=payload.kind, purpose=payload.purpose, user_id=current_user.id)
+    return {"id": r.id, "status": r.status}
+
+
+@router.post("/me/certificate-requests/{request_id}/cancel", summary="Cancel my request before the office answers it (students)")
+async def cancel_my_certificate(request_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    from app.records.requests import CertificateRequestService
+
+    s = await _me(current_user, db)
+    r = await CertificateRequestService(db).cancel_mine(request_id, s.id, user_id=current_user.id)
+    return {"id": r.id, "status": r.status}
+
+
+@router.get("/me/certificate-requests/{request_id}/pdf", summary="Download my certificate once it is ready (students)")
+async def my_certificate_pdf(request_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> Response:
+    from app.records.requests import CertificateRequestService
+
+    s = await _me(current_user, db)
+    return await _certificate_pdf(await CertificateRequestService(db).pdf_parts(request_id, student_id=s.id))
+
+
+@router.get("/certificate-requests", summary="Certificate requests from students (the office). status: OPEN, REQUESTED, AWAITING_FEE, READY, REJECTED, CANCELLED")
+async def certificate_requests(status: str | None = None, current_user: CurrentUser = Depends(issue), db=Depends(get_db)) -> dict:
+    from app.records.requests import CertificateRequestService
+
+    return await CertificateRequestService(db).office(status=status)
+
+
+@router.post("/certificate-requests/{request_id}/approve", summary="Approve a request: with a fee the student gets a challan, without one the certificate is issued now")
+async def approve_certificate(request_id: uuid.UUID, payload: CertificateApproveIn, current_user: CurrentUser = Depends(issue), db=Depends(get_db)) -> dict:
+    from app.records.requests import CertificateRequestService
+
+    r = await CertificateRequestService(db).approve(request_id, actor_id=current_user.id, fee=payload.fee, override_reason=payload.override_reason, note=payload.note)
+    return {"id": r.id, "status": r.status}
+
+
+@router.post("/certificate-requests/{request_id}/reject", summary="Refuse a request (the student is told why)")
+async def reject_certificate(request_id: uuid.UUID, payload: CertificateNoteIn, current_user: CurrentUser = Depends(issue), db=Depends(get_db)) -> dict:
+    from app.records.requests import CertificateRequestService
+
+    r = await CertificateRequestService(db).reject(request_id, actor_id=current_user.id, note=payload.note)
+    return {"id": r.id, "status": r.status}
+
+
+@router.post("/certificate-requests/{request_id}/cancel", summary="Cancel an approved request whose fee is unpaid (what is owed is written off)")
+async def cancel_certificate(request_id: uuid.UUID, payload: CertificateNoteIn, current_user: CurrentUser = Depends(issue), db=Depends(get_db)) -> dict:
+    from app.records.requests import CertificateRequestService
+
+    r = await CertificateRequestService(db).cancel_unpaid(request_id, actor_id=current_user.id, note=payload.note)
+    return {"id": r.id, "status": r.status}
+
+
+@router.get("/certificate-requests/{request_id}/pdf", summary="Print a requested certificate that is ready (the office)")
+async def office_certificate_pdf(request_id: uuid.UUID, current_user: CurrentUser = Depends(issue), db=Depends(get_db)) -> Response:
+    from app.records.requests import CertificateRequestService
+
+    return await _certificate_pdf(await CertificateRequestService(db).pdf_parts(request_id))
