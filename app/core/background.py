@@ -69,6 +69,9 @@ async def send_due(session: AsyncSession, *, time_budget: float = 20) -> dict:
     await fee_reminders(session)                                         # from 9 AM, once a day; never raises
     await parent_weekly(session)                                         # Mondays from 9 AM; never raises
     await certificate_round(session)                                     # paid certificate fees -> certificate ready; never raises
+    from app.notifications.family import payment_messages
+
+    await payment_messages(session)                                      # a message (and receipt on WhatsApp) for each payment; never raises
     from app.reports.monthly import send_on_the_first
 
     await send_on_the_first(session)                                     # the 1st from 8 AM: last month's report is ready; never raises

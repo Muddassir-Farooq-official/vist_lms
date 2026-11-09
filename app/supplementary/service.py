@@ -208,7 +208,7 @@ class SupplementaryService:
                 await create_notification(self.session, user_id=st.user_id, category=NotificationCategory.RESULT,
                                           title=f"Supplementary result: {course.code}", message=f"{course.code} {course.title}: {outcome_text}.",
                                           link="/dashboard/student/results")
-            await SmsService(self.session).queue_for_student(e.student_id, event="RESULTS",
+            await SmsService(self.session).queue_for_student(e.student_id, event="RESULTS", attachment=f"RESULT:{e.student_id}",
                                                             body=f"{settings.app_name}: supplementary result {course.code}: {outcome_text}.")
             await AuditService(self.session).log(actor_user_id=actor_id, action="supplementary.published", entity_type="enrollment",
                                                  entity_id=e.id, before=a.original_result, after=res)

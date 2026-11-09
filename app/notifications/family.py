@@ -53,12 +53,12 @@ async def _notify(session: AsyncSession, user_id, title: str, message: str, link
         await create_notification(session, user_id=user_id, category=NotificationCategory.GENERAL, title=title, message=message, link=link)
 
 
-async def _sms(session: AsyncSession, student_id, *, event: str, body: str, guardian_body: str) -> None:
+async def _sms(session: AsyncSession, student_id, *, event: str, body: str, guardian_body: str, attachment: str | None = None) -> None:
     try:
         from app.sms.service import SmsService
 
         async with session.begin_nested():
-            await SmsService(session).queue_for_student(student_id, event=event, body=body, guardian_body=guardian_body)
+            await SmsService(session).queue_for_student(student_id, event=event, body=body, guardian_body=guardian_body, attachment=attachment)
     except Exception as exc:  # noqa: BLE001 - the app message is already there
         logger.warning("family_sms_failed", event=event, error=str(exc)[:200])
 
@@ -129,7 +129,8 @@ async def fee_reminders(session: AsyncSession) -> int:
                 await _notify(session, uid, t2, m2, "/dashboard/parent/fees")
             _, sms_student = fee_text(f["lang"], who=f["first"], for_parent=False, **kw)
             _, sms_guardian = fee_text(_guardian_lang(f), who=f["first"], for_parent=True, **kw)
-            await _sms(session, a.payer_id, event="FEE_REMINDER", body=f"{settings.app_name}: {sms_student}", guardian_body=f"{settings.app_name}: {sms_guardian}")
+            await _sms(session, a.payer_id, event="FEE_REMINDER", body=f"{settings.app_name}: {sms_student}", guardian_body=f"{settings.app_name}: {sms_guardian}",
+                       attachment=f"CHALLAN:{ch.id}")                     # on WhatsApp the challan itself goes with it
             sent += 1
         await beat(session, "fee-reminders", f"{day} reminded {sent}")
         return sent
@@ -210,3 +211,48 @@ async def attention_for(session: AsyncSession, student_id: uuid.UUID, lang: str 
     from app.academics.watchlist import for_students
 
     return (await for_students(session, {student_id})).get(student_id, [])
+
+
+# ---------------------------------------------------------------- payment received (with the receipt on WhatsApp)
+async def payment_messages(session: AsyncSession, *, limit: int = 300) -> int:
+    """Each fee payment recorded since the last round -> a message to the student and guardian, with the receipt on WhatsApp.
+
+    Works from the fee ledger itself (every way of paying ends there: counter, bank, 1Bill, online), so nothing is missed and
+    nothing is sent twice: the time of the last payment handled is kept in service_heartbeats ("fee-paid-messages"). The first
+    round only sets that mark, so payments from before this was switched on are never messaged. Never raises."""
+    try:
+        from datetime import datetime, timezone
+
+        from app.core.background import beat
+        from app.fees.models import FeeAssignment, FeeLedgerEntry, FeeStructure, LedgerEntryType, PayerType
+        from app.notifications.email_models import ServiceHeartbeat
+
+        name = "fee-paid-messages"
+        hb = await session.get(ServiceHeartbeat, name)
+        if hb is None or not hb.detail:
+            await beat(session, name, datetime.now(timezone.utc).isoformat())
+            return 0
+        if not int(getattr(settings, "sms_on_fee_paid", 1)):
+            await beat(session, name, datetime.now(timezone.utc).isoformat())        # switched off: do not save them up
+            return 0
+        mark = datetime.fromisoformat(hb.detail)
+        rows = (await session.execute(
+            select(FeeLedgerEntry, FeeAssignment.payer_id, FeeStructure.name)
+            .join(FeeAssignment, FeeAssignment.id == FeeLedgerEntry.fee_assignment_id)
+            .join(FeeStructure, FeeStructure.id == FeeAssignment.fee_structure_id)
+            .where(FeeLedgerEntry.entry_type == LedgerEntryType.CREDIT, FeeLedgerEntry.receipt_number.is_not(None),
+                   FeeLedgerEntry.created_at > mark, FeeAssignment.payer_type == PayerType.STUDENT)
+            .order_by(FeeLedgerEntry.created_at).limit(limit))).all()
+        if not rows:
+            return 0
+        n = 0
+        for e, student_id, fee_name in rows:
+            body = (f"{settings.app_name}: payment of Rs. {float(e.amount):,.0f} received for {fee_name}. "
+                    f"Receipt {e.receipt_number}. Thank you.")
+            await _sms(session, student_id, event="FEE_PAID", body=body, guardian_body=body, attachment=f"RECEIPT:{e.id}")
+            n += 1
+        await beat(session, name, rows[-1][0].created_at.isoformat())
+        return n
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("payment_messages_failed", error=str(exc)[:300])
+        return 0

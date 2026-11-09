@@ -1,15 +1,64 @@
 {% extends "admin/_base.html" %}
-{% block title %}SMS{% endblock %}
-{% block page_title %}SMS{% endblock %}
-{% block page_subtitle %}<div class="content-subtitle">Text messages to students and guardians: attendance fines, datesheets, results and overdue fees. Turn each kind on or off in Settings &rarr; Institute Policy &rarr; SMS.</div>{% endblock %}
+{% block title %}SMS & WhatsApp{% endblock %}
+{% block page_title %}SMS & WhatsApp{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Messages to students and guardians: fees, results, attendance, datesheets and more. With WhatsApp set up, each message goes by WhatsApp first and by SMS only if WhatsApp fails. Turn each kind on or off in Settings &rarr; SMS messages.</div>{% endblock %}
+
+{% block extra_head %}<style>.wa-head{display:flex;align-items:center;gap:10px;justify-content:space-between}.wa-head h2{margin:0}.wa-panel .form-grid .form-grid{padding:0}.sms-by small{display:block;color:var(--text-muted)}</style>{% endblock %}
 
 {% block content %}
-<p class="dash-alert error" id="sms-not-configured" hidden>No SMS provider is set up yet, so messages are recorded as <strong>Logged</strong> but not sent. Add the provider's details to the server's .env (SMS_PROVIDER_URL, SMS_API_KEY, SMS_SENDER_ID) and restart.</p>
+<p class="dash-alert error" id="sms-not-configured" hidden>Neither WhatsApp nor SMS is set up yet, so messages are recorded as <strong>Logged</strong> but not sent. Set up WhatsApp below, or ask your technical person to add the SMS provider's details.</p>
 <section class="stat-grid" aria-label="Last 7 days">
   <div class="stat-card stat-card--green"><span class="stat-label">Sent (7 days)</span><span class="stat-value" id="sms-sent">&mdash;</span></div>
   <div class="stat-card"><span class="stat-label">Waiting to send</span><span class="stat-value" id="sms-queued">&mdash;</span></div>
   <div class="stat-card stat-card--red"><span class="stat-label">Failed (7 days)</span><span class="stat-value" id="sms-failed">&mdash;</span></div>
   <div class="stat-card"><span class="stat-label">Logged, not sent (7 days)</span><span class="stat-value" id="sms-logged">&mdash;</span></div>
+</section>
+
+<section class="panel wa-panel" aria-labelledby="wa-h">
+  <div class="wa-head">
+    <h2 class="panel-title" id="wa-h">WhatsApp</h2>
+    <span class="status-pill" id="wa-state">&hellip;</span>
+  </div>
+  <p class="panel-hint">Cheaper than SMS, and the challan, receipt, result card or certificate goes with the message as a PDF. Messages go one way: replies are not read here.</p>
+  <form id="wa-form" class="form-grid" novalidate>
+    <label class="span-all">How to send
+      <select id="wa-mode" class="select-input">
+        <option value="OFF">Off: SMS only</option>
+        <option value="META">WhatsApp Cloud API (Meta, official)</option>
+        <option value="LINK">A WhatsApp provider's web link</option>
+      </select>
+    </label>
+    <div class="span-all wa-fields" data-mode="META" hidden>
+      <p class="panel-hint">From Meta's WhatsApp Manager: the phone number ID, a permanent access token, and the names of your approved templates. The text template's body must be just <code>{% raw %}{{1}}{% endraw %}</code>; the document template has a <em>Document</em> header and the same body.</p>
+      <div class="form-grid">
+        <label>Phone number ID<input id="wa-pnid" class="text-input" maxlength="40" autocomplete="off" /></label>
+        <label>Access token<input id="wa-token" class="text-input" type="password" maxlength="1000" autocomplete="new-password" /><small id="wa-token-hint"></small></label>
+        <label>Text template name<input id="wa-tpl" class="text-input" maxlength="100" placeholder="e.g. portal_message" /></label>
+        <label>Document template name (optional)<input id="wa-tpl-doc" class="text-input" maxlength="100" placeholder="e.g. portal_document" /></label>
+        <label>Template language<input id="wa-lang" class="text-input small-input" maxlength="10" value="en" /></label>
+      </div>
+    </div>
+    <div class="span-all wa-fields" data-mode="LINK" hidden>
+      <p class="panel-hint">Paste the web address your provider gave you. Use <code>{to}</code>, <code>{message}</code>, <code>{api_key}</code>, <code>{sender}</code>, and for documents <code>{document_url}</code> and <code>{document_name}</code>. Without <code>{document_url}</code> the document link is added to the end of the message.</p>
+      <div class="form-grid">
+        <label class="span-all">Web address<input id="wa-url" class="text-input" maxlength="1000" placeholder="https://api.provider.pk/send?key={api_key}&amp;to={to}&amp;text={message}" /></label>
+        <label>Method<select id="wa-method" class="select-input"><option>GET</option><option>POST</option></select></label>
+        <label>API key<input id="wa-key" class="text-input" type="password" maxlength="500" autocomplete="new-password" /><small id="wa-key-hint"></small></label>
+        <label>Sender (optional)<input id="wa-sender" class="text-input" maxlength="60" /></label>
+        <label>Reply must contain (optional)<input id="wa-marker" class="text-input" maxlength="100" placeholder="e.g. success" /></label>
+        <label class="span-all" id="wa-body-l" hidden>Body (for POST)<textarea id="wa-body" class="text-input" rows="3" maxlength="2000"></textarea></label>
+      </div>
+    </div>
+    <label class="check-row span-all"><input id="wa-docs" type="checkbox" checked /> Send the challan, receipt, result card or certificate as a PDF with the message</label>
+    <p class="panel-hint span-all" id="wa-docs-note" hidden></p>
+    <p class="dash-alert error span-all" id="wa-error" role="alert" hidden></p>
+    <div class="toolbar span-all">
+      <button type="submit" class="role-btn" id="wa-save">Save</button>
+      <input id="wa-test-number" class="text-input small-input" placeholder="0300-1234567" aria-label="Number for a test message" />
+      <button type="button" class="role-btn secondary-btn" id="wa-test">Send a test WhatsApp</button>
+    </div>
+    <p class="panel-hint span-all" id="wa-test-result" hidden></p>
+  </form>
 </section>
 
 <section class="panel">
@@ -27,7 +76,7 @@
     </select>
   </div>
   <p id="sms-msg" class="panel-hint" hidden></p>
-  <table class="dash-table"><thead><tr><th>When</th><th>To</th><th>About</th><th>Status</th><th>Message</th></tr></thead><tbody id="sms-tbody"></tbody></table>
+  <table class="dash-table"><thead><tr><th>When</th><th>To</th><th>About</th><th>Status</th><th>By</th><th>Message</th></tr></thead><tbody id="sms-tbody"></tbody></table>
 </section>
 
 <section class="sh-card">
@@ -60,5 +109,6 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="/static/js/sms-admin.js"></script>
+<script src="/static/js/sms-admin.js?v={{ app_version() }}"></script>
+<script src="/static/js/whatsapp-settings.js?v={{ app_version() }}"></script>
 {% endblock %}

@@ -231,6 +231,15 @@ class CertificateRequestService:
         r.content = {"paragraphs": result["paragraphs"], "issued_on": result["issued_on"].isoformat(), "institute": result["institute"]}
         r.status, r.ready_at = "READY", datetime.now(timezone.utc)
         await self._notify_student(r, "Your certificate is ready", f"Your {CERTIFICATES[r.kind].lower()} is ready. Download it from the Certificates page.")
+        try:
+            from app.sms.service import SmsService
+
+            async with self.session.begin_nested():               # a texting problem must not undo the certificate
+                await SmsService(self.session).queue_for_student(
+                    r.student_id, event="CERTIFICATE_READY", attachment=f"CERTIFICATE:{r.id}",
+                    body=f"{settings.app_name}: your {CERTIFICATES[r.kind].lower()} is ready. Download it from Certificates in the portal.")
+        except Exception:  # noqa: BLE001
+            pass
 
     async def sweep(self, *, student_id: uuid.UUID | None = None, only: CertificateRequest | None = None) -> int:
         """Issue every approved certificate whose challan is now paid. Run on each look at the list, and by the background job."""

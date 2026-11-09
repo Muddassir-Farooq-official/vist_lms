@@ -82,6 +82,30 @@ async def challan_pdf(challan_id: uuid.UUID, current_user: CurrentUser = Depends
         own = await _own_payer(db, current_user)
         if (own is None or (assignment.payer_type, assignment.payer_id) != own) and not await _parent_of(db, current_user, assignment):
             raise ResourceNotFoundError("Challan not found.")             # other people's challans are simply not there
+    data = await challan_pdf_data(db, challan, assignment)
+    return Response(content=await run_in_threadpool(render_challan_pdf, data), media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="challan-{challan.consumer_number}.pdf"', **_SECURITY_HEADERS})
+
+
+@router.get("/receipts/{entry_id}/pdf", summary="Download the receipt for one recorded payment (the person who paid, or staff)")
+async def receipt_pdf(entry_id: uuid.UUID, current_user: CurrentUser = Depends(require_any_permission(Permissions.FEE_VIEW, Permissions.PARENT_VIEW)), db=Depends(get_db)) -> Response:
+    from app.fees.receipt_pdf import render_receipt_pdf
+
+    entry = await db.get(FeeLedgerEntry, entry_id)
+    if entry is None or entry.entry_type not in (LedgerEntryType.CREDIT, LedgerEntryType.REFUND) or not entry.receipt_number:
+        raise ResourceNotFoundError("Receipt not found.")
+    assignment = await db.get(FeeAssignment, entry.fee_assignment_id)
+    if not (Roles.ADMIN in current_user.roles or Roles.ACCOUNTS_OFFICER in current_user.roles):
+        own = await _own_payer(db, current_user)
+        if (own is None or (assignment.payer_type, assignment.payer_id) != own) and not await _parent_of(db, current_user, assignment):
+            raise ResourceNotFoundError("Receipt not found.")
+    data = await receipt_pdf_data(db, entry, assignment)
+    return Response(content=await run_in_threadpool(render_receipt_pdf, data), media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="receipt-{entry.receipt_number}.pdf"', **_SECURITY_HEADERS})
+
+
+async def challan_pdf_data(db, challan: PaymentChallan, assignment: FeeAssignment) -> dict:
+    """What the challan PDF shows (shared with the WhatsApp document link, app/sms/whatsapp.py)."""
     entry = await db.get(FeeLedgerEntry, challan.fee_ledger_entry_id)
     structure = await db.get(FeeStructure, assignment.fee_structure_id)
     fee_type = await db.get(FeeType, structure.fee_type_id)
@@ -93,23 +117,12 @@ async def challan_pdf(challan_id: uuid.UUID, current_user: CurrentUser = Depends
             "payer": await AccountService(db).payer(assignment.payer_type, assignment.payer_id), "payable": float(challan.amount),
             "charged": float(entry.amount), "concession": concession, "status": challan.status.value, "paid_on": challan.paid_at,
             "generated_on": challan.generated_at or datetime.now(timezone.utc), "late_fee_per_day": float(structure.late_fee_per_day) if structure.late_fee_per_day else None}
-    return Response(content=await run_in_threadpool(render_challan_pdf, data), media_type="application/pdf",
-                    headers={"Content-Disposition": f'attachment; filename="challan-{challan.consumer_number}.pdf"', **_SECURITY_HEADERS})
+    return data
 
-
-@router.get("/receipts/{entry_id}/pdf", summary="Download the receipt for one recorded payment (the person who paid, or staff)")
-async def receipt_pdf(entry_id: uuid.UUID, current_user: CurrentUser = Depends(require_any_permission(Permissions.FEE_VIEW, Permissions.PARENT_VIEW)), db=Depends(get_db)) -> Response:
+async def receipt_pdf_data(db, entry: FeeLedgerEntry, assignment: FeeAssignment) -> dict:
+    """What the receipt PDF shows (shared with the WhatsApp document link)."""
     from app.core.config import settings
-    from app.fees.receipt_pdf import render_receipt_pdf
 
-    entry = await db.get(FeeLedgerEntry, entry_id)
-    if entry is None or entry.entry_type not in (LedgerEntryType.CREDIT, LedgerEntryType.REFUND) or not entry.receipt_number:
-        raise ResourceNotFoundError("Receipt not found.")
-    assignment = await db.get(FeeAssignment, entry.fee_assignment_id)
-    if not (Roles.ADMIN in current_user.roles or Roles.ACCOUNTS_OFFICER in current_user.roles):
-        own = await _own_payer(db, current_user)
-        if (own is None or (assignment.payer_type, assignment.payer_id) != own) and not await _parent_of(db, current_user, assignment):
-            raise ResourceNotFoundError("Receipt not found.")
     structure = await db.get(FeeStructure, assignment.fee_structure_id)
     data = {"institute": settings.app_name, "receipt_number": entry.receipt_number, "paid_on": entry.paid_on, "recorded_on": entry.created_at.date(),
             "payer": await AccountService(db).payer(assignment.payer_type, assignment.payer_id), "fee_name": structure.name,
@@ -117,8 +130,7 @@ async def receipt_pdf(entry_id: uuid.UUID, current_user: CurrentUser = Depends(r
             "reference": entry.payment_reference, "description": entry.description,
             "kind": "refund" if entry.entry_type == LedgerEntryType.REFUND else "receipt",
             "void": entry.entry_type == LedgerEntryType.CREDIT and await ChallanService(db).payment_is_reversed(entry.id)}
-    return Response(content=await run_in_threadpool(render_receipt_pdf, data), media_type="application/pdf",
-                    headers={"Content-Disposition": f'attachment; filename="receipt-{entry.receipt_number}.pdf"', **_SECURITY_HEADERS})
+    return data
 
 
 # ============================================================ advance credit

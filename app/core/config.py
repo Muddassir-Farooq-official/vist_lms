@@ -264,6 +264,8 @@ class Settings(BaseSettings):
     certificate_fee_migration: float = 2000.0
     certificate_fee_fee_clearance: float = 0.0
     monthly_report_notice: int = 1          # the 1st of each month: tell the principal last month's report is ready
+    sms_on_fee_paid: int = 1                 # a message (receipt on WhatsApp) for each fee payment
+    sms_on_certificate_ready: int = 1        # a message (certificate on WhatsApp) when a requested certificate is ready
     sms_on_parent_weekly: int = 1            # Monday note to parents when a child needs attention
     sms_to_guardian: int = 1
     sms_on_admission: int = 1
