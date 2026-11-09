@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from app.core.net import client_ip
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Cookie, Depends, Request, Response
@@ -27,6 +29,14 @@ def _cookie_kwargs() -> dict:
         domain=settings.cookie_domain or None,
         path="/",
     )
+
+
+LANG_COOKIE = "vist_lang"   # not secret: read by the pages to show Urdu or English (static/js/i18n.js)
+
+
+def _set_lang_cookie(response: Response, language: str | None) -> None:
+    response.set_cookie(LANG_COOKIE, "ur" if language == "ur" else "en", max_age=365 * 86400, secure=settings.cookie_secure,
+                        samesite="lax", domain=settings.cookie_domain or None, path="/", httponly=False)
 
 
 def _set_access_cookie(response: Response, access_token: str) -> None:
@@ -68,12 +78,18 @@ async def login(
             return TokenResponse(access_token="", expires_in_minutes=0, two_factor="code", challenge=tf.challenge_for(user, "code"),
                                  remember_days=int(settings.two_factor_remember_days))
     tokens = await service.start_session(user, ip=ip, user_agent=ua)
-    return await _signed_in(db, response, service, user, tokens)
+    return await _signed_in(db, response, service, user, tokens, request)
 
 
-async def _signed_in(db, response: Response, service: AuthService, user, tokens) -> TokenResponse:
+async def _signed_in(db, response: Response, service: AuthService, user, tokens, request: Request | None = None) -> TokenResponse:
     """Cookies + the answer the login page needs to go straight to the right portal."""
     _set_auth_cookies(response, access_token=tokens.access_token, refresh_token=tokens.refresh_token)
+    # The language picked on the sign-in page (cookie) wins and is kept on the account; otherwise the account's choice.
+    chosen = request.cookies.get(LANG_COOKIE) if request is not None else None
+    if chosen in ("en", "ur") and chosen != getattr(user, "language", "en"):
+        user.language = chosen
+        await db.commit()
+    _set_lang_cookie(response, getattr(user, "language", "en"))
     roles, perms = service._roles_and_permissions(user)
     from app.core.dependencies import email_gate_on
 
@@ -129,7 +145,7 @@ async def two_factor_verify(payload: _TwoFactorCodeIn, request: Request, respons
         _remember_cookie(response, await tf.remember_device(db, user.id, request.headers.get("user-agent")))
     service = AuthService(db)
     tokens = await service.start_session(user, ip=client_ip(request), user_agent=request.headers.get("user-agent"))
-    return await _signed_in(db, response, service, user, tokens)
+    return await _signed_in(db, response, service, user, tokens, request)
 
 
 @router.post("/2fa/setup", summary="Set-up step 1: the QR code (and the key, to type in by hand) for the authenticator app")
@@ -160,7 +176,7 @@ async def two_factor_setup_confirm(payload: _TwoFactorCodeIn, request: Request, 
         _remember_cookie(response, await tf.remember_device(db, user.id, request.headers.get("user-agent")))
     service = AuthService(db)
     tokens = await service.start_session(user, ip=client_ip(request), user_agent=request.headers.get("user-agent"))
-    return await _signed_in(db, response, service, user, tokens)
+    return await _signed_in(db, response, service, user, tokens, request)
 
 
 @router.post("/refresh", response_model=TokenResponse, summary="Rotate refresh token, issue new access token")
@@ -222,6 +238,31 @@ async def reset_password(payload: _ResetIn, request: Request, db=Depends(get_db)
 @router.get("/me", response_model=CurrentUser, summary="Get the current authenticated user")
 async def me(current_user: CurrentUser = Depends(get_current_user_allow_pending_password_change)) -> CurrentUser:
     return current_user
+
+
+class LanguageIn(BaseModel):
+    language: Literal["en", "ur"]
+
+
+@router.get("/me/language", summary="My language for the screens and SMS")
+async def my_language(current_user: CurrentUser = Depends(get_current_user_allow_pending_password_change), db=Depends(get_db)) -> dict:
+    from app.auth.models import User
+
+    u = await db.get(User, current_user.id)
+    return {"language": (u.language if u else "en") or "en"}
+
+
+@router.post("/me/language", summary="Choose Urdu or English for my screens and SMS")
+async def set_my_language(payload: LanguageIn, response: Response,
+                          current_user: CurrentUser = Depends(get_current_user_allow_pending_password_change), db=Depends(get_db)) -> dict:
+    from app.auth.models import User
+
+    u = await db.get(User, current_user.id)
+    if u is not None and u.language != payload.language:
+        u.language = payload.language
+        await db.commit()
+    _set_lang_cookie(response, payload.language)
+    return {"language": payload.language}
 
 
 @router.post("/change-password", status_code=204, summary="Change own password")

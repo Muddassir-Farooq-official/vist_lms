@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+{% set _lang = ui_lang(request) %}<html lang="{{ _lang }}" dir="{{ 'rtl' if _lang == 'ur' else 'ltr' }}">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -12,6 +12,7 @@
        the page they land on appears instantly after sign-in. -->
   <link rel="prefetch" href="/static/css/dashboard.css" as="style" />
   <link rel="prefetch" href="/static/js/admin-common.js" as="script" />
+  {% include "_i18n_head.html" %}
 </head>
 <body class="signin-body">
   <div class="signin">
@@ -44,6 +45,7 @@
         <h1 id="auth-title">Sign in</h1>
         <p class="auth-sub">Students use their roll number, staff their employee code, parents their CNIC.</p>
 
+        {% include "_lang_toggle.html" %}
         <form id="login-form" novalidate>
           <div class="auth-field">
             <label for="username">Username</label>

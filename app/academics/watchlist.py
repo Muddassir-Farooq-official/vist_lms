@@ -147,3 +147,44 @@ def rules() -> list[str]:
             f"Less than {MARKS_MIN:g}% of the marks given so far",
             f"{MISSED_MIN} or more assignments missed",
             f"A fee overdue for {FEE_DAYS} days or more"]
+
+
+async def for_students(session: AsyncSession, student_ids: set | None = None) -> dict:
+    """The same signs, per student across all their current courses (no fee sign: parents already see their fees).
+    {student_id: [{"course_code", "course_title", "kind", "text"}]} — only students with at least one sign."""
+    from app.academics.models import Course, CourseOffering, Enrollment, EnrollmentStatus
+    from app.attendance.shortfall import percentages
+
+    today = institute_today()
+    q = (select(Enrollment.student_id, CourseOffering, Course).join(CourseOffering, CourseOffering.id == Enrollment.course_offering_id)
+         .join(Course, Course.id == CourseOffering.course_id)
+         .where(Enrollment.status == EnrollmentStatus.ENROLLED,
+                (CourseOffering.term_end_date.is_(None)) | (CourseOffering.term_end_date >= today)))
+    if student_ids is not None:
+        q = q.where(Enrollment.student_id.in_(student_ids or {uuid.uuid4()}))
+    rows = (await session.execute(q)).all()
+    offerings = {o.id: (o, c) for _, o, c in rows}
+    if not offerings:
+        return {}
+    ids = list(offerings)
+    attendance = {}
+    for oid in ids:
+        for r in await percentages(session, offering_id=oid):
+            attendance[(r["student_id"], oid)] = r
+    marks = await _marks_so_far(session, ids)
+    missed = await _missed(session, ids)
+    out: dict = {}
+    for sid, o, c in rows:
+        key = (sid, o.id)
+        a = attendance.get(key)
+        if a and a["taken"] >= MIN_CLASSES_FOR_ATTENDANCE and a["percentage"] < ATTENDANCE_MIN:
+            out.setdefault(sid, []).append({"course_code": c.code, "course_title": c.title, "kind": "attendance", "value": round(a["percentage"])})
+        got, mx = marks.get(key, (0.0, 0.0))
+        if mx > 0 and _pct(got, mx) < MARKS_MIN:
+            out.setdefault(sid, []).append({"course_code": c.code, "course_title": c.title, "kind": "marks", "value": round(_pct(got, mx))})
+        miss = missed.get(key, [])
+        if len(miss) >= MISSED_MIN:
+            out.setdefault(sid, []).append({"course_code": c.code, "course_title": c.title, "kind": "assignments", "value": len(miss)})
+    for v in out.values():
+        v.sort(key=lambda r: (r["course_code"], r["kind"]))
+    return out

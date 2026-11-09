@@ -108,6 +108,8 @@ UI: dict[str, dict] = {
                                        "control": "number", "after": "%"},
     # ---------------------------------------------------------------- sms
     "sms_on_fee_overdue": {"section": "SMS messages", "label": "Weekly reminder for overdue fees", "control": "switch"},
+    "sms_on_fee_reminder": {"section": "SMS messages", "label": "Fee reminder before the due date", "control": "switch"},
+    "sms_on_parent_weekly": {"section": "SMS messages", "label": "Monday note to parents when a child needs attention", "control": "switch"},
     "sms_on_attendance_fine": {"section": "SMS messages", "label": "When an attendance fine is issued", "control": "switch"},
     "sms_on_attendance_warning": {"section": "SMS messages", "label": "Weekly attendance warning", "control": "switch"},
     "sms_on_results": {"section": "SMS messages", "label": "When results are published", "control": "switch"},

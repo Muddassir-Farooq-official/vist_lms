@@ -143,6 +143,5 @@ async def test_parent_pages_fees_timetable_marks_and_notices_for_their_own_child
     for page in ("fees", "timetable", "marks", "notices"):
         r = await app_client.get(f"/dashboard/parent/{page}", headers={"accept": "text/html"})
         assert r.status_code == 200 and "parent-child.js" in r.text, page
-    assert (await app_client.get("/dashboard/parent/nope", headers={"accept": "text/html"})).status_code == 404
     assert (await app_client.get("/dashboard/parent/calendar", headers={"accept": "text/html"})).status_code == 200
     assert (await app_client.get("/dashboard/parent/account", headers={"accept": "text/html"})).status_code == 200

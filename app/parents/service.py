@@ -159,11 +159,14 @@ class ParentService:
         for (_e, off, _c), a in zip(sorted(current, key=lambda r: r[2].code), attendance):
             a["risk"] = risk.get(off.id)
         transcript = await TranscriptService(self.session).build(student.id)
+        from app.academics.watchlist import for_students
         fees = await AccountService(self.session).build(PayerType.STUDENT, student.id, staff_view=False)
         return {"student": (await self.children(user_id)) and next(c for c in await self.children(user_id) if c["id"] == student.id),
                 "attendance": attendance, "attendance_minimum": settings.attendance_eligibility_threshold_percent,
                 "results": {"summary": transcript["summary"], "terms": transcript["terms"]},
-                "fees": {"summary": fees["summary"], "assignments": fees["assignments"], "payments": fees["payments"][:20]}}
+                "fees": {"summary": fees["summary"], "assignments": fees["assignments"], "payments": fees["payments"][:20]},
+                # low marks so far and missed assignments (attendance is already shown above): the same signs teachers see
+                "attention": [i for i in (await for_students(self.session, {student.id})).get(student.id, []) if i["kind"] != "attendance"]}
 
     async def challan_owner_check(self, user_id: uuid.UUID, challan_id: uuid.UUID) -> None:
         from app.fees.models import FeeAssignment, PayerType

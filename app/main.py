@@ -136,6 +136,17 @@ from app.core.releases import current_version  # noqa: E402
 
 templates.env.globals["app_version"] = current_version
 
+
+def ui_lang(request) -> str:
+    """"ur" or "en", from the vist_lang cookie (set by the language button and at sign-in from the account)."""
+    try:
+        return "ur" if request.cookies.get("vist_lang") == "ur" else "en"
+    except Exception:  # noqa: BLE001
+        return "en"
+
+
+templates.env.globals["ui_lang"] = ui_lang
+
 # Role cards shown on the landing page (Section 18 roles). Purely
 # presentational — actual authorization is still enforced entirely by the
 # API's RBAC dependencies, never by which page the person clicked into.
@@ -1426,11 +1437,25 @@ async def parent_account_page(request: Request):
     return templates.TemplateResponse(request, "parent/account.html", {"nav_items": PARENT_NAV_ITEMS, "active_nav": "account"})
 
 
-@app.get("/dashboard/parent/{page}", include_in_schema=False)
-async def parent_page(request: Request, page: str):
-    if page not in ("fees", "timetable", "marks", "notices"):
-        raise HTTPException(status_code=404)
-    return templates.TemplateResponse(request, f"parent/{page}.html", {"nav_items": PARENT_NAV_ITEMS, "active_nav": page})
+# One real route per page, so notification links to them are recognised (app/notifications/service._known_page).
+@app.get("/dashboard/parent/fees", include_in_schema=False)
+async def parent_fees_page(request: Request):
+    return templates.TemplateResponse(request, "parent/fees.html", {"nav_items": PARENT_NAV_ITEMS, "active_nav": "fees"})
+
+
+@app.get("/dashboard/parent/timetable", include_in_schema=False)
+async def parent_timetable_page(request: Request):
+    return templates.TemplateResponse(request, "parent/timetable.html", {"nav_items": PARENT_NAV_ITEMS, "active_nav": "timetable"})
+
+
+@app.get("/dashboard/parent/marks", include_in_schema=False)
+async def parent_marks_page(request: Request):
+    return templates.TemplateResponse(request, "parent/marks.html", {"nav_items": PARENT_NAV_ITEMS, "active_nav": "marks"})
+
+
+@app.get("/dashboard/parent/notices", include_in_schema=False)
+async def parent_notices_page(request: Request):
+    return templates.TemplateResponse(request, "parent/notices.html", {"nav_items": PARENT_NAV_ITEMS, "active_nav": "notices"})
 
 
 @app.get("/dashboard/principal", include_in_schema=False)

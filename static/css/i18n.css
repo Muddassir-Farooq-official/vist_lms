@@ -1,0 +1,21 @@
+/* Urdu (Nastaliq) and right-to-left layout for the student, parent and sign-in pages. */
+@font-face { font-family: "Noto Nastaliq Urdu"; font-style: normal; font-weight: 400; font-display: swap; src: url("/static/fonts/noto-nastaliq-urdu-400.woff2") format("woff2"); }
+@font-face { font-family: "Noto Nastaliq Urdu"; font-style: normal; font-weight: 700; font-display: swap; src: url("/static/fonts/noto-nastaliq-urdu-700.woff2") format("woff2"); }
+
+html[lang="ur"] body { font-family: "Noto Nastaliq Urdu", "Outfit", system-ui, sans-serif; line-height: 2; }
+html[lang="ur"] h1, html[lang="ur"] h2, html[lang="ur"] h3, html[lang="ur"] strong, html[lang="ur"] b { line-height: 1.9; }
+/* Nastaliq is tall: give buttons, pills and inputs a little more room so nothing is cut off */
+html[lang="ur"] button, html[lang="ur"] .status-pill, html[lang="ur"] .nav-link, html[lang="ur"] input, html[lang="ur"] select { line-height: 1.9; }
+/* numbers, codes and English names keep their own font and direction */
+html[lang="ur"] code, html[lang="ur"] .pp-amt, html[lang="ur"] input[type="text"], html[lang="ur"] input[type="password"] { font-family: "Outfit", system-ui, sans-serif; }
+/* hide the English for a moment while it is being translated (at most 1.5 s) */
+html[lang="ur"]:not(.i18n-ready) body { visibility: hidden; }
+
+.lang-toggle { border: 1px solid var(--border-strong, #cbd5e1); background: var(--surface, #fff); color: var(--blue-600, #2454d6); border-radius: 999px;
+  padding: 4px 12px; font: inherit; font-size: .9rem; font-weight: 600; cursor: pointer; line-height: 1.6; }
+.lang-toggle:hover { background: var(--blue-50, #eef3ff); }
+html:not([lang="ur"]) .lang-toggle { font-family: "Noto Nastaliq Urdu", system-ui, sans-serif; }
+#login-form ~ .lang-toggle, .auth-card > .lang-toggle { margin-bottom: 8px; }
+/* the phone's bottom bar has very little height: Nastaliq needs a smaller size there */
+html[lang="ur"] .bottom-link span { font-size: .64rem; line-height: 1.7; overflow: visible; padding-bottom: 2px; }
+html[lang="ur"] .content-subtitle { line-height: 1.9; }

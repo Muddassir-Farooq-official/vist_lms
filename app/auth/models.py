@@ -34,6 +34,8 @@ class User(UUIDPKMixin, TimestampMixin, Base):
     totp_secret_enc: Mapped[str | None] = mapped_column(String(300), nullable=True)      # in use
     totp_pending_enc: Mapped[str | None] = mapped_column(String(300), nullable=True)     # being set up, not confirmed yet
     totp_enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Language of the screens and of the SMS sent to this person: "en" or "ur" (migration d5f7b9c1e3a5).
+    language: Mapped[str] = mapped_column(String(5), nullable=False, default="en", server_default="en")
 
     user_roles: Mapped[list["UserRole"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
