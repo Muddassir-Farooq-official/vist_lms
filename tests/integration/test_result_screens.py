@@ -31,7 +31,7 @@ async def test_the_teacher_page_shows_the_approval_state_and_locks_when_submitte
 
 async def test_the_student_page_explains_unpublished_results(app_client):
     js = (await app_client.get("/static/js/student-results.js")).text
-    assert "have not been published yet" in js
+    assert "grade appears when the result is published" in js and "No marks have been entered" in js
     assert "published" in (await app_client.get("/dashboard/student/results")).text.lower()
     assert "RESULT:" in (await app_client.get("/static/js/admin-common.js")).text
 

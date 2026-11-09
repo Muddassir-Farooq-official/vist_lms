@@ -1,5 +1,43 @@
 [
   {
+    "version": "1.7.0",
+    "date": "2026-11-09",
+    "title": "A full portal for parents",
+    "summary": "Parents now have their own pages for fees, marks, timetable and notices, for each of their children.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Students & parents",
+        "text": "Fees: what is due, with the challan to download and the consumer number for paying online, and every payment with its receipt."
+      },
+      {
+        "kind": "new",
+        "for": "Students & parents",
+        "text": "Marks: quiz, assignment and exam marks in each subject as the teachers enter them, with the total so far."
+      },
+      {
+        "kind": "new",
+        "for": "Students & parents",
+        "text": "Timetable & exams: classes for the next two weeks and the exam datesheet with the admit card."
+      },
+      {
+        "kind": "new",
+        "for": "Students & parents",
+        "text": "Notices: the institute's announcements for the child's class."
+      },
+      {
+        "kind": "improved",
+        "for": "Students & parents",
+        "text": "Students now also see each mark as soon as the teacher enters it. The final grade still appears when results are published."
+      },
+      {
+        "kind": "improved",
+        "for": "Students & parents",
+        "text": "Parents with more than one child switch between them with one tap, and the portal remembers the last one chosen."
+      }
+    ]
+  },
+  {
     "version": "1.6.1",
     "date": "2026-11-08",
     "title": "Fix: link previews on WhatsApp",

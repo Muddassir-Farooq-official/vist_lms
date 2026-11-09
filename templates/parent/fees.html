@@ -1,0 +1,34 @@
+{% extends "parent/_base.html" %}
+{% block title %}Fees{% endblock %}
+{% block page_title %}Fees{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Every fee, its challans to download and pay, and the receipts of what has been paid.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/parent.css?v={{ app_version() }}" />{% endblock %}
+{% block content %}
+{% include "parent/_child_bar.html" %}
+<div id="pf-view" hidden>
+  <section class="pp-sum" id="pf-sum" aria-label="Summary"></section>
+  <section class="panel pp-panel" aria-labelledby="pf-pay-h">
+    <h2 id="pf-pay-h">To pay</h2>
+    <ul class="pp-list" id="pf-due"></ul>
+    <p class="pp-empty" id="pf-due-none" hidden>Nothing to pay right now.</p>
+    <details class="pp-how">
+      <summary>How to pay</summary>
+      <ol>
+        <li>Download the challan and pay it at any branch of the bank printed on it, <b>or</b></li>
+        <li>In your bank app, JazzCash or Easypaisa choose <b>Bill payment → 1Bill → Invoice / Voucher</b> and enter the challan's <b>consumer number</b> (when the institute has switched 1Bill on).</li>
+      </ol>
+      <p>The payment shows here once the institute receives it.</p>
+    </details>
+  </section>
+  <section class="panel pp-panel" aria-labelledby="pf-paid-h">
+    <h2 id="pf-paid-h">Payments and receipts</h2>
+    <ul class="pp-list" id="pf-paid"></ul>
+    <p class="pp-empty" id="pf-paid-none" hidden>No payments recorded yet.</p>
+  </section>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script src="/static/js/dash-common.js"></script>
+<script src="/static/js/parent-child.js?v={{ app_version() }}"></script>
+<script src="/static/js/parent-fees.js?v={{ app_version() }}"></script>
+{% endblock %}

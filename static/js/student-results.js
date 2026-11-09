@@ -79,17 +79,17 @@
         table.innerHTML = rowsHtml;
         block.appendChild(table);
 
-        if (enrollment.outcome) {
+        {
           const totalP = document.createElement("p");
           totalP.className = "panel-hint";
           const pct = totalMax > 0 ? ((totalObtained / totalMax) * 100).toFixed(2) : "0";
-          totalP.textContent = "Total: " + totalObtained + " / " + totalMax + " (" + pct + "%)";
+          totalP.textContent = (enrollment.outcome ? "Total: " : "Marks so far: ") + totalObtained + " / " + totalMax + " (" + pct + "%)" + (enrollment.outcome ? "" : ". Your grade appears when the result is published.");
           block.appendChild(totalP);
         }
       } else {
         const noneP = document.createElement("p");
         noneP.className = "panel-hint";
-        noneP.textContent = enrollment.outcome ? "No marks are recorded for this subject." : "Your results for this subject have not been published yet. You will get a notification when they are.";
+        noneP.textContent = enrollment.outcome ? "No marks are recorded for this subject." : "No marks have been entered for this subject yet. They appear here as your teacher enters them; your grade comes when the result is published.";
         block.appendChild(noneP);
       }
 

@@ -175,3 +175,76 @@ class ParentService:
         a = await self.session.get(FeeAssignment, challan.fee_assignment_id)
         if a.payer_type != PayerType.STUDENT or await self.session.get(ParentStudentLink, (user_id, a.payer_id)) is None:
             raise ResourceNotFoundError("Challan not found.")
+    # ------------------------------------------------------------ the parent's own pages (each checks the child is theirs)
+    async def fees(self, user_id: uuid.UUID, student_id: uuid.UUID) -> dict:
+        """The child's whole fee account as the student sees it: fees, instalments, challans (with the consumer number
+        for 1Bill), discounts, payments with receipts, and what is still due."""
+        await self._own_child(user_id, student_id)
+        from app.fees.account_service import AccountService
+        from app.fees.models import PayerType
+
+        return await AccountService(self.session).build(PayerType.STUDENT, student_id, staff_view=False)
+
+    async def timetable(self, user_id: uuid.UUID, student_id: uuid.UUID, days: int = 14) -> dict:
+        """The child's classes from today for `days` days (cancelled ones left out), and the published datesheets."""
+        await self._own_child(user_id, student_id)
+        from datetime import timedelta
+
+        from app.academics.models import ClassSession, ClassSessionStatus, Course, CourseOffering, Enrollment, EnrollmentStatus
+        from app.core.clock import institute_today
+        from app.employees.models import Employee
+        from app.exams.service import ExamScheduleService
+
+        today = institute_today()
+        rows = (await self.session.execute(
+            select(ClassSession, CourseOffering, Course)
+            .join(CourseOffering, CourseOffering.id == ClassSession.course_offering_id)
+            .join(Course, Course.id == CourseOffering.course_id)
+            .join(Enrollment, Enrollment.course_offering_id == CourseOffering.id)
+            .where(Enrollment.student_id == student_id, Enrollment.status == EnrollmentStatus.ENROLLED,
+                   ClassSession.session_date >= today, ClassSession.session_date <= today + timedelta(days=days),
+                   ClassSession.status != ClassSessionStatus.CANCELLED)
+            .order_by(ClassSession.session_date, ClassSession.start_time))).all()
+        teachers = {e.id: e.full_name for e in (await self.session.execute(select(Employee).where(
+            Employee.id.in_({o.assigned_teacher_id for _, o, _ in rows if o.assigned_teacher_id} or {uuid.uuid4()})))).scalars()}
+        classes = [{"date": s.session_date, "start": s.start_time, "end": s.end_time, "room": s.room, "course_code": c.code,
+                    "course_title": c.title, "teacher": teachers.get(o.assigned_teacher_id)} for s, o, c in rows]
+        return {"from": today, "to": today + timedelta(days=days), "classes": classes,
+                "exams": await ExamScheduleService(self.session).for_student(student_id)}
+
+    async def marks(self, user_id: uuid.UUID, student_id: uuid.UUID) -> list[dict]:
+        """Marks entered so far in each current subject (quizzes, assignments, mid-term...), with the running total."""
+        await self._own_child(user_id, student_id)
+        from app.academics.models import (AssessmentType, Course, CourseOffering, Enrollment, EnrollmentStatus, OfferingAssessment,
+                                          StudentMark)
+
+        enrolled = (await self.session.execute(
+            select(Enrollment, CourseOffering, Course).join(CourseOffering, CourseOffering.id == Enrollment.course_offering_id)
+            .join(Course, Course.id == CourseOffering.course_id)
+            .where(Enrollment.student_id == student_id, Enrollment.status == EnrollmentStatus.ENROLLED)
+            .order_by(Course.code))).all()
+        out = []
+        for e, o, c in enrolled:
+            rows = (await self.session.execute(
+                select(AssessmentType.name, AssessmentType.max_marks, StudentMark.obtained_marks)
+                .join(OfferingAssessment, OfferingAssessment.assessment_type_id == AssessmentType.id)
+                .join(StudentMark, StudentMark.offering_assessment_id == OfferingAssessment.id)
+                .where(StudentMark.enrollment_id == e.id).order_by(AssessmentType.name))).all()
+            items = [{"name": n, "obtained": float(got), "max": float(mx)} for n, mx, got in rows]
+            got = sum(i["obtained"] for i in items)
+            mx = sum(i["max"] for i in items)
+            out.append({"course_code": c.code, "course_title": c.title, "term_label": o.term_label, "items": items,
+                        "obtained": round(got, 2), "max": round(mx, 2), "percentage": round(100 * got / mx, 1) if mx else None})
+        return out
+
+    async def announcements(self, user_id: uuid.UUID, student_id: uuid.UUID, limit: int = 30) -> list[dict]:
+        """What the institute announced to the child's students (their programme or everyone), newest first."""
+        student = await self._own_child(user_id, student_id)
+        from app.announcements.service import AnnouncementService, Viewer
+
+        svc = AnnouncementService(self.session)
+        viewer = Viewer(user_id=user_id, is_admin=False, student=True, teacher=False, staff=False, program_id=student.program_id)
+        items = (await svc.visible_to(viewer))[:max(1, min(limit, 100))]
+        return [{"id": a.id, "title": a.title, "body": a.body, "category": getattr(a.category, "value", a.category),
+                 "priority": getattr(a.priority, "value", a.priority), "pinned": a.pinned, "issuer_name": a.issuer_name,
+                 "issuer_designation": a.issuer_designation, "published_at": a.published_at} for a in items]

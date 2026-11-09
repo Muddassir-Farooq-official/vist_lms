@@ -295,6 +295,10 @@ STAFF_NAV_ITEMS = [
 
 PARENT_NAV_ITEMS = [
     _nav("children", "My children", "students", "/dashboard/parent", mobile=True, short="Children"),
+    _nav("fees", "Fees", "fees", "/dashboard/parent/fees", mobile=True, short="Fees"),
+    _nav("marks", "Marks", "exams", "/dashboard/parent/marks", mobile=True, short="Marks"),
+    _nav("timetable", "Timetable & exams", "clock", "/dashboard/parent/timetable"),
+    _nav("notices", "Notices", "megaphone", "/dashboard/parent/notices"),
     _nav("calendar", "Calendar", "clock", "/dashboard/parent/calendar"),
     _nav("account", "My account", "settings", "/dashboard/parent/account", mobile=True, short="Account"),
 ]
@@ -1420,6 +1424,13 @@ async def parent_home_page(request: Request):
 @app.get("/dashboard/parent/account", include_in_schema=False)
 async def parent_account_page(request: Request):
     return templates.TemplateResponse(request, "parent/account.html", {"nav_items": PARENT_NAV_ITEMS, "active_nav": "account"})
+
+
+@app.get("/dashboard/parent/{page}", include_in_schema=False)
+async def parent_page(request: Request, page: str):
+    if page not in ("fees", "timetable", "marks", "notices"):
+        raise HTTPException(status_code=404)
+    return templates.TemplateResponse(request, f"parent/{page}.html", {"nav_items": PARENT_NAV_ITEMS, "active_nav": page})
 
 
 @app.get("/dashboard/principal", include_in_schema=False)

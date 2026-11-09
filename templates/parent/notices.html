@@ -1,0 +1,17 @@
+{% extends "parent/_base.html" %}
+{% block title %}Notices{% endblock %}
+{% block page_title %}Notices{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Announcements from the institute for your child's class.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/parent.css?v={{ app_version() }}" />{% endblock %}
+{% block content %}
+{% include "parent/_child_bar.html" %}
+<div id="pn-view" hidden>
+  <ul class="pp-notices" id="pn-list"></ul>
+  <p class="pp-empty panel pp-panel" id="pn-none" hidden>No notices right now.</p>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script src="/static/js/dash-common.js"></script>
+<script src="/static/js/parent-child.js?v={{ app_version() }}"></script>
+<script src="/static/js/parent-notices.js?v={{ app_version() }}"></script>
+{% endblock %}

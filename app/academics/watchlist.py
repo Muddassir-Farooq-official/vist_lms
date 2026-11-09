@@ -73,7 +73,7 @@ async def _fee_overdue(session: AsyncSession, student_ids: set) -> set:
         return set()
     from app.reports.finance_service import FinanceReportService
 
-    data = await FinanceReportService(session).defaulters()
+    data = await FinanceReportService(session).defaulters(student_ids=student_ids)
     return {p["student_id"] for p in data["students"] if p["student_id"] in student_ids and p["days_overdue"] >= FEE_DAYS}
 
 

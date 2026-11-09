@@ -93,3 +93,56 @@ async def test_only_the_administration_manages_parent_access(app_client, admin_u
     await _login(app_client, ua, "StudentPass123!")
     assert (await app_client.post(f"{P}/students/{a}")).status_code == 403
     assert (await app_client.get(f"{P}/me/children")).status_code == 403
+
+async def test_parent_pages_fees_timetable_marks_and_notices_for_their_own_child_only(app_client, admin_user, db_session):
+    import uuid as _u
+    from datetime import datetime, timedelta, time, timezone
+
+    from app.academics.models import AssessmentType, ClassSession, Enrollment, OfferingAssessment, StudentMark
+    from app.announcements.models import Announcement, AnnouncementStatus
+    from app.core.clock import institute_today
+    from tests.integration.test_attendance_and_grading import _setup_offering_with_enrolled_students
+
+    off, studs = await _setup_offering_with_enrolled_students(app_client, code="PP1", n_students=1, cnic_base=7700)
+    sid, _username, enr = studs[0]
+    await _login_admin(app_client)
+    other = await app_client.post("/api/v1/students", json=_student_payload(cnic="76003-0000003-3", guardian_cnic="76007-7777777-7"))
+    other_id = other.json()["id"]
+    await _create_active_fee_structure(app_client, total_amount=8000, installment_count=2)
+    await _login_admin(app_client)
+    made = (await app_client.post(f"{P}/students/{sid}")).json()
+
+    today = institute_today()
+    db_session.add(ClassSession(course_offering_id=_u.UUID(off), session_date=today + timedelta(days=1), start_time=time(9), end_time=time(10), room="B-12"))
+    t = AssessmentType(name="PP Quiz 1", max_marks=10)
+    db_session.add(t)
+    await db_session.flush()
+    oa = OfferingAssessment(course_offering_id=_u.UUID(off), assessment_type_id=t.id)
+    db_session.add(oa)
+    await db_session.flush()
+    db_session.add(StudentMark(enrollment_id=_u.UUID(enr), offering_assessment_id=oa.id, obtained_marks=7, entered_at=datetime.now(timezone.utc)))
+    db_session.add(Announcement(title="Parents meeting on Friday", body="All parents are invited.", issuer_name="Principal", issuer_designation="Principal",
+                                audience_students=True, audience_teachers=False, audience_staff=False, status=AnnouncementStatus.PUBLISHED,
+                                published_at=datetime.now(timezone.utc)))
+    db_session.add(Announcement(title="Staff only", body="x", issuer_name="Principal", issuer_designation="Principal", audience_students=False,
+                                audience_teachers=True, audience_staff=True, status=AnnouncementStatus.PUBLISHED, published_at=datetime.now(timezone.utc)))
+    await db_session.commit()
+
+    await _parent_login(app_client, made["username"], made["temporary_password"])
+    fees = (await app_client.get(f"{P}/me/children/{sid}/fees")).json()
+    assert fees["summary"]["remaining"] == 8000.0 and len(fees["assignments"][0]["installments"]) == 2
+    assert fees["assignments"][0]["installments"][0]["challan"]["consumer_number"]
+    tt = (await app_client.get(f"{P}/me/children/{sid}/timetable")).json()
+    assert [(c["course_code"], c["room"]) for c in tt["classes"]] == [("PP1-C1", "B-12")] and "exams" in tt
+    marks = (await app_client.get(f"{P}/me/children/{sid}/marks")).json()
+    assert marks[0]["items"] == [{"name": "PP Quiz 1", "obtained": 7.0, "max": 10.0}] and marks[0]["percentage"] == 70.0
+    notes = [n["title"] for n in (await app_client.get(f"{P}/me/children/{sid}/announcements")).json()]
+    assert "Parents meeting on Friday" in notes and "Staff only" not in notes
+    for part in ("fees", "timetable", "marks", "announcements"):
+        assert (await app_client.get(f"{P}/me/children/{other_id}/{part}")).status_code == 404, part
+    for page in ("fees", "timetable", "marks", "notices"):
+        r = await app_client.get(f"/dashboard/parent/{page}", headers={"accept": "text/html"})
+        assert r.status_code == 200 and "parent-child.js" in r.text, page
+    assert (await app_client.get("/dashboard/parent/nope", headers={"accept": "text/html"})).status_code == 404
+    assert (await app_client.get("/dashboard/parent/calendar", headers={"accept": "text/html"})).status_code == 200
+    assert (await app_client.get("/dashboard/parent/account", headers={"accept": "text/html"})).status_code == 200

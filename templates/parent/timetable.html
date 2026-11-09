@@ -1,0 +1,25 @@
+{% extends "parent/_base.html" %}
+{% block title %}Timetable{% endblock %}
+{% block page_title %}Timetable &amp; exams{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Classes for the next two weeks and the exam datesheet.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/parent.css?v={{ app_version() }}" />{% endblock %}
+{% block content %}
+{% include "parent/_child_bar.html" %}
+<div id="pt-view" hidden>
+  <section class="panel pp-panel" aria-labelledby="pt-ex-h">
+    <h2 id="pt-ex-h">Exams</h2>
+    <div id="pt-exams"></div>
+    <p class="pp-empty" id="pt-exams-none" hidden>No exam datesheet has been published yet.</p>
+  </section>
+  <section class="panel pp-panel" aria-labelledby="pt-cl-h">
+    <h2 id="pt-cl-h">Classes</h2>
+    <div id="pt-days"></div>
+    <p class="pp-empty" id="pt-none" hidden>No classes in the next two weeks.</p>
+  </section>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script src="/static/js/dash-common.js"></script>
+<script src="/static/js/parent-child.js?v={{ app_version() }}"></script>
+<script src="/static/js/parent-timetable.js?v={{ app_version() }}"></script>
+{% endblock %}
