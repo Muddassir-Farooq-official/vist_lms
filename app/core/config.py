@@ -255,6 +255,8 @@ class Settings(BaseSettings):
     sms_on_datesheet: int = 1
     sms_on_results: int = 1
     sms_on_fee_overdue: int = 1
+    sms_on_fee_reminder: int = 1             # 7 and 3 days before a challan is due, and on the day
+    sms_on_parent_weekly: int = 1            # Monday note to parents when a child needs attention
     sms_to_guardian: int = 1
     sms_on_admission: int = 1
     sms_on_security_alert: int = 1                  # text administrators when a security alert fires (at most once per half hour per kind)

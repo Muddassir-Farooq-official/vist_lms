@@ -41,7 +41,7 @@ MAX_ATTEMPTS = 3
 MAX_BODY = 300
 EVENT_SWITCH = {"ATTENDANCE_FINE": "sms_on_attendance_fine", "ATTENDANCE_WARNING": "sms_on_attendance_warning", "DATESHEET": "sms_on_datesheet",
                 "RESULTS": "sms_on_results", "FEE_OVERDUE": "sms_on_fee_overdue", "ADMISSION": "sms_on_admission",
-                "SECURITY": "sms_on_security_alert"}
+                "SECURITY": "sms_on_security_alert", "FEE_REMINDER": "sms_on_fee_reminder", "PARENT_WEEKLY": "sms_on_parent_weekly"}
 
 
 def normalize_pk_mobile(raw: str | None) -> str | None:
@@ -108,6 +108,24 @@ class SmsService:
             n += 1 if norm else 0
         await self.session.flush()
         return n
+
+    async def queue_to_guardian(self, student_id: uuid.UUID, *, event: str, body: str) -> int:
+        """To the student's primary guardian only (a note meant for the family, not the student)."""
+        switch = EVENT_SWITCH.get(event)
+        if (switch and not int(getattr(settings, switch, 1))) or not int(settings.sms_to_guardian):
+            return 0
+        from app.students.models import StudentGuardian
+
+        g = (await self.session.execute(select(StudentGuardian).where(StudentGuardian.student_id == student_id)
+                                        .order_by(StudentGuardian.is_primary.desc()))).scalars().first()
+        if g is None or not g.contact_no:
+            return 0
+        norm = normalize_pk_mobile(g.contact_no)
+        self.session.add(SmsMessage(to_number=g.contact_no[:20], recipient="GUARDIAN", body=_clip(body), event=event, student_id=student_id,
+                                    status=SmsStatus.QUEUED if norm else SmsStatus.SKIPPED,
+                                    last_error=None if norm else "Not a valid Pakistani mobile number"))
+        await self.session.flush()
+        return 1 if norm else 0
 
     async def queue_to_number(self, number: str, *, event: str, body: str) -> int:
         """To someone who is not (yet) a student, e.g. an applicant. Uses the same on/off switch as the event."""

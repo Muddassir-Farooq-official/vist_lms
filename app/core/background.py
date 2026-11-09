@@ -64,6 +64,10 @@ async def send_due(session: AsyncSession, *, time_budget: float = 20) -> dict:
     from app.feedback.service import remind as feedback_remind
 
     await feedback_remind(session)                                       # from 9 AM, once a day; never raises
+    from app.notifications.family import fee_reminders, parent_weekly
+
+    await fee_reminders(session)                                         # from 9 AM, once a day; never raises
+    await parent_weekly(session)                                         # Mondays from 9 AM; never raises
     sms = await SmsService(session).send_pending(limit=100, time_budget=time_budget)
     emails = await send_emails(session, limit=100, time_budget=time_budget)
     pushed = await push_round(session)

@@ -99,7 +99,13 @@
     const items = [];
     (d.attendance || []).filter(function (a) { return a.below_minimum; }).forEach(function (a) {
       const fine = a.risk && a.risk.fine && !a.risk.charged ? " If it stays this low, the attendance fine is " + D.money(a.risk.fine) + "." : "";
-      items.push({ count: Math.round(a.percentage) + "%", text: first + "'s attendance in " + a.course_code + " is below " + d.attendance_minimum + "%." + fine + " Please talk to the teacher.", href: "#pr-att-h", tone: "red" });
+      const ur = document.documentElement.lang === "ur";
+      items.push({ count: Math.round(a.percentage) + "%", text: ur ? a.course_code + " میں " + first + " کی حاضری " + d.attendance_minimum + "% سے کم ہے۔" + (a.risk && a.risk.fine && !a.risk.charged ? " یہی رہی تو حاضری جرمانہ " + D.money(a.risk.fine) + " ہوگا۔" : "") + " براہ کرم استاد سے بات کریں۔" : first + "'s attendance in " + a.course_code + " is below " + d.attendance_minimum + "%." + fine + " Please talk to the teacher.", href: "#pr-att-h", tone: "red" });
+    });
+    (d.attention || []).forEach(function (a) {
+      const ur = document.documentElement.lang === "ur";
+      if (a.kind === "marks") items.push({ count: a.value + "%", text: ur ? a.course_code + " میں " + first + " کے اب تک کے نمبر کم ہیں۔ براہ کرم استاد سے بات کریں۔" : first + "'s marks so far in " + a.course_code + " are low. Please talk to the teacher.", href: "/dashboard/parent/marks", tone: "red" });
+      if (a.kind === "assignments") items.push({ count: a.value, text: ur ? a.course_code + " میں اسائنمنٹس چھوٹ گئیں۔ " + first + " سے کہیں کہ کام مکمل کرے۔" : "assignments missed in " + a.course_code + ". Please ask " + first + " to catch up.", href: "/dashboard/parent/marks", tone: "red" });
     });
     const f = d.fees.summary;
     if (f.overdue > 0) items.push({ count: "!", text: D.money(f.overdue) + " of fees is overdue" + (f.late_fee_accrued ? " (late fee so far " + D.money(f.late_fee_accrued) + ")" : "") + ". Pay with the challan at any bank.", href: "#pr-fee-h", tone: "red" });

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+{% set _lang = ui_lang(request) %}<html lang="{{ _lang }}" dir="{{ 'rtl' if _lang == 'ur' else 'ltr' }}">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/static/css/dashboard.css" />
   {% from "_brand.html" import brand_head, brand_mark %}{{ brand_head() }}
   {% block extra_head %}{% endblock %}
+  {% include "_i18n_head.html" %}
 </head>
 <body data-allowed-roles="STUDENT" data-login-path="/?reauth=1" data-card-tables>
   {% from "_icons.html" import nav_icon %}
@@ -43,6 +44,7 @@
           {% block page_subtitle %}{% endblock %}
         </div>
         <div class="content-topbar-right">
+          {% include "_lang_toggle.html" %}
           <span id="whoami" class="whoami"></span>
         </div>
       </header>

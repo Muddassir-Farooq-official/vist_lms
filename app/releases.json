@@ -1,5 +1,38 @@
 [
   {
+    "version": "1.8.0",
+    "date": "2026-11-09",
+    "title": "اردو — Urdu for parents and students, and fee reminders",
+    "summary": "Parents and students can use the portal in Urdu, get a reminder before a fee is due, and parents hear on Monday if their child needs attention.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Students & parents",
+        "text": "Urdu: tap \"اردو\" on the sign-in page or at the top of any page. The choice is kept on the account and also used for SMS."
+      },
+      {
+        "kind": "new",
+        "for": "Students & parents",
+        "text": "Fee reminders 7 days and 3 days before a challan is due, and on the due date, with the amount and consumer number. Only while it is unpaid."
+      },
+      {
+        "kind": "new",
+        "for": "Students & parents",
+        "text": "Monday note to parents when a child needs attention: attendance below 75%, low marks so far, or missed assignments. Sent only when something changed."
+      },
+      {
+        "kind": "improved",
+        "for": "Students & parents",
+        "text": "The parent home page now also lists low marks and missed assignments."
+      },
+      {
+        "kind": "new",
+        "for": "Admins",
+        "text": "Settings → SMS: switches for the fee reminder and the Monday note to parents."
+      }
+    ]
+  },
+  {
     "version": "1.7.0",
     "date": "2026-11-09",
     "title": "A full portal for parents",
