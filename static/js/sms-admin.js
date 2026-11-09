@@ -4,7 +4,10 @@
   // Admin SMS log: /api/v1/sms
   const VA = window.VistAdmin;
   const esc = VA.escapeHtml;
-  const ABOUT = { ATTENDANCE_FINE: "Attendance fine", DATESHEET: "Datesheet", RESULTS: "Results", FEE_OVERDUE: "Overdue fee", TEST: "Test", BULK: "Group message", PASSWORD_RESET: "Password reset", ADMISSION: "Admission" };
+  const ABOUT = { ATTENDANCE_FINE: "Attendance fine", DATESHEET: "Datesheet", RESULTS: "Results", FEE_OVERDUE: "Overdue fee", TEST: "Test", BULK: "Group message", PASSWORD_RESET: "Password reset", ADMISSION: "Admission",
+    FEE_REMINDER: "Fee reminder", FEE_PAID: "Payment received", CERTIFICATE_READY: "Certificate ready", PARENT_WEEKLY: "Monday note to parents",
+    ATTENDANCE_WARNING: "Attendance warning", SECURITY: "Security alert" };
+  const DOC = { CHALLAN: "challan", RECEIPT: "receipt", RESULT: "result card", CERTIFICATE: "certificate" };
   const STATUS = { QUEUED: "Waiting", SENT: "Sent", FAILED: "Failed", LOGGED: "Logged (not sent)", SKIPPED: "Skipped" };
   const PILL = { QUEUED: "pending", SENT: "active", FAILED: "failed", LOGGED: "cancelled", SKIPPED: "cancelled" };
 
@@ -20,7 +23,7 @@
     const r = await VA.fetchJson("/api/v1/sms" + (f ? "?status=" + f : ""));
     if (!r.ok) return say(errText(r));
     const d = r.body;
-    document.getElementById("sms-not-configured").hidden = d.provider_configured;
+    document.getElementById("sms-not-configured").hidden = d.provider_configured || d.whatsapp_on;
     ["sent", "queued", "failed", "logged"].forEach(function (k) {
       document.getElementById("sms-" + k).textContent = String(d.last_7_days[k.toUpperCase()] || 0);
     });
@@ -28,8 +31,12 @@
       const at = String(m.created_at);
       return '<tr><td><strong>' + esc(at.slice(11, 16)) + "</strong><small>" + esc(window.VistAdmin.formatDateLong(at.slice(0, 10))) + "</small></td><td>" + esc(m.to_number) +
         "<small>" + esc(m.recipient.charAt(0) + m.recipient.slice(1).toLowerCase()) + "</small></td><td>" + esc(ABOUT[m.event] || m.event) + "</td><td>" +
-        '<span class="status-pill ' + (PILL[m.status] || "pending") + '">' + esc(STATUS[m.status] || m.status) + "</span>" + (m.last_error ? "<small>" + esc(m.last_error) + "</small>" : "") + '</td><td class="sms-body">' + esc(m.body) + "</td></tr>";
-    }).join("") || '<tr><td colspan="5">No messages yet.</td></tr>';
+        '<span class="status-pill ' + (PILL[m.status] || "pending") + '">' + esc(STATUS[m.status] || m.status) + "</span>" + (m.last_error ? "<small>" + esc(m.last_error) + "</small>" : "") + '</td><td class="sms-by">' +
+        esc(m.status === "SENT" ? (m.channel === "WHATSAPP" ? "WhatsApp" : "SMS") : "") +
+        (m.attachment && m.channel === "WHATSAPP" ? "<small>with " + esc(DOC[m.attachment] || "document") + "</small>" : "") +
+        (m.whatsapp_error && m.channel === "SMS" ? '<small title="' + esc(m.whatsapp_error) + '">WhatsApp did not take it</small>' : "") +
+        '</td><td class="sms-body">' + esc(m.body) + "</td></tr>";
+    }).join("") || '<tr><td colspan="6">No messages yet.</td></tr>';
   }
 
   // ---- a message to a chosen group

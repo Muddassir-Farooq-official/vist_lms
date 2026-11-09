@@ -85,6 +85,10 @@ POLICY: tuple[Policy, ...] = (
            "7 days and 3 days before a challan is due, and on the due date; only while it is unpaid. The app message is always sent."),
     Policy("sms_on_parent_weekly", "SMS parents on Monday when a child needs attention (1 = yes, 0 = no)", "SMS", int, 0, 1,
            "Only when something changed since the last note: attendance below 75%, low marks so far, or missed assignments."),
+    Policy("sms_on_fee_paid", "Message when a fee payment is received (1 = yes, 0 = no)", "SMS", int, 0, 1,
+           "To the student and guardian, for every payment however it was paid. On WhatsApp the receipt is attached."),
+    Policy("sms_on_certificate_ready", "Message when a requested certificate is ready (1 = yes, 0 = no)", "SMS", int, 0, 1,
+           "On WhatsApp the certificate itself is attached."),
     Policy("sms_on_admission", "SMS applicants selected in a merit list (1 = yes, 0 = no)", "SMS", int, 0, 1, "One SMS per offered applicant."),
     Policy("sms_on_security_alert", "SMS administrators on a security alert (1 = yes, 0 = no)", "SMS", int, 0, 1,
            "Sent to administrators' own mobile numbers (their employee record) and the institute phone if it is a mobile. "

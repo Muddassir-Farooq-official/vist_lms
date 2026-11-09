@@ -21,7 +21,7 @@ from app.approvals.router import router as approvals_router
 from app.branding.router import public_router as branding_public_router
 from app.branding.router import router as branding_router
 from app.supplementary.router import router as supplementary_router
-from app.sms.router import router as sms_router
+from app.sms.router import public_router as sms_public_router, router as sms_router
 from app.exams.router import router as exams_router
 from app.policy.router import router as policy_router
 from app.notifications.email_router import me_router as email_me_router, router as email_settings_router, status_router as system_status_router
@@ -254,7 +254,7 @@ ADMIN_NAV_ITEMS = [
     _nav("applications", "Applications", "file", "/dashboard/admin/applications", group="Support"),
     _nav("complaints", "Complaints", "ban", "/dashboard/admin/complaints", group="Support"),
     _nav("imports", "CSV Imports", "imports", "/dashboard/admin/imports", group="System"),
-    _nav("sms", "SMS", "megaphone", "/dashboard/admin/sms", group="System"),
+    _nav("sms", "SMS & WhatsApp", "megaphone", "/dashboard/admin/sms", group="System"),
     _nav("activity", "Activity log", "clock", "/dashboard/admin/activity", group="System"),
     _nav("settings", "Settings", "settings", "/dashboard/admin/settings", group="System"),
 ]
@@ -647,6 +647,7 @@ app.include_router(onebill_router, prefix=settings.api_v1_prefix)
 app.include_router(onebill_report_router, prefix=settings.api_v1_prefix)
 app.include_router(exams_router, prefix=settings.api_v1_prefix)
 app.include_router(sms_router, prefix=settings.api_v1_prefix)
+app.include_router(sms_public_router)                          # /wa/d/<token>: the document sent with a WhatsApp message
 from app.reports.finance_router import router as finance_reports_router  # noqa: E402
 from app.reports.center_router import router as report_center_router  # noqa: E402
 from app.reports.monthly_router import router as monthly_report_router  # noqa: E402

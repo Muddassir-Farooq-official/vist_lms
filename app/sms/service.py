@@ -20,6 +20,10 @@ gateways). Configure in .env:
 
 With no SMS_PROVIDER_URL every message is recorded as LOGGED and nothing is sent,
 so the system can go live before the SMS contract is signed.
+
+WhatsApp (app/sms/whatsapp.py, set up in Settings): when it is on, every message is offered to WhatsApp first and
+goes by SMS only if WhatsApp could not take it. A message can carry a document (challan, receipt, result card,
+certificate) that is sent on WhatsApp only.
 """
 from __future__ import annotations
 
@@ -41,7 +45,8 @@ MAX_ATTEMPTS = 3
 MAX_BODY = 300
 EVENT_SWITCH = {"ATTENDANCE_FINE": "sms_on_attendance_fine", "ATTENDANCE_WARNING": "sms_on_attendance_warning", "DATESHEET": "sms_on_datesheet",
                 "RESULTS": "sms_on_results", "FEE_OVERDUE": "sms_on_fee_overdue", "ADMISSION": "sms_on_admission",
-                "SECURITY": "sms_on_security_alert", "FEE_REMINDER": "sms_on_fee_reminder", "PARENT_WEEKLY": "sms_on_parent_weekly"}
+                "SECURITY": "sms_on_security_alert", "FEE_REMINDER": "sms_on_fee_reminder", "PARENT_WEEKLY": "sms_on_parent_weekly",
+                "FEE_PAID": "sms_on_fee_paid", "CERTIFICATE_READY": "sms_on_certificate_ready"}
 
 
 def normalize_pk_mobile(raw: str | None) -> str | None:
@@ -73,7 +78,7 @@ class SmsService:
 
     # ---------------------------------------------------------------- queueing
     async def queue_for_student(self, student_id: uuid.UUID, *, event: str, body: str, guardian_body: str | None = None,
-                                once_within_days: int | None = None) -> int:
+                                once_within_days: int | None = None, attachment: str | None = None) -> int:
         """Queue to the student's mobile and (policy permitting) the primary guardian's. Returns how many were queued.
         once_within_days: skip if this event already went to this student that recently (reminders)."""
         switch = EVENT_SWITCH.get(event)
@@ -103,13 +108,13 @@ class SmsService:
                 continue                                  # student and guardian share a phone: one message
             seen.add(norm)
             self.session.add(SmsMessage(to_number=(number or "")[:20], recipient=who, body=_clip(text), event=event, student_id=student_id,
-                                        status=SmsStatus.QUEUED if norm else SmsStatus.SKIPPED,
+                                        attachment=attachment, status=SmsStatus.QUEUED if norm else SmsStatus.SKIPPED,
                                         last_error=None if norm else "Not a valid Pakistani mobile number"))
             n += 1 if norm else 0
         await self.session.flush()
         return n
 
-    async def queue_to_guardian(self, student_id: uuid.UUID, *, event: str, body: str) -> int:
+    async def queue_to_guardian(self, student_id: uuid.UUID, *, event: str, body: str, attachment: str | None = None) -> int:
         """To the student's primary guardian only (a note meant for the family, not the student)."""
         switch = EVENT_SWITCH.get(event)
         if (switch and not int(getattr(settings, switch, 1))) or not int(settings.sms_to_guardian):
@@ -122,7 +127,7 @@ class SmsService:
             return 0
         norm = normalize_pk_mobile(g.contact_no)
         self.session.add(SmsMessage(to_number=g.contact_no[:20], recipient="GUARDIAN", body=_clip(body), event=event, student_id=student_id,
-                                    status=SmsStatus.QUEUED if norm else SmsStatus.SKIPPED,
+                                    attachment=attachment, status=SmsStatus.QUEUED if norm else SmsStatus.SKIPPED,
                                     last_error=None if norm else "Not a valid Pakistani mobile number"))
         await self.session.flush()
         return 1 if norm else 0
@@ -227,7 +232,7 @@ class SmsService:
     async def queue_test(self, number: str, body: str) -> SmsMessage:
         if normalize_pk_mobile(number) is None:
             raise ValidationAppError("Enter a Pakistani mobile number, e.g. 0300-1234567.")
-        msg = SmsMessage(to_number=number[:20], recipient="TEST", body=_clip(body), event="TEST", status=SmsStatus.QUEUED)
+        msg = SmsMessage(to_number=number[:20], recipient="TEST", body=_clip(body), event="TEST", status=SmsStatus.QUEUED, channel="SMS")   # SMS only
         self.session.add(msg)
         await self.session.flush()
         return msg
@@ -272,7 +277,10 @@ class SmsService:
                                                 .order_by(SmsMessage.created_at).limit(limit).with_for_update(skip_locked=True))).scalars())
         if not msgs:
             return {"processed": 0, "sent": 0, "failed": 0, "logged": 0}
-        if not settings.sms_provider_url:
+        from app.sms import whatsapp
+
+        wa = await whatsapp.load_config(self.session)
+        if not settings.sms_provider_url and not wa.ready:
             for m in msgs:
                 m.status, m.last_error = SmsStatus.LOGGED, "No SMS provider configured (SMS_PROVIDER_URL)"
             await self.session.flush()
@@ -285,7 +293,7 @@ class SmsService:
             for m in msgs:
                 if time_budget is not None and done and time.monotonic() - started >= time_budget:
                     break
-                await self._deliver(client, m)
+                await self._send_one(client, wa, m)
                 done.append(m)
             msgs = done
         finally:
@@ -295,10 +303,35 @@ class SmsService:
         return {"processed": len(msgs), "sent": sum(m.status == SmsStatus.SENT for m in msgs),
                 "failed": sum(m.status == SmsStatus.FAILED for m in msgs), "logged": 0}
 
+    async def _send_one(self, client: httpx.AsyncClient, wa, m: SmsMessage) -> None:
+        """WhatsApp first (when it is on and this message has not already been passed to SMS), then SMS."""
+        from app.sms import whatsapp
+
+        if wa.ready and m.channel != "SMS":
+            ok, info = await whatsapp.send(client, wa, normalize_pk_mobile(m.to_number), m.body, m.attachment)
+            if ok:
+                m.status, m.channel, m.sent_at, m.last_error = SmsStatus.SENT, "WHATSAPP", datetime.now(timezone.utc), None
+                m.provider_reference = info or None
+                m.attempts += 1
+                return
+            m.whatsapp_error = info[:300]
+            if not settings.sms_provider_url:                     # nothing to fall back to: retry WhatsApp in the next rounds
+                m.attempts += 1
+                m.last_error = f"WhatsApp: {info}"[:300]
+                if m.attempts >= MAX_ATTEMPTS:
+                    m.status = SmsStatus.FAILED
+                return
+            m.channel = "SMS"
+        await self._deliver(client, m)
+        if m.status == SmsStatus.SENT:
+            m.channel = "SMS"
+
     async def retry_failed(self) -> int:
         failed = list((await self.session.execute(select(SmsMessage).where(SmsMessage.status.in_([SmsStatus.FAILED, SmsStatus.LOGGED])))).scalars())
         for m in failed:
             m.status, m.attempts = SmsStatus.QUEUED, 0
+            if m.recipient != "TEST":
+                m.channel = None                                   # WhatsApp gets another chance first
         await self.session.flush()
         return len(failed)
 
@@ -332,6 +365,14 @@ class SmsService:
         if status:
             stmt = stmt.where(SmsMessage.status == status)
         items = [{"id": m.id, "created_at": m.created_at, "to_number": m.to_number, "recipient": m.recipient, "event": m.event,
-                  "status": m.status.value, "attempts": m.attempts, "body": m.body, "last_error": m.last_error, "sent_at": m.sent_at}
+                  "status": m.status.value, "attempts": m.attempts, "body": m.body, "last_error": m.last_error, "sent_at": m.sent_at,
+                  "channel": m.channel, "attachment": (m.attachment or "").split(":", 1)[0] or None, "whatsapp_error": m.whatsapp_error}
                  for m in (await self.session.execute(stmt)).scalars()]
-        return {"provider_configured": bool(settings.sms_provider_url), "last_7_days": counts, "messages": items}
+        from app.sms import whatsapp
+
+        wa = await whatsapp.load_config(self.session)
+        by_channel = {k or "NONE": n for k, n in (await self.session.execute(select(SmsMessage.channel, func.count()).where(
+            SmsMessage.created_at >= since, SmsMessage.status == SmsStatus.SENT).group_by(SmsMessage.channel))).all()}
+        return {"provider_configured": bool(settings.sms_provider_url), "whatsapp_on": wa.ready, "last_7_days": counts,
+                "sent_by_channel": {"WHATSAPP": by_channel.get("WHATSAPP", 0), "SMS": by_channel.get("SMS", 0) + by_channel.get("NONE", 0)},
+                "messages": items}

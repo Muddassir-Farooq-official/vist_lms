@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.11.0",
+    "date": "2026-11-09",
+    "title": "WhatsApp messages, with documents",
+    "summary": "Messages to students and parents can now go by WhatsApp, with the challan, receipt, result card or certificate attached. SMS is used only when WhatsApp fails.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Students & parents",
+        "text": "Messages from the institute arrive on WhatsApp, with the PDF attached: the challan with a fee reminder, the receipt when a payment is received, the result card with results, and the certificate when it is ready."
+      },
+      {
+        "kind": "new",
+        "for": "Students & parents",
+        "text": "A message when a fee payment is received, with the receipt number."
+      },
+      {
+        "kind": "new",
+        "for": "Admins",
+        "text": "SMS & WhatsApp page: set up WhatsApp (Meta's official WhatsApp Cloud API, or any provider's web link) and send a test. Each message shows whether it went by WhatsApp or SMS."
+      },
+      {
+        "kind": "improved",
+        "for": "Admins",
+        "text": "Settings: two new message switches (payment received, certificate ready)."
+      }
+    ]
+  },
+  {
     "version": "1.10.0",
     "date": "2026-11-09",
     "title": "Certificates on request and a monthly report",
