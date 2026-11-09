@@ -57,7 +57,8 @@ async def test_language_is_kept_on_the_account_and_switches_the_pages(app_client
     sid, username, _ = studs[0]
     app_client.cookies.clear()
     page = await app_client.get("/", headers={"accept": "text/html"})
-    assert '<html lang="en" dir="ltr">' in page.text and "data-lang-toggle" in page.text and "/static/js/i18n.js" in page.text
+    assert '<html lang="en" dir="ltr">' in page.text and "/static/js/i18n.js" in page.text
+    assert 'data-lang-set="en" lang="en" aria-pressed="true"' in page.text and 'data-lang-set="ur" lang="ur" aria-pressed="false"' in page.text
 
     await _login(app_client, username, PW)
     r = await app_client.post("/api/v1/auth/me/language", json={"language": "ur"})

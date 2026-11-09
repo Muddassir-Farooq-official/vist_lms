@@ -13,10 +13,13 @@
 
   // ------------------------------------------------------------- the language button
   document.addEventListener("click", function (e) {
-    var b = e.target.closest && e.target.closest("[data-lang-toggle]");
+    var b = e.target.closest && e.target.closest("[data-lang-toggle],[data-lang-set]");
     if (!b) return;
     e.preventDefault();
-    var next = lang === "ur" ? "en" : "ur";
+    var next = b.getAttribute("data-lang-set") || (lang === "ur" ? "en" : "ur");
+    if (next === lang) return;                            // already showing it
+    var box = b.closest(".lang-switch");
+    if (box) { box.querySelectorAll("[data-lang-set]").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); }); box.setAttribute("aria-busy", "true"); }
     setCookie(next);
     var done = function () { location.reload(); };
     fetch("/api/v1/auth/me/language", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ language: next }) })

@@ -42,10 +42,12 @@
     <!-- The form. Element ids are what static/js/login.js works with: keep them. -->
     <main class="signin-main">
       <section class="signin-card" aria-labelledby="auth-title">
-        <h1 id="auth-title">Sign in</h1>
+        <div class="signin-card-top">
+          <h1 id="auth-title">Sign in</h1>
+          {% include "_lang_switch.html" %}
+        </div>
         <p class="auth-sub">Students use their roll number, staff their employee code, parents their CNIC.</p>
 
-        {% include "_lang_toggle.html" %}
         <form id="login-form" novalidate>
           <div class="auth-field">
             <label for="username">Username</label>
