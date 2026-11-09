@@ -1,0 +1,37 @@
+/* Student home: the "Today" panel, compact number tiles on phones, a tidier class list */
+.today .dash-panel-head { align-items: baseline; }
+.today-date { color: var(--text-muted); font-size: .88rem; }
+.today-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.today-col { min-width: 0; }
+.today-h { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: .82rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-secondary); }
+.today-h svg { width: 16px; height: 16px; color: var(--blue-600); }
+.today-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.today-item { display: flex; flex-direction: column; gap: 1px; padding: 9px 12px; border-radius: 10px; background: var(--surface-alt); color: inherit; text-decoration: none; min-height: 44px; justify-content: center; }
+a.today-item:hover { background: var(--blue-50); }
+.today-item strong { color: var(--text-primary); font-size: .92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.today-item small { color: var(--text-muted); font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.today-list .live .today-item { background: var(--blue-50); box-shadow: inset 3px 0 0 var(--blue-600); }
+.today-list .past .today-item { opacity: .55; }
+.today-list .urgent .today-item { box-shadow: inset 3px 0 0 var(--danger); }
+.today-list .empty .today-item { background: none; border: 1px dashed var(--border); }
+.today-list .mk { font-weight: 700; color: var(--success); }
+.today-list .mk.low { color: var(--danger); }
+.ag-ics { flex: none; width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--blue-600); display: grid; place-items: center; cursor: pointer; }
+.ag-ics:hover { background: var(--blue-50); }
+
+@media (max-width: 900px) { .today-grid { grid-template-columns: 1fr; gap: 14px; } }
+@media (max-width: 600px) {
+  /* the six number tiles: smaller on a phone, so the day's information is on the first screen */
+  .kpi-row--compact { gap: 8px; }
+  .kpi-row--compact .kpi { padding: 10px 12px; min-height: 0; }
+  .kpi-row--compact .kpi-icon { width: 26px; height: 26px; }
+  .kpi-row--compact .kpi-icon svg { width: 15px; height: 15px; }
+  .kpi-row--compact .kpi-label { font-size: .7rem; }
+  .kpi-row--compact .kpi-value { font-size: 1.15rem; }
+  .kpi-row--compact .kpi-sub { font-size: .7rem; }
+}
+/* tap targets: at least 40 px on touch screens */
+@media (pointer: coarse) { .small-btn, .view-all-link, .portal-tab { min-height: 40px; } }
+/* the calendar button is now a small icon: keep the class on one line beside it */
+.agenda li { flex-wrap: nowrap !important; }
+.agenda li .ag-ics { width: 40px !important; margin-left: 0 !important; padding: 0 !important; }

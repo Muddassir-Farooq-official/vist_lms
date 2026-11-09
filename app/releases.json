@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.9.0",
+    "date": "2026-11-09",
+    "title": "A \"Today\" view for students",
+    "summary": "The student home page now opens with what matters today: classes, what is due this week and the latest marks.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Students & parents",
+        "text": "Today: the day's classes (the one running now is highlighted), everything due in the next 7 days (assignments, fee instalments with the consumer number, exams) and the latest marks."
+      },
+      {
+        "kind": "improved",
+        "for": "Students & parents",
+        "text": "On a phone the number tiles are smaller and the class list shorter, so the day's information fits on the first screen."
+      },
+      {
+        "kind": "improved",
+        "for": "Students & parents",
+        "text": "Results now has its own button in the phone's bottom bar."
+      },
+      {
+        "kind": "improved",
+        "for": "Everyone",
+        "text": "Bigger buttons on touch screens, and the language button no longer gets cut off."
+      }
+    ]
+  },
+  {
     "version": "1.8.0",
     "date": "2026-11-09",
     "title": "اردو — Urdu for parents and students, and fee reminders",
