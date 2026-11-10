@@ -18,10 +18,12 @@
 
   // ------------------------------------------------------------------ the list
   function statusPill(a) {
+    if (a.review === "PENDING") return '<span class="status-pill pending">Waiting for approval</span>';
     return '<span class="status-pill ' + (a.status === "PUBLISHED" ? "active" : a.status === "DRAFT" ? "pending" : "dropped") + '">' +
       (a.status === "PUBLISHED" ? "Published" : a.status === "DRAFT" ? "Draft" : "Taken down") + "</span>";
   }
   function audience(a) {
+    if (a.audience_text) return a.audience_text;
     const who = [];
     if (a.audience_students) who.push(a.program_names && a.program_names.length ? "students (" + a.program_names.join(", ") + ")" : "all students");
     if (a.audience_teachers) who.push("teachers");
@@ -39,8 +41,9 @@
       '<p class="adm-line"><strong>' + esc(a.issuer_name) + "</strong>, " + esc(a.issuer_designation) + "</p>" +
       '<p class="adm-line">For: ' + esc(audience(a)) + (a.attachments.length ? " \u00b7 \uD83D\uDCCE " + a.attachments.length + " file" + (a.attachments.length > 1 ? "s" : "") : "") +
       (a.expires_at ? " \u00b7 hidden after " + esc(new Date(a.expires_at).toLocaleDateString()) : "") + "</p>" +
+      (a.review === "PENDING" ? '<p class="adm-line"><strong>Written by ' + esc(a.submitted_by_name || a.issuer_name) + "</strong> \u00b7 sent " + esc(AU.when(a.submitted_at)) + " \u2014 waiting for your approval.</p>" : "") +
       (a.status === "DRAFT"
-        ? '<p class="adm-line">Not published yet \u2014 nobody can see it.</p>'
+        ? (a.review === "PENDING" ? "" : '<p class="adm-line">Not published yet \u2014 nobody can see it.</p>')
         : '<div class="adm-reach"><span><strong>' + a.read_count + "</strong> of <strong>" + a.recipients + "</strong> have opened it (" + pct + '%)</span><div class="meter" role="progressbar" aria-valuenow="' + pct +
           '" aria-valuemin="0" aria-valuemax="100"><span class="meter-fill" style="width:' + Math.max(pct, a.read_count ? 3 : 0) + '%"></span></div></div>' +
           '<p class="adm-line">Published ' + esc(AU.when(a.published_at)) + "</p>") +
@@ -51,6 +54,30 @@
       b.type = "button"; b.className = "role-btn small-btn " + cls; b.textContent = label; b.addEventListener("click", fn); actions.appendChild(b);
     };
     add("View", "secondary-btn", function () { AU.openDetail(a); });
+    if (a.review === "PENDING") {
+      add("Approve and publish", "", function () { act(a, "approve", "Approve \u201c" + a.title + "\u201d? It goes live now and everyone it is for is notified."); });
+      add("Edit", "secondary-btn", function () { startEdit(a); });
+      add("Send back", "secondary-btn", function () {
+        if (el.querySelector(".rev-reject")) return;
+        const box = document.createElement("div");
+        box.className = "rev-reject";
+        box.innerHTML = '<input class="text-input" maxlength="500" placeholder="What should they change?" aria-label="What should they change?" />';
+        const go = document.createElement("button"); go.type = "button"; go.className = "role-btn small-btn danger-btn"; go.textContent = "Send back";
+        go.addEventListener("click", async function () {
+          const note = box.querySelector("input").value.trim();
+          if (note.length < 4) { box.querySelector("input").focus(); return; }
+          go.disabled = true;
+          const r = await VA.fetchJson(API + "/" + a.id + "/reject", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note: note }) });
+          if (!r.ok) { go.disabled = false; VA.toast(msg(r.body, "Could not send it back."), "error"); return; }
+          VA.toast("Sent back. " + a.issuer_name + " has been told what to change.");
+          loadList();
+        });
+        box.appendChild(go);
+        el.appendChild(box);
+        box.querySelector("input").focus();
+      });
+      return el;
+    }
     add("Edit", "secondary-btn", function () { startEdit(a); });
     if (a.status === "PUBLISHED") add("Take down", "secondary-btn", function () { act(a, "archive", "Take this announcement down? People will no longer see it (it is kept for the record)."); });
     else add(a.status === "DRAFT" ? "Publish" : "Publish again", "", function () { act(a, "publish", "Publish this announcement now?" + (a.published_at ? "" : " Everyone it is for will be notified.")); });
@@ -62,7 +89,7 @@
     if (!window.confirm(question)) return;
     const r = await VA.fetchJson(API + "/" + a.id + "/" + action, { method: "POST" });
     if (!r.ok) { VA.toast(msg(r.body, "That did not work."), "error"); return; }
-    VA.toast(action === "publish" ? "Published." : "Taken down.");
+    VA.toast(action === "approve" ? "Approved and published. " + a.issuer_name + " has been told." : action === "publish" ? "Published." : "Taken down.");
     loadList();
   }
   async function remove(a) {
@@ -73,12 +100,18 @@
 
   async function loadList() {
     const status = $("adm-status").value;
-    const r = await VA.fetchJson(API + "/manage" + (status ? "?status=" + status : ""));
+    const [r, rev] = await Promise.all([VA.fetchJson(API + "/manage" + (status ? "?status=" + status : "")), VA.fetchJson(API + "/manage?review=PENDING")]);
     listEl.innerHTML = "";
     if (!r.ok) { listEl.innerHTML = '<p class="home-empty">' + esc(msg(r.body, "Could not load announcements.")) + "</p>"; return; }
-    items = r.body;
+    items = r.body.filter(function (a) { return a.review !== "PENDING"; });
     emptyEl.hidden = items.length > 0;
     items.forEach(function (a) { listEl.appendChild(card(a)); });
+    const pending = rev.ok ? rev.body : [];
+    $("rev-list").innerHTML = "";
+    pending.forEach(function (a) { $("rev-list").appendChild(card(a)); });
+    $("rev-empty").hidden = pending.length > 0;
+    $("rev-count").hidden = !pending.length;
+    $("rev-count").textContent = pending.length;
   }
 
   // ------------------------------------------------------------------ compose / edit
@@ -89,6 +122,7 @@
     $("compose-tab-label").textContent = "New announcement";
     $("ann-cancel").hidden = true;
     $("ann-publish").textContent = "Publish now";
+    $("ann-issuer").hidden = false; $("ann-issuer-fixed").hidden = true;
     $("ann-existing").innerHTML = ""; $("ann-picked").innerHTML = ""; errorEl.hidden = true; $("ann-count").textContent = "0";
     document.querySelectorAll("#ann-programs input").forEach(function (c) { c.checked = false; });
     updateProgramsVisibility();
@@ -108,7 +142,11 @@
     (a.program_ids || []).forEach(function (id) { const c = document.querySelector('#ann-programs input[value="' + id + '"]'); if (c) c.checked = true; });
     const match = authorities.find(function (x) { return x.is_active && x.name === a.issuer_name && x.designation === a.issuer_designation; });
     if (match) $("ann-issuer").value = match.id;
-    $("ann-publish").textContent = a.status === "PUBLISHED" ? "Save changes" : "Publish now";
+    const written = !!a.review;                         // written by a teacher / staff member: stays in their name
+    $("ann-issuer").hidden = written;
+    $("ann-issuer-fixed").hidden = !written;
+    $("ann-issuer-fixed").textContent = written ? a.issuer_name + " \u2014 " + a.issuer_designation + " (written by them)" : "";
+    $("ann-publish").textContent = a.status === "PUBLISHED" ? "Save changes" : a.review === "PENDING" ? "Save and approve" : "Publish now";
     $("ann-draft").hidden = a.status === "PUBLISHED";
     renderExisting();
     updateProgramsVisibility();
@@ -156,7 +194,8 @@
     errorEl.hidden = true;
     const fail = function (text) { errorEl.textContent = text; errorEl.hidden = false; errorEl.scrollIntoView({ block: "center" }); };
     const title = $("ann-title").value.trim(), body = $("ann-body").value.trim();
-    if (!authorities.some(function (a) { return a.is_active; })) return fail("Add an issuing official first (the Issuing officials tab).");
+    const written = !!(editing && editing.review);
+    if (!written && !authorities.some(function (a) { return a.is_active; })) return fail("Add an issuing official first (the Issuing officials tab).");
     if (title.length < 3) return fail("Give the announcement a title.");
     if (!body) return fail("Write the message.");
     if (!$("ann-aud-students").checked && !$("ann-aud-teachers").checked && !$("ann-aud-staff").checked) return fail("Choose who this announcement is for.");
@@ -170,6 +209,7 @@
       audience_students: $("ann-aud-students").checked, audience_teachers: $("ann-aud-teachers").checked, audience_staff: $("ann-aud-staff").checked,
       pinned: $("ann-pinned").checked,
     };
+    if (written) delete payload.issuer_id;                // keep the writer's name and job
     const expires = $("ann-expires").value;
     const buttons = [$("ann-publish"), $("ann-draft")];
     buttons.forEach(function (b) { b.disabled = true; });

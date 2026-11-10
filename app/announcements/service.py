@@ -43,6 +43,8 @@ class Viewer:
     teacher: bool
     staff: bool
     program_id: uuid.UUID | None = None
+    semester: int | None = None
+    offering_ids: frozenset = frozenset()          # course sections the student is enrolled in (as strings)
 
 
 class AnnouncementService:
@@ -91,9 +93,11 @@ class AnnouncementService:
         publish = data.pop("publish", False)
         authority = await self._issuer(data.pop("issuer_id"))
         program_ids = [str(p) for p in (data.pop("program_ids", None) or [])] or None
+        semesters = sorted({int(x) for x in (data.pop("semesters", None) or [])}) or None
+        offering_ids = [str(o) for o in (data.pop("offering_ids", None) or [])] or None
         announcement = Announcement(
             **data, issuer_id=authority.id, issuer_name=authority.name, issuer_designation=authority.designation,
-            program_ids=program_ids, status=AnnouncementStatus.DRAFT, created_by=actor_id,
+            program_ids=program_ids, semesters=semesters, offering_ids=offering_ids, status=AnnouncementStatus.DRAFT, created_by=actor_id,
         )
         self.session.add(announcement)
         await self.session.flush()
@@ -114,6 +118,10 @@ class AnnouncementService:
             announcement.program_ids = [str(p) for p in changes.pop("program_ids")] or None
         else:
             changes.pop("program_ids", None)
+        if "semesters" in changes:
+            announcement.semesters = sorted({int(x) for x in (changes.pop("semesters") or [])}) or None
+        if "offering_ids" in changes:
+            announcement.offering_ids = [str(o) for o in (changes.pop("offering_ids") or [])] or None
         if changes.pop("clear_expiry", False):
             announcement.expires_at = None
         for key, value in changes.items():
@@ -190,19 +198,33 @@ class AnnouncementService:
     async def viewer_for(self, user_id: uuid.UUID, roles: list[str]) -> Viewer:
         is_admin = Roles.ADMIN in roles
         student = Roles.STUDENT in roles
-        program_id = None
-        if student:
-            row = (await self.session.execute(select(Student.program_id).where(Student.user_id == user_id))).first()
-            program_id = row[0] if row else None
         staff = any(r not in (Roles.STUDENT, Roles.TEACHER, Roles.ADMIN, Roles.PARENT) for r in roles)
-        return Viewer(user_id=user_id, is_admin=is_admin, student=student, teacher=Roles.TEACHER in roles, staff=staff, program_id=program_id)
+        base = Viewer(user_id=user_id, is_admin=is_admin, student=student, teacher=Roles.TEACHER in roles, staff=staff)
+        if student:
+            s = (await self.session.execute(select(Student).where(Student.user_id == user_id))).scalars().first()
+            if s is not None:
+                return await self.student_viewer(s, user_id=user_id, teacher=base.teacher, staff=staff)
+        return base
+
+    async def student_viewer(self, s: Student, *, user_id: uuid.UUID, teacher: bool = False, staff: bool = False) -> Viewer:
+        """What a student's announcements are matched on (also used for a parent looking at their child)."""
+        from app.academics.models import Enrollment, EnrollmentStatus
+
+        offerings = (await self.session.execute(select(Enrollment.course_offering_id).where(
+            Enrollment.student_id == s.id, Enrollment.status == EnrollmentStatus.ENROLLED))).scalars().all()
+        return Viewer(user_id=user_id, is_admin=False, student=True, teacher=teacher, staff=staff, program_id=s.program_id,
+                      semester=s.current_semester, offering_ids=frozenset(str(o) for o in offerings))
 
     @staticmethod
     def is_for(a: Announcement, viewer: Viewer) -> bool:
         if viewer.is_admin:
             return True
-        if viewer.student and a.audience_students and (not a.program_ids or str(viewer.program_id) in a.program_ids):
-            return True
+        if viewer.student and a.audience_students:
+            if a.offering_ids:
+                if viewer.offering_ids.intersection(a.offering_ids):
+                    return True
+            elif (not a.program_ids or str(viewer.program_id) in a.program_ids) and (not a.semesters or viewer.semester in a.semesters):
+                return True
         return (viewer.teacher and a.audience_teachers) or (viewer.staff and a.audience_staff)
 
     @staticmethod
@@ -237,8 +259,16 @@ class AnnouncementService:
         out: dict[uuid.UUID, str | None] = {}
         if a.audience_students:
             stmt = select(Student.user_id).where(Student.user_id.is_not(None), Student.status == StudentStatus.ACTIVE)
-            if a.program_ids:
-                stmt = stmt.where(Student.program_id.in_([uuid.UUID(p) for p in a.program_ids]))
+            if a.offering_ids:
+                from app.academics.models import Enrollment, EnrollmentStatus
+
+                stmt = stmt.where(Student.id.in_(select(Enrollment.student_id).where(
+                    Enrollment.course_offering_id.in_([uuid.UUID(o) for o in a.offering_ids]), Enrollment.status == EnrollmentStatus.ENROLLED)))
+            else:
+                if a.program_ids:
+                    stmt = stmt.where(Student.program_id.in_([uuid.UUID(p) for p in a.program_ids]))
+                if a.semesters:
+                    stmt = stmt.where(Student.current_semester.in_([int(x) for x in a.semesters]))
             for (uid,) in (await self.session.execute(stmt)).all():
                 out[uid] = PORTAL_FOR_ROLE[Roles.STUDENT]
         wanted = []

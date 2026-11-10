@@ -265,6 +265,7 @@ ADMIN_NAV_ITEMS = [
 LIBRARY_NAV_ITEMS = [
     _nav("dashboard", "Dashboard", "dashboard", "/dashboard/library", mobile=True, short="Home"),
     _nav("announcements", "Announcements", "megaphone", "/dashboard/library/announcements"),
+    _nav("my-announcements", "Post an announcement", "megaphone", "/dashboard/library/my-announcements"),
     _nav("issue-return", "Issue & Return", "issue-return", "/dashboard/library/issue-return", group="Circulation", mobile=True, short="Issue"),
     _nav("requests", "Borrow Requests", "issue-return", "/dashboard/library/requests", group="Circulation"),
     _nav("overdue", "Overdue", "clock", "/dashboard/library/overdue", group="Circulation", mobile=True),
@@ -287,6 +288,7 @@ GATE_NAV_ITEMS = [
     _nav("log", "Visitor log book", "file", "/dashboard/gate/log", mobile=True, short="Log book"),
     _nav("staff", "Staff in / out", "clock", "/dashboard/gate/staff", mobile=True, short="Staff"),
     _nav("announcements", "Announcements", "megaphone", "/dashboard/gate/announcements"),
+    _nav("my-announcements", "Post an announcement", "megaphone", "/dashboard/gate/my-announcements"),
     _nav("tasks", "Tasks", "tasks", "/dashboard/gate/tasks"),
     _nav("applications", "Applications", "file", "/dashboard/gate/applications"),
     _nav("purchases", "Purchase requests", "tasks", "/dashboard/gate/purchases"),
@@ -302,6 +304,7 @@ STAFF_NAV_ITEMS = [
     _nav("tasks", "Tasks", "tasks", "/dashboard/staff/tasks", mobile=True),
     _nav("payslips", "My pay & attendance", "file", "/dashboard/staff/payslips", mobile=True, short="Pay"),
     _nav("announcements", "Announcements", "megaphone", "/dashboard/staff/announcements", mobile=True, short="News"),
+    _nav("my-announcements", "Post an announcement", "megaphone", "/dashboard/staff/my-announcements"),
     _nav("applications", "Applications", "file", "/dashboard/staff/applications", group="Requests"),
     _nav("purchases", "Purchase requests", "tasks", "/dashboard/staff/purchases", group="Requests"),
     _nav("complaints", "Feedback & Complaints", "ban", "/dashboard/staff/complaints", group="Requests"),
@@ -327,6 +330,7 @@ PRINCIPAL_NAV_ITEMS = [
     _nav("students", "Student lookup", "students", "/dashboard/principal/students", mobile=True, short="Students"),
     _nav("monthly", "Monthly report", "exams", "/dashboard/principal/monthly"),
     _nav("warnings", "Warnings", "alert", "/dashboard/principal/warnings"),
+    _nav("my-announcements", "Post an announcement", "megaphone", "/dashboard/principal/my-announcements"),
     _nav("reports", "Reports", "exams", "/dashboard/principal/reports"),
     _nav("staff-attendance", "Staff attendance", "clock", "/dashboard/principal/staff-attendance"),
     _nav("calendar", "Calendar", "clock", "/dashboard/principal/calendar"),
@@ -342,6 +346,7 @@ HOD_NAV_ITEMS = [
     _nav("students", "Student lookup", "students", "/dashboard/hod/students", mobile=True, short="Students"),
     _nav("reports", "Reports", "exams", "/dashboard/hod/reports"),
     _nav("calendar", "Calendar", "clock", "/dashboard/hod/calendar"),
+    _nav("my-announcements", "Post an announcement", "megaphone", "/dashboard/hod/my-announcements"),
 ]
 
 EXAM_NAV_ITEMS = [
@@ -353,6 +358,7 @@ EXAM_NAV_ITEMS = [
     _nav("students", "Student lookup", "students", "/dashboard/exam/students"),
     _nav("reports", "Reports", "exams", "/dashboard/exam/reports"),
     _nav("announcements", "Announcements", "megaphone", "/dashboard/exam/announcements", mobile=True, short="News"),
+    _nav("my-announcements", "Post an announcement", "megaphone", "/dashboard/exam/my-announcements"),
     _nav("tasks", "Tasks", "tasks", "/dashboard/exam/tasks", mobile=True),
     _nav("applications", "Applications", "file", "/dashboard/exam/applications"),
     _nav("purchases", "Purchase requests", "tasks", "/dashboard/exam/purchases"),
@@ -366,6 +372,7 @@ WARDEN_NAV_ITEMS = [
     _nav("home", "Home", "dashboard", "/dashboard/warden/home", mobile=True, short="Home"),
     _nav("hostel", "Hostel", "students", "/dashboard/warden/hostel", mobile=True),
     _nav("announcements", "Announcements", "megaphone", "/dashboard/warden", mobile=True, short="News"),
+    _nav("my-announcements", "Post an announcement", "megaphone", "/dashboard/warden/my-announcements"),
     _nav("tasks", "Tasks", "tasks", "/dashboard/warden/tasks", mobile=True),
     _nav("applications", "Applications", "file", "/dashboard/warden/applications"),
     _nav("purchases", "Purchase requests", "tasks", "/dashboard/warden/purchases"),
@@ -378,6 +385,7 @@ WARDEN_NAV_ITEMS = [
 ACCOUNTS_NAV_ITEMS = [
     _nav("home", "Home", "dashboard", "/dashboard/accounts", mobile=True, short="Home"),
     _nav("announcements", "Announcements", "megaphone", "/dashboard/accounts/announcements"),
+    _nav("my-announcements", "Post an announcement", "megaphone", "/dashboard/accounts/my-announcements"),
     _nav("fees", "Fees", "fees", "/dashboard/accounts/fees", mobile=True),
     _nav("finance", "Accounts", "tasks", "/dashboard/accounts/finance", mobile=True),
     _nav("reports", "Reports", "exams", "/dashboard/accounts/reports", mobile=False),
@@ -425,6 +433,7 @@ STUDENT_NAV_ITEMS = [
 FACULTY_NAV_ITEMS = [
     _nav("home", "Home", "dashboard", "/dashboard/faculty", mobile=True),
     _nav("announcements", "Announcements", "megaphone", "/dashboard/faculty/announcements"),
+    _nav("my-announcements", "Post an announcement", "megaphone", "/dashboard/faculty/my-announcements"),
     _nav("assignments", "Assignments", "exams", "/dashboard/faculty/assignments", group="Teaching"),
     _nav("courses", "My Courses", "graduation-cap", "/dashboard/faculty/courses", group="Teaching", mobile=True, short="Courses"),
     _nav("attendance", "Attendance", "attendance", "/dashboard/faculty/attendance", group="Teaching", mobile=True),
@@ -1885,6 +1894,35 @@ def _my_warnings_page(portal: str):
 # "My warnings" in every portal a student or employee lands on (explicit paths, so notification links can be checked)
 for _portal in ("student", "faculty", "accounts", "library", "exam", "warden", "gate", "staff", "principal", "hod"):
     app.add_api_route(f"/dashboard/{_portal}/my-warnings", _my_warnings_page(_portal), methods=["GET"], include_in_schema=False)
+
+
+def _my_announcements_page(portal: str):
+    async def view(request: Request):
+        base, nav, _roles = _CALENDAR_PAGES[portal]
+        return templates.TemplateResponse(request, "shared/my_announcements.html", {"base_template": base, "nav_items": globals()[nav],
+                                                                                    "active_nav": "my-announcements", "allowed_roles": _roles})
+    return view
+
+
+# "Post an announcement" in every staff portal (explicit paths, so notification links can be checked)
+for _portal in ("faculty", "accounts", "library", "exam", "warden", "gate", "staff", "principal", "hod"):
+    app.add_api_route(f"/dashboard/{_portal}/my-announcements", _my_announcements_page(_portal), methods=["GET"], include_in_schema=False)
+
+
+@app.get("/dashboard/my-announcements", include_in_schema=False)
+async def my_announcements_redirect(request: Request):
+    """Sends a teacher or staff member to the announcements page of their own portal (used by approval notifications)."""
+    try:
+        roles = decode_access_token(request.cookies.get("access_token") or "").get("roles", [])
+    except Exception:
+        return RedirectResponse("/?reauth=1", status_code=302)
+    for role, portal in (("PRINCIPAL", "principal"), ("HOD", "hod")):
+        if role in roles:
+            return RedirectResponse(f"/dashboard/{portal}/my-announcements", status_code=302)
+    home = profile_for_roles(roles)
+    if home and not any(x in home for x in ("/student/", "/parent/", "/admin/")):
+        return RedirectResponse(home.rsplit("/", 1)[0] + "/my-announcements", status_code=302)
+    return RedirectResponse(home or "/", status_code=302)
 
 
 @app.get("/dashboard/my-warnings", include_in_schema=False)

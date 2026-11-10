@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.13.0",
+    "date": "2026-11-10",
+    "title": "Announcements from teachers and staff",
+    "summary": "Teachers and staff can write announcements; the admin approves them before anyone sees them. The student home page now starts with the latest announcements.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Staff",
+        "text": "Post an announcement: teachers, heads of department, the principal and other staff write a notice for students (all, by program and semester, or a course section) or for colleagues. It is issued in their own name and job, and goes live once the admin approves it."
+      },
+      {
+        "kind": "new",
+        "for": "Admins",
+        "text": "Announcements → Waiting for approval: approve and publish, edit first, or send it back with what to change. The writer is told either way and can fix it and send it again."
+      },
+      {
+        "kind": "improved",
+        "for": "Students & parents",
+        "text": "Home page order: the latest 3 announcements first (new ones marked), then the key numbers, then alerts and deadlines, then today."
+      },
+      {
+        "kind": "improved",
+        "for": "Admins",
+        "text": "Announcements can also be aimed at chosen semesters or course sections."
+      }
+    ]
+  },
+  {
     "version": "1.12.0",
     "date": "2026-11-10",
     "title": "Warnings to students and staff",

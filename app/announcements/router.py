@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, UploadFile
 from fastapi.responses import Response
+from pydantic import BaseModel, Field
+from sqlalchemy import select
 
-from app.announcements.models import CATEGORY_LABELS, Announcement, AnnouncementCategory, AnnouncementStatus
+from app.announcements.models import CATEGORY_LABELS, Announcement, AnnouncementCategory, AnnouncementPriority, AnnouncementStatus
 from app.announcements.schemas import (
     AnnouncementAdminOut,
     AnnouncementCreate,
@@ -49,6 +52,15 @@ async def _build(service: AnnouncementService, items: list[Announcement], *, use
     seen = await service.read_ids(user_id)
     reach = await service.reach(items) if admin else {}
     names = await service.program_names([uuid.UUID(p) for a in items for p in (a.program_ids or [])]) if admin else {}
+    from app.announcements.submissions import audience_text
+
+    texts = await audience_text(service.session, items)
+    writers = {}
+    sub_ids = {a.submitted_by for a in items if a.submitted_by}
+    if admin and sub_ids:
+        from app.auth.models import User
+
+        writers = {u.id: u.username for u in (await service.session.execute(select(User).where(User.id.in_(sub_ids)))).scalars()}
     out = []
     for a in items:
         recipients, reads = reach.get(a.id, (None, None))
@@ -60,6 +72,10 @@ async def _build(service: AnnouncementService, items: list[Announcement], *, use
             audience_students=a.audience_students, audience_teachers=a.audience_teachers, audience_staff=a.audience_staff,
             program_ids=[uuid.UUID(p) for p in a.program_ids] if a.program_ids else None,
             recipients=recipients, read_count=reads, program_names=[names.get(uuid.UUID(p), "?") for p in (a.program_ids or [])] if admin else [],
+            semesters=a.semesters, audience_text=texts.get(a.id, ""),
+            offering_ids=[uuid.UUID(o) for o in a.offering_ids] if a.offering_ids else None,
+            review=a.review, review_note=a.review_note, submitted_at=a.submitted_at,
+            submitted_by_name=(f"{a.issuer_name} ({writers.get(a.submitted_by, '')})" if a.submitted_by and admin else None),
         ))
     return out
 
@@ -71,6 +87,121 @@ async def _can_see(service: AnnouncementService, a: Announcement, user: CurrentU
 
     viewer = await service.viewer_for(user.id, user.roles)
     return service.is_live(a, dt.datetime.now(dt.timezone.utc)) and service.is_for(a, viewer)
+
+
+# ============================================================ written by teachers and staff (approved by the admin)
+class SubmitIn(BaseModel):
+    title: str = Field(min_length=3, max_length=200)
+    body: str = Field(min_length=1, max_length=10000)
+    category: AnnouncementCategory = AnnouncementCategory.GENERAL
+    priority: AnnouncementPriority = AnnouncementPriority.NORMAL
+    audience_students: bool = True
+    audience_teachers: bool = False
+    audience_staff: bool = False
+    program_ids: list[uuid.UUID] | None = Field(default=None, max_length=50)
+    semesters: list[int] | None = Field(default=None, max_length=12)
+    offering_ids: list[uuid.UUID] | None = Field(default=None, max_length=50)
+    expires_at: datetime | None = None
+
+
+class RejectIn(BaseModel):
+    note: str = Field(min_length=4, max_length=500)
+
+
+def _mine_out(a: Announcement, text: str, atts: list) -> dict:
+    from app.announcements.submissions import REVIEW_TEXT
+
+    return {"id": a.id, "title": a.title, "body": a.body, "category": a.category, "priority": a.priority, "issuer_name": a.issuer_name,
+            "issuer_designation": a.issuer_designation, "audience_students": a.audience_students, "audience_teachers": a.audience_teachers,
+            "audience_staff": a.audience_staff, "program_ids": a.program_ids, "semesters": a.semesters, "offering_ids": a.offering_ids,
+            "expires_at": a.expires_at, "audience_text": text, "review": a.review, "review_text": REVIEW_TEXT.get(a.review or "", ""),
+            "review_note": a.review_note, "submitted_at": a.submitted_at, "published_at": a.published_at, "status": a.status,
+            "can_edit": a.review in ("PENDING", "REJECTED"), "attachments": [_attachment_out(x).model_dump() for x in atts]}
+
+
+@router.get("/mine", summary="Announcements I have written (teachers and staff), with whether they are approved")
+async def my_submissions(current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    from app.announcements.submissions import SubmissionService, audience_text
+
+    svc = SubmissionService(db)
+    name, job = await svc.writer(current_user.id, current_user.roles)
+    items = await svc.mine(current_user.id)
+    texts = await audience_text(db, items)
+    atts: dict = {}
+    for att in await svc.base.attachments_of([a.id for a in items]):
+        atts.setdefault(att.announcement_id, []).append(att)
+    return {"issued_as": {"name": name, "designation": job}, "targets": await svc.targets(current_user.id, current_user.roles),
+            "categories": [{"value": c.value, "label": CATEGORY_LABELS[c]} for c in AnnouncementCategory],
+            "announcements": [_mine_out(a, texts.get(a.id, ""), atts.get(a.id, [])) for a in items]}
+
+
+@router.post("/mine", status_code=201, summary="Write an announcement; it is published once the admin approves it")
+async def submit_announcement(payload: SubmitIn, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    from app.announcements.submissions import SubmissionService, audience_text
+
+    a = await SubmissionService(db).submit(payload.model_dump(), user_id=current_user.id, roles=current_user.roles)
+    return _mine_out(a, (await audience_text(db, [a])).get(a.id, ""), [])
+
+
+@router.patch("/mine/{announcement_id}", summary="Change my announcement while it waits, or fix a rejected one (it goes back to the admin)")
+async def edit_my_announcement(announcement_id: uuid.UUID, payload: SubmitIn, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    from app.announcements.submissions import SubmissionService, audience_text
+
+    svc = SubmissionService(db)
+    a = await svc.edit(announcement_id, payload.model_dump(), user_id=current_user.id, roles=current_user.roles)
+    return _mine_out(a, (await audience_text(db, [a])).get(a.id, ""), await svc.base.attachments_of([a.id]))
+
+
+@router.post("/mine/{announcement_id}/cancel", summary="Take back my announcement before it is published")
+async def cancel_my_announcement(announcement_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    from app.announcements.submissions import SubmissionService
+
+    a = await SubmissionService(db).cancel(announcement_id, user_id=current_user.id)
+    return {"id": a.id, "review": a.review}
+
+
+@router.post("/mine/{announcement_id}/attachments", response_model=AttachmentOut, status_code=201, summary="Attach a file to my announcement")
+async def add_my_attachment(announcement_id: uuid.UUID, file: UploadFile = File(...), current_user: CurrentUser = Depends(get_current_user),
+                            db=Depends(get_db)) -> AttachmentOut:
+    a = await AnnouncementService(db).get(announcement_id)
+    if a.submitted_by != current_user.id:
+        raise ResourceNotFoundError("Announcement not found.")
+    if a.review not in ("PENDING", "REJECTED"):
+        raise BusinessRuleViolationError("Files can be added only before it is published.")
+    content = await file.read(MAX_ATTACHMENT_BYTES + 1)
+    try:
+        att = await AnnouncementService(db).add_attachment(announcement_id, content=content, filename=file.filename or "file",
+                                                           declared_type=file.content_type, actor_id=current_user.id)
+    except (UnsupportedFileTypeError, FileTooLargeError) as exc:
+        raise BusinessRuleViolationError(str(exc)) from exc
+    return _attachment_out(att)
+
+
+@router.delete("/mine/attachments/{attachment_id}", status_code=204, summary="Remove a file from my announcement before it is published")
+async def remove_my_attachment(attachment_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> Response:
+    svc = AnnouncementService(db)
+    att = await svc.get_attachment(attachment_id)
+    a = await svc.get(att.announcement_id)
+    if a.submitted_by != current_user.id or a.review not in ("PENDING", "REJECTED"):
+        raise ResourceNotFoundError("Attachment not found.")
+    await svc.remove_attachment(attachment_id, actor_id=current_user.id)
+    return Response(status_code=204)
+
+
+@router.post("/{announcement_id}/approve", response_model=AnnouncementAdminOut, summary="Approve a teacher's or staff member's announcement: it is published (admin)")
+async def approve_announcement(announcement_id: uuid.UUID, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> AnnouncementAdminOut:
+    from app.announcements.submissions import SubmissionService
+
+    a = await SubmissionService(db).approve(announcement_id, actor_id=current_user.id)
+    return (await _build(AnnouncementService(db), [a], user_id=current_user.id, admin=True))[0]
+
+
+@router.post("/{announcement_id}/reject", response_model=AnnouncementAdminOut, summary="Send it back with what to change (admin)")
+async def reject_announcement(announcement_id: uuid.UUID, payload: RejectIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> AnnouncementAdminOut:
+    from app.announcements.submissions import SubmissionService
+
+    a = await SubmissionService(db).reject(announcement_id, actor_id=current_user.id, note=payload.note)
+    return (await _build(AnnouncementService(db), [a], user_id=current_user.id, admin=True))[0]
 
 
 # ============================================================ issuing authorities (admin)
@@ -97,13 +228,16 @@ async def update_authority(authority_id: uuid.UUID, payload: AuthorityUpdate, cu
 # ============================================================ writing and publishing (admin)
 @router.get("/manage", response_model=list[AnnouncementAdminOut], summary="Every announcement, drafts included, with how many people have read it (admin)")
 async def list_for_admin(
-    status: AnnouncementStatus | None = None, current_user: CurrentUser = Depends(manage), db=Depends(get_db),
+    status: AnnouncementStatus | None = None, review: str | None = None, current_user: CurrentUser = Depends(manage), db=Depends(get_db),
 ) -> list[AnnouncementAdminOut]:
-    from sqlalchemy import select
-
+    """review=PENDING: written by teachers/staff and waiting for approval. Taken-back and rejected ones are left out unless asked for."""
     stmt = select(Announcement).order_by(Announcement.pinned.desc(), Announcement.created_at.desc()).limit(300)
     if status:
         stmt = stmt.where(Announcement.status == status)
+    if review:
+        stmt = stmt.where(Announcement.review == review.upper())
+    else:
+        stmt = stmt.where((Announcement.review.is_(None)) | (Announcement.review.in_(["PENDING", "APPROVED"])))
     items = list((await db.execute(stmt)).scalars())
     return await _build(AnnouncementService(db), items, user_id=current_user.id, admin=True)
 
@@ -204,7 +338,13 @@ async def update_announcement(announcement_id: uuid.UUID, payload: AnnouncementU
 @router.post("/{announcement_id}/publish", response_model=AnnouncementAdminOut, summary="Publish it: it goes live and its audience is notified (admin)")
 async def publish_announcement(announcement_id: uuid.UUID, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> AnnouncementAdminOut:
     service = AnnouncementService(db)
-    a = await service.publish(announcement_id, actor_id=current_user.id)
+    a = await service.get(announcement_id)
+    if a.review == "PENDING":                                  # written by staff: publishing it is approving it
+        from app.announcements.submissions import SubmissionService
+
+        a = await SubmissionService(db).approve(announcement_id, actor_id=current_user.id)
+    else:
+        a = await service.publish(announcement_id, actor_id=current_user.id)
     return (await _build(service, [a], user_id=current_user.id, admin=True))[0]
 
 

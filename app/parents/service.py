@@ -246,7 +246,7 @@ class ParentService:
         from app.announcements.service import AnnouncementService, Viewer
 
         svc = AnnouncementService(self.session)
-        viewer = Viewer(user_id=user_id, is_admin=False, student=True, teacher=False, staff=False, program_id=student.program_id)
+        viewer = await svc.student_viewer(student, user_id=user_id)
         items = (await svc.visible_to(viewer))[:max(1, min(limit, 100))]
         return [{"id": a.id, "title": a.title, "body": a.body, "category": getattr(a.category, "value", a.category),
                  "priority": getattr(a.priority, "value", a.priority), "pinned": a.pinned, "issuer_name": a.issuer_name,

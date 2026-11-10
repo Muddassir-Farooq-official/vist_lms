@@ -194,6 +194,27 @@
     }));
   }
 
+  // Latest announcements, newest first (the 3 most recent; unread ones marked). Opening one goes to Notices.
+  function newsStrip(rows) {
+    const list = document.getElementById("news-cards"), empty = document.getElementById("news-empty");
+    if (!list) return;
+    if (!rows) { list.innerHTML = ""; empty.hidden = false; empty.textContent = "Announcements could not be loaded."; return; }
+    const latest = rows.slice().sort(function (a, b) { return String(b.published_at || "").localeCompare(String(a.published_at || "")); }).slice(0, 3);
+    empty.hidden = latest.length > 0;
+    const esc = window.VistAdmin.escapeHtml;
+    const TAG = { URGENT: "Urgent", IMPORTANT: "Important" };
+    list.innerHTML = latest.map(function (a) {
+      const when = a.published_at ? new Date(a.published_at).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : "";
+      return '<li class="news-card' + (a.is_read ? "" : " unread") + (a.priority !== "NORMAL" ? " p-" + a.priority.toLowerCase() : "") + '">' +
+        '<a href="/dashboard/student/announcements?open=' + encodeURIComponent(a.id) + '">' +
+        '<span class="news-top">' + (a.is_read ? "" : '<span class="news-dot" aria-label="New"></span>') +
+        (TAG[a.priority] ? '<span class="news-tag">' + TAG[a.priority] + "</span>" : "") + '<span class="news-date">' + esc(when) + "</span></span>" +
+        "<strong>" + esc(a.title) + "</strong>" +
+        '<small>' + esc(a.issuer_name || "") + (a.issuer_designation ? ", " + esc(a.issuer_designation) : "") + "</small>" +
+        '<span class="news-body">' + esc((a.body || "").replace(/\s+/g, " ").slice(0, 120)) + "</span></a></li>";
+    }).join("");
+  }
+
   function todayPanel(d) {
     const now = nowHM(), ur = document.documentElement.lang === "ur";
     $("today-date").textContent = new Date().toLocaleDateString(ur ? "ur-PK" : "en-GB", { weekday: "long", day: "numeric", month: "long" });
@@ -258,7 +279,7 @@
       applications: "/api/v1/applications/mine",
       exams: "/api/v1/exams/me/datesheets",
       calendar: D.upcoming(),
-      announcements: "/api/v1/announcements?limit=3",
+      announcements: "/api/v1/announcements?limit=12",
       marks: "/api/v1/academics/enrollments/me/recent-marks?limit=4",
       account: "/api/v1/fees/accounts/me",
     });
@@ -273,7 +294,7 @@
     D.run(function () { fees(d.fees); });
     D.run(function () { loans(d.loans); });
     D.run(function () { D.calendar("cal-list", "cal-empty", d.calendar, 4); });
-    D.run(function () { D.announcements("ann-list", "ann-empty", d.announcements, 3, "/dashboard/student/announcements"); });
+    D.run(function () { newsStrip(d.announcements); });
   }
 
   document.addEventListener("vistadmin:ready", function (ev) { load(ev.detail && ev.detail.me); });
