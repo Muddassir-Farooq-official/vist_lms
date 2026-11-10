@@ -79,6 +79,8 @@ UI: dict[str, dict] = {
                                  "control": "number", "after": "days after the term starts"},
     # ---------------------------------------------------------------- exams
     "admit_card_requires_fees_cleared": {"section": "Exams & results", "label": "Hold the admit card while fees are overdue", "control": "switch"},
+    "exam_students_per_invigilator": {"section": "Exams & results", "label": "One teacher on exam duty for every", "control": "number",
+                                      "after": "students"},
     "graduation_min_cgpa": {"section": "Exams & results", "label": "Lowest CGPA that can graduate", "control": "number", "after": "out of 4.00"},
     "supplementary_max_grade_points": {"section": "Exams & results", "label": "Highest grade points a supplementary pass can earn",
                                        "control": "optional", "after": "grade points", "off": "No cap", "on": "Cap it"},
@@ -119,6 +121,7 @@ UI: dict[str, dict] = {
     "monthly_report_notice": {"section": "Reports", "label": "Tell the principal on the 1st that last month's report is ready", "control": "switch"},
     "sms_on_fee_overdue": {"section": "SMS messages", "label": "Weekly reminder for overdue fees", "control": "switch"},
     "sms_on_fee_reminder": {"section": "SMS messages", "label": "Fee reminder before the due date", "control": "switch"},
+    "sms_on_exam_duty": {"section": "SMS messages", "label": "A teacher is put on exam duty (to the teacher)", "control": "switch"},
     "sms_on_warning": {"section": "SMS messages", "label": "A student is given a warning (to the guardian)", "control": "switch"},
     "sms_on_fee_paid": {"section": "SMS messages", "label": "Fee payment received (with the receipt on WhatsApp)", "control": "switch"},
     "sms_on_certificate_ready": {"section": "SMS messages", "label": "Certificate ready (with the certificate on WhatsApp)", "control": "switch"},

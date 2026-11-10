@@ -282,6 +282,13 @@
     // Everyone's marks are fetched at once (one request each, in parallel), then the rows are drawn in roster order.
     const listed = activeRoster.filter(function (e) { return e.status !== "WITHDRAWN"; }); // marks can't be recorded for a withdrawn enrollment
     const allMarks = await Promise.all(listed.map(function (e) { return VA.fetchJson("/api/v1/academics/enrollments/" + e.id + "/marks"); }));
+    // Absent in an exam paper of this course (the exam roll): shown on that result type's cell, or by the name when no type matches.
+    const absent = {}, absentByName = {};
+    const absRes = await VA.fetchJson("/api/v1/exams/offerings/" + activeOfferingId + "/absences");
+    if (absRes.ok) absRes.body.forEach(function (a) {
+      if (a.offering_assessment_id) absent[a.enrollment_id + "|" + a.offering_assessment_id] = a.schedule;
+      else (absentByName[a.enrollment_id] = absentByName[a.enrollment_id] || []).push(a.schedule);
+    });
     const countEl = document.getElementById("marks-count");
     if (countEl) countEl.textContent = listed.length + " student" + (listed.length === 1 ? "" : "s");
     for (let i = 0; i < listed.length; i++) {
@@ -296,13 +303,16 @@
 
       const tr = document.createElement("tr");
       tr.dataset.enrollmentId = enrollment.id;
-      let cellsHtml = "<td>" + VA.escapeHtml(enrollment.student_name) + "</td>" +
+      const absNote = absentByName[enrollment.id] ? '<span class="mark-absent">Absent: ' + VA.escapeHtml(absentByName[enrollment.id].join(", ")) + " paper</span>" : "";
+      let cellsHtml = "<td>" + VA.escapeHtml(enrollment.student_name) + absNote + "</td>" +
         "<td>" + VA.escapeHtml(enrollment.roll_number || "\u2014") + "</td>";
       activeComponents.forEach(function (c) {
         const existing = marksByAssessment[c.id];
-        cellsHtml += '<td class="num"><input type="number" class="text-input mark-input" ' +
-          'data-assessment-id="' + c.id + '" data-enrollment-id="' + enrollment.id + '" ' +
-          'min="0" max="' + c.max_marks + '" step="0.01" value="' + (existing !== undefined ? existing : "") + '"' + (sheet && !sheet.can_edit ? " disabled" : "") + ' /></td>';
+        const wasAbsent = absent[enrollment.id + "|" + c.id];
+        cellsHtml += '<td class="num"><input type="number" class="text-input mark-input' + (wasAbsent ? " is-absent" : "") + '" ' +
+          'data-assessment-id="' + c.id + '" data-enrollment-id="' + enrollment.id + '" ' + (wasAbsent ? 'placeholder="Absent" title="Absent in the ' + VA.escapeHtml(wasAbsent) + ' paper (exam roll)" ' : "") +
+          'min="0" max="' + c.max_marks + '" step="0.01" value="' + (existing !== undefined ? existing : "") + '"' + (sheet && !sheet.can_edit ? " disabled" : "") + " />" +
+          (wasAbsent ? '<span class="mark-absent">Absent</span>' : "") + "</td>";
       });
       const outcomeCell = enrollment.outcome ? statusPillHtml(enrollment.outcome) : "\u2014";
       cellsHtml += '<td class="num marks-total-cell"></td>';

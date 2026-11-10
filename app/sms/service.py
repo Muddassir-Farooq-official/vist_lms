@@ -46,7 +46,8 @@ MAX_BODY = 300
 EVENT_SWITCH = {"ATTENDANCE_FINE": "sms_on_attendance_fine", "ATTENDANCE_WARNING": "sms_on_attendance_warning", "DATESHEET": "sms_on_datesheet",
                 "RESULTS": "sms_on_results", "FEE_OVERDUE": "sms_on_fee_overdue", "ADMISSION": "sms_on_admission",
                 "SECURITY": "sms_on_security_alert", "FEE_REMINDER": "sms_on_fee_reminder", "PARENT_WEEKLY": "sms_on_parent_weekly",
-                "FEE_PAID": "sms_on_fee_paid", "WARNING": "sms_on_warning", "CERTIFICATE_READY": "sms_on_certificate_ready"}
+                "FEE_PAID": "sms_on_fee_paid", "WARNING": "sms_on_warning", "CERTIFICATE_READY": "sms_on_certificate_ready",
+                "EXAM_DUTY": "sms_on_exam_duty"}
 
 
 def normalize_pk_mobile(raw: str | None) -> str | None:
@@ -143,6 +144,18 @@ class SmsService:
                                     last_error=None if norm else "Not a valid Pakistani mobile number"))
         await self.session.flush()
         return 1 if norm else 0
+
+    async def queue_to_staff(self, employee, *, event: str, body: str) -> int:
+        """To a member of staff's own mobile (their employee record)."""
+        switch = EVENT_SWITCH.get(event)
+        if switch and not int(getattr(settings, switch, 1)):
+            return 0
+        norm = normalize_pk_mobile(employee.contact_no)
+        if not norm:
+            return 0
+        self.session.add(SmsMessage(to_number=norm[:20], recipient="STAFF", body=_clip(body), event=event, status=SmsStatus.QUEUED))
+        await self.session.flush()
+        return 1
 
     async def queue_to_admins(self, *, event: str, body: str, admin_user_ids: list) -> int:
         """To the administrators' own mobiles (their employee record) and the institute phone when it is a mobile."""

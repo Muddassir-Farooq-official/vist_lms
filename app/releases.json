@@ -1,5 +1,43 @@
 [
   {
+    "version": "1.15.0",
+    "date": "2026-11-11",
+    "title": "Exam duty and the exam roll",
+    "summary": "Put teachers on exam duty with suggestions of who is free, and take a separate attendance in every paper.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "Datesheets → Duty on each paper: the system says how many teachers are needed (one for every 30 students, changeable in Settings → Exams & results) and lists the teachers who are free at that time first. A teacher with a class or another duty then is marked busy, with the reason. Choose the suggested teachers in one click and mark one as in charge. Duties can be changed until the paper starts."
+      },
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "Exam duties shows the papers you are on duty for. You are told when you are put on duty, taken off, or when the paper's date, time or room changes (also by SMS or WhatsApp when it is switched on in Settings)."
+      },
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "Exam roll: on the exam day the teachers on duty mark each student present, late or absent. Only students allowed to sit the paper are listed; students held back by short attendance or unpaid fees are shown apart with the reason. It does not change anyone's class attendance. The exam office can correct it later."
+      },
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "Grading: a student marked absent in an exam paper shows as \"Absent\" in marks entry for that result type. When creating a datesheet, the exam office can say which result type its marks go into."
+      },
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "Unfair means cases: a teacher on duty can report cheating with a note. The exam office is told and records a decision. Cases are kept on record."
+      },
+      {
+        "kind": "fix",
+        "for": "Everyone",
+        "text": "On phones, some wide tables shown as cards had their first line hidden behind a blank bar. Fixed."
+      }
+    ]
+  },
+  {
     "version": "1.14.0",
     "date": "2026-11-10",
     "title": "Task map, notification tones and a message for every change",
