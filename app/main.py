@@ -213,6 +213,7 @@ ADMIN_NAV_ITEMS = [
     _nav("hostel", "Hostel", "students", "/dashboard/admin/hostel", group="People"),
     _nav("profile-changes", "Profile changes", "user", "/dashboard/admin/profile-changes", group="People"),
     _nav("certificates", "Certificate requests", "file", "/dashboard/admin/certificates", group="People"),
+    _nav("warnings", "Warnings", "alert", "/dashboard/admin/warnings", group="People"),
     _nav("programs", "Programs", "programs", "/dashboard/admin/programs", group="Academics"),
     _nav("courses", "Courses", "graduation-cap", "/dashboard/admin/courses", group="Academics", mobile=True),
     _nav("timetable", "Timetable", "clock", "/dashboard/admin/timetable", group="Academics"),
@@ -276,6 +277,7 @@ LIBRARY_NAV_ITEMS = [
     _nav("payslips", "My pay & attendance", "file", "/dashboard/library/payslips", group="Services"),
     _nav("calendar", "Calendar", "clock", "/dashboard/library/calendar", group="Services"),
     _nav("profile", "My Profile", "user", "/dashboard/library/profile", group="Services"),
+    _nav("my-warnings", "My warnings", "alert", "/dashboard/library/my-warnings", group="Services"),
 ]
 
 # Accounts Officer's own portal.
@@ -291,6 +293,7 @@ GATE_NAV_ITEMS = [
     _nav("payslips", "My pay & attendance", "file", "/dashboard/gate/payslips"),
     _nav("calendar", "Calendar", "clock", "/dashboard/gate/calendar"),
     _nav("profile", "My Profile", "user", "/dashboard/gate/profile"),
+    _nav("my-warnings", "My warnings", "alert", "/dashboard/gate/my-warnings"),
 ]
 
 # General staff (office boy, IT, driver, cleaner...): only their own things.
@@ -304,6 +307,7 @@ STAFF_NAV_ITEMS = [
     _nav("complaints", "Feedback & Complaints", "ban", "/dashboard/staff/complaints", group="Requests"),
     _nav("calendar", "Calendar", "clock", "/dashboard/staff/calendar", group="Account"),
     _nav("profile", "My Profile", "user", "/dashboard/staff/profile", group="Account"),
+    _nav("my-warnings", "My warnings", "alert", "/dashboard/staff/my-warnings", group="Account"),
 ]
 
 PARENT_NAV_ITEMS = [
@@ -322,6 +326,7 @@ PRINCIPAL_NAV_ITEMS = [
     _nav("feedback", "Course feedback", "check-circle", "/dashboard/principal/feedback"),
     _nav("students", "Student lookup", "students", "/dashboard/principal/students", mobile=True, short="Students"),
     _nav("monthly", "Monthly report", "exams", "/dashboard/principal/monthly"),
+    _nav("warnings", "Warnings", "alert", "/dashboard/principal/warnings"),
     _nav("reports", "Reports", "exams", "/dashboard/principal/reports"),
     _nav("staff-attendance", "Staff attendance", "clock", "/dashboard/principal/staff-attendance"),
     _nav("calendar", "Calendar", "clock", "/dashboard/principal/calendar"),
@@ -354,6 +359,7 @@ EXAM_NAV_ITEMS = [
     _nav("payslips", "My pay & attendance", "file", "/dashboard/exam/payslips"),
     _nav("calendar", "Calendar", "clock", "/dashboard/exam/calendar"),
     _nav("profile", "My Profile", "user", "/dashboard/exam/profile"),
+    _nav("my-warnings", "My warnings", "alert", "/dashboard/exam/my-warnings"),
 ]
 
 WARDEN_NAV_ITEMS = [
@@ -366,6 +372,7 @@ WARDEN_NAV_ITEMS = [
     _nav("payslips", "My pay & attendance", "file", "/dashboard/warden/payslips"),
     _nav("calendar", "Calendar", "clock", "/dashboard/warden/calendar"),
     _nav("profile", "My Profile", "user", "/dashboard/warden/profile"),
+    _nav("my-warnings", "My warnings", "alert", "/dashboard/warden/my-warnings"),
 ]
 
 ACCOUNTS_NAV_ITEMS = [
@@ -387,6 +394,7 @@ ACCOUNTS_NAV_ITEMS = [
     _nav("applications", "Applications", "file", "/dashboard/accounts/applications"),
     _nav("calendar", "Calendar", "clock", "/dashboard/accounts/calendar"),
     _nav("profile", "My Profile", "user", "/dashboard/accounts/profile"),
+    _nav("my-warnings", "My warnings", "alert", "/dashboard/accounts/my-warnings"),
 ]
 
 # Student self-service. Home is a real overview; Library is one service among
@@ -409,6 +417,7 @@ STUDENT_NAV_ITEMS = [
     _nav("fines", "My Fines", "fees", "/dashboard/student/fines", group="Services"),
     _nav("complaints", "Feedback & Complaints", "ban", "/dashboard/student/complaints", group="Services"),
     _nav("profile", "My Profile", "user", "/dashboard/student/profile", group="Account"),
+    _nav("my-warnings", "My warnings", "alert", "/dashboard/student/my-warnings", group="Account"),
     _nav("calendar", "Calendar", "clock", "/dashboard/student/calendar", group="Services"),
 ]
 
@@ -432,6 +441,7 @@ FACULTY_NAV_ITEMS = [
     _nav("fines", "My Fines", "fees", "/dashboard/faculty/fines", group="Services"),
     _nav("complaints", "Feedback & Complaints", "ban", "/dashboard/faculty/complaints", group="Services"),
     _nav("profile", "My Profile", "user", "/dashboard/faculty/profile", group="Account"),
+    _nav("my-warnings", "My warnings", "alert", "/dashboard/faculty/my-warnings", group="Account"),
     _nav("calendar", "Calendar", "clock", "/dashboard/faculty/calendar", group="Services"),
 ]
 
@@ -651,9 +661,11 @@ app.include_router(sms_public_router)                          # /wa/d/<token>: 
 from app.reports.finance_router import router as finance_reports_router  # noqa: E402
 from app.reports.center_router import router as report_center_router  # noqa: E402
 from app.reports.monthly_router import router as monthly_report_router  # noqa: E402
+from app.discipline.router import router as discipline_router  # noqa: E402
 
 app.include_router(report_center_router, prefix=settings.api_v1_prefix)
 app.include_router(monthly_report_router, prefix=settings.api_v1_prefix)
+app.include_router(discipline_router, prefix=settings.api_v1_prefix)
 
 app.include_router(finance_reports_router, prefix=settings.api_v1_prefix)
 from app.calendar.router import router as calendar_router  # noqa: E402
@@ -1848,6 +1860,47 @@ async def admin_monthly_page(request: Request):
 @app.get("/dashboard/principal/monthly", include_in_schema=False)
 async def principal_monthly_page(request: Request):
     return templates.TemplateResponse(request, "shared/monthly_report.html", {"nav_items": PRINCIPAL_NAV_ITEMS, "active_nav": "monthly"})
+
+
+@app.get("/dashboard/admin/warnings", include_in_schema=False)
+async def admin_warnings_page(request: Request):
+    return templates.TemplateResponse(request, "shared/warnings.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "warnings", "can_issue": True,
+                                                                         "allowed_roles": "ADMIN"})
+
+
+@app.get("/dashboard/principal/warnings", include_in_schema=False)
+async def principal_warnings_page(request: Request):
+    return templates.TemplateResponse(request, "shared/warnings.html", {"nav_items": PRINCIPAL_NAV_ITEMS, "active_nav": "warnings", "can_issue": False,
+                                                                         "allowed_roles": "ADMIN,PRINCIPAL"})
+
+
+def _my_warnings_page(portal: str):
+    async def view(request: Request):
+        base, nav, _roles = _CALENDAR_PAGES[portal]
+        return templates.TemplateResponse(request, "shared/my_warnings.html", {"base_template": base, "nav_items": globals()[nav], "active_nav": "my-warnings",
+                                                                               "allowed_roles": _roles})
+    return view
+
+
+# "My warnings" in every portal a student or employee lands on (explicit paths, so notification links can be checked)
+for _portal in ("student", "faculty", "accounts", "library", "exam", "warden", "gate", "staff", "principal", "hod"):
+    app.add_api_route(f"/dashboard/{_portal}/my-warnings", _my_warnings_page(_portal), methods=["GET"], include_in_schema=False)
+
+
+@app.get("/dashboard/my-warnings", include_in_schema=False)
+async def my_warnings_redirect(request: Request):
+    """Sends anyone to the My warnings page of their own portal (used by warning notifications)."""
+    try:
+        roles = decode_access_token(request.cookies.get("access_token") or "").get("roles", [])
+    except Exception:
+        return RedirectResponse("/?reauth=1", status_code=302)
+    home = profile_for_roles(roles)
+    if home:
+        return RedirectResponse(home.rsplit("/", 1)[0] + "/my-warnings", status_code=302)
+    for role, portal in (("PRINCIPAL", "principal"), ("HOD", "hod")):
+        if role in roles:
+            return RedirectResponse(f"/dashboard/{portal}/my-warnings", status_code=302)
+    return RedirectResponse("/", status_code=302)
 
 
 @app.get("/dashboard/faculty/watch", include_in_schema=False)

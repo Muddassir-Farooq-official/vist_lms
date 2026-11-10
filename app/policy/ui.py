@@ -118,6 +118,7 @@ UI: dict[str, dict] = {
     "monthly_report_notice": {"section": "Reports", "label": "Tell the principal on the 1st that last month's report is ready", "control": "switch"},
     "sms_on_fee_overdue": {"section": "SMS messages", "label": "Weekly reminder for overdue fees", "control": "switch"},
     "sms_on_fee_reminder": {"section": "SMS messages", "label": "Fee reminder before the due date", "control": "switch"},
+    "sms_on_warning": {"section": "SMS messages", "label": "A student is given a warning (to the guardian)", "control": "switch"},
     "sms_on_fee_paid": {"section": "SMS messages", "label": "Fee payment received (with the receipt on WhatsApp)", "control": "switch"},
     "sms_on_certificate_ready": {"section": "SMS messages", "label": "Certificate ready (with the certificate on WhatsApp)", "control": "switch"},
     "sms_on_parent_weekly": {"section": "SMS messages", "label": "Monday note to parents when a child needs attention", "control": "switch"},

@@ -1,0 +1,52 @@
+/* Warnings (office page and My warnings). */
+.wr-kind { display: inline-flex; gap: 4px; padding: 3px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-alt); margin-bottom: 12px; }
+.wr-kind label { cursor: pointer; }
+.wr-kind input { position: absolute; opacity: 0; pointer-events: none; }
+.wr-kind span { display: inline-block; padding: 6px 14px; border-radius: 999px; font-weight: 600; font-size: .88rem; color: var(--text-secondary); }
+.wr-kind input:checked + span { background: var(--surface); color: var(--blue-600); box-shadow: 0 1px 3px rgba(15, 31, 61, .14); }
+.wr-kind input:focus-visible + span { outline: 2px solid var(--blue-500); }
+.wr-find { position: relative; max-width: 560px; margin-bottom: 12px; }
+.wr-results { list-style: none; margin: 4px 0 0; padding: 4px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface);
+  box-shadow: 0 8px 24px rgba(15, 31, 61, .12); max-height: 320px; overflow: auto; }
+.wr-results li { padding: 2px 0; }
+.wr-person { display: grid; gap: 2px; width: 100%; text-align: start; border: 0; background: transparent; padding: 8px 10px; border-radius: 8px; cursor: pointer; font: inherit; color: inherit; }
+.wr-person:hover, .wr-person:focus-visible { background: var(--surface-alt); }
+.wr-chosen { padding: 10px 12px; border-radius: var(--radius); background: var(--surface-alt); border: 1px solid var(--border); }
+.wr-types { margin-top: 14px; }
+.wr-types summary { cursor: pointer; font-weight: 600; color: var(--blue-600); }
+.wr-types-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin: 10px 0; }
+.wr-types h3 { font-size: .9rem; margin: 0 0 6px; }
+.wr-types ul { list-style: none; margin: 0; padding: 0; }
+.wr-types li { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: .9rem; }
+.wr-types li.wr-off span { color: var(--text-muted); text-decoration: line-through; }
+.wr-count { font-size: .75rem; }
+.wr-count:empty { display: none; }
+.wr-list { display: grid; gap: 12px; }
+.wr-card { border: 1px solid var(--border); border-left: 4px solid var(--yellow-500, #e5a50a); border-radius: var(--radius); padding: 14px 16px; background: var(--surface); }
+.wr-card.wr-final { border-left-color: var(--red-600, #b42318); }
+.wr-card.wr-withdrawn { border-left-color: var(--border); opacity: .8; }
+html[dir="rtl"] .wr-card { border-left-width: 1px; border-right: 4px solid var(--yellow-500, #e5a50a); }
+html[dir="rtl"] .wr-card.wr-final { border-right-color: var(--red-600, #b42318); }
+.wr-card p { margin: 6px 0 0; }
+.wr-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.wr-violation { font-weight: 600; }
+.wr-note { white-space: pre-wrap; }
+.wr-reply { margin: 10px 0 0; padding: 8px 12px; border-inline-start: 3px solid var(--blue-500); background: var(--surface-alt); border-radius: 6px; white-space: pre-wrap; }
+.wr-decision { font-weight: 600; color: var(--red-600, #b42318); }
+.wr-actions-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.wr-reply-form { display: grid; gap: 8px; margin-top: 10px; }
+.wr-reply-form .role-btn { justify-self: start; }
+.wr-actions { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; }
+.wr-actions legend { font-weight: 600; margin-bottom: 4px; }
+.wr-action { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+#wr-dialog .form-actions { display: flex; gap: 10px; justify-content: flex-end; }
+#wr-dialog h2, #wr-dialog p { margin: 0; }
+.wr-summary { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.wr-meter { display: flex; gap: 6px; }
+.wr-dot { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border); background: var(--surface-alt); }
+.wr-dot.on { background: var(--yellow-500, #e5a50a); border-color: var(--yellow-500, #e5a50a); }
+.wr-dot.final { background: var(--red-600, #b42318); border-color: var(--red-600, #b42318); }
+.wr-summary-text { margin: 0; font-weight: 600; }
+@media (max-width: 600px) { .wr-actions-row .role-btn { flex: 1 1 auto; text-align: center; } }
+
+.wr-read { color: var(--green-700, #15803d); font-size: .85rem; font-weight: 600; }

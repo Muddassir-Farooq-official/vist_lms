@@ -1,0 +1,15 @@
+{% extends base_template %}
+{% block allowed_roles %}{{ allowed_roles|default("ADMIN") }}{% endblock %}
+{% block title %}My warnings{% endblock %}
+{% block page_title %}My warnings{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Formal warnings from the administration. Each one counts for 12 months; a 3rd one within 12 months is final.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/warnings.css?v={{ app_version() }}" />{% endblock %}
+
+{% block content %}
+<section class="panel wr-summary" id="wr-summary" aria-live="polite"><p class="cc-meta">Loading&hellip;</p></section>
+<div id="wr-mine" class="wr-list"></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/my-warnings.js?v={{ app_version() }}"></script>
+{% endblock %}

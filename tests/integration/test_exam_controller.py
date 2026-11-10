@@ -118,7 +118,7 @@ async def test_the_hostel_warden_has_a_portal_of_their_own():
     from app.main import WARDEN_NAV_ITEMS
     assert home_for_roles(["HOSTEL_WARDEN"]) == "/dashboard/warden/home"
     assert home_for_roles(["HOSTEL_WARDEN"], must_change_password=True) == "/change-password"
-    assert [i["slug"] for i in WARDEN_NAV_ITEMS] == ["home", "hostel", "announcements", "tasks", "applications", "purchases", "payslips", "calendar", "profile"]
+    assert [i["slug"] for i in WARDEN_NAV_ITEMS] == ["home", "hostel", "announcements", "tasks", "applications", "purchases", "payslips", "calendar", "profile", "my-warnings"]
     assert "/dashboard/warden/home" in {i["href"] for i in WARDEN_NAV_ITEMS}                                            # the sign-in landing page is in the menu
 
 

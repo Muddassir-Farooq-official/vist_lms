@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.12.0",
+    "date": "2026-11-10",
+    "title": "Warnings to students and staff",
+    "summary": "The admin can give formal warnings with a violation from a list. The 3rd warning within 12 months is final, and the admin or principal decides the action.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Admins",
+        "text": "Warnings: find a student or staff member, choose the violation from the list, write what happened. Each warning counts for 12 months; the 3rd is final. The list of violations can be edited, and a warning given by mistake can be withdrawn with a reason (it stays on record)."
+      },
+      {
+        "kind": "new",
+        "for": "Principal",
+        "text": "Final warnings wait for a decision by the admin or principal: final chance, suspension (cannot sign in until it is ended), expulsion or termination, or a fine. The decision is applied to the person's record."
+      },
+      {
+        "kind": "new",
+        "for": "Students & staff",
+        "text": "My warnings: read each warning, confirm 'I have read this', and reply once with your side."
+      },
+      {
+        "kind": "improved",
+        "for": "Admins",
+        "text": "Settings → SMS messages: a switch to also tell a student's guardian about a warning (off unless switched on)."
+      }
+    ]
+  },
+  {
     "version": "1.11.0",
     "date": "2026-11-09",
     "title": "WhatsApp messages, with documents",
