@@ -14,7 +14,7 @@ TABBED = {
     "/dashboard/faculty/profile": ["details", "quals", "certs"],
     "/dashboard/faculty/complaints": ["overview", "mine", "new"],
     "/dashboard/admin/complaints": ["overview", "all", "people"],
-    "/dashboard/admin/announcements": ["all", "compose", "officials"],
+    "/dashboard/admin/announcements": ["all", "review", "compose", "officials"],
     "/dashboard/student/assignments": ["todo", "done", "closed"],
     "/dashboard/admin/applications": ["queue", "all", "overview", "types"],
     "/dashboard/admin/staff-attendance": ["daily", "month", "timings", "leave", "tools"],
