@@ -31,7 +31,7 @@
         "text": "Unfair means cases: a teacher on duty can report cheating with a note. The exam office is told and records a decision. Cases are kept on record."
       },
       {
-        "kind": "fix",
+        "kind": "fixed",
         "for": "Everyone",
         "text": "On phones, some wide tables shown as cards had their first line hidden behind a blank bar. Fixed."
       }
