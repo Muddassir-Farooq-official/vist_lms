@@ -46,7 +46,7 @@ MAX_BODY = 300
 EVENT_SWITCH = {"ATTENDANCE_FINE": "sms_on_attendance_fine", "ATTENDANCE_WARNING": "sms_on_attendance_warning", "DATESHEET": "sms_on_datesheet",
                 "RESULTS": "sms_on_results", "FEE_OVERDUE": "sms_on_fee_overdue", "ADMISSION": "sms_on_admission",
                 "SECURITY": "sms_on_security_alert", "FEE_REMINDER": "sms_on_fee_reminder", "PARENT_WEEKLY": "sms_on_parent_weekly",
-                "FEE_PAID": "sms_on_fee_paid", "CERTIFICATE_READY": "sms_on_certificate_ready"}
+                "FEE_PAID": "sms_on_fee_paid", "WARNING": "sms_on_warning", "CERTIFICATE_READY": "sms_on_certificate_ready"}
 
 
 def normalize_pk_mobile(raw: str | None) -> str | None:

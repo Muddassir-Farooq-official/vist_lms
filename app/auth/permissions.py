@@ -234,6 +234,9 @@ class Permissions:
     ACADEMIC_OVERSIGHT = "academic.oversight"
     # Read-only institute-wide overview and dashboards (admin + principal).
     INSTITUTE_OVERVIEW = "institute.overview"
+    # Warnings to students and staff (app/discipline): issue them (admin only); see all and decide on a final one (admin + principal).
+    WARNING_ISSUE = "warning.issue"
+    WARNING_DECIDE = "warning.decide"
     # Build and publish exam datesheets, print any student's admit card (admin + exam controller).
     EXAM_SCHEDULE_MANAGE = "exam.schedule.manage"
     # See the SMS log, send queued messages, retry failures, send a test SMS (admin).
@@ -268,6 +271,8 @@ class Permissions:
 # seed script), not editing scattered `if` statements.
 ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
     Roles.ADMIN: (
+        Permissions.WARNING_ISSUE,
+        Permissions.WARNING_DECIDE,
         Permissions.POLICY_MANAGE,
         Permissions.RESULT_HISTORY_IMPORT,
         Permissions.ATTENDANCE_CORRECTION_DECIDE,
@@ -445,7 +450,7 @@ ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
     Roles.HOSTEL_WARDEN: (Permissions.HOSTEL_VIEW, Permissions.HOSTEL_MANAGE, Permissions.STUDENT_VIEW, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
     Roles.EXAM_CONTROLLER: (Permissions.EXAM_SCHEDULE_MANAGE, Permissions.COURSE_VIEW, Permissions.RESULT_APPROVE, Permissions.MARKS_ENTER, Permissions.STUDENT_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
     Roles.PARENT: (Permissions.PARENT_VIEW,),
-    Roles.PRINCIPAL: (Permissions.INSTITUTE_OVERVIEW, Permissions.AUDIT_VIEW, Permissions.HOSTEL_VIEW, Permissions.INVENTORY_VIEW, Permissions.ASSET_VIEW, Permissions.STAFF_ATTENDANCE_VIEW, Permissions.ACADEMIC_OVERSIGHT, Permissions.ATTENDANCE_VIEW,
+    Roles.PRINCIPAL: (Permissions.INSTITUTE_OVERVIEW, Permissions.WARNING_DECIDE, Permissions.AUDIT_VIEW, Permissions.HOSTEL_VIEW, Permissions.INVENTORY_VIEW, Permissions.ASSET_VIEW, Permissions.STAFF_ATTENDANCE_VIEW, Permissions.ACADEMIC_OVERSIGHT, Permissions.ATTENDANCE_VIEW,
                       Permissions.COURSE_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.STUDENT_VIEW,
                       Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
     Roles.HOD: (Permissions.ATTENDANCE_CORRECTION_DECIDE, Permissions.ACADEMIC_OVERSIGHT, Permissions.ATTENDANCE_VIEW,

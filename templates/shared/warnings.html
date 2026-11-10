@@ -1,0 +1,78 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}{{ allowed_roles }}{% endblock %}
+{% block title %}Warnings{% endblock %}
+{% block page_title %}Warnings{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Formal warnings to students and staff. A warning counts for 12 months; the 3rd one is final and the admin or principal decides the action.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/warnings.css?v={{ app_version() }}" />{% endblock %}
+
+{% block content %}
+{% if can_issue %}
+<section class="panel" aria-labelledby="wr-issue-h">
+  <h2 class="panel-title" id="wr-issue-h">Issue a warning</h2>
+  <div class="wr-kind" role="radiogroup" aria-label="Warning to">
+    <label><input type="radio" name="wr-kind" value="STUDENT" checked /> <span>Student</span></label>
+    <label><input type="radio" name="wr-kind" value="EMPLOYEE" /> <span>Staff member</span></label>
+  </div>
+  <div class="wr-find">
+    <input id="wr-q" class="text-input" type="search" autocomplete="off" placeholder="Search by name, roll number / employee code or CNIC" aria-label="Find the person" />
+    <ul id="wr-results" class="wr-results" hidden></ul>
+  </div>
+  <form id="wr-form" class="form-grid" novalidate hidden>
+    <div class="span-all wr-chosen" id="wr-chosen"></div>
+    <label>Violation<select id="wr-type" class="select-input" required></select></label>
+    <label>Date it happened<input id="wr-date" class="text-input" type="date" required /></label>
+    <label class="span-all">What happened (the person will read this)<textarea id="wr-note" class="text-input" rows="4" maxlength="4000" required></textarea></label>
+    <p class="dash-alert error span-all" id="wr-final-note" hidden></p>
+    <p class="form-error span-all" id="wr-error" role="alert" hidden></p>
+    <div class="toolbar span-all">
+      <button type="submit" class="role-btn" id="wr-send">Issue warning</button>
+      <button type="button" class="role-btn secondary-btn" id="wr-clear">Cancel</button>
+    </div>
+  </form>
+  <details class="wr-types" id="wr-types">
+    <summary>Edit the list of violations</summary>
+    <div class="wr-types-grid">
+      <div><h3>Students</h3><ul id="wr-types-STUDENT"></ul></div>
+      <div><h3>Staff</h3><ul id="wr-types-EMPLOYEE"></ul></div>
+    </div>
+    <form id="wr-type-form" class="toolbar" novalidate>
+      <select id="wr-type-for" class="select-input" aria-label="For"><option value="STUDENT">For students</option><option value="EMPLOYEE">For staff</option><option value="BOTH">For both</option></select>
+      <input id="wr-type-name" class="text-input" maxlength="120" placeholder="New violation" aria-label="New violation" />
+      <button type="submit" class="role-btn secondary-btn">Add</button>
+    </form>
+  </details>
+</section>
+{% endif %}
+
+<div class="portal-tabs" role="tablist" id="wr-tabs">
+  <button class="portal-tab active" data-view="pending" role="tab" aria-selected="true"><span>Needs a decision</span> <b class="wr-count" id="wr-c-pending"></b></button>
+  <button class="portal-tab" data-view="replies" role="tab" aria-selected="false"><span>Replies</span> <b class="wr-count" id="wr-c-replies"></b></button>
+  <button class="portal-tab" data-view="all" role="tab" aria-selected="false"><span>All warnings</span></button>
+</div>
+<section class="panel">
+  <div class="toolbar">
+    <select id="wr-filter" class="select-input" aria-label="Show"><option value="">Students and staff</option><option value="STUDENT">Students</option><option value="EMPLOYEE">Staff</option></select>
+  </div>
+  <div id="wr-list" class="wr-list"><p class="cc-meta">Loading&hellip;</p></div>
+  <p class="empty-state" id="wr-empty" hidden>Nothing here.</p>
+</section>
+
+<dialog class="modal" id="wr-dialog" aria-labelledby="wr-d-title">
+  <form method="dialog" id="wr-d-form" class="modal-body form-grid" novalidate>
+    <h2 id="wr-d-title" class="span-all">Decide</h2>
+    <p class="cc-meta span-all" id="wr-d-who"></p>
+    <fieldset class="span-all wr-actions" id="wr-d-actions"><legend>Action</legend></fieldset>
+    <label class="span-all" id="wr-d-amount-l" hidden>Fine (Rs.)<input id="wr-d-amount" class="text-input" type="number" min="1" step="1" /></label>
+    <label class="span-all"><span id="wr-d-note-label">Decision (the person reads it)</span><textarea id="wr-d-note" class="text-input" rows="3" maxlength="500"></textarea></label>
+    <p class="form-error span-all" id="wr-d-error" role="alert" hidden></p>
+    <div class="form-actions span-all">
+      <button type="button" class="role-btn secondary-btn" id="wr-d-cancel">Back</button>
+      <button type="submit" class="role-btn" id="wr-d-ok">Save</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/warnings-office.js?v={{ app_version() }}"></script>
+{% endblock %}
