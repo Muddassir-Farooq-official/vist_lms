@@ -3,7 +3,8 @@
 (function () {
   "use strict";
   const VA = window.VistAdmin;
-  const W = 1000, H = 620, NS = "http://www.w3.org/2000/svg";
+  let W = 1000, H = 620;                       // a portrait drawing on phones (set in draw())
+  const NS = "http://www.w3.org/2000/svg";
   const ORDER = ["late", "open", "waiting", "done", "rejected", "cancelled"];
   const LABEL = { late: "Late", open: "In progress", waiting: "Waiting for confirmation", done: "Done", rejected: "Rejected", cancelled: "Called off" };
   const STATUS = { PENDING: "Not accepted yet", ACCEPTED: "In progress", AWAITING_CONFIRMATION: "Waiting for confirmation", COMPLETED: "Done",
@@ -75,6 +76,8 @@
   // ------------------------------------------------------------------ drawing
   function draw() {
     const box = $("tm-canvas");
+    const narrow = (box.clientWidth || window.innerWidth) < 640;
+    W = narrow ? 420 : 1000; H = narrow ? 560 : 620;
     box.innerHTML = "";
     $("tm-empty").hidden = data.edges.length > 0;
     if (!data.edges.length) { $("tm-side").innerHTML = ""; return; }
@@ -84,7 +87,8 @@
     const svg = el("svg", { viewBox: "0 0 " + W + " " + H, class: "tm-svg", preserveAspectRatio: "xMidYMid meet" }, box);
     const defs = el("defs", {}, svg);
     ORDER.forEach(function (g) {
-      const m = el("marker", { id: "tm-arrow-" + g, viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" }, defs);
+      const m = el("marker", { id: "tm-arrow-" + g, viewBox: "0 0 10 10", refX: 8, refY: 5, markerWidth: 13, markerHeight: 13, markerUnits: "userSpaceOnUse",
+        orient: "auto-start-reverse" }, defs);       // the same size however thick the line is
       el("path", { d: "M0,0 L10,5 L0,10 z", class: "tm-arrow g-" + g }, m);
     });
     const max = Math.max.apply(null, data.edges.map(function (e) { return e.counts.total; }));

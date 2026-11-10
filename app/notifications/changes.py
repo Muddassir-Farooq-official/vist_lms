@@ -139,11 +139,19 @@ def _hm(v) -> str:
 
 
 def _timing_text(after: dict) -> str:
-    start, end = _hm(after.get("start_time") or after.get("arrive")), _hm(after.get("end_time") or after.get("leave"))
-    days = after.get("days") or after.get("work_days")
+    """'09:00–17:00 · Mon–Fri' from the saved timing (in_time, out_time, working_days 0 = Monday)."""
+    start, end = _hm(after.get("in_time") or after.get("start_time")), _hm(after.get("out_time") or after.get("end_time"))
     text = f"{start}–{end}" if start and end else ""
+    raw = after.get("working_days")
+    names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    try:
+        days = sorted({int(x) for x in str(raw).replace("[", "").replace("]", "").split(",") if x.strip() != ""}) if raw not in (None, "") else []
+    except ValueError:
+        days = []
     if days:
-        text += (" · " if text else "") + str(days).replace("[", "").replace("]", "").replace("'", "")
+        run = days == list(range(days[0], days[-1] + 1)) and len(days) > 2
+        label = f"{names[days[0]]}–{names[days[-1]]}" if run else ", ".join(names[d] for d in days if 0 <= d < 7)
+        text += (" · " if text else "") + label
     return text
 
 
@@ -327,9 +335,14 @@ async def _leave_from_classes(s, *, entity_id, metadata, **_):
                 f"({m.get('classes', 0)} classes marked as leave).", STUDENT_LINKS["attendance"])
 
 
-async def _slot(s, *, action, before, after, **_):
+async def _slot(s, *, action, before, after, entity_id=None, **_):
     after, before = after or {}, before or {}
     oid = after.get("course_offering_id")
+    if not oid and entity_id:                                    # a moved class: the new slot knows its course
+        from app.academics.models import TimetableSlot
+
+        slot = await s.get(TimetableSlot, entity_id)
+        oid = slot.course_offering_id if slot else None
     if not oid:
         return None
     students, teacher, label = await _offering_people(s, oid)

@@ -47,7 +47,7 @@ async def test_staff_are_told_when_their_working_hours_salary_or_record_change(a
     assert (await app_client.put("/api/v1/staff-attendance/timings/default", json=ALL_WEEK)).status_code == 204
     for u in (teacher, librarian):
         notes = await _notes(db_session, u.id, "Your working hours have changed")
-        assert len(notes) == 1 and "for all staff" in notes[0].message and "09:00–17:00" in notes[0].message
+        assert len(notes) == 1 and "for all staff" in notes[0].message and "09:00–17:00 · Mon–Fri" in notes[0].message
     assert await _notes(db_session, admin_user.id, "Your working hours have changed") == []
 
     # just one person's hours
@@ -70,6 +70,13 @@ async def test_students_and_teacher_hear_about_a_timetable_change_and_marks(app_
     off, studs = await _setup_offering_with_enrolled_students(app_client, code="CN2", n_students=2, cnic_base=5130)
     s_ids = [uuid.UUID(s[0]) for s in studs]
     users = (await db_session.execute(select(Student.user_id).where(Student.id.in_(s_ids)))).scalars().all()
+    from sqlalchemy import update
+
+    from app.academics.models import CourseOffering
+    from app.core.clock import institute_today
+
+    await db_session.execute(update(CourseOffering).where(CourseOffering.id == uuid.UUID(off)).values(term_end_date=institute_today() + timedelta(days=60)))
+    await db_session.commit()
     await _login_admin(app_client)
     period = await _get_or_create_period(app_client, "09:00:00", "10:00:00")
     slot = await app_client.post(f"/api/v1/academics/offerings/{off}/timetable-slots", json={"day_of_week": SLOT_DAY_OF_WEEK, "period_id": period, "room": "R-1"})
@@ -77,7 +84,7 @@ async def test_students_and_teacher_hear_about_a_timetable_change_and_marks(app_
     for uid in users:
         added = await _notes(db_session, uid, "Timetable change")
         assert len(added) == 1 and "a new class" in added[0].message and "CN2-C1" in added[0].message and added[0].link == "/dashboard/student/timetable"
-    later = (datetime.now(timezone.utc) + timedelta(days=1)).date().isoformat()
+    later = (institute_today() + timedelta(days=1)).isoformat()
     moved = await app_client.post(f"/api/v1/academics/timetable-slots/{slot.json()['slot']['id'] if 'slot' in slot.json() else slot.json()['id']}/change",
                                   json={"from_date": later, "period_id": period, "day_of_week": "FRIDAY" if SLOT_DAY_OF_WEEK != "FRIDAY" else "MONDAY", "room": "R-9"})
     assert moved.status_code == 200, moved.text
