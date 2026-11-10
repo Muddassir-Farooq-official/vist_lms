@@ -120,7 +120,7 @@
       tasks: "/api/v1/tasks/summary",
       inbox: "/api/v1/tasks/inbox",
       calendar: D.upcoming(),
-      announcements: "/api/v1/announcements?limit=1",
+      announcements: "/api/v1/announcements?limit=12",
     };
     if (!admin) Object.assign(urls, {
       attendance: "/api/v1/staff-attendance/me",

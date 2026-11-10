@@ -49,14 +49,14 @@ async def test_the_admin_screen_has_compose_attachments_and_officials(app_client
 async def test_student_and_teacher_home_show_the_latest_announcements(app_client):
     html = (await app_client.get("/dashboard/faculty")).text
     assert 'id="ann-list"' in html and "/dashboard/faculty/announcements" in html
-    assert "announcements?limit=3" in (await app_client.get("/static/js/faculty-home.js")).text
-    # the student home starts with a strip of the latest announcements (newest 3 of the latest 12)
+    assert "announcements?limit=12" in (await app_client.get("/static/js/faculty-home.js")).text
+    # the student home starts with the latest announcement (the newest of the latest 12)
     html = (await app_client.get("/dashboard/student")).text
     assert 'id="news-cards"' in html and "/dashboard/student/announcements" in html
     js = (await app_client.get("/static/js/student-home.js")).text
-    assert "announcements?limit=12" in js and "newsStrip(" in js and ".slice(0, 3)" in js
+    assert "announcements?limit=12" in js and "newsStrip(" in js and ".slice(0, 1)" in js
     js = (await app_client.get("/static/js/portal-home.js")).text
-    assert "loadNews(" in js and "announcements?limit=3" in js
+    assert "loadNews(" in js and "announcements?limit=12" in js
     common = (await app_client.get("/static/js/admin-common.js")).text
     assert "wireAnnouncementBadge" in common and "announcements/unread-count" in common and "ANNOUNCEMENT:" in common
 

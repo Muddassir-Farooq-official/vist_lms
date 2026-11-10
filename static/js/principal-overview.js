@@ -206,7 +206,8 @@
   function announcements(rows) {
     if (!rows) { $("ann-list").closest(".dash-panel").hidden = true; return; }
     $("ann-empty").hidden = rows.length > 0;
-    $("ann-list").innerHTML = rows.slice(0, 3).map(function (a) {
+    rows = rows.slice().sort(function (a, b) { return String(b.published_at || "").localeCompare(String(a.published_at || "")); });
+    $("ann-list").innerHTML = rows.slice(0, 1).map(function (a) {
       return '<li><div class="note"><strong>' + esc(a.title) + "</strong><small>" + esc(a.issuer_name || "") +
         (a.published_at ? " · " + esc(VA.formatDateTime(a.published_at)) : "") + "</small><span>" + esc((a.body || "").slice(0, 140)) + "</span></div></li>";
     }).join("");
@@ -218,7 +219,7 @@
     const keys = ["overview", "progress", "staff", "hostel", "assets", "inventory", "tasks", "calendar", "announcements"];
     const urls = ["/api/v1/reports/institute-overview", "/api/v1/academics/teacher-progress", "/api/v1/staff-attendance/board", "/api/v1/hostel/summary",
       "/api/v1/assets/summary", "/api/v1/inventory/summary", "/api/v1/tasks/summary",
-      "/api/v1/calendar?start=" + iso(now) + "&end=" + iso(in14), "/api/v1/announcements?limit=3"];
+      "/api/v1/calendar?start=" + iso(now) + "&end=" + iso(in14), "/api/v1/announcements?limit=12"];
     const values = await Promise.all(urls.map(get));
     const d = {};
     keys.forEach(function (k, i) { d[k] = values[i]; });

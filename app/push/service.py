@@ -54,6 +54,21 @@ def device_name(user_agent: str | None) -> str:
     return f"{browser} on {system}" if system else browser
 
 
+
+def alert_style(title: str) -> dict:
+    """How strongly a phone alert asks for attention (Settings -> Notifications): vibration, and staying until tapped."""
+    from app.core.config import settings
+
+    t = (title or "").upper()
+    urgent = t.startswith(("URGENT", "FINAL"))
+    important = urgent or t.startswith("IMPORTANT")
+    out: dict = {"urgent": urgent}
+    if int(getattr(settings, "phone_alert_vibrate", 1)):
+        out["vibrate"] = [400, 150, 400, 150, 800, 300, 800] if urgent else [200, 100, 200]
+    if important and int(getattr(settings, "phone_alert_keep_urgent", 1)):
+        out["keep"] = True
+    return out
+
 class PushService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -141,7 +156,7 @@ class PushService:
         async with httpx.AsyncClient(timeout=10) as client:
             for n in rows:
                 if n.user_id in with_devices:
-                    payload = {"title": n.title, "body": n.message[:300], "url": n.link or "/", "tag": str(n.id)}
+                    payload = {"title": n.title, "body": n.message[:300], "url": n.link or "/", "tag": str(n.id), **alert_style(n.title)}
                     subs = (await self.session.execute(select(PushSubscription).where(PushSubscription.user_id == n.user_id))).scalars().all()
                     for sub in subs:
                         pushed += await self._send_one(client, sub, payload)

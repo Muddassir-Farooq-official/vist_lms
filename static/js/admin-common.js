@@ -763,9 +763,41 @@ window.VistAdmin = (function () {
       readAll.hidden = unread === 0;
     }
 
+    // The tone for a new notification (Settings -> Notifications). It plays when the unread count goes up,
+    // also while the portal is in a background tab. static/js/notify-sound.js makes the sounds.
+    let sound = null;
+    let seen = null;
+    try { const s = sessionStorage.getItem("vist_bell_seen"); if (s !== null) seen = Number(s); } catch (e) { /* private mode */ }
+    function loadSound() {
+      if (sound) return Promise.resolve(sound);
+      return fetchJson("/api/v1/notifications/sound", { quiet: true }).then(function (r) {
+        sound = r.ok && r.body ? r.body : { tone: 0, urgent_tone: 0 };
+        if ((sound.tone || sound.urgent_tone) && !window.VistSound) {
+          const tag = document.createElement("script");
+          tag.src = "/static/js/notify-sound.js"; tag.async = true;
+          document.head.appendChild(tag);
+        }
+        return sound;
+      });
+    }
+    async function ring() {
+      const cfg = await loadSound();
+      if (!cfg.tone && !cfg.urgent_tone) return;
+      const latest = await fetchJson("/api/v1/notifications/me?unread_only=true&limit=1", { quiet: true });
+      const top = latest.ok && latest.body && latest.body[0];
+      const urgent = !!(top && /^(URGENT|FINAL)/i.test(top.title || ""));
+      const tone = urgent && cfg.urgent_tone ? cfg.urgent_tone : cfg.tone;
+      if (tone && window.VistSound) window.VistSound.play(tone, { volume: cfg.volume, repeat: urgent ? Math.max(cfg.repeat || 1, 2) : cfg.repeat });
+    }
     async function refreshCount() {
       const r = await fetchJson("/api/v1/notifications/me/unread-count", { quiet: true });
-      if (r.ok && r.body) setUnread(r.body.unread_count);
+      if (r.ok && r.body) {
+        const n = r.body.unread_count;
+        if (seen !== null && n > seen) ring();
+        seen = n;
+        try { sessionStorage.setItem("vist_bell_seen", String(n)); } catch (e) { /* private mode */ }
+        setUnread(n);
+      }
     }
 
     function itemEl(n) {
@@ -833,8 +865,10 @@ window.VistAdmin = (function () {
       }
     });
 
+    loadSound();
     refreshCount();
-    setInterval(function () { if (!document.hidden) refreshCount(); }, 60000);
+    let ticks = 0;          // every 30 s while the page is in view, every 90 s in a background tab
+    setInterval(function () { ticks += 1; if (!document.hidden || ticks % 3 === 0) refreshCount(); }, 30000);
     document.addEventListener("visibilitychange", function () { if (!document.hidden) refreshCount(); });
   }
 

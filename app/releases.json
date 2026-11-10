@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.14.0",
+    "date": "2026-11-10",
+    "title": "Task map, notification tones and a message for every change",
+    "summary": "See who gives tasks to whom on a map, hear a tone when a notification arrives, and get told whenever the office changes something about you.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Staff",
+        "text": "Tasks → Task map: a picture of who gives tasks to whom. Thicker arrows mean more tasks; colours show late, in progress, waiting, done or rejected. Click a person or an arrow to see the tasks. The admin sees everyone; staff see their own."
+      },
+      {
+        "kind": "new",
+        "for": "Everyone",
+        "text": "A notification tone plays in the portal when something new arrives (also in a background tab): the admin picks it for everyone in Settings → Notifications, including long ringtone-like tones and a separate alarm for urgent notices. Phones vibrate longer for urgent notices, and urgent alerts stay on screen until opened."
+      },
+      {
+        "kind": "new",
+        "for": "Everyone",
+        "text": "You are told when the office changes something about you: working hours, attendance corrections, salary, bonus, job role, status, password reset, record details; for students also courses and sections, marks, leave, hostel and fee changes; and everyone in a class when its timetable changes."
+      },
+      {
+        "kind": "improved",
+        "for": "Everyone",
+        "text": "Dashboards show only the latest announcement, with View all for the rest."
+      }
+    ]
+  },
+  {
     "version": "1.13.0",
     "date": "2026-11-10",
     "title": "Announcements from teachers and staff",

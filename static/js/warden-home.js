@@ -124,7 +124,7 @@
       history: "/api/v1/hostel/history",
       tasks: "/api/v1/tasks/summary",
       calendar: D.upcoming(),
-      announcements: "/api/v1/announcements?limit=1",
+      announcements: "/api/v1/announcements?limit=12",
     };
     if (!adminLooking(me, "wd-note")) urls.applications = "/api/v1/applications/mine";
     const d = await D.getAll(urls);

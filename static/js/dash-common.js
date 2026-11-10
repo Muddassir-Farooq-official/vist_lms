@@ -141,7 +141,9 @@ window.Dash = (function () {
     const list = $(listId);
     if (!rows) { hide(listId); return; }
     $(emptyId).hidden = rows.length > 0;
-    list.innerHTML = rows.slice(0, n || 3).map(function (a) {
+    // the newest first (the feed puts pinned ones on top), then only as many as the dashboard shows
+    rows = rows.slice().sort(function (a, b) { return String(b.published_at || "").localeCompare(String(a.published_at || "")); });
+    list.innerHTML = rows.slice(0, n || 1).map(function (a) {
       const body = "<strong>" + esc(a.title) + "</strong><small>" + esc(a.issuer_name || "") + (a.published_at ? " · " + esc(VA.formatDateTime(a.published_at)) : "") +
         "</small><span>" + esc((a.body || "").slice(0, 140)) + "</span>";
       return "<li>" + (href ? '<a href="' + esc(href) + '">' + body + "</a>" : '<div class="note">' + body + "</div>") + "</li>";

@@ -263,6 +263,13 @@ class Settings(BaseSettings):
     certificate_fee_provisional: float = 1000.0
     certificate_fee_migration: float = 2000.0
     certificate_fee_fee_clearance: float = 0.0
+    # Notification sound and phone alerts (app/notifications/router.py /sound, static/js/notify-sound.js). Editable in Settings.
+    notify_sound_tone: int = 1               # soft chime
+    notify_sound_urgent_tone: int = 7        # alarm
+    notify_sound_volume: int = 70
+    notify_sound_repeat: int = 1
+    phone_alert_vibrate: int = 1
+    phone_alert_keep_urgent: int = 1
     monthly_report_notice: int = 1          # the 1st of each month: tell the principal last month's report is ready
     sms_on_warning: int = 0                  # tell the guardian when a student is warned (app/discipline); off unless switched on
     sms_on_fee_paid: int = 1                 # a message (receipt on WhatsApp) for each fee payment

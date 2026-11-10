@@ -124,7 +124,7 @@
       books: "/api/v1/library/books?page_size=200",
       tasks: "/api/v1/tasks/summary",
       calendar: D.upcoming(),
-      announcements: "/api/v1/announcements?limit=3",
+      announcements: "/api/v1/announcements?limit=12",
     });
     if (d.books && d.books.items) d.books = d.books.items;
     if (!d.stats) { const e = $("lb-error"); e.textContent = "Could not load the dashboard. Please refresh the page."; e.hidden = false; }
@@ -136,7 +136,7 @@
     D.run(function () { activity(d.stats); });
     D.run(function () { requests(d.requests); });
     D.run(function () { D.calendar("cal-list", "cal-empty", d.calendar, 4); });
-    D.run(function () { D.announcements("ann-list", "ann-empty", d.announcements, 3, "/dashboard/library/announcements"); });
+    D.run(function () { D.announcements("ann-list", "ann-empty", d.announcements, 1, "/dashboard/library/announcements"); });
   }
 
   document.addEventListener("vistadmin:ready", function (ev) { load(ev.detail && ev.detail.me); });

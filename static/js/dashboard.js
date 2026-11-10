@@ -226,7 +226,8 @@
     const list = $("ann-list");
     if (!rows) { list.closest(".dash-panel").hidden = true; return; }
     $("ann-empty").hidden = rows.length > 0;
-    list.innerHTML = rows.slice(0, 3).map(function (a) {
+    rows = rows.slice().sort(function (a, b) { return String(b.published_at || "").localeCompare(String(a.published_at || "")); });
+    list.innerHTML = rows.slice(0, 1).map(function (a) {
       return '<li><a href="/dashboard/admin/announcements"><strong>' + esc(a.title) + "</strong><small>" + esc(a.issuer_name || "") +
         (a.published_at ? " · " + esc(VA.formatDateTime(a.published_at)) : "") + "</small><span>" + esc((a.body || "").slice(0, 120)) + "</span></a></li>";
     }).join("");
@@ -268,7 +269,7 @@
       "/api/v1/applications/overview", "/api/v1/complaints/analytics/overview", "/api/v1/attendance/correction-requests?status=PENDING",
       "/api/v1/attendance/needs-attention", "/api/v1/purchases/summary", "/api/v1/tasks/summary", "/api/v1/inventory/summary",
       "/api/v1/library/dashboard", "/api/v1/assets/summary", "/api/v1/staff-attendance/board", "/api/v1/gate/summary", "/api/v1/hostel/summary",
-      "/api/v1/calendar?start=" + iso(now) + "&end=" + iso(in14), "/api/v1/announcements?limit=3",
+      "/api/v1/calendar?start=" + iso(now) + "&end=" + iso(in14), "/api/v1/announcements?limit=12",
       "/api/v1/staff-attendance/leave/count", "/api/v1/attendance/shortfalls/count"];
     const values = await Promise.all(urls.map(get));
     const d = {};
