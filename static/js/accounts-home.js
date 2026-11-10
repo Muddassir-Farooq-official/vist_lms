@@ -152,7 +152,7 @@
       assets: "/api/v1/assets/summary",
       tasks: "/api/v1/tasks/summary",
       calendar: D.upcoming(),
-      announcements: "/api/v1/announcements?limit=1",
+      announcements: "/api/v1/announcements?limit=12",
     });
     if (!d.month && !d.fees) { const e = $("ac-error"); e.textContent = "Could not load the dashboard. Please refresh the page."; e.hidden = false; }
     D.run(function () { hero(me, d); });

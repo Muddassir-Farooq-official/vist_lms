@@ -46,6 +46,9 @@
       let html = '<select id="' + id + '" class="st-select" data-key="' + esc(p.key) + '" aria-describedby="h-' + esc(p.key) + '">' +
         u.choices.map(function (c) { return '<option value="' + c[0] + '"' + (Number(c[0]) === v ? " selected" : "") + ">" + esc(c[1]) + "</option>"; }).join("") +
         (u.custom ? '<option value="custom"' + (known ? "" : " selected") + ">Custom…</option>" : "") + "</select>";
+      if (u.preview === "sound") {
+        html += '<button type="button" class="role-btn small-btn secondary-btn st-play" data-play-for="' + esc(p.key) + '" aria-label="Play this tone">\u25B6 Play</button>';
+      }
       if (u.custom) {
         html += '<span class="st-unit st-custom"' + (known ? " hidden" : "") + '><b>Every</b><input type="number" min="1" max="' + p.max + '" step="1" data-custom-for="' +
           esc(p.key) + '" aria-label="' + esc(u.label) + ': number of ' + esc(u.custom) + '" value="' + (known ? "" : v) + '"><b>' + esc(u.custom) + "</b></span>";
@@ -227,4 +230,17 @@
 
   window.SettingsPolicy = { load: load, changes: changes, changedLabels: changedLabels, save: save, discard: render, showSection: showSection,
     clearSearch: clearSearch, current: function () { return current; } };
+
+  // ▶ Play next to a notification tone: hear it with the volume and repeats chosen on the page
+  document.addEventListener("click", function (e) {
+    const b = e.target.closest && e.target.closest(".st-play");
+    if (!b) return;
+    const sel = document.querySelector('[data-key="' + b.getAttribute("data-play-for") + '"]');
+    const num = function (k, d) { const x = document.querySelector('[data-key="' + k + '"]'); return x && x.value !== "" ? Number(x.value) : d; };
+    const go = function () { window.VistSound.preview(Number(sel.value), { volume: num("notify_sound_volume", 70), repeat: num("notify_sound_repeat", 1) }); };
+    if (window.VistSound) { go(); return; }
+    const tag = document.createElement("script");
+    tag.src = "/static/js/notify-sound.js"; tag.onload = go;
+    document.head.appendChild(tag);
+  });
 })();

@@ -27,6 +27,14 @@ async def list_my_notifications(
     return [NotificationOut.model_validate(n) for n in items]
 
 
+@router.get("/sound", summary="The notification tone and volume set for everyone (Settings -> Notifications)")
+async def notification_sound(current_user: CurrentUser = Depends(get_current_user)) -> dict:
+    from app.core.config import settings
+
+    return {"tone": int(settings.notify_sound_tone), "urgent_tone": int(settings.notify_sound_urgent_tone) or int(settings.notify_sound_tone),
+            "volume": int(settings.notify_sound_volume), "repeat": int(settings.notify_sound_repeat)}
+
+
 @router.get("/me/unread-count", response_model=UnreadCountOut, summary="How many of my notifications are unread")
 async def my_unread_count(
     current_user: CurrentUser = Depends(get_current_user),

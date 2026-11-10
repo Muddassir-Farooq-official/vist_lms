@@ -107,7 +107,7 @@
       board: "/api/v1/staff-attendance/board",
       tasks: "/api/v1/tasks/summary",
       calendar: D.upcoming(),
-      announcements: "/api/v1/announcements?limit=1",
+      announcements: "/api/v1/announcements?limit=12",
     });
     if (!d.summary) { const e = $("gt-error"); e.textContent = "Could not load the gate summary. Please refresh the page."; e.hidden = false; }
     D.run(function () { kpis(d); });

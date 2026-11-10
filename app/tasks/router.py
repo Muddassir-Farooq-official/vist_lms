@@ -105,6 +105,12 @@ async def person_report(user_id: uuid.UUID, days: int = Days, current_user: Curr
 
 
 # ============================================================ one task
+@router.get("/map", summary="Who gave tasks to whom, by status: everyone's (administration) or only mine")
+async def task_map(days: int = Days, mine: bool = False, current_user: CurrentUser = Depends(use), db=Depends(get_db)) -> dict:
+    only = None if (_manage(current_user) and not mine) else current_user.id
+    return await TaskService(db).task_map(days, only_user=only)
+
+
 @router.get("/{task_id}", response_model=TaskOut, summary="One task in full (only for the two people involved, and the administration)")
 async def get_task(task_id: uuid.UUID, current_user: CurrentUser = Depends(use), db=Depends(get_db)) -> TaskOut:
     return await _one(TaskService(db), task_id, current_user)

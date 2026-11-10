@@ -42,3 +42,9 @@ class AuditService:
             )
         )
         await self.session.flush()
+        # tell the person the change is about (app/notifications/changes.py); a no-op for most actions, never raises
+        from app.notifications.changes import RULES, after_audit
+
+        if action in RULES:
+            await after_audit(self.session, action=action, entity_id=entity_id, actor_user_id=actor_user_id, before=before, after=after,
+                              metadata=metadata)

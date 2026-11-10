@@ -548,6 +548,45 @@ class TaskService:
             stmt = stmt.where(cond)
         return list((await self.session.execute(stmt.limit(50000))).scalars())
 
+    async def task_map(self, days: int, *, only_user: uuid.UUID | None = None) -> dict:
+        """Who gave tasks to whom: people (nodes) and assigner -> assignee links (edges), each counted by status.
+        only_user: just the tasks that person gave or received (a staff member's own map)."""
+        now = _now()
+        extra = [or_(Task.assigner_user_id == only_user, Task.assignee_user_id == only_user)] if only_user else []
+        tasks = await self._window(days, *extra)
+
+        def group(t: Task) -> str:
+            if t.status in (TaskStatus.PENDING, TaskStatus.ACCEPTED, TaskStatus.AWAITING_CONFIRMATION):
+                return "late" if t.deadline < now and t.status != TaskStatus.AWAITING_CONFIRMATION else (
+                    "waiting" if t.status == TaskStatus.AWAITING_CONFIRMATION else "open")
+            return {TaskStatus.COMPLETED: "done", TaskStatus.REJECTED: "rejected", TaskStatus.CANCELLED: "cancelled"}[t.status]
+
+        blank = lambda: {"open": 0, "late": 0, "waiting": 0, "done": 0, "rejected": 0, "cancelled": 0, "total": 0}   # noqa: E731
+        edges: dict = {}
+        given: dict = {}
+        received: dict = {}
+        for t in tasks:
+            g = group(t)
+            e = edges.setdefault((t.assigner_user_id, t.assignee_user_id), {"counts": blank(), "tasks": []})
+            for bucket in (e["counts"], given.setdefault(t.assigner_user_id, blank()), received.setdefault(t.assignee_user_id, blank())):
+                bucket[g] += 1
+                bucket["total"] += 1
+            e["tasks"].append({"id": t.id, "ref": f"TASK-{t.serial_no:05d}", "title": t.title, "status": t.status.value, "group": g,
+                               "deadline": t.deadline, "priority": t.priority.value})
+        people = await self.people(set(given) | set(received))
+        nodes = [{"user_id": uid, "name": p["name"], "detail": p["detail"], "given": given.get(uid, blank()), "received": received.get(uid, blank()),
+                  "is_me": uid == only_user} for uid, p in people.items()]
+        nodes.sort(key=lambda n: (-(n["given"]["total"] + n["received"]["total"]), n["name"].lower()))
+        out_edges = []
+        for (a, b), e in edges.items():
+            e["tasks"].sort(key=lambda x: x["deadline"], reverse=True)
+            out_edges.append({"from": a, "to": b, "counts": e["counts"], "tasks": e["tasks"][:30]})
+        totals = blank()
+        for e in out_edges:
+            for k, v in e["counts"].items():
+                totals[k] += v
+        return {"days": days, "nodes": nodes, "edges": out_edges, "totals": totals, "only_user": only_user}
+
     async def staff_report(self, days: int) -> dict:
         now = _now()
         tasks = await self._window(days)

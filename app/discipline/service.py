@@ -62,6 +62,14 @@ def counts_now(w: DisciplinaryWarning) -> bool:
     return w.status == "ACTIVE" and (w.created_at is None or w.created_at >= _since())
 
 
+
+async def _quietly(change):
+    """Run a status change without the general 'your status has changed' message: the warning's own message says it better."""
+    from app.notifications.changes import quiet
+
+    with quiet():
+        return await change
+
 class WarningService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -328,16 +336,16 @@ class WarningService:
             from app.students.models import StudentStatus
             from app.students.service import StudentService
 
-            await StudentService(self.session).change_status(p.id, new_status=StudentStatus.SUSPENDED if action == "SUSPEND" else StudentStatus.DROPPED,
-                                                             reason=reason, actor_id=actor_id)
+            await _quietly(StudentService(self.session).change_status(p.id, new_status=StudentStatus.SUSPENDED if action == "SUSPEND" else StudentStatus.DROPPED,
+                                                             reason=reason, actor_id=actor_id))
         elif kind == "EMPLOYEE" and action in ("SUSPEND", "TERMINATE"):
             from app.employees.models import EmployeeStatus
             from app.employees.service import EmployeeService
 
             if action == "SUSPEND":
                 await self._block_sign_in(p, actor_id)                 # checked before anything changes
-            await EmployeeService(self.session).change_status(p.id, new_status=EmployeeStatus.ON_LEAVE if action == "SUSPEND" else EmployeeStatus.TERMINATED,
-                                                              reason=reason, actor_id=actor_id)
+            await _quietly(EmployeeService(self.session).change_status(p.id, new_status=EmployeeStatus.ON_LEAVE if action == "SUSPEND" else EmployeeStatus.TERMINATED,
+                                                              reason=reason, actor_id=actor_id))
             if action == "SUSPEND":
                 await self._block_sign_in(p, actor_id, apply=True)
         if action == "FINE":
@@ -390,14 +398,14 @@ class WarningService:
             from app.students.service import StudentService
 
             if p.status == StudentStatus.SUSPENDED:
-                await StudentService(self.session).change_status(p.id, new_status=StudentStatus.ACTIVE, reason=reason, actor_id=actor_id)
+                await _quietly(StudentService(self.session).change_status(p.id, new_status=StudentStatus.ACTIVE, reason=reason, actor_id=actor_id))
         else:
             from app.auth.models import User
             from app.employees.models import EmployeeStatus
             from app.employees.service import EmployeeService
 
             if p.status == EmployeeStatus.ON_LEAVE:
-                await EmployeeService(self.session).change_status(p.id, new_status=EmployeeStatus.ACTIVE, reason=reason, actor_id=actor_id)
+                await _quietly(EmployeeService(self.session).change_status(p.id, new_status=EmployeeStatus.ACTIVE, reason=reason, actor_id=actor_id))
             if p.status == EmployeeStatus.ACTIVE and p.user_id:
                 user = await self.session.get(User, p.user_id)
                 if user is not None:

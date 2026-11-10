@@ -69,6 +69,8 @@ self.addEventListener("push", function (event) {
     renotify: !!data.tag,
     data: { url: data.url || "/" },
   };
+  if (Array.isArray(data.vibrate)) options.vibrate = data.vibrate;         // Android; set in Settings -> Notifications
+  if (data.keep) options.requireInteraction = true;                         // stays until tapped (computers, many Android phones)
   event.waitUntil(self.registration.showNotification(title, options));
 });
 

@@ -145,13 +145,14 @@
 
   // Latest official announcements, with the unread ones marked. Opens the full notice when clicked.
   function loadNews(base) {
-    VA.fetchJson("/api/v1/announcements?limit=3").then(function (r) {
+    VA.fetchJson("/api/v1/announcements?limit=12").then(function (r) {
       const box = el("sh-news");
       if (!box) return;
       if (!r.ok) { box.innerHTML = '<p class="home-empty">Could not load announcements right now.</p>'; return; }
       if (!r.body.length) { box.innerHTML = '<p class="home-empty">No announcements yet.</p>'; return; }
       box.innerHTML = "";
-      r.body.forEach(function (a) {
+      // only the newest one on the home page; the rest are under View all
+      r.body.slice().sort(function (a, b) { return String(b.published_at || "").localeCompare(String(a.published_at || "")); }).slice(0, 1).forEach(function (a) {
         const d = new Date(a.published_at);
         const node = document.createElement("a");
         node.className = "sh-news-row " + a.priority.toLowerCase() + (a.is_read ? "" : " unread");

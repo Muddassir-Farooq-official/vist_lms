@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.notifications.changes import silently
 from app.core.clock import institute_today
 
 import itertools
@@ -1175,6 +1176,7 @@ class TimetableService:
     async def offering_repo_enrolled(self, offering_id: uuid.UUID) -> set[uuid.UUID]:
         return await self._enrolled_for(offering_id)
 
+    @silently                     # building a timetable in bulk: no message per class (app/notifications/changes.py)
     async def auto_schedule_term(
         self, *, term_label: str, rooms: list[str], sessions_per_week: int | None, actor_id: uuid.UUID
     ) -> dict:
@@ -1229,6 +1231,7 @@ class TimetableService:
         )
         return {"scheduled": scheduled, "skipped": skipped, "failed": failed}
 
+    @silently                     # building a timetable in bulk: no message per class (app/notifications/changes.py)
     async def copy_from_term(self, *, source_term: str, target_term: str, actor_id: uuid.UUID) -> dict:
         """Repeat last term's timetable: for each offering of the target term
         that has no slots, copy the weekly slots (day, period, room) of the SAME
@@ -1450,6 +1453,7 @@ class TimetableService:
             return period, {d: (common[0] if common else usable[d][0]) for d in chosen}
         return None
 
+    @silently                     # building a timetable in bulk: no message per class (app/notifications/changes.py)
     async def auto_assign(
         self, *, course_offering_id: uuid.UUID, sessions_per_week: int, room: str, actor_id: uuid.UUID, starts_from: date | None = None,
     ) -> tuple[list[TimetableSlot], int]:
@@ -1587,7 +1591,8 @@ class TimetableService:
         await self.slot_repo.delete(slot)
         await self.audit.log(
             actor_user_id=actor_id, action="timetable_slot.deleted", entity_type="timetable_slot", entity_id=slot_id,
-            after={"future_sessions_cancelled": len(future_sessions)},
+            after={"future_sessions_cancelled": len(future_sessions), "course_offering_id": str(slot.course_offering_id),
+                   "day_of_week": slot.day_of_week.value, "start_time": str(slot.start_time), "end_time": str(slot.end_time), "room": slot.room},
         )
         return len(future_sessions)
 

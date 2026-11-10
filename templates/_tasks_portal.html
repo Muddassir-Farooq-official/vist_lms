@@ -5,6 +5,7 @@
   <button class="portal-tab" data-tab="sent" role="tab" aria-selected="false"><span>Assigned by me</span></button>
   <button class="portal-tab" data-tab="new" role="tab" aria-selected="false"><span>Assign a task</span></button>
   <button class="portal-tab" data-tab="mine" role="tab" aria-selected="false"><span>My progress</span></button>
+  <button class="portal-tab" data-tab="map" role="tab" aria-selected="false"><span>Task map</span></button>
   <button class="portal-tab" data-tab="covers" role="tab" aria-selected="false" id="cv-tab" hidden><span>Classes I'm covering</span> <span class="ss-count" id="cv-count"></span></button>
   {% if is_admin %}
   <button class="portal-tab" data-tab="flags" role="tab" aria-selected="false"><span id="tk-tab-flags">Flagged for review</span></button>
@@ -88,6 +89,33 @@
 
 <div class="portal-tab-panel" data-tab-panel="mine" hidden>
   <section class="sh-card" id="tk-mine"></section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="map" hidden>
+  <section class="sh-card tm-card" id="tm" data-admin="{{ '1' if is_admin else '0' }}">
+    <div class="tm-toolbar">
+      <div>
+        <h2 class="tm-title">{{ "Who gives tasks to whom" if is_admin else "My tasks: given and received" }}</h2>
+        <p class="tm-hint">Each circle is a person, each arrow goes from who gave the task to who received it. Thicker = more tasks. Click a person or an arrow for the tasks.</p>
+      </div>
+      <div class="tm-controls">
+        <select id="tm-days" class="select-input" aria-label="Period">
+          <option value="30">Last 30 days</option><option value="90" selected>Last 90 days</option><option value="365">Last 12 months</option><option value="0">All time</option>
+        </select>
+        {% if is_admin %}<label class="check-row tm-mine"><input type="checkbox" id="tm-mine" /> Only mine</label>{% endif %}
+      </div>
+    </div>
+    <div class="tm-legend" aria-hidden="true">
+      <span><i class="tm-dot g-late"></i>Late</span><span><i class="tm-dot g-open"></i>In progress</span><span><i class="tm-dot g-waiting"></i>Waiting for confirmation</span>
+      <span><i class="tm-dot g-done"></i>Done</span><span><i class="tm-dot g-rejected"></i>Rejected / called off</span>
+    </div>
+    <div class="tm-totals" id="tm-totals"></div>
+    <div class="tm-body">
+      <div class="tm-canvas" id="tm-canvas" role="img" aria-label="Task map"></div>
+      <aside class="tm-side" id="tm-side" aria-live="polite"><p class="tm-hint">Click a person or an arrow.</p></aside>
+    </div>
+    <p class="empty-state" id="tm-empty" hidden>No tasks in this period.</p>
+  </section>
 </div>
 
 {% if is_admin %}
@@ -203,3 +231,5 @@
   </div>
 </dialog>
 <script src="/static/js/cover-classes.js" defer></script>
+<link rel="stylesheet" href="/static/css/task-map.css?v={{ app_version() }}" />
+<script src="/static/js/task-map.js?v={{ app_version() }}" defer></script>

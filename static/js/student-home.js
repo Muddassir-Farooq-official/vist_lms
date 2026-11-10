@@ -194,12 +194,12 @@
     }));
   }
 
-  // Latest announcements, newest first (the 3 most recent; unread ones marked). Opening one goes to Notices.
+  // The latest announcement only (unread marked); the rest are under View all. Opening it goes to Notices.
   function newsStrip(rows) {
     const list = document.getElementById("news-cards"), empty = document.getElementById("news-empty");
     if (!list) return;
     if (!rows) { list.innerHTML = ""; empty.hidden = false; empty.textContent = "Announcements could not be loaded."; return; }
-    const latest = rows.slice().sort(function (a, b) { return String(b.published_at || "").localeCompare(String(a.published_at || "")); }).slice(0, 3);
+    const latest = rows.slice().sort(function (a, b) { return String(b.published_at || "").localeCompare(String(a.published_at || "")); }).slice(0, 1);
     empty.hidden = latest.length > 0;
     const esc = window.VistAdmin.escapeHtml;
     const TAG = { URGENT: "Urgent", IMPORTANT: "Important" };
@@ -211,7 +211,7 @@
         (TAG[a.priority] ? '<span class="news-tag">' + TAG[a.priority] + "</span>" : "") + '<span class="news-date">' + esc(when) + "</span></span>" +
         "<strong>" + esc(a.title) + "</strong>" +
         '<small>' + esc(a.issuer_name || "") + (a.issuer_designation ? ", " + esc(a.issuer_designation) : "") + "</small>" +
-        '<span class="news-body">' + esc((a.body || "").replace(/\s+/g, " ").slice(0, 120)) + "</span></a></li>";
+        '<span class="news-body">' + esc((a.body || "").replace(/\s+/g, " ").slice(0, 260)) + "</span></a></li>";
     }).join("");
   }
 

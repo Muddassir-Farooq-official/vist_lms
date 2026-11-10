@@ -151,7 +151,7 @@
       fines: "/api/v1/fines/me/balance",
       loans: "/api/v1/library/me/loans",
       calendar: D.upcoming(),
-      announcements: "/api/v1/announcements?limit=3",
+      announcements: "/api/v1/announcements?limit=12",
     });
     d.sheets = await Promise.all((d.overview || []).map(function (c) { return D.get("/api/v1/results/offerings/" + c.offering_id + "/sheet"); }));
     let todays = [];
@@ -161,7 +161,7 @@
     D.run(function () { courses(d); });
     D.run(function () { assignments(d.assignments); });
     D.run(function () { D.calendar("cal-list", "cal-empty", d.calendar, 4); });
-    D.run(function () { D.announcements("ann-list", "ann-empty", d.announcements, 3, "/dashboard/faculty/announcements"); });
+    D.run(function () { D.announcements("ann-list", "ann-empty", d.announcements, 1, "/dashboard/faculty/announcements"); });
   }
 
   document.addEventListener("vistadmin:ready", function (ev) { load(ev.detail && ev.detail.me); });
