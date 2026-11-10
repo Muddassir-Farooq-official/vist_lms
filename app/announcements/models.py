@@ -54,7 +54,7 @@ class IssuingAuthority(UUIDPKMixin, TimestampMixin, Base):
 
 class Announcement(UUIDPKMixin, TimestampMixin, Base):
     __tablename__ = "announcements"
-    __table_args__ = (Index("ix_announcements_status", "status"),)
+    __table_args__ = (Index("ix_announcements_status", "status"), Index("ix_announcements_submitted_by", "submitted_by"))
 
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
@@ -76,6 +76,20 @@ class Announcement(UUIDPKMixin, TimestampMixin, Base):
     audience_staff: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=true())  # librarian, accounts...
     # Optional: only students of these programs (empty / null = every student)
     program_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # Optional: only students in these semesters (with or without a program filter) -- migration b9d1f3a5c7e9
+    semesters: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # Optional: only students enrolled in these course sections (course offerings). When set, programs/semesters are ignored.
+    offering_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
+
+    # Written by a teacher or staff member and waiting for the admin: review = PENDING -> APPROVED (published) or REJECTED
+    # (they can fix it and send it again) or CANCELLED (they took it back). NULL = written by the admin. While not approved the
+    # announcement stays a DRAFT, so nobody else sees it. It is issued in the writer's own name and job (issuer_* below).
+    review: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    review_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    submitted_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewed_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     status: Mapped[AnnouncementStatus] = mapped_column(
         Enum(AnnouncementStatus, name="announcement_status"), nullable=False, default=AnnouncementStatus.DRAFT

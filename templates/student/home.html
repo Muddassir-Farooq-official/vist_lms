@@ -22,22 +22,13 @@
     </nav>
   </section>
 
-  <section class="panel dash-panel today" aria-labelledby="st-today-h">
-    <div class="dash-panel-head"><h2 id="st-today-h">Today</h2><span class="today-date" id="today-date"></span></div>
-    <div class="today-grid">
-      <div class="today-col">
-        <h3 class="today-h">{{ nav_icon("clock") }} Classes today</h3>
-        <ul class="today-list" id="today-classes"><li class="skeleton-line"></li></ul>
-      </div>
-      <div class="today-col">
-        <h3 class="today-h">{{ nav_icon("file") }} Due this week</h3>
-        <ul class="today-list" id="today-due"><li class="skeleton-line"></li></ul>
-      </div>
-      <div class="today-col">
-        <h3 class="today-h">{{ nav_icon("graduation-cap") }} Latest marks</h3>
-        <ul class="today-list" id="today-marks"><li class="skeleton-line"></li></ul>
-      </div>
+  <section class="panel dash-panel news-strip" aria-labelledby="st-latest-h">
+    <div class="dash-panel-head">
+      <h2 id="st-latest-h">{{ nav_icon("megaphone") }} Latest announcements</h2>
+      <a href="/dashboard/student/announcements" class="view-all-link">View all {{ nav_icon("arrow-right") }}</a>
     </div>
+    <ul class="news-cards" id="news-cards" aria-live="polite"><li class="skeleton-line"></li></ul>
+    <p class="dash-empty" id="news-empty" hidden>No announcements yet.</p>
   </section>
 
   <section class="kpi-row kpi-row--compact" aria-label="Key numbers">
@@ -79,24 +70,41 @@
     </a>
   </section>
 
-  <div class="dash-grid dash-grid--2-1">
-    <section class="panel dash-panel" aria-labelledby="st-classes-h">
-      <div class="dash-panel-head">
-        <h2 id="st-classes-h">Your next classes</h2>
-        <a href="/dashboard/student/timetable" class="view-all-link">Full timetable {{ nav_icon("arrow-right") }}</a>
-      </div>
-      <ol class="agenda" id="class-list" aria-live="polite"><li class="agenda-loading">{{ skeleton }}</li></ol>
-      <p class="dash-empty" id="class-empty" hidden>No upcoming classes scheduled.</p>
-      <h3 class="dash-sub-h">This week</h3>
-      <div class="week-strip" id="week-strip"></div>
-    </section>
+  <section class="panel dash-panel" id="dh-attention-panel" aria-labelledby="st-alerts-h">
+    <div class="dash-panel-head"><h2 id="st-alerts-h">Alerts &amp; deadlines</h2></div>
+    <ul class="attn-list" id="attn-list"><li class="skeleton-line"></li><li class="skeleton-line short"></li></ul>
+    <p class="attn-clear" id="attn-clear" hidden>{{ nav_icon("check-circle") }} Nothing needs your attention. Well done.</p>
+  </section>
 
-    <section class="panel dash-panel" id="dh-attention-panel" aria-labelledby="st-alerts-h">
-      <div class="dash-panel-head"><h2 id="st-alerts-h">Alerts &amp; deadlines</h2></div>
-      <ul class="attn-list" id="attn-list"><li class="skeleton-line"></li><li class="skeleton-line short"></li></ul>
-      <p class="attn-clear" id="attn-clear" hidden>{{ nav_icon("check-circle") }} Nothing needs your attention. Well done.</p>
-    </section>
-  </div>
+  <section class="panel dash-panel today" aria-labelledby="st-today-h">
+    <div class="dash-panel-head"><h2 id="st-today-h">Today</h2><span class="today-date" id="today-date"></span></div>
+    <div class="today-grid">
+      <div class="today-col">
+        <h3 class="today-h">{{ nav_icon("clock") }} Classes today</h3>
+        <ul class="today-list" id="today-classes"><li class="skeleton-line"></li></ul>
+      </div>
+      <div class="today-col">
+        <h3 class="today-h">{{ nav_icon("file") }} Due this week</h3>
+        <ul class="today-list" id="today-due"><li class="skeleton-line"></li></ul>
+      </div>
+      <div class="today-col">
+        <h3 class="today-h">{{ nav_icon("graduation-cap") }} Latest marks</h3>
+        <ul class="today-list" id="today-marks"><li class="skeleton-line"></li></ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel dash-panel" aria-labelledby="st-classes-h">
+    <div class="dash-panel-head">
+      <h2 id="st-classes-h">Your next classes</h2>
+      <a href="/dashboard/student/timetable" class="view-all-link">Full timetable {{ nav_icon("arrow-right") }}</a>
+    </div>
+    <ol class="agenda" id="class-list" aria-live="polite"><li class="agenda-loading">{{ skeleton }}</li></ol>
+    <p class="dash-empty" id="class-empty" hidden>No upcoming classes scheduled.</p>
+    <h3 class="dash-sub-h">This week</h3>
+    <div class="week-strip" id="week-strip"></div>
+  </section>
+
 
   <section class="panel dash-panel" aria-labelledby="st-courses-h">
     <div class="dash-panel-head">
@@ -139,7 +147,7 @@
     </section>
   </div>
 
-  <div class="dash-grid dash-grid--3">
+  <div class="dash-grid dash-grid--2">
     <section class="panel dash-panel" aria-labelledby="st-lib-h">
       <div class="dash-panel-head">
         <h2 id="st-lib-h">Library</h2>
@@ -158,19 +166,11 @@
       <p class="dash-empty" id="cal-empty" hidden>Nothing on the calendar for the next two weeks.</p>
     </section>
 
-    <section class="panel dash-panel" aria-labelledby="st-news-h">
-      <div class="dash-panel-head">
-        <h2 id="st-news-h">Announcements</h2>
-        <a href="/dashboard/student/announcements" class="view-all-link">All {{ nav_icon("arrow-right") }}</a>
-      </div>
-      <ul class="note-list" id="ann-list"></ul>
-      <p class="dash-empty" id="ann-empty" hidden>No announcements yet.</p>
-    </section>
   </div>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="/static/js/dash-common.js"></script>
-<script src="/static/js/student-home.js"></script>
+<script src="/static/js/dash-common.js?v={{ app_version() }}"></script>
+<script src="/static/js/student-home.js?v={{ app_version() }}"></script>
 {% endblock %}

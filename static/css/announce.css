@@ -1,0 +1,38 @@
+/* Post an announcement (teachers and staff) */
+.an-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.an-head .panel-title { margin: 0; }
+.an-issuer { margin: 0; color: var(--text-muted); font-size: .88rem; }
+.an-issuer strong { color: var(--text-primary); }
+.an-form { display: grid; gap: 14px; margin-top: 12px; }
+.an-form > label, .an-row > label { display: grid; gap: 6px; font-size: .86rem; font-weight: 600; color: var(--text-secondary); }
+.an-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.an-who { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 10px; margin: 0; }
+.an-who legend { font-weight: 700; padding: 0 6px; }
+.an-students { margin-inline-start: 26px; display: grid; gap: 10px; }
+.an-seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.an-seg label { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; cursor: pointer; font-size: .86rem; }
+.an-seg label:has(input:checked) { border-color: var(--blue-500, #3b6ef5); background: var(--blue-50, #eef3ff); color: var(--blue-700, #1d4ed8); font-weight: 600; }
+.an-seg input { accent-color: var(--blue-600, #2454d6); }
+.an-hint { margin: 0; color: var(--text-muted); font-size: .82rem; }
+.an-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.an-chips label { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: .84rem; cursor: pointer; background: var(--surface); }
+.an-chips label:has(input:checked) { border-color: var(--blue-500, #3b6ef5); background: var(--blue-50, #eef3ff); }
+.an-chips--wide label { flex: 1 1 260px; }
+.an-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: .85rem; }
+.an-files button { margin-inline-start: 8px; }
+.an-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+.an-list { display: grid; gap: 12px; }
+.an-card { border: 1px solid var(--border); border-inline-start: 4px solid var(--border); border-radius: var(--radius); padding: 12px 14px; background: var(--surface); }
+.an-card[data-review="PENDING"] { border-inline-start-color: var(--yellow-500, #eab308); }
+.an-card[data-review="APPROVED"] { border-inline-start-color: var(--green-500, #22c55e); }
+.an-card[data-review="REJECTED"] { border-inline-start-color: var(--red-500, #ef4444); }
+.an-card-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
+.an-card p { margin: 6px 0 0; }
+.an-meta { color: var(--text-muted); font-size: .82rem; }
+.an-note { color: var(--red-600, #dc2626); font-size: .86rem; }
+.an-card-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+@media (max-width: 700px) {
+  .an-row { grid-template-columns: 1fr; }
+  .an-students { margin-inline-start: 0; }
+  .an-actions .role-btn { flex: 1 1 auto; }
+}

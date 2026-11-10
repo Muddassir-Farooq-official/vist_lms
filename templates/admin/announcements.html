@@ -7,6 +7,7 @@
 {% block content %}
 <div class="portal-tabs" role="tablist" data-auto-tabs>
   <button class="portal-tab active" data-tab="all" role="tab" aria-selected="true"><span>All announcements</span></button>
+  <button class="portal-tab" data-tab="review" role="tab" aria-selected="false"><span>Waiting for approval</span> <b class="tab-count" id="rev-count" hidden></b></button>
   <button class="portal-tab" data-tab="compose" role="tab" aria-selected="false"><span id="compose-tab-label">New announcement</span></button>
   <button class="portal-tab" data-tab="officials" role="tab" aria-selected="false"><span>Issuing officials</span></button>
 </div>
@@ -24,6 +25,14 @@
   </section>
 </div>
 
+<div class="portal-tab-panel" data-tab-panel="review" hidden>
+  <section class="sh-card">
+    <p class="panel-hint">Announcements written by teachers and staff. They are issued in the writer's own name and job, and nobody sees them until you approve. You can edit one before approving it, or send it back with what to change.</p>
+    <div id="rev-list" class="adm-list" aria-live="polite"></div>
+    <p class="empty-state" id="rev-empty" hidden>Nothing is waiting for approval.</p>
+  </section>
+</div>
+
 <div class="portal-tab-panel" data-tab-panel="compose" hidden>
   <section class="sh-card">
     <div class="sh-card-head"><h2 id="compose-title">Write an announcement</h2></div>
@@ -32,6 +41,7 @@
 
       <div class="form-field"><label for="ann-issuer">Issued by</label>
         <select id="ann-issuer" class="select-input" required></select>
+        <p class="ann-fixed-issuer" id="ann-issuer-fixed" hidden></p>
         <small class="field-hint" id="ann-issuer-hint">The official this notice comes from, shown to everyone who reads it.</small></div>
       <div class="form-field"><label for="ann-category">Category</label>
         <select id="ann-category" class="select-input">
@@ -107,6 +117,8 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="/static/js/announcement-ui.js"></script>
-<script src="/static/js/announcements-admin.js"></script>
+<style>.tab-count{display:inline-block;min-width:1.4em;padding:0 6px;border-radius:999px;background:var(--yellow-500,#eab308);color:#1f2937;font-size:.72rem;line-height:1.5;text-align:center}
+.rev-reject{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.rev-reject input{flex:1 1 260px}.ann-fixed-issuer{margin:0;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-alt)}</style>
+<script src="/static/js/announcement-ui.js?v={{ app_version() }}"></script>
+<script src="/static/js/announcements-admin.js?v={{ app_version() }}"></script>
 {% endblock %}

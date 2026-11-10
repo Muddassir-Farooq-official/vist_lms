@@ -36,6 +36,8 @@ class AnnouncementCreate(BaseModel):
     audience_teachers: bool = True
     audience_staff: bool = True
     program_ids: list[uuid.UUID] | None = None          # only students of these programs (null / empty = every student)
+    semesters: list[int] | None = Field(default=None, max_length=12)          # only students in these semesters
+    offering_ids: list[uuid.UUID] | None = Field(default=None, max_length=50)  # only students in these course sections
     pinned: bool = False
     expires_at: datetime | None = None
     publish: bool = False                                # False = save as a draft
@@ -58,6 +60,8 @@ class AnnouncementUpdate(BaseModel):
     audience_staff: bool | None = None
     program_ids: list[uuid.UUID] | None = None
     clear_program_filter: bool = False
+    semesters: list[int] | None = Field(default=None, max_length=12)
+    offering_ids: list[uuid.UUID] | None = Field(default=None, max_length=50)
     pinned: bool | None = None
     expires_at: datetime | None = None
     clear_expiry: bool = False
@@ -93,12 +97,20 @@ class AnnouncementOut(BaseModel):
     audience_teachers: bool
     audience_staff: bool
     program_ids: list[uuid.UUID] | None = None
+    semesters: list[int] | None = None
+    audience_text: str = ""             # "BSCS, semester 3" / "CS-201 A" / "All students" ...
 
 
 class AnnouncementAdminOut(AnnouncementOut):
     recipients: int | None = None       # how many people it was sent to
     read_count: int | None = None       # how many have opened it
     program_names: list[str] = []
+    offering_ids: list[uuid.UUID] | None = None
+    # written by staff (review is null for the admin's own)
+    review: str | None = None
+    review_note: str | None = None
+    submitted_by_name: str | None = None
+    submitted_at: datetime | None = None
 
 
 class UnreadCountOut(BaseModel):

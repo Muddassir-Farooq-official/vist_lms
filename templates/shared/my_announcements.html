@@ -1,0 +1,66 @@
+{% extends base_template %}
+{% block allowed_roles %}{{ allowed_roles|default("ADMIN") }}{% endblock %}
+{% block title %}Post an announcement{% endblock %}
+{% block page_title %}Post an announcement{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Write a notice for students or colleagues. It goes live once the admin approves it, issued in your name.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/announce.css?v={{ app_version() }}" />{% endblock %}
+
+{% block content %}
+<section class="panel" aria-labelledby="an-h">
+  <div class="an-head">
+    <h2 class="panel-title" id="an-h"><span id="an-form-title">New announcement</span></h2>
+    <p class="an-issuer" id="an-issuer" aria-live="polite"></p>
+  </div>
+  <form id="an-form" class="an-form" novalidate>
+    <label>Title<input id="an-title" class="text-input" maxlength="200" required /></label>
+    <label>Announcement<textarea id="an-body" class="text-input" rows="6" maxlength="10000" required></textarea></label>
+    <div class="an-row">
+      <label>Kind<select id="an-category" class="select-input"></select></label>
+      <label>Importance<select id="an-priority" class="select-input">
+        <option value="NORMAL">Normal</option><option value="IMPORTANT">Important</option><option value="URGENT">Urgent</option></select></label>
+      <label>Show until (optional)<input id="an-expires" class="text-input" type="date" /></label>
+    </div>
+
+    <fieldset class="an-who">
+      <legend>Who is it for?</legend>
+      <label class="check-row"><input type="checkbox" id="an-students" checked /> Students</label>
+      <div class="an-students" id="an-students-box">
+        <div class="an-seg" role="radiogroup" aria-label="Which students">
+          <label><input type="radio" name="an-scope" value="ALL" checked /> All students</label>
+          <label><input type="radio" name="an-scope" value="PROGRAM" /> By program &amp; semester</label>
+          <label><input type="radio" name="an-scope" value="SECTION" /> A course section</label>
+        </div>
+        <div class="an-scope" data-scope="PROGRAM" hidden>
+          <p class="an-hint">Programs (none ticked = every program)</p>
+          <div class="an-chips" id="an-programs"></div>
+          <p class="an-hint">Semesters (none ticked = every semester)</p>
+          <div class="an-chips" id="an-semesters"></div>
+        </div>
+        <div class="an-scope" data-scope="SECTION" hidden>
+          <p class="an-hint" id="an-sections-hint">Students enrolled in the sections you tick</p>
+          <div class="an-chips an-chips--wide" id="an-sections"></div>
+        </div>
+      </div>
+      <label class="check-row"><input type="checkbox" id="an-teachers" /> Teachers</label>
+      <label class="check-row"><input type="checkbox" id="an-staff" /> Other staff</label>
+    </fieldset>
+
+    <label>Attach a file (optional)<input id="an-file" type="file" class="text-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" /></label>
+    <ul class="an-files" id="an-files"></ul>
+    <p class="form-error" id="an-error" role="alert" hidden></p>
+    <div class="an-actions">
+      <button type="button" class="role-btn secondary-btn" id="an-reset" hidden>Cancel changes</button>
+      <button type="submit" class="role-btn" id="an-send">Send for approval</button>
+    </div>
+  </form>
+</section>
+
+<section class="panel" aria-labelledby="an-mine-h">
+  <h2 class="panel-title" id="an-mine-h">My announcements</h2>
+  <div id="an-mine" class="an-list"><p class="cc-meta">Loading&hellip;</p></div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/my-announcements.js?v={{ app_version() }}"></script>
+{% endblock %}
