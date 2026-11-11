@@ -10,11 +10,14 @@ WORDS = [("Courses", "Subjects"), ("Course", "Subject"), ("Programs", "Classes")
 HIDE = {"supplementary"}                         # university-only pages
 # School mode only (stage 2): hidden in a college / university copy.
 SCHOOL_ONLY = {"/dashboard/faculty/my-class", "/dashboard/faculty/homework", "/dashboard/student/diary", "/dashboard/parent/diary",
-               "/dashboard/parent/meetings"}
+               "/dashboard/parent/meetings", "/dashboard/faculty/exam-marks", "/dashboard/student/report-cards", "/dashboard/parent/report-cards"}
 # Per-period subject attendance: a school takes one morning roll call instead (My class / Diary & attendance).
-COLLEGE_ONLY = {"/dashboard/faculty/attendance", "/dashboard/student/attendance"}
+COLLEGE_ONLY = {"/dashboard/faculty/attendance", "/dashboard/student/attendance",
+                # ... and course grading / GPA results: a school has exam marks and report cards (stage 3)
+                "/dashboard/faculty/grading", "/dashboard/student/results", "/dashboard/parent/marks"}
 # ... and these take the attendance item's place in the phone bar.
-PHONE_IN_SCHOOL = {"/dashboard/faculty/my-class", "/dashboard/student/diary"}
+PHONE_IN_SCHOOL = {"/dashboard/faculty/my-class", "/dashboard/student/diary", "/dashboard/faculty/exam-marks", "/dashboard/student/report-cards",
+                   "/dashboard/parent/report-cards"}
 SWAP = {"/dashboard/admin/programs": {"slug": "classes", "label": "Classes & sections", "href": "/dashboard/admin/classes"}}
 
 

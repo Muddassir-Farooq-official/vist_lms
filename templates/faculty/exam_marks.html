@@ -1,0 +1,33 @@
+{% extends "faculty/_base.html" %}
+{% block title %}Exam marks &amp; report cards{% endblock %}
+{% block page_title %}Exam marks &amp; report cards{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Enter the marks of the subjects you teach. Class teachers also write each student's remarks and rate skills &amp; behaviour. The office publishes the report cards.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/school-daily.css?v={{ app_version() }}" /><link rel="stylesheet" href="/static/css/school-results.css?v={{ app_version() }}" />{% endblock %}
+
+{% block content %}
+<p class="empty-state" id="em-none" hidden>No exam is set up for this session yet. The office sets up the 1st Term, Mid-Term and Final exams.</p>
+<div id="em-view" hidden>
+  <div class="mc-tabs" role="tablist" aria-label="What to enter">
+    <button type="button" class="mc-tab active" data-pane="marks" role="tab" aria-selected="true">Marks</button>
+    <button type="button" class="mc-tab" data-pane="notes" role="tab" aria-selected="false" id="em-notes-tab" hidden>Remarks &amp; skills</button>
+  </div>
+  <section class="sh-card" data-pane-box="marks">
+    <div class="em-pick">
+      <label>Exam<select id="em-exam" class="select-input"></select></label>
+      <label>Class and subject<select id="em-class" class="select-input"></select></label>
+    </div>
+    <div id="em-sheet"></div>
+  </section>
+  <section class="sh-card" data-pane-box="notes" hidden>
+    <div class="em-pick">
+      <label>Exam<select id="en-exam" class="select-input"></select></label>
+      <label>Section<select id="en-section" class="select-input"></select></label>
+    </div>
+    <div id="en-sheet"></div>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/school-exam-marks.js?v={{ app_version() }}"></script>
+{% endblock %}

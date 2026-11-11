@@ -328,6 +328,7 @@ PARENT_NAV_ITEMS = [
     _nav("timetable", "Timetable & exams", "clock", "/dashboard/parent/timetable"),
     _nav("diary", "Diary & attendance", "attendance", "/dashboard/parent/diary"),     # School mode only
     _nav("meetings", "Parent-teacher meetings", "students", "/dashboard/parent/meetings"),   # School mode only
+    _nav("report-cards", "Report cards", "exams", "/dashboard/parent/report-cards", short="Results"),   # School mode only
     _nav("notices", "Notices", "megaphone", "/dashboard/parent/notices"),
     _nav("calendar", "Calendar", "clock", "/dashboard/parent/calendar"),
     _nav("account", "My account", "settings", "/dashboard/parent/account", mobile=True, short="Account"),
@@ -425,6 +426,7 @@ STUDENT_NAV_ITEMS = [
     _nav("timetable", "My Timetable", "clock", "/dashboard/student/timetable", group="Study", mobile=True, short="Timetable"),
     _nav("attendance", "My Attendance", "attendance", "/dashboard/student/attendance", group="Study", mobile=True, short="Attendance"),
     _nav("diary", "Diary & attendance", "attendance", "/dashboard/student/diary", group="Study", short="Diary"),     # School mode only
+    _nav("report-cards", "Report cards", "exams", "/dashboard/student/report-cards", group="Study", short="Results"),   # School mode only
     _nav("exams", "My Exams", "clock", "/dashboard/student/exams", group="Study"),
     _nav("results", "My Results", "exams", "/dashboard/student/results", group="Study", mobile=True, short="Results"),
     _nav("feedback", "Course feedback", "check-circle", "/dashboard/student/feedback", group="Study"),
@@ -450,6 +452,7 @@ FACULTY_NAV_ITEMS = [
     _nav("attendance", "Attendance", "attendance", "/dashboard/faculty/attendance", group="Teaching", mobile=True),
     _nav("my-class", "My class", "students", "/dashboard/faculty/my-class", group="Teaching", short="My class"),   # School mode only
     _nav("homework", "Homework diary", "exams", "/dashboard/faculty/homework", group="Teaching"),                                # School mode only
+    _nav("exam-marks", "Exam marks & report cards", "exams", "/dashboard/faculty/exam-marks", group="Teaching", short="Marks"),  # School mode only
     _nav("grading", "Grading", "exams", "/dashboard/faculty/grading", group="Teaching", mobile=True),
     _nav("watch", "Students to watch", "students", "/dashboard/faculty/watch", group="Teaching"),
     _nav("feedback", "Student feedback", "check-circle", "/dashboard/faculty/feedback", group="Teaching"),
@@ -767,6 +770,9 @@ app.include_router(school_router, prefix=settings.api_v1_prefix)
 from app.school.daily_router import router as school_daily_router  # noqa: E402
 
 app.include_router(school_daily_router, prefix=settings.api_v1_prefix)
+from app.school.results_router import router as school_results_router  # noqa: E402
+
+app.include_router(school_results_router, prefix=settings.api_v1_prefix)
 from app.push.router import router as push_router  # noqa: E402
 from app.push.app_shell import router as app_shell_router  # noqa: E402
 
@@ -1502,6 +1508,8 @@ async def parent_timetable_page(request: Request):
 
 @app.get("/dashboard/parent/marks", include_in_schema=False)
 async def parent_marks_page(request: Request):
+    if school_mode():                                  # a school: exam marks and report cards instead
+        return RedirectResponse("/dashboard/parent/report-cards", status_code=302)
     return templates.TemplateResponse(request, "parent/marks.html", {"nav_items": PARENT_NAV_ITEMS, "active_nav": "marks"})
 
 
@@ -1648,6 +1656,21 @@ async def parent_diary_page(request: Request):
 @app.get("/dashboard/parent/meetings", include_in_schema=False)
 async def parent_meetings_page(request: Request):
     return templates.TemplateResponse(request, "parent/meetings.html", {"nav_items": PARENT_NAV_ITEMS, "active_nav": "meetings"})
+
+
+@app.get("/dashboard/faculty/exam-marks", include_in_schema=False)
+async def faculty_exam_marks_page(request: Request):
+    return templates.TemplateResponse(request, "faculty/exam_marks.html", {"nav_items": FACULTY_NAV_ITEMS, "active_nav": "exam-marks"})
+
+
+@app.get("/dashboard/student/report-cards", include_in_schema=False)
+async def student_report_cards_page(request: Request):
+    return templates.TemplateResponse(request, "student/report_cards.html", {"nav_items": STUDENT_NAV_ITEMS, "active_nav": "report-cards"})
+
+
+@app.get("/dashboard/parent/report-cards", include_in_schema=False)
+async def parent_report_cards_page(request: Request):
+    return templates.TemplateResponse(request, "parent/report_cards.html", {"nav_items": PARENT_NAV_ITEMS, "active_nav": "report-cards"})
 
 
 @app.get("/dashboard/faculty/exams", include_in_schema=False)
@@ -1877,6 +1900,8 @@ async def student_attendance_page(request: Request):
 
 @app.get("/dashboard/student/results", include_in_schema=False)
 async def student_results_page(request: Request):
+    if school_mode():                                  # a school: exam marks and report cards instead
+        return RedirectResponse("/dashboard/student/report-cards", status_code=302)
     return templates.TemplateResponse(
         request, "student/results.html", {"nav_items": STUDENT_NAV_ITEMS, "active_nav": "results"}
     )
@@ -2022,6 +2047,8 @@ async def faculty_attendance_page(request: Request):
 
 @app.get("/dashboard/faculty/grading", include_in_schema=False)
 async def faculty_grading_page(request: Request):
+    if school_mode():                                  # a school: exam marks and report cards instead
+        return RedirectResponse("/dashboard/faculty/exam-marks", status_code=302)
     return templates.TemplateResponse(
         request, "faculty/grading.html", {"nav_items": FACULTY_NAV_ITEMS, "active_nav": "grading"}
     )

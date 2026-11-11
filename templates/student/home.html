@@ -16,7 +16,7 @@
     <nav class="dash-actions" aria-label="Quick actions">
       <a href="/api/v1/academics/timetable/weekly.pdf" data-download="timetable.pdf" data-label="PDF" class="dash-action">{{ nav_icon("clock") }}<span>Timetable PDF</span></a>
       <a href="/dashboard/student/assignments" class="dash-action">{{ nav_icon("file") }}<span>Assignments</span></a>
-      <a href="/dashboard/student/results" class="dash-action">{{ nav_icon("graduation-cap") }}<span>Results</span></a>
+      <a href="{{ '/dashboard/student/report-cards' if school_mode() else '/dashboard/student/results' }}" class="dash-action">{{ nav_icon("graduation-cap") }}<span>Results</span></a>
       <a href="/dashboard/student/fees" class="dash-action">{{ nav_icon("fees") }}<span>Fees</span></a>
       <a href="/dashboard/student/library" class="dash-action">{{ nav_icon("library") }}<span>Library</span></a>
     </nav>
@@ -50,7 +50,7 @@
       <strong class="kpi-value" id="k-asg">&mdash;</strong>
       <span class="kpi-sub" id="k-asg-sub">&nbsp;</span>
     </a>
-    <a class="kpi" href="/dashboard/student/results" data-tone="green">
+    <a class="kpi" href="{{ '/dashboard/student/report-cards' if school_mode() else '/dashboard/student/results' }}" data-tone="green">
       <span class="kpi-icon">{{ nav_icon("graduation-cap") }}</span>
       <span class="kpi-label">CGPA</span>
       <strong class="kpi-value" id="k-cgpa">&mdash;</strong>

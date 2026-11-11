@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.19.0",
+    "date": "2026-11-11",
+    "title": "School mode: exams, report cards and promotion",
+    "summary": "For schools: 1st Term, Mid-Term and Final exams, marks entry by subject teachers, report cards for students and parents, and moving students up to the next class.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Classes & sections has a new Exams & results tab: set up the 1st Term, Mid-Term and Final exams, set each subject's total marks (100 unless changed), follow how far marks entry has got in every class, and publish report cards class by class. Students and parents are told when a report card is ready."
+      },
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "Exam marks & report cards: subject teachers enter marks for their sections (tick Absent for a student who missed the paper; it counts as 0). The class teacher also writes remarks and rates skills and behaviour A to D."
+      },
+      {
+        "kind": "new",
+        "for": "Everyone",
+        "text": "Report cards show each subject's marks and grade, the total, position in the section (students with the same marks share a position), attendance, skills and remarks, and can be downloaded as a PDF. Grades follow the board scale; O and A Level classes use the Cambridge scale."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "After the Final exam the report card shows the year's result, weighted 20% 1st Term, 30% Mid-Term and 50% Final (changeable in Settings). Promotion moves the students of a class to the next class in the new session: those who passed are ticked, others are kept back or promoted on approval, and Class 8 and 10 students can be placed in their chosen stream."
+      }
+    ]
+  },
+  {
     "version": "1.18.0",
     "date": "2026-11-11",
     "title": "School mode: roll call, homework diary and parent-teacher meetings",

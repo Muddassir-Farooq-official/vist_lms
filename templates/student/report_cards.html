@@ -1,0 +1,12 @@
+{% extends "student/_base.html" %}
+{% block title %}Report cards{% endblock %}
+{% block page_title %}Report cards{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Your report cards for each exam, once the school publishes them.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/school-results.css?v={{ app_version() }}" />{% endblock %}
+{% block content %}
+<section class="sh-card" aria-label="Report cards"><div id="rc-cards"><div class="skeleton-stack"><div class="skeleton-line"></div></div></div></section>
+{% endblock %}
+{% block extra_scripts %}
+<script src="/static/js/school-cards-view.js?v={{ app_version() }}"></script>
+<script src="/static/js/student-report-cards.js?v={{ app_version() }}"></script>
+{% endblock %}

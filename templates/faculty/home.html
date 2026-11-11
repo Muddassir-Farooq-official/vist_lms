@@ -16,7 +16,7 @@
       {% if school_mode() %}<a href="/dashboard/faculty/my-class" class="dash-action">{{ nav_icon("attendance") }}<span>Roll call</span></a>
       {% else %}<a href="{{ attendance_href('faculty') }}" class="dash-action">{{ nav_icon("attendance") }}<span>Attendance</span></a>{% endif %}
       <a href="/dashboard/faculty/courses" class="dash-action">{{ nav_icon("graduation-cap") }}<span>Lesson plans</span></a>
-      <a href="/dashboard/faculty/grading" class="dash-action">{{ nav_icon("exams") }}<span>Grading</span></a>
+      <a href="{{ '/dashboard/faculty/exam-marks' if school_mode() else '/dashboard/faculty/grading' }}" class="dash-action">{{ nav_icon("exams") }}<span>{{ 'Exam marks' if school_mode() else 'Grading' }}</span></a>
       <a href="/dashboard/faculty/assignments" class="dash-action">{{ nav_icon("file") }}<span>Assignments</span></a>
       <a href="/api/v1/academics/timetable/weekly.pdf" data-download="timetable.pdf" data-label="PDF" class="dash-action">{{ nav_icon("clock") }}<span>Timetable PDF</span></a>
     </nav>
