@@ -9,6 +9,7 @@ Nothing here changes what is stored (still the number in policy_settings); it on
 from __future__ import annotations
 
 SECTIONS: tuple[tuple[str, str], ...] = (
+    ("Institute type", "A school, or a college / university. A school gets Classes & sections and school words in the menus."),
     ("Fees & fines", "Late fees, how they grow, and when they become fines to collect."),
     ("Sign-in security", "The code from an authenticator app that administrators type after their password."),
     ("Attendance", "Marking classes, alerts for teachers, and the limits that affect students."),
@@ -27,6 +28,8 @@ SECTIONS: tuple[tuple[str, str], ...] = (
 HOURS = [[0, "Never"]] + [[h, f"{(h - 1) % 12 + 1}:00 {'AM' if h < 12 else 'PM'}"] for h in range(1, 24)]
 
 UI: dict[str, dict] = {
+    "school_mode": {"section": "Institute type", "label": "This institute is a", "control": "choice",
+                    "choices": [[0, "College / University"], [1, "School"]]},
     # ---------------------------------------------------------------- fees
     "fee_late_fee_grace_days": {"section": "Fees & fines", "sub": "Late fee", "label": "Grace days after the due date",
                                 "control": "number", "after": "days"},

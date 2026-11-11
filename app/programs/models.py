@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Index, Integer, String, UniqueConstraint, func
+import uuid
+
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base, TimestampMixin, UUIDPKMixin
@@ -21,6 +23,13 @@ class Program(UUIDPKMixin, TimestampMixin, Base):
     # global constant) — this is the actual enrollment/retake gate; see
     # app/academics/service.py EnrollmentService.
     max_credit_hours_per_semester: Mapped[int] = mapped_column(Integer, nullable=False, default=18)
+
+    # School mode (app/school): a program can be a school CLASS, e.g. "Class 9 (Science)". Set only for classes;
+    # all four stay empty for college / university programs.
+    school_level: Mapped[int | None] = mapped_column(Integer, nullable=True)           # order: Playgroup 1 ... Class 12 15
+    school_stage: Mapped[str | None] = mapped_column(String(20), nullable=True)        # PRE_SCHOOL, PRIMARY, MIDDLE, MATRIC, INTER, O_LEVEL, A_LEVEL
+    stream: Mapped[str | None] = mapped_column(String(40), nullable=True)              # Science, Computer Science, Arts, Pre-Medical ...
+    promotes_to_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("programs.id", ondelete="SET NULL"), nullable=True)
 
 
 # Case-insensitive uniqueness on trimmed name (Section 9/11) — declared as a

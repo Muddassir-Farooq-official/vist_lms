@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.16.0",
+    "date": "2026-11-11",
+    "title": "School mode: classes and sections",
+    "summary": "A copy can now run a school: classes from Playgroup to Class 12 and O / A Levels, sections with class teachers, subjects and subject teachers.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Settings → Institute type: choose School or College / University. A school gets Classes & sections, and the menus use school words (Subjects instead of Courses, Classes instead of Programs). Nothing changes until it is switched on."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Classes & sections → Set up classes: tick Pre-school, Class 1-5, Class 6-8, Matric (Science, Computer Science, Arts), Intermediate (Pre-Medical, Pre-Engineering, ICS, I.Com, F.A.), O Level or A Level, name the session (e.g. 2026-27) and the sections. Each class gets its usual subjects and knows the next class for promotion. Running it again only adds what is missing."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Each section: choose the class teacher, room and seats, and the teacher of every subject. Teachers are told about their new class. Add or remove subjects (optional \"choice\" subjects for O / A Levels), and add sections."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Put students in a section: they are enrolled in all the class's subjects (and the choice subjects you tick) in one step. A student can move to another section before classes start, taking their subjects along."
+      }
+    ]
+  },
+  {
     "version": "1.15.0",
     "date": "2026-11-11",
     "title": "Exam duty and the exam roll",
