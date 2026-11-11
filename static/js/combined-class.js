@@ -24,7 +24,7 @@
       html += '<p class="cb-on"><strong>Combined class</strong> of ' + d.members.length + " sections, " + d.students + " students in all" +
         (d.members[0].teacher ? ", taught by " + esc(d.members[0].teacher) : "") + ".</p><ul class=\"cb-list\">" +
         d.members.map(function (m) {
-          return "<li>" + who(m) + (m.id === OFFERING_ID ? ' <span class="status-pill active">this section</span>' : ' <a href="/dashboard/admin/offerings/' + esc(m.id) + '">Open</a>') + "</li>";
+          return "<li>" + who(m) + (m.id === OFFERING_ID ? ' <span class="status-pill active">this section</span>' : ' <a href="/dashboard/admin/courses/offering/' + esc(m.id) + '">Open</a>') + "</li>";
         }).join("") + "</ul>" +
         '<button type="button" class="role-btn secondary-btn small-btn" id="cb-separate">Take this section out of the combined class</button>';
     } else {
