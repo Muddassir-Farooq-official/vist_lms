@@ -1,10 +1,11 @@
 """Datesheets and admit cards.
 
 The exam office builds a datesheet (one paper per course: date, time, room,
-invigilator) while it is a DRAFT. It cannot be published while any clash exists:
+teachers on duty) while it is a DRAFT. It cannot be published while any clash exists:
   - a student with two papers at overlapping times,
   - a room with two papers at overlapping times (across every datesheet),
-  - an invigilator in two places at once.
+  - a teacher on duty in two places at once.
+Duties, the exam roll and unfair means cases: app/exams/duty.py.
 Once PUBLISHED, students, teachers and parents see it, and admit cards (roll-number
 slips) can be printed. A changed paper is re-checked for clashes before it is saved.
 
@@ -39,7 +40,8 @@ class ExamScheduleService:
         self.session = session
 
     # ---------------------------------------------------------------- schedules
-    async def create(self, *, term_label: str, name: str, instructions: str | None, actor_id: uuid.UUID) -> ExamSchedule:
+    async def create(self, *, term_label: str, name: str, instructions: str | None, actor_id: uuid.UUID,
+                     assessment_type_id: uuid.UUID | None = None) -> ExamSchedule:
         name = " ".join(name.split())
         if not name:
             raise ValidationAppError("Give the datesheet a name, for example Midterm.")
@@ -49,7 +51,12 @@ class ExamScheduleService:
         dup = (await self.session.execute(select(ExamSchedule).where(ExamSchedule.term_label == term_label, ExamSchedule.name == name))).scalar_one_or_none()
         if dup:
             raise DuplicateResourceError(f'A "{name}" datesheet for {term_label} already exists.')
-        sched = ExamSchedule(term_label=term_label, name=name, instructions=instructions, created_by=actor_id)
+        if assessment_type_id is not None:
+            from app.academics.models import AssessmentType
+
+            if await self.session.get(AssessmentType, assessment_type_id) is None:
+                raise ResourceNotFoundError("Result type not found.")
+        sched = ExamSchedule(term_label=term_label, name=name, instructions=instructions, created_by=actor_id, assessment_type_id=assessment_type_id)
         self.session.add(sched)
         await self.session.flush()
         return sched
@@ -84,33 +91,55 @@ class ExamScheduleService:
             raise ValidationAppError("Give the room or hall.")
 
     async def add_paper(self, schedule_id: uuid.UUID, *, course_offering_id: uuid.UUID, exam_date: date, start_time, end_time,
-                        room: str, invigilator_employee_id: uuid.UUID | None) -> ExamPaper:
+                        room: str, invigilator_employee_id: uuid.UUID | None = None, actor_id: uuid.UUID | None = None) -> ExamPaper:
         sched = await self.get(schedule_id)
         exists = (await self.session.execute(select(ExamPaper).where(ExamPaper.schedule_id == schedule_id,
                                                                      ExamPaper.course_offering_id == course_offering_id))).scalar_one_or_none()
         if exists:
             raise DuplicateResourceError("This course already has a paper on this datesheet. Change that paper instead.")
         paper = ExamPaper(schedule_id=schedule_id, course_offering_id=course_offering_id, exam_date=exam_date, start_time=start_time,
-                          end_time=end_time, room=room.strip(), invigilator_employee_id=invigilator_employee_id)
+                          end_time=end_time, room=room.strip())
         await self._validate(sched, paper)
         self.session.add(paper)
         await self.session.flush()
+        if invigilator_employee_id:
+            from app.exams.duty import ExamDutyService
+
+            await ExamDutyService(self.session).assign(paper.id, employee_ids=[invigilator_employee_id], in_charge_id=invigilator_employee_id,
+                                                      actor_id=actor_id)
         if sched.status == ScheduleStatus.PUBLISHED:
             await self._refuse_new_clashes(sched, paper)
         return paper
 
-    async def update_paper(self, paper_id: uuid.UUID, **changes) -> ExamPaper:
+    async def update_paper(self, paper_id: uuid.UUID, actor_id: uuid.UUID | None = None, **changes) -> ExamPaper:
+        """Change the date, time or room (and, the old way, the teacher in charge). Teachers on duty are told of a change
+        to a published paper."""
+        from app.exams.duty import ExamDutyService
+
         paper = await self.session.get(ExamPaper, paper_id)
         if paper is None:
             raise ResourceNotFoundError("Paper not found.")
         sched = await self.get(paper.schedule_id)
+        duty = ExamDutyService(self.session)
+        if "invigilator_employee_id" in changes:
+            eid = changes.pop("invigilator_employee_id")
+            others = [a["employee_id"] for a in (await duty.duties([paper.id]))[paper.id] if a["role"] != "IN_CHARGE"]
+            await duty.assign(paper.id, employee_ids=([eid] if eid else []) + ([o for o in others if o != eid] if eid else others),
+                              in_charge_id=eid, actor_id=actor_id)
+        before = (paper.exam_date, paper.start_time, paper.end_time, paper.room)
         for k, v in changes.items():
-            if v is not None or k == "invigilator_employee_id":
+            if v is not None:
                 setattr(paper, k, v.strip() if isinstance(v, str) else v)
         await self._validate(sched, paper)
         await self.session.flush()
         if sched.status == ScheduleStatus.PUBLISHED:
             await self._refuse_new_clashes(sched, paper)
+            if before != (paper.exam_date, paper.start_time, paper.end_time, paper.room):
+                label = (await self._labels([paper.course_offering_id]))[paper.course_offering_id]
+                for a in (await duty.duties([paper.id]))[paper.id]:
+                    await duty.tell(a["employee_id"], f"Exam duty changed: {label}",
+                                    f"The {sched.name} paper of {label} you are on duty for is now on {paper.exam_date:%a %d %b %Y}, "
+                                    f"{paper.start_time:%H:%M}–{paper.end_time:%H:%M}, room {paper.room}.")
         return paper
 
     async def delete_paper(self, paper_id: uuid.UUID) -> None:
@@ -121,9 +150,12 @@ class ExamScheduleService:
 
     # ---------------------------------------------------------------- clashes
     async def clashes(self, schedule_id: uuid.UUID) -> list[dict]:
+        from app.exams.duty import ExamDutyService
+
         papers = await self.papers(schedule_id)
         if not papers:
             return []
+        on_duty = {pid: {a["employee_id"]: a["name"] for a in rows} for pid, rows in (await ExamDutyService(self.session).duties([p.id for p in papers])).items()}
         label = await self._labels([p.course_offering_id for p in papers])
         out: list[dict] = []
         # students: who is enrolled in each paper's course
@@ -140,9 +172,11 @@ class ExamScheduleService:
                 if shared:
                     out.append({"kind": "STUDENT", "papers": [label[a.course_offering_id], label[b.course_offering_id]],
                                 "date": a.exam_date, "detail": f"{len(shared)} student(s) sit both papers at the same time"})
-                if a.invigilator_employee_id and a.invigilator_employee_id == b.invigilator_employee_id:
+                both = set(on_duty[a.id]) & set(on_duty[b.id])
+                if both:
+                    names = ", ".join(sorted(on_duty[a.id][e] for e in both))
                     out.append({"kind": "INVIGILATOR", "papers": [label[a.course_offering_id], label[b.course_offering_id]],
-                                "date": a.exam_date, "detail": "the same invigilator is in two rooms"})
+                                "date": a.exam_date, "detail": f"{names} on duty in two rooms at once"})
         # rooms: against every paper on those dates, in every datesheet
         dates = {p.exam_date for p in papers}
         others = list((await self.session.execute(select(ExamPaper).where(ExamPaper.exam_date.in_(dates)))).scalars())
@@ -187,6 +221,9 @@ class ExamScheduleService:
         await AuditService(self.session).log(actor_user_id=actor_id, action="exam_schedule.published", entity_type="exam_schedule",
                                              entity_id=sched.id, after={"term": sched.term_label, "name": sched.name})
         await self._notify_students(sched)
+        from app.exams.duty import ExamDutyService
+
+        await ExamDutyService(self.session).tell_on_publish(sched)
         return sched
 
     async def _notify_students(self, sched: ExamSchedule) -> None:
@@ -212,11 +249,14 @@ class ExamScheduleService:
                                       link="/dashboard/student/exams")
 
     # ---------------------------------------------------------------- what people see
-    async def _paper_rows(self, papers: list[ExamPaper]) -> list[dict]:
+    async def _paper_rows(self, papers: list[ExamPaper], *, with_duty: bool = False, sched: ExamSchedule | None = None) -> list[dict]:
         from app.employees.models import Employee
+        from app.exams.duty import ExamDutyService
 
         if not papers:
             return []
+        duty = ExamDutyService(self.session)
+        on_duty = await duty.duties([p.id for p in papers])
         rows = {o.id: (o, c) for o, c in (await self.session.execute(select(CourseOffering, Course).join(Course, Course.id == CourseOffering.course_id)
                                                                       .where(CourseOffering.id.in_([p.course_offering_id for p in papers])))).all()}
         inv_ids = [p.invigilator_employee_id for p in papers if p.invigilator_employee_id]
@@ -226,17 +266,25 @@ class ExamScheduleService:
             o, c = rows[p.course_offering_id]
             out.append({"id": p.id, "course_offering_id": o.id, "course_code": c.code, "course_title": c.title, "section": o.section_label,
                         "exam_date": p.exam_date, "start_time": p.start_time.strftime("%H:%M"), "end_time": p.end_time.strftime("%H:%M"),
-                        "room": p.room, "invigilator_employee_id": p.invigilator_employee_id, "invigilator": inv.get(p.invigilator_employee_id)})
+                        "room": p.room, "invigilator_employee_id": p.invigilator_employee_id, "invigilator": inv.get(p.invigilator_employee_id),
+                        "on_duty": [{"name": a["name"], "role": a["role"]} for a in on_duty[p.id]]})
+            if with_duty:
+                n = await duty.students_sitting(o.id)
+                out[-1].update({"on_duty": on_duty[p.id], "students": n, "needed": duty.needed(n),
+                                "started": bool(sched) and duty.locked(p, sched)})
         return out
 
     async def detail(self, schedule_id: uuid.UUID) -> dict:
         sched = await self.get(schedule_id)
-        return {**self.summary(sched), "papers": await self._paper_rows(await self.papers(schedule_id)), "clashes": await self.clashes(schedule_id)}
+        from app.exams.duty import ExamDutyService
+
+        return {**self.summary(sched), "papers": await self._paper_rows(await self.papers(schedule_id), with_duty=True, sched=sched),
+                "clashes": await self.clashes(schedule_id), "cases": await ExamDutyService(self.session).cases(schedule_id=schedule_id)}
 
     @staticmethod
     def summary(s: ExamSchedule) -> dict:
         return {"id": s.id, "term_label": s.term_label, "name": s.name, "status": s.status.value, "instructions": s.instructions,
-                "published_at": s.published_at}
+                "published_at": s.published_at, "assessment_type_id": s.assessment_type_id}
 
     async def for_student(self, student_id: uuid.UUID) -> list[dict]:
         """Every PUBLISHED datesheet with at least one paper for a course this student is enrolled in."""
@@ -252,7 +300,10 @@ class ExamScheduleService:
         return out
 
     async def for_teacher(self, employee_id: uuid.UUID) -> list[dict]:
-        """Published papers of courses this person teaches, or invigilates."""
+        """Published papers of courses this person teaches, or is on duty for."""
+        from app.exams.models import ExamDuty
+
+        mine = set((await self.session.execute(select(ExamDuty.paper_id).where(ExamDuty.employee_id == employee_id))).scalars())
         out = []
         for s in await self.list():
             if s.status != ScheduleStatus.PUBLISHED:
@@ -260,45 +311,32 @@ class ExamScheduleService:
             papers = []
             for p in await self.papers(s.id):
                 o = await self.session.get(CourseOffering, p.course_offering_id)
-                if p.invigilator_employee_id == employee_id or o.assigned_teacher_id == employee_id:
+                if p.id in mine or o.assigned_teacher_id == employee_id:
                     papers.append(p)
             if papers:
                 out.append({**self.summary(s), "papers": await self._paper_rows(papers)})
         return out
 
     # ---------------------------------------------------------------- admit card
-    async def admit_card(self, schedule_id: uuid.UUID, student_id: uuid.UUID) -> dict:
-        from app.attendance.holds import unpaid_attendance_fines
+    async def course_eligibility(self, student_id: uuid.UUID, offering_id: uuid.UUID) -> tuple[bool, str | None, float]:
+        """(may sit, reason when not, attendance %) for one course: attendance at or above the minimum, or a cleared shortfall."""
         from app.attendance.service import AttendanceService
+
+        pct = await AttendanceService(self.session).compute_percentage(student_id, offering_id)
+        ok = pct["total_sessions_taken"] == 0 or pct["percentage"] >= settings.attendance_eligibility_threshold_percent
+        reason = None
+        if not ok:
+            from app.attendance.shortfall import cleared, not_cleared_reason
+
+            ok = await cleared(self.session, student_id, offering_id, pct["percentage"])
+            reason = None if ok else await not_cleared_reason(self.session, student_id, offering_id, pct["percentage"])
+        return ok, reason, pct["percentage"]
+
+    async def withheld(self, student_id: uuid.UUID) -> list[str]:
+        """Why the whole admit card is held: an unpaid attendance fine, or (by policy) overdue fees."""
+        from app.attendance.holds import unpaid_attendance_fines
         from app.fees.assignment_service import FeeStatusCalculator, late_pause
         from app.fees.models import AssignmentStatus, FeeAssignment, FeeStructure, PayerType
-        from app.programs.models import Program
-        from app.students.models import Student
-
-        sched = await self.get(schedule_id)
-        if sched.status != ScheduleStatus.PUBLISHED:
-            raise BusinessRuleViolationError("Admit cards are available once the datesheet is published.")
-        student = await self.session.get(Student, student_id)
-        if student is None:
-            raise ResourceNotFoundError("Student not found.")
-        mine = set((await self.session.execute(select(Enrollment.course_offering_id).where(
-            Enrollment.student_id == student_id, Enrollment.status == EnrollmentStatus.ENROLLED))).scalars())
-        papers = [p for p in await self.papers(schedule_id) if p.course_offering_id in mine]
-        if not papers:
-            raise ResourceNotFoundError("This student has no paper on this datesheet.")
-        att = AttendanceService(self.session)
-        rows = await self._paper_rows(papers)
-        minimum = settings.attendance_eligibility_threshold_percent
-        for r in rows:
-            pct = await att.compute_percentage(student_id, r["course_offering_id"])
-            ok = pct["total_sessions_taken"] == 0 or pct["percentage"] >= minimum
-            if not ok:
-                from app.attendance.shortfall import cleared, not_cleared_reason
-
-                ok = await cleared(self.session, student_id, r["course_offering_id"], pct["percentage"])
-            r["attendance_percent"] = pct["percentage"]
-            r["eligible"] = ok
-            r["reason"] = None if ok else await not_cleared_reason(self.session, student_id, r["course_offering_id"], pct["percentage"])
 
         withheld = []
         n_fines, fine_total = await unpaid_attendance_fines(self.session, student_id)
@@ -319,6 +357,30 @@ class ExamScheduleService:
                         overdue += row["remaining"]
             if overdue > 0.005:
                 withheld.append(f"overdue fees of Rs. {overdue:,.0f}")
+        return withheld
+
+    async def admit_card(self, schedule_id: uuid.UUID, student_id: uuid.UUID) -> dict:
+        from app.programs.models import Program
+        from app.students.models import Student
+
+        sched = await self.get(schedule_id)
+        if sched.status != ScheduleStatus.PUBLISHED:
+            raise BusinessRuleViolationError("Admit cards are available once the datesheet is published.")
+        student = await self.session.get(Student, student_id)
+        if student is None:
+            raise ResourceNotFoundError("Student not found.")
+        mine = set((await self.session.execute(select(Enrollment.course_offering_id).where(
+            Enrollment.student_id == student_id, Enrollment.status == EnrollmentStatus.ENROLLED))).scalars())
+        papers = [p for p in await self.papers(schedule_id) if p.course_offering_id in mine]
+        if not papers:
+            raise ResourceNotFoundError("This student has no paper on this datesheet.")
+        rows = await self._paper_rows(papers)
+        for r in rows:
+            ok, reason, pct = await self.course_eligibility(student_id, r["course_offering_id"])
+            r["attendance_percent"] = pct
+            r["eligible"] = ok
+            r["reason"] = reason
+        withheld = await self.withheld(student_id)
         prog = await self.session.get(Program, student.program_id) if student.program_id else None
         return {"schedule": self.summary(sched), "student": {"id": student.id, "name": f"{student.first_name} {student.last_name}",
                 "roll_number": student.roll_number, "program": prog.code if prog else None, "semester": student.current_semester},

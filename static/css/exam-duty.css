@@ -1,0 +1,75 @@
+/* Exam duty (datesheets page) and the exam roll (datesheets + Exam duties pages). */
+
+/* ---- on-duty cell in the papers table */
+.dt-names { display: flex; flex-wrap: wrap; gap: 4px; }
+.dt-name { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--surface-alt); border: 1px solid var(--border); font-size: 0.8rem; }
+.dt-name.is-charge { background: var(--blue-50); border-color: var(--blue-100); color: var(--blue-700); font-weight: 600; }
+.dt-need { display: block; margin-top: 3px; font-size: 0.76rem; color: var(--text-muted); }
+.dt-need.is-short { color: var(--danger); font-weight: 600; }
+.dt-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+
+/* ---- duty panel */
+.dt-box, .er-box { margin-top: 16px; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+.dt-head, .er-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.dt-head h3, .er-head h3 { margin: 0; flex: 1 1 auto; }
+.dt-head p, .er-head p { flex: 1 1 100%; margin: 2px 0 0; order: 3; }
+.er-close, .dt-close { margin-left: auto; }
+.dt-summary { margin: 12px 0; padding: 10px 12px; border-radius: 10px; background: var(--blue-50); color: var(--blue-700); font-size: 0.9rem; }
+.dt-summary.is-ok { background: var(--success-bg); color: var(--success); }
+.dt-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 12px; max-height: 420px; overflow-y: auto; }
+.dt-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 12px; border-top: 1px solid var(--border); }
+.dt-row:first-child { border-top: none; }
+.dt-row.is-busy { background: var(--surface-alt); }
+.dt-row.is-on { background: var(--blue-50); }
+.dt-row input[type="checkbox"] { width: 18px; height: 18px; }
+.dt-who strong { display: block; }
+.dt-who small { color: var(--text-muted); }
+.dt-free { color: var(--success); font-size: 0.8rem; font-weight: 600; }
+.dt-busy { color: var(--yellow-600); font-size: 0.8rem; }
+.dt-own { color: var(--text-muted); font-size: 0.78rem; }
+.dt-charge { display: inline-flex; align-items: center; gap: 5px; font-size: 0.8rem; white-space: nowrap; }
+.dt-foot { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.dt-filter { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; margin: 0 0 8px; }
+
+/* ---- exam roll */
+.er-chips { margin: 10px 0 4px; }
+.er-note { margin: 6px 0; font-size: 0.82rem; color: var(--text-muted); }
+.er-info { margin: 8px 0; padding: 9px 12px; border-radius: 10px; background: var(--yellow-50); color: var(--yellow-600); border: 1px solid var(--yellow-100); font-size: 0.88rem; }
+.er-bar { display: flex; justify-content: flex-end; margin: 8px 0 0; }
+.er-seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 10px; overflow: hidden; }
+.er-opt { position: relative; cursor: pointer; }
+.er-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.er-opt span { display: inline-block; min-width: 64px; padding: 6px 10px; text-align: center; font-size: 0.82rem; white-space: nowrap; border-left: 1px solid var(--border); }
+.er-opt:first-child span { border-left: none; }
+.er-opt input:focus-visible + span { outline: 2px solid var(--blue-500); outline-offset: -2px; }
+.er-present input:checked + span { background: var(--success-bg); color: var(--success); font-weight: 700; }
+.er-late input:checked + span { background: var(--yellow-100); color: var(--yellow-600); font-weight: 700; }
+.er-absent input:checked + span { background: var(--danger-bg); color: var(--danger); font-weight: 700; }
+.er-opt input:disabled + span { cursor: default; opacity: 0.75; }
+.er-sub { margin: 18px 0 6px; font-size: 0.95rem; }
+.er-barred, .er-cases { margin: 0; padding-left: 18px; font-size: 0.88rem; }
+.er-barred li, .er-cases li { margin: 4px 0; }
+
+/* ---- cases list on the datesheets page */
+.dc-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.dc-item { padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; margin-top: 8px; }
+.dc-item p { margin: 4px 0; }
+.dc-item .role-btn { margin-top: 6px; }
+
+/* ---- marks entry: absent in the exam */
+.mark-absent { display: block; margin-top: 2px; font-size: 0.72rem; font-weight: 700; color: var(--danger); text-transform: uppercase; letter-spacing: 0.02em; }
+.mark-input.is-absent { border-color: var(--danger-border); }
+
+/* ---- teacher's duties */
+.fd-today { background: var(--blue-50); }
+.fd-role { font-size: 0.78rem; font-weight: 600; }
+
+@media (max-width: 640px) {
+  .dt-row { grid-template-columns: auto minmax(0, 1fr); }
+  .dt-charge { grid-column: 2; }
+  .er-table th:nth-child(1), .er-table td:nth-child(1) { display: none; }
+  .er-seg { display: flex; width: 100%; }
+  .er-opt { flex: 1 1 0; }
+  .er-opt span { display: block; min-width: 0; padding: 8px 4px; }
+  .er-bar .role-btn, .dt-foot .role-btn { width: 100%; }
+}

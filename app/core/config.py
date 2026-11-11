@@ -239,6 +239,8 @@ class Settings(BaseSettings):
     require_registered_terms: bool = True
     # Exams: withhold the admit card while the student has overdue fees (1 = yes, 0 = no).
     admit_card_requires_fees_cleared: int = 1
+    # Exam duty: one teacher on duty for every this many students sitting a paper (app/exams/duty.py).
+    exam_students_per_invigilator: int = 30
     # SMS (see app/sms/service.py). No SMS_PROVIDER_URL = messages are recorded (LOGGED) but not sent.
     # Supplementary exams: the most grade points a supplementary pass can earn (0 = no cap; e.g. 2.0 = at most C).
     supplementary_max_grade_points: float = 0.0
@@ -271,6 +273,7 @@ class Settings(BaseSettings):
     phone_alert_vibrate: int = 1
     phone_alert_keep_urgent: int = 1
     monthly_report_notice: int = 1          # the 1st of each month: tell the principal last month's report is ready
+    sms_on_exam_duty: int = 1                # tell a teacher by SMS / WhatsApp when they are put on (or taken off) exam duty
     sms_on_warning: int = 0                  # tell the guardian when a student is warned (app/discipline); off unless switched on
     sms_on_fee_paid: int = 1                 # a message (receipt on WhatsApp) for each fee payment
     sms_on_certificate_ready: int = 1        # a message (certificate on WhatsApp) when a requested certificate is ready

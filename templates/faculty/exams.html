@@ -1,12 +1,19 @@
 {% extends "faculty/_base.html" %}
 {% block title %}Exam duties{% endblock %}
 {% block page_title %}Exam duties{% endblock %}
-{% block page_subtitle %}<div class="content-subtitle">Published exam papers for the courses you teach and the papers you invigilate.</div>{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">The papers you are on duty for, with the exam roll to mark on the day, and the papers of the courses you teach.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/exam-duty.css" />{% endblock %}
 
 {% block content %}
+<section class="sh-card">
+  <div class="sh-card-head"><h2>My duties</h2></div>
+  <div id="my-duties"><div class="skeleton-stack"><div class="skeleton-line"></div></div></div>
+  <div id="er-box" class="er-box" hidden></div>
+</section>
 <div id="duty-list"><div class="skeleton-stack"><div class="skeleton-line"></div></div></div>
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="/static/js/exam-roll.js"></script>
 <script src="/static/js/faculty-exams.js"></script>
 {% endblock %}

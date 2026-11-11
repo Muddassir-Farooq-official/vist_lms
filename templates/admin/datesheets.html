@@ -2,7 +2,8 @@
 {% block allowed_roles %}ADMIN,EXAM_CONTROLLER{% endblock %}
 {% block title %}Datesheets{% endblock %}
 {% block page_title %}Datesheets &amp; Admit Cards{% endblock %}
-{% block page_subtitle %}<div class="content-subtitle">Plan each exam's papers, fix clashes, publish, and print admit cards. Students see a datesheet only after it is published.</div>{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Plan each exam's papers, put teachers on duty, fix clashes, publish, and print admit cards. Students see a datesheet only after it is published.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/exam-duty.css" />{% endblock %}
 
 {% block content %}
 <section class="panel">
@@ -13,6 +14,7 @@
   <div class="ar-form">
     <label>Term<select id="ds-term" class="select-input term-select"><option value="">Select a term&hellip;</option></select></label>
     <label class="att-span2">Exam name<input id="ds-name" class="text-input" maxlength="80" placeholder="e.g. Mid-term exams" /></label>
+    <label>Marks go into<select id="ds-assess" class="select-input"><option value="">Same name as the exam</option></select></label>
     <div class="att-go"><button id="ds-create" class="role-btn" type="button">Create datesheet</button></div>
   </div>
   <p id="ds-error" class="dash-alert error" hidden></p>
@@ -36,7 +38,9 @@
     </div>
   </div>
   <div id="ds-clashes"></div>
-  <table class="dash-table"><thead><tr><th>Date</th><th>Time</th><th>Course</th><th>Room</th><th class="crs-actions"></th></tr></thead><tbody id="pp-list"></tbody></table>
+  <table class="dash-table"><thead><tr><th>Date</th><th>Time</th><th>Course</th><th>Room</th><th>On duty</th><th class="crs-actions"></th></tr></thead><tbody id="pp-list"></tbody></table>
+  <div id="dt-box" class="dt-box" hidden></div>
+  <div id="er-box" class="er-box" hidden></div>
   <div class="ds-foot">
     <button id="ds-publish" class="role-btn" type="button">Publish datesheet</button>
     <div class="ds-admit" id="ac-row" hidden>
@@ -44,10 +48,12 @@
       <button id="ac-print" class="role-btn secondary-btn" type="button">{{ nav_icon("download") }} Admit card</button>
     </div>
   </div>
+  <div id="ds-cases"></div>
 </section>
 {% endblock %}
 
 {% block extra_scripts %}
 <script src="/static/js/academic-terms.js"></script>
+<script src="/static/js/exam-roll.js"></script>
 <script src="/static/js/datesheets.js"></script>
 {% endblock %}
