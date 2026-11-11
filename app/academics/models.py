@@ -121,6 +121,10 @@ class CourseOffering(UUIDPKMixin, TimestampMixin, Base):
     # keeps "enrollment period is open/closed" a deliberate admin
     # decision rather than something that silently flips on a calendar.
     is_open_for_enrollment: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Combined class (app/academics/combined.py): sections of the SAME course in the same term that one teacher
+    # teaches together, e.g. AHS201 for BS Anesthesia (A) and BS Dental (B). They share one timetable, one teacher,
+    # one attendance list and one exam paper, while each section keeps its own students, attendance and marks.
+    combined_group_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True, index=True)
 
     # One combined syllabus document per offering (same "one supporting
     # PDF" pattern as the student/employee certificate upload) —

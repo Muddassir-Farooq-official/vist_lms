@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.17.0",
+    "date": "2026-11-11",
+    "title": "Combined classes",
+    "summary": "One teacher can teach the same course to several programs together, e.g. AHS201 for BS Anesthesia and BS Dental, at the same time in the same room.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Course section → Overview → Combined class: combine sections of the same course (e.g. section A for BS Anesthesia and section B for BS Dental). They get one teacher and one timetable, with no clash for sharing the teacher and the room. A section without a timetable gets the other's. Each section keeps its own students, attendance, marks and result sheet. A section can be taken out again."
+      },
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "A combined class shows as one class in Attendance and Grading: one list of all its students, each with their program. Attendance and marks are saved to each student's own section, and Submit sends every section's marks."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "In a combined class, a timetable slot added, changed or removed in one section is done in all of them, and so is a change of teacher or of the marks scheme."
+      },
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "A combined class has one paper on the datesheet for all its sections: the exam roll, admit cards, clash checks and the number of teachers on duty count every section's students."
+      }
+    ]
+  },
+  {
     "version": "1.16.0",
     "date": "2026-11-11",
     "title": "School mode: classes and sections",

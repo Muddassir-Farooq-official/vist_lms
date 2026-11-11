@@ -33,6 +33,11 @@
   const reasonInput = document.getElementById("correction-reason-input");
   const csvLink = document.getElementById("register-csv-link");
 
+  function isCombined() {
+    const o = offeringsCache.find(function (x) { return x.id === offeringSelect.value; });
+    return !!(o && (o.combined_with || []).length);
+  }
+
   async function loadMyOfferings() {
     const result = await VA.fetchJson("/api/v1/academics/offerings/me");
     if (!result.ok) return;
@@ -52,12 +57,22 @@
 
   function renderOfferingOptions() {
     const termFilter = termSelect.value;
-    const filtered = offeringsCache.filter(function (o) { return !termFilter || o.term_label === termFilter; });
+    const seen = {};
+    // A combined class (several sections taught together) is ONE entry: its first section opens the whole class.
+    const filtered = offeringsCache.filter(function (o) {
+      if (termFilter && o.term_label !== termFilter) return false;
+      if (!(o.combined_with || []).length) return true;
+      const key = o.course_id + "|" + o.term_label + "|" + [o.section_label].concat(o.combined_with).sort().join(",");
+      if (seen[key]) return false;
+      seen[key] = true;
+      return true;
+    });
     offeringSelect.innerHTML = '<option value="">Choose a course…</option>';
     filtered.forEach(function (o) {
       const opt = document.createElement("option");
       opt.value = o.id;
-      opt.textContent = o.course_code + " \u2014 " + o.course_title + " (" + o.term_label + ")";
+      opt.textContent = o.course_code + " \u2014 " + o.course_title + " (" + o.term_label + ")" +
+        ((o.combined_with || []).length ? " \u00b7 combined class: sections " + [o.section_label].concat(o.combined_with).sort().join(" + ") : "");
       offeringSelect.appendChild(opt);
     });
   }
@@ -73,7 +88,7 @@
     csvLink.hidden = false;
     const [sessionsResult, rosterResult] = await Promise.all([
       VA.fetchJson("/api/v1/academics/offerings/" + offeringSelect.value + "/class-sessions"),
-      VA.fetchJson("/api/v1/academics/offerings/" + offeringSelect.value + "/roster"),
+      VA.fetchJson("/api/v1/academics/offerings/" + offeringSelect.value + "/roster" + (isCombined() ? "?combined=true" : "")),
     ]);
     sessionsCache = sessionsResult.ok ? sessionsResult.body.filter(function (s) { return s.status !== "CANCELLED"; }) : [];
     sessionsCache.sort(function (a, b) { return a.session_date.localeCompare(b.session_date); });
@@ -129,7 +144,7 @@
     }
     const windowClosed = clock.now() > new Date(start.getTime() + windowMinutes * 60000);
 
-    const existingResult = await VA.fetchJson("/api/v1/attendance/sessions/" + session.id);
+    const existingResult = await VA.fetchJson("/api/v1/attendance/sessions/" + session.id + (isCombined() ? "?combined=true" : ""));
     const existingByStudent = {};
     if (existingResult.ok) {
       existingResult.body.forEach(function (r) { existingByStudent[r.student_id] = r.status; });
@@ -170,7 +185,7 @@
       const reqResult = await VA.fetchJson("/api/v1/attendance/sessions/" + sessionSelect.value + "/correction-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(Object.assign({ reason: reasonInput.value.trim() }, register)),
+        body: JSON.stringify(Object.assign({ reason: reasonInput.value.trim(), combined: isCombined() }, register)),
       });
       saveBtn.disabled = false;
       if (!reqResult.ok) {
@@ -187,7 +202,7 @@
     const markResult = await VA.fetchJson("/api/v1/attendance/sessions/" + sessionSelect.value + "/mark", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(register),
+      body: JSON.stringify(Object.assign({ combined: isCombined() }, register)),
     });
 
     if (!markResult.ok) {

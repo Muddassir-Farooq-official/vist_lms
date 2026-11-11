@@ -109,7 +109,7 @@ class GradingService:
         return list((await self.session.execute(stmt)).scalars())
 
     async def add_offering_assessment(
-        self, course_offering_id: uuid.UUID, *, assessment_type_id: uuid.UUID, actor_id: uuid.UUID
+        self, course_offering_id: uuid.UUID, *, assessment_type_id: uuid.UUID, actor_id: uuid.UUID, mirror: bool = True
     ) -> OfferingAssessment:
         offering = await self.offering_repo.get_by_id(course_offering_id)
         if offering is None:
@@ -137,12 +137,30 @@ class GradingService:
             entity_id=offering_assessment.id,
             after={"course_offering_id": str(course_offering_id), "assessment_type": assessment_type.name},
         )
+        if mirror and offering.combined_group_id is not None:        # a combined class keeps one marks scheme
+            from app.academics.combined import members
+
+            for other in await members(self.session, offering):
+                if other.id != offering.id and (await self.session.execute(select(OfferingAssessment.id).where(
+                        OfferingAssessment.course_offering_id == other.id, OfferingAssessment.assessment_type_id == assessment_type_id))).first() is None:
+                    await self.add_offering_assessment(other.id, assessment_type_id=assessment_type_id, actor_id=actor_id, mirror=False)
         return offering_assessment
 
-    async def remove_offering_assessment(self, offering_assessment_id: uuid.UUID, *, actor_id: uuid.UUID) -> None:
+    async def remove_offering_assessment(self, offering_assessment_id: uuid.UUID, *, actor_id: uuid.UUID, mirror: bool = True) -> None:
         offering_assessment = await self.session.get(OfferingAssessment, offering_assessment_id)
         if offering_assessment is None:
             raise ResourceNotFoundError("This subject's assessment entry was not found.")
+        if mirror:                                                    # a combined class keeps one marks scheme
+            from app.academics.combined import members
+
+            for other in await members(self.session, offering_assessment.course_offering_id):
+                if other.id == offering_assessment.course_offering_id:
+                    continue
+                twin = (await self.session.execute(select(OfferingAssessment).where(
+                    OfferingAssessment.course_offering_id == other.id,
+                    OfferingAssessment.assessment_type_id == offering_assessment.assessment_type_id))).scalar_one_or_none()
+                if twin is not None:
+                    await self.remove_offering_assessment(twin.id, actor_id=actor_id, mirror=False)
         await self._assert_structure_editable(offering_assessment.course_offering_id)
 
         existing_mark_stmt = (

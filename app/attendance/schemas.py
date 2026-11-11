@@ -18,6 +18,8 @@ class MarkSessionRequest(BaseModel):
     present_student_ids: list[uuid.UUID] = Field(default_factory=list)
     # Everyone enrolled and NOT in this list is ABSENT: attendance is Present or Absent, nothing else.
     late_note: str | None = Field(default=None, max_length=500)
+    # A combined class: the same class of every section is marked from this one list (the teacher's combined roster).
+    combined: bool = False
 
 
 class AttendanceRecordOut(BaseModel):
@@ -98,6 +100,7 @@ class LockPreviewOut(BaseModel):
 class CorrectionRequestCreate(BaseModel):
     reason: str = Field(min_length=5, max_length=500)
     present_student_ids: list[uuid.UUID] = Field(default_factory=list)
+    combined: bool = False        # a combined class: one request per section, from one list
 
 
 class CorrectionDecision(BaseModel):

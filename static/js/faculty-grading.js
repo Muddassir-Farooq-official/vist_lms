@@ -32,6 +32,22 @@
   let activeComponents = []; // [{id, assessment_type_id, assessment_type_name, category, max_marks}]
   let catalogCache = []; // the full institute-wide AssessmentType catalog
   let activeRoster = []; // full EnrollmentOut list
+  let myOfferings = [];
+  let memberAssessments = {}; // a combined class: {section offering id: {assessment type id: that section's assessment id}}
+
+  // A combined class (sections taught together): one list; each mark is saved to the student's own section.
+  function activeOffering() { return myOfferings.find(function (o) { return o.id === activeOfferingId; }); }
+  function isCombined() { const o = activeOffering(); return !!(o && (o.combined_with || []).length); }
+  function memberIds() {
+    const ids = {};
+    activeRoster.forEach(function (e) { ids[e.course_offering_id] = true; });
+    ids[activeOfferingId] = true;
+    return Object.keys(ids);
+  }
+  function oaFor(enrollment, c) {
+    if (enrollment.course_offering_id === activeOfferingId) return c.id;
+    return (memberAssessments[enrollment.course_offering_id] || {})[c.assessment_type_id];
+  }
 
   async function loadMyOfferings() {
     const result = await VA.fetchJson("/api/v1/academics/offerings/me");
@@ -43,11 +59,19 @@
       return;
     }
     noOfferings.hidden = true;
-
+    myOfferings = result.body;
+    const seen = {};
     result.body.forEach(function (o) {
+      const combined = (o.combined_with || []).length;
+      if (combined) {
+        const key = o.course_id + "|" + o.term_label + "|" + [o.section_label].concat(o.combined_with).sort().join(",");
+        if (seen[key]) return;
+        seen[key] = true;
+      }
       const opt = document.createElement("option");
       opt.value = o.id;
-      opt.textContent = o.course_code + " — " + o.course_title + " (" + o.term_label + ")";
+      opt.textContent = o.course_code + " — " + o.course_title + " (" + o.term_label + ")" +
+        (combined ? " · combined class: sections " + [o.section_label].concat(o.combined_with).sort().join(" + ") : "");
       offeringSelect.appendChild(opt);
     });
   }
@@ -215,6 +239,14 @@
 
   async function submitSheet() {
     if (!(await VA.confirm("Submit these marks for approval? They will be locked until they are approved or sent back to you.", "Submit"))) return;
+    // a combined class: every section's sheet is submitted (the first one shown here last)
+    const others = isCombined() ? memberIds().filter(function (id) { return id !== activeOfferingId; }) : [];
+    for (let i = 0; i < others.length; i++) {
+      const st = await VA.fetchJson(API_RESULTS + others[i] + "/sheet");
+      if (!st.ok || !(st.body.status === "DRAFT" || st.body.status === "RETURNED")) continue;      // already submitted
+      const o = await VA.fetchJson(API_RESULTS + others[i] + "/submit", { method: "POST" });
+      if (!o.ok) { marksError.textContent = extractErrorMessage(o.body, "Could not submit the marks of another section of this class."); marksError.hidden = false; return; }
+    }
     const r = await VA.fetchJson(API_RESULTS + activeOfferingId + "/submit", { method: "POST" });
     if (!r.ok) { marksError.textContent = extractErrorMessage(r.body, "Could not submit the marks."); marksError.hidden = false; return; }
     marksError.hidden = true;
@@ -251,8 +283,17 @@
   }
 
   async function loadRosterAndMarks() {
-    const rosterResult = await VA.fetchJson("/api/v1/academics/offerings/" + activeOfferingId + "/roster");
+    const rosterResult = await VA.fetchJson("/api/v1/academics/offerings/" + activeOfferingId + "/roster" + (isCombined() ? "?combined=true" : ""));
     activeRoster = rosterResult.ok ? rosterResult.body : [];
+    memberAssessments = {};
+    if (isCombined()) {
+      const ids = memberIds().filter(function (id) { return id !== activeOfferingId; });
+      const lists = await Promise.all(ids.map(function (id) { return VA.fetchJson("/api/v1/academics/offerings/" + id + "/assessments"); }));
+      ids.forEach(function (id, i) {
+        memberAssessments[id] = {};
+        (lists[i].ok ? lists[i].body : []).forEach(function (a) { memberAssessments[id][a.assessment_type_id] = a.id; });
+      });
+    }
 
     marksTheadRow.innerHTML = "<th>Student</th><th>Roll no.</th>";
     activeComponents.forEach(function (c) {
@@ -284,7 +325,7 @@
     const allMarks = await Promise.all(listed.map(function (e) { return VA.fetchJson("/api/v1/academics/enrollments/" + e.id + "/marks"); }));
     // Absent in an exam paper of this course (the exam roll): shown on that result type's cell, or by the name when no type matches.
     const absent = {}, absentByName = {};
-    const absRes = await VA.fetchJson("/api/v1/exams/offerings/" + activeOfferingId + "/absences");
+    const absRes = await VA.fetchJson("/api/v1/exams/offerings/" + activeOfferingId + "/absences" + (isCombined() ? "?combined=true" : ""));
     if (absRes.ok) absRes.body.forEach(function (a) {
       if (a.offering_assessment_id) absent[a.enrollment_id + "|" + a.offering_assessment_id] = a.schedule;
       else (absentByName[a.enrollment_id] = absentByName[a.enrollment_id] || []).push(a.schedule);
@@ -304,13 +345,15 @@
       const tr = document.createElement("tr");
       tr.dataset.enrollmentId = enrollment.id;
       const absNote = absentByName[enrollment.id] ? '<span class="mark-absent">Absent: ' + VA.escapeHtml(absentByName[enrollment.id].join(", ")) + " paper</span>" : "";
-      let cellsHtml = "<td>" + VA.escapeHtml(enrollment.student_name) + absNote + "</td>" +
+      const from = enrollment.program ? '<span class="mark-from">' + VA.escapeHtml(enrollment.program) + (enrollment.section_label ? " (" + VA.escapeHtml(enrollment.section_label) + ")" : "") + "</span>" : "";
+      let cellsHtml = "<td>" + VA.escapeHtml(enrollment.student_name) + from + absNote + "</td>" +
         "<td>" + VA.escapeHtml(enrollment.roll_number || "\u2014") + "</td>";
       activeComponents.forEach(function (c) {
-        const existing = marksByAssessment[c.id];
-        const wasAbsent = absent[enrollment.id + "|" + c.id];
+        const oa = oaFor(enrollment, c);
+        const existing = marksByAssessment[oa];
+        const wasAbsent = absent[enrollment.id + "|" + oa];
         cellsHtml += '<td class="num"><input type="number" class="text-input mark-input' + (wasAbsent ? " is-absent" : "") + '" ' +
-          'data-assessment-id="' + c.id + '" data-enrollment-id="' + enrollment.id + '" ' + (wasAbsent ? 'placeholder="Absent" title="Absent in the ' + VA.escapeHtml(wasAbsent) + ' paper (exam roll)" ' : "") +
+          'data-assessment-id="' + oa + '" data-enrollment-id="' + enrollment.id + '" ' + (wasAbsent ? 'placeholder="Absent" title="Absent in the ' + VA.escapeHtml(wasAbsent) + ' paper (exam roll)" ' : "") +
           'min="0" max="' + c.max_marks + '" step="0.01" value="' + (existing !== undefined ? existing : "") + '"' + (sheet && !sheet.can_edit ? " disabled" : "") + " />" +
           (wasAbsent ? '<span class="mark-absent">Absent</span>' : "") + "</td>";
       });
@@ -351,7 +394,7 @@
 
         // Refresh just this row's outcome cell — the outcome may have
         // just been auto-computed if this was the last assessment needed.
-        const rosterResult = await VA.fetchJson("/api/v1/academics/offerings/" + activeOfferingId + "/roster");
+        const rosterResult = await VA.fetchJson("/api/v1/academics/offerings/" + activeOfferingId + "/roster" + (isCombined() ? "?combined=true" : ""));
         if (rosterResult.ok) {
           const updated = rosterResult.body.find(function (e) { return e.id === enrollmentId; });
           if (updated) {
