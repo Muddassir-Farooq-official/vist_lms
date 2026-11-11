@@ -26,14 +26,14 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.academics.models import Course, CourseOffering, Enrollment, EnrollmentStatus
+from app.academics.models import Course, CourseOffering, Enrollment, EnrollmentOutcome, EnrollmentStatus
 from app.academics.terms import AcademicTerm
 from app.audit.service import AuditService
 from app.core.config import settings
 from app.core.exceptions import AuthorizationError, BusinessRuleViolationError, DuplicateResourceError, ResourceNotFoundError, ValidationAppError
 from app.core.logging import get_logger
 from app.programs.models import Program
-from app.school.daily import _teaches_section, can_see_student, current_section, employee_of, is_office
+from app.school.daily import _teaches_section, can_see_student, employee_of, is_office
 from app.school.models import (ClassSubject, DailyAttendance, DayStatus, ExamKind, PromotionDecision, ReportCardNote, ReportPublication, SchoolExam,
                                SchoolExamSubject, SchoolMark, SchoolPromotion, SchoolSection, SchoolSkill)
 from app.school.service import SchoolService, school_mode
@@ -169,7 +169,7 @@ class ResultsService:
         courses = set((await self.session.execute(select(SchoolExamSubject.course_id).where(SchoolExamSubject.exam_id == ex.id,
                                                                                             SchoolExamSubject.program_id == program.id))).scalars())
         return (await self.session.execute(select(func.count()).select_from(Enrollment).join(CourseOffering, CourseOffering.id == Enrollment.course_offering_id)
-                                           .where(Enrollment.student_id.in_([s.id for s in pupils]), Enrollment.status == EnrollmentStatus.ENROLLED,
+                                           .where(Enrollment.student_id.in_([s.id for s in pupils]), Enrollment.status.in_((EnrollmentStatus.ENROLLED, EnrollmentStatus.COMPLETED)),
                                                   CourseOffering.term_label == term.label, CourseOffering.course_id.in_(courses or {uuid.uuid4()})))).scalar_one()
 
     async def totals(self, exam_id: uuid.UUID, program_id: uuid.UUID) -> list[dict]:
@@ -285,7 +285,7 @@ class ResultsService:
         await self._fill_subjects(ex, term)
         es = await self.session.get(SchoolExamSubject, (ex.id, off.course_id))
         pupils = (await self.session.execute(select(Student).join(Enrollment, Enrollment.student_id == Student.id).where(
-            Enrollment.course_offering_id == off.id, Enrollment.status == EnrollmentStatus.ENROLLED).order_by(Student.roll_number))).scalars().all()
+            Enrollment.course_offering_id == off.id, Enrollment.status.in_((EnrollmentStatus.ENROLLED, EnrollmentStatus.COMPLETED))).order_by(Student.roll_number))).scalars().all()
         marks = {m.student_id: m for m in (await self.session.execute(select(SchoolMark).where(SchoolMark.exam_id == ex.id,
                                                                                                SchoolMark.course_id == off.course_id))).scalars()}
         roll_absent = await self._roll_absent(ex, off)
@@ -390,7 +390,7 @@ class ResultsService:
                                            .join(Enrollment, Enrollment.course_offering_id == CourseOffering.id)
                                            .join(SchoolExamSubject, (SchoolExamSubject.course_id == Course.id) & (SchoolExamSubject.exam_id == ex.id))
                                            .join(ClassSubject, (ClassSubject.course_id == Course.id) & (ClassSubject.program_id == SchoolExamSubject.program_id))
-                                           .where(Enrollment.student_id == student.id, Enrollment.status == EnrollmentStatus.ENROLLED,
+                                           .where(Enrollment.student_id == student.id, Enrollment.status.in_((EnrollmentStatus.ENROLLED, EnrollmentStatus.COMPLETED)),
                                                   CourseOffering.term_label == term.label).order_by(ClassSubject.sort_order, Course.title))).all()
         return [(c, t) for c, t, _o in rows]
 
@@ -416,8 +416,32 @@ class ResultsService:
         return {"subjects": rows, "obtained": round(obtained, 2), "total": total, "percentage": pct, "grade": grade(pct, program.school_stage),
                 "complete": complete, "passed": passed}
 
+    async def _class_in_term(self, student: Student, term: AcademicTerm) -> tuple[Program | None, SchoolSection | None]:
+        """The class and section the student was in during that session (from their subjects), so a past year's
+        report card still shows that year's class after promotion."""
+        off = (await self.session.execute(select(CourseOffering).join(Enrollment, Enrollment.course_offering_id == CourseOffering.id)
+                                          .join(ClassSubject, ClassSubject.course_id == CourseOffering.course_id)
+                                          .where(Enrollment.student_id == student.id, CourseOffering.term_label == term.label,
+                                                 Enrollment.status.in_((EnrollmentStatus.ENROLLED, EnrollmentStatus.COMPLETED))).limit(1))).scalars().first()
+        if off is None:
+            return None, None
+        from app.school.daily import section_of_offering
+
+        sec = await section_of_offering(self.session, off)
+        return (await self.session.get(Program, sec.program_id) if sec else None), sec
+
+    async def _section_pupils(self, sec: SchoolSection, term: AcademicTerm) -> list[Student]:
+        """Students who took this section's subjects in that session (still there, or since promoted)."""
+        return list((await self.session.execute(select(Student).join(Enrollment, Enrollment.student_id == Student.id)
+                                                .join(CourseOffering, CourseOffering.id == Enrollment.course_offering_id)
+                                                .join(ClassSubject, (ClassSubject.course_id == CourseOffering.course_id) & (ClassSubject.program_id == sec.program_id))
+                                                .where(CourseOffering.term_label == term.label, func.upper(CourseOffering.section_label) == sec.label.upper(),
+                                                       Enrollment.status.in_((EnrollmentStatus.ENROLLED, EnrollmentStatus.COMPLETED)),
+                                                       Student.status == StudentStatus.ACTIVE)
+                                                .distinct().order_by(Student.roll_number))).scalars())
+
     async def section_positions(self, ex: SchoolExam, term: AcademicTerm, sec: SchoolSection, program: Program) -> dict:
-        pupils = await SchoolService(self.session)._pupils(program.id, sec.label)
+        pupils = await self._section_pupils(sec, term)
         pcts = {}
         for p in pupils:
             r = await self.exam_result(ex, term, p, program)
@@ -456,10 +480,10 @@ class ResultsService:
         overall = round(sum(x["percentage"] * x["weight"] for x in per_exam) / tw, 2) if tw else None
         sub_pass = float(settings.school_subject_pass_percent)
         subjects = []
-        for v in subj.values():
+        for cid, v in subj.items():
             sw = sum(wt for _p, wt in v["parts"])
             pct = round(sum(p * wt for p, wt in v["parts"]) / sw, 2) if sw else None
-            subjects.append({"subject": v["subject"], "percentage": pct, "grade": grade(pct, program.school_stage),
+            subjects.append({"course_id": cid, "subject": v["subject"], "percentage": pct, "grade": grade(pct, program.school_stage),
                              "passed": None if pct is None else pct >= sub_pass})
         has_final = any(x["kind"] == ExamKind.FINAL.value for x in per_exam)
         passed = None if overall is None else (overall >= float(settings.school_pass_percent) and all(s["passed"] for s in subjects if s["passed"] is not None))
@@ -470,17 +494,15 @@ class ResultsService:
     async def report_card(self, exam_id: uuid.UUID, student_id: uuid.UUID, user) -> dict:
         student = await can_see_student(self.session, user, student_id)
         ex, term = await self._exam(exam_id)
-        program = await self.session.get(Program, student.program_id) if student.program_id else None
+        program, sec = await self._class_in_term(student, term)
         if program is None:
-            raise ResourceNotFoundError("This student is not in a class.")
+            raise ResourceNotFoundError("This student was not in a school class in that session.")
         published = await self.session.get(ReportPublication, (ex.id, program.id)) is not None
         office = is_office(user)
         if not published and not office:
             emp = await employee_of(self.session, user)
-            sec = await current_section(self.session, student)
             if not (emp and sec and (sec.class_teacher_id == emp.id or await _teaches_section(self.session, emp.id, sec))):
                 raise ResourceNotFoundError("This report card is not published yet.")
-        sec = await current_section(self.session, student)
         result = await self.exam_result(ex, term, student, program)
         pos = await self.section_positions(ex, term, sec, program) if sec else {"positions": {}, "of": 0}
         note = await self.session.get(ReportCardNote, (ex.id, student.id))
@@ -615,6 +637,7 @@ class ResultsService:
             y = await self.yearly(term, s, program, published_only=False)
             rows.append({"student_id": s.id, "name": _name(s), "roll_number": s.roll_number, "section": s.section_label, "percentage": y["percentage"],
                          "grade": y["grade"], "passed": y["passed"], "failed_subjects": [x["subject"] for x in y["subjects"] if x["passed"] is False],
+                         "failed_course_ids": [x["course_id"] for x in y["subjects"] if x["passed"] is False],
                          "done": done[s.id].decision.value if s.id in done else None})
         later = (await self.session.execute(select(AcademicTerm).where(AcademicTerm.id != term.id, AcademicTerm.start_date > (term.start_date or datetime.min.date()))
                                             .order_by(AcademicTerm.start_date))).scalars().all()
@@ -657,6 +680,7 @@ class ResultsService:
             sec = await svc._ensure_section(to_term, to_prog, r["section"].upper(), {"sections": 0, "subject_classes": 0}, actor_id)
             try:
                 async with self.session.begin_nested():
+                    await self._finish_year(sid, from_term, set(r["failed_course_ids"]))
                     res = await svc.place(sec.id, [sid], optional_course_ids=[], actor_id=actor_id)
                     if res["failed"]:
                         raise BusinessRuleViolationError(res["failed"][0]["reason"])
@@ -673,6 +697,20 @@ class ResultsService:
                                         "kept_back": sum(1 for m in moved if m["decision"] == "KEPT_BACK")})
             await self._tell_promotion(moved, to_term)
         return {"moved": moved, "failed": failed, "list": await self.promotion_list(program_id, term_label)}
+
+    async def _finish_year(self, student_id: uuid.UUID, term: AcademicTerm, failed_course_ids: set) -> None:
+        """Close the student's subjects of the finished session: COMPLETED, passed or failed by the year's result
+        (kept on record, as for a finished college term), so the new session's subjects can be enrolled."""
+        rows = (await self.session.execute(select(Enrollment).join(CourseOffering, CourseOffering.id == Enrollment.course_offering_id)
+                                           .join(ClassSubject, ClassSubject.course_id == CourseOffering.course_id)
+                                           .where(Enrollment.student_id == student_id, Enrollment.status == EnrollmentStatus.ENROLLED,
+                                                  CourseOffering.term_label == term.label))).scalars().unique().all()
+        offs = {o.id: o.course_id for o in (await self.session.execute(select(CourseOffering).where(
+            CourseOffering.id.in_([e.course_offering_id for e in rows])))).scalars()} if rows else {}
+        for e in rows:
+            e.status = EnrollmentStatus.COMPLETED
+            e.outcome = EnrollmentOutcome.FAILED if offs.get(e.course_offering_id) in failed_course_ids else EnrollmentOutcome.PASSED
+        await self.session.flush()
 
     async def _tell_promotion(self, moved: list[dict], to_term: AcademicTerm) -> None:
         from app.notifications.family import _notify, family

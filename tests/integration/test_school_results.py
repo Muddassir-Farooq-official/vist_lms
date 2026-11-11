@@ -6,8 +6,9 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 
+from app.academics.models import CourseOffering, Enrollment, EnrollmentOutcome, EnrollmentStatus
 from app.core.config import settings
 from app.notifications.models import Notification
 from app.school.models import SchoolPromotion
@@ -29,7 +30,7 @@ def _school(monkeypatch):
     monkeypatch.setattr(settings, "school_mode", 1)
 
 
-def test_grades_and_ties():
+async def test_grades_and_ties():
     assert [grade(p, None) for p in (85, 70, 65.5, 50, 45, 33, 32.9)] == ["A+", "A", "B", "C", "D", "E", "F"]
     assert [grade(p, "O_LEVEL") for p in (91, 80, 39)] == ["A*", "A", "U"]
     assert rank({"a": 90, "b": 80, "c": 80, "d": 70, "e": None}) == {"a": 1, "b": 2, "c": 2, "d": 4}
@@ -188,6 +189,21 @@ async def test_promotion_to_the_next_session(app_client, admin_user, db_session)
     # the Final card now says where the student goes
     card = (await app_client.get(f"{S}/students/{p1}/report-cards/{final}")).json()
     assert card["promotion"] == {"decision": "PROMOTED", "to_class": "Class 6"}
+    # ...and still shows last year's class, section, marks and position after the move
+    assert (card["class"], card["section"], card["position_of"]) == ("Class 5", "A", 3) and card["position"] == 1 and card["passed"] is True
+    assert card["percentage"] is not None and all(x["marks"] is not None for x in card["subjects"])
+    kept = (await app_client.get(f"{S}/students/{p3}/report-cards/{final}")).json()
+    assert kept["class"] == "Class 5" and kept["promotion"]["decision"] == "KEPT_BACK" and kept["passed"] is False
+    # last year's subjects are closed on record (passed / failed by the year's result), not deleted
+    old = (await db_session.execute(select(Enrollment.status, Enrollment.outcome).join(CourseOffering, CourseOffering.id == Enrollment.course_offering_id)
+                                    .where(Enrollment.student_id == uuid.UUID(p3), CourseOffering.term_label == "2026-27"))).all()
+    assert old and {st for st, _o in old} == {EnrollmentStatus.COMPLETED} and EnrollmentOutcome.FAILED in {o for _s, o in old}
+    new_subjects = (await db_session.execute(select(func.count()).select_from(Enrollment).join(CourseOffering, CourseOffering.id == Enrollment.course_offering_id)
+                                             .where(Enrollment.student_id == uuid.UUID(p3), CourseOffering.term_label == "2027-28",
+                                                    Enrollment.status == EnrollmentStatus.ENROLLED))).scalar_one()
+    assert new_subjects == len(old)                                   # repeating Class 5: the same subjects again
+    cards = (await app_client.get(f"{S}/students/{p1}/report-cards")).json()
+    assert [c["class"] for c in cards] == ["Class 5"]
     _ = progs
 
 
