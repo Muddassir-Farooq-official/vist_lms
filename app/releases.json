@@ -1,5 +1,43 @@
 [
   {
+    "version": "1.18.0",
+    "date": "2026-11-11",
+    "title": "School mode: roll call, homework diary and parent-teacher meetings",
+    "summary": "For schools: the class teacher's morning roll call with messages to parents, a homework diary, and parent-teacher meetings that parents book.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "My class: the class teacher marks the section Present, Late, Absent or Leave each morning. Parents of an absent or late child are told at once, in the parent portal and by SMS or WhatsApp. If the class teacher is away, the office can choose a teacher to cover that day."
+      },
+      {
+        "kind": "new",
+        "for": "Everyone",
+        "text": "For school classes the morning roll call is the attendance: each subject's attendance %, admit cards, warnings and the parents' notes use it, and teachers no longer mark attendance in every period."
+      },
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "Homework diary: subject teachers set homework for their sections, with a due date and an optional worksheet (PDF or picture). Students and parents see it at once, and each family gets one message with the day's homework in the evening (the time is in Settings)."
+      },
+      {
+        "kind": "new",
+        "for": "Parents",
+        "text": "Diary & attendance shows your child's homework and a month of attendance. Parent-teacher meetings: when the school sets a meeting day, book a time with the class teacher, and change or cancel it until the day."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Classes & sections now has Roll call (every section's roll call for a day: taken or not, absent and late, open it to correct, set a cover teacher) and Parent-teacher meetings (set a day and minutes per meeting, see bookings, cancel)."
+      },
+      {
+        "kind": "fixed",
+        "for": "Everyone",
+        "text": "Right after changing a first-time password, the portal sometimes showed the change-password page again for a few seconds. It now opens straight away."
+      }
+    ]
+  },
+  {
     "version": "1.17.0",
     "date": "2026-11-11",
     "title": "Combined classes",

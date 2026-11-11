@@ -1,0 +1,85 @@
+/* School mode, stage 2: roll call, homework diary, parent-teacher meetings. */
+
+/* ---- roll call (static/js/school-roll.js) */
+.rc-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 6px; }
+.rc-title { margin: 0; font-size: 1.05rem; flex: 1 1 auto; }
+.rc-day { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; }
+.rc-day .text-input { width: auto; }
+.rc-note { margin: 4px 0; font-size: 0.85rem; color: var(--blue-700); }
+.rc-info { margin: 8px 0; padding: 9px 12px; border-radius: 10px; background: var(--yellow-50); color: var(--yellow-600); border: 1px solid var(--yellow-100); font-size: 0.88rem; }
+.rc-chips { margin: 8px 0; }
+.rc-bar { display: flex; justify-content: flex-end; margin: 6px 0; }
+.rc-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 12px; }
+.rc-row { display: grid; grid-template-columns: minmax(140px, 1fr) auto minmax(140px, 220px); align-items: center; gap: 10px; padding: 9px 12px; border-top: 1px solid var(--border); }
+.rc-row:first-child { border-top: none; }
+.rc-who strong { display: block; }
+.rc-who small { color: var(--text-muted); font-size: 0.78rem; }
+.rc-seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 10px; overflow: hidden; }
+.rc-opt { position: relative; cursor: pointer; }
+.rc-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.rc-opt span { display: inline-block; min-width: 62px; padding: 7px 8px; text-align: center; font-size: 0.82rem; white-space: nowrap; border-left: 1px solid var(--border); }
+.rc-opt:first-child span { border-left: none; }
+.rc-opt input:focus-visible + span { outline: 2px solid var(--blue-500); outline-offset: -2px; }
+.rc-present input:checked + span { background: var(--success-bg); color: var(--success); font-weight: 700; }
+.rc-late input:checked + span { background: var(--yellow-100); color: var(--yellow-600); font-weight: 700; }
+.rc-absent input:checked + span { background: var(--danger-bg); color: var(--danger); font-weight: 700; }
+.rc-leave input:checked + span { background: var(--blue-50); color: var(--blue-700); font-weight: 700; }
+.rc-opt input:disabled + span { cursor: default; opacity: 0.75; }
+.rc-foot { display: flex; justify-content: flex-end; margin-top: 12px; }
+
+/* ---- My class / office tabs */
+.mc-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.mc-tab { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; font: inherit; font-size: 0.88rem; }
+.mc-tab.active { background: var(--blue-50); border-color: var(--blue-500); color: var(--blue-700); font-weight: 600; }
+.mc-tab small { color: var(--text-muted); margin-left: 4px; }
+.mc-box { margin-top: 4px; }
+
+/* ---- meetings (teacher and office) */
+.pm-day { border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-top: 10px; }
+.pm-day h4 { margin: 0 0 8px; }
+.pm-slot { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 4px 12px; align-items: start; padding: 8px 0; border-top: 1px solid var(--border); }
+.pm-slot:first-of-type { border-top: none; }
+.pm-time { font-weight: 700; font-size: 0.88rem; }
+.pm-free { color: var(--text-muted); font-size: 0.85rem; }
+.pm-notes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }
+.pm-notes textarea { flex: 1 1 260px; min-height: 40px; }
+.pm-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; align-items: end; }
+.pm-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; font-weight: 600; }
+.pm-form .pm-wide { grid-column: 1 / -1; }
+
+/* ---- homework */
+.hw-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.hw-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; font-weight: 600; }
+.hw-form .hw-wide { grid-column: 1 / -1; }
+.hw-form textarea { min-height: 70px; }
+.hw-list { list-style: none; margin: 0; padding: 0; }
+.hw-item { padding: 10px 0; border-top: 1px solid var(--border); }
+.hw-item:first-child { border-top: none; }
+.hw-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.hw-subject { font-weight: 700; }
+.hw-meta { font-size: 0.8rem; color: var(--text-muted); }
+.hw-item p { margin: 4px 0 0; white-space: pre-line; }
+.hw-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.hw-day { margin: 14px 0 4px; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+
+/* ---- month of attendance */
+.dy-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin-top: 8px; }
+.dy-cell { min-height: 40px; border-radius: 8px; border: 1px solid var(--border); padding: 3px 4px; font-size: 0.75rem; background: var(--surface); }
+.dy-cell b { display: block; font-size: 0.8rem; }
+.dy-cell.dy-head { border: none; min-height: 0; text-align: center; font-weight: 700; color: var(--text-muted); background: none; }
+.dy-cell.dy-blank { border: none; background: none; }
+.dy-PRESENT { background: var(--success-bg); }
+.dy-LATE { background: var(--yellow-100); }
+.dy-ABSENT { background: var(--danger-bg); }
+.dy-LEAVE { background: var(--blue-50); }
+.dy-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+
+@media (max-width: 640px) {
+  .rc-row { grid-template-columns: 1fr; }
+  .rc-seg { display: flex; width: 100%; }
+  .rc-opt { flex: 1 1 0; }
+  .rc-opt span { display: block; min-width: 0; padding: 9px 2px; }
+  .rc-foot .role-btn, .rc-bar .role-btn { width: 100%; }
+  .pm-slot { grid-template-columns: 1fr; }
+  .dy-cell { min-height: 34px; font-size: 0.7rem; }
+}

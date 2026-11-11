@@ -1,0 +1,29 @@
+{% extends "faculty/_base.html" %}
+{% block title %}Homework diary{% endblock %}
+{% block page_title %}Homework diary{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Set homework for the classes you teach. Students and parents see it at once, and families get the day's homework in one message in the evening.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/school-daily.css?v={{ app_version() }}" />{% endblock %}
+
+{% block content %}
+<section class="sh-card" aria-labelledby="hw-h">
+  <div class="sh-card-head"><h2 id="hw-h">Set homework</h2></div>
+  <p class="empty-state" id="hw-none" hidden>You do not teach a school class this session.</p>
+  <form id="hw-form" class="hw-form" novalidate hidden>
+    <label class="hw-wide">Class and subject<select id="hw-class" class="select-input" required></select></label>
+    <label class="hw-wide">Homework<input id="hw-title" class="text-input" maxlength="150" required placeholder="e.g. Exercise 4.2, questions 1-5" /></label>
+    <label class="hw-wide">Details (optional)<textarea id="hw-details" class="text-input" maxlength="2000" placeholder="Page numbers, what to bring, how to do it"></textarea></label>
+    <label>Due on (optional)<input id="hw-due" class="text-input" type="date" /></label>
+    <label>Worksheet (PDF or picture, optional)<input id="hw-file" class="text-input" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" /></label>
+    <p class="form-error hw-wide" id="hw-error" role="alert" hidden></p>
+    <div class="toolbar hw-wide"><button type="submit" class="role-btn" id="hw-send">Set homework</button></div>
+  </form>
+</section>
+<section class="sh-card" aria-labelledby="hw-list-h">
+  <div class="sh-card-head"><h2 id="hw-list-h">Homework I set (last two weeks)</h2></div>
+  <ul id="hw-list" class="hw-list"></ul>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/school-homework.js?v={{ app_version() }}"></script>
+{% endblock %}

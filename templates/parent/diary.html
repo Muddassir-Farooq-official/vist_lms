@@ -1,0 +1,18 @@
+{% extends "parent/_base.html" %}
+{% block title %}Diary &amp; attendance{% endblock %}
+{% block page_title %}Diary &amp; attendance{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Your child's homework for the last two weeks, and attendance from the morning roll call.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/parent.css?v={{ app_version() }}" /><link rel="stylesheet" href="/static/css/school-daily.css?v={{ app_version() }}" />{% endblock %}
+{% block content %}
+{% include "parent/_child_bar.html" %}
+<div id="pd-view" hidden>
+  <section class="panel pp-panel" aria-labelledby="pd-hw-h"><h2 id="pd-hw-h">Homework</h2><div id="pd-hw"></div></section>
+  <section class="panel pp-panel" aria-labelledby="pd-at-h"><h2 id="pd-at-h">Attendance</h2><div id="pd-at"></div></section>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script src="/static/js/dash-common.js"></script>
+<script src="/static/js/parent-child.js?v={{ app_version() }}"></script>
+<script src="/static/js/school-diary-view.js?v={{ app_version() }}"></script>
+<script src="/static/js/parent-diary.js?v={{ app_version() }}"></script>
+{% endblock %}

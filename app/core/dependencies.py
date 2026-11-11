@@ -87,8 +87,9 @@ async def _decode_current_user(
     now = time.monotonic()
     cached = _session_ok.get(user_id)
     ttl = max(int(settings.session_check_seconds or 0), 0)
-    # An account still waiting to verify its email is always re-read, so it gets in the moment it verifies (on every server).
-    if cached is None or ttl == 0 or now - cached[0] >= ttl or cached[5]:
+    # An account still waiting to verify its email, or to change its first password, is always re-read, so it gets in
+    # the moment it does (on every server) instead of being sent back to that page for a few seconds.
+    if cached is None or ttl == 0 or now - cached[0] >= ttl or cached[5] or cached[2]:
         fresh = await _fresh_account(db, user_id)
         if fresh is None or not fresh[0]:
             _session_ok.pop(user_id, None)

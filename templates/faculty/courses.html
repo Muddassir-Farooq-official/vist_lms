@@ -6,7 +6,7 @@
 
 {% block content %}
 <section class="sh-card" aria-labelledby="fc-h">
-  <div class="sh-card-head"><h2 id="fc-h">Courses I teach</h2><a class="see-all" href="/dashboard/faculty/attendance">Take attendance</a></div>
+  <div class="sh-card-head"><h2 id="fc-h">Courses I teach</h2><a class="see-all" href="{{ attendance_href('faculty') }}">Take attendance</a></div>
   <div id="my-offerings-grid" class="course-grid" aria-live="polite"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
   <p class="empty-state" id="my-offerings-empty" hidden>You have no assigned courses yet.</p>
 </section>

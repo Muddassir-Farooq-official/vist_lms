@@ -247,6 +247,13 @@ class TeachingService:
         now = institute_now()
         data = await self.day(now.date())
         hits = [r for r in data["classes"] if r["missed_while_in"]]
+        from app.school.service import school_mode
+
+        if hits and school_mode():                                     # school classes use the daily roll call instead
+            from app.school.models import ClassSubject
+
+            school_codes = set((await self.session.execute(select(Course.code).join(ClassSubject, ClassSubject.course_id == Course.id))).scalars())
+            hits = [r for r in hits if r["course_code"] not in school_codes]
         if not hits:
             return 0
         start = datetime.combine(now.date(), time.min).replace(tzinfo=timezone.utc) - timedelta(days=1)

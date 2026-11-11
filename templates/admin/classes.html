@@ -2,11 +2,18 @@
 {% block title %}Classes &amp; sections{% endblock %}
 {% block page_title %}Classes &amp; sections{% endblock %}
 {% block page_subtitle %}<div class="content-subtitle">The school's classes for a session, their sections and class teachers, the subjects each class studies and who teaches them, and which students sit in each section.</div>{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="/static/css/school.css?v={{ app_version() }}" />{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/school.css?v={{ app_version() }}" /><link rel="stylesheet" href="/static/css/school-daily.css?v={{ app_version() }}" />{% endblock %}
 
 {% block content %}
 <p class="dash-alert error" id="sc-off" hidden>School mode is off. Switch it on in <a href="/dashboard/admin/settings">Settings &rarr; Institute type</a> to set up classes and sections.</p>
 
+<div class="mc-tabs" id="sc-tabs" role="tablist" aria-label="Classes and sections">
+  <button type="button" class="mc-tab active" role="tab" aria-selected="true" data-tab="classes">Classes</button>
+  <button type="button" class="mc-tab" role="tab" aria-selected="false" data-tab="today">Roll call</button>
+  <button type="button" class="mc-tab" role="tab" aria-selected="false" data-tab="ptm">Parent-teacher meetings</button>
+</div>
+
+<div data-panel="classes">
 <div class="sc-bar" id="sc-bar" hidden>
   <label class="sc-session">Session <select id="sc-session" class="select-input"></select></label>
   <button type="button" class="role-btn secondary-btn" id="sc-open-setup">Set up more classes</button>
@@ -32,8 +39,40 @@
 <section class="panel sc-detail" id="sc-detail" hidden aria-live="polite"></section>
 
 <div id="sc-classes"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line"></div></div></div>
+</div>
+
+<div data-panel="today" hidden>
+  <section class="panel" aria-labelledby="td-h">
+    <div class="rc-head"><h2 class="panel-title rc-title" id="td-h">Roll call</h2>
+      <label class="rc-day">Day <input type="date" id="td-day" class="text-input" /></label></div>
+    <p class="sc-hint" id="td-sum"></p>
+    <table class="dash-table"><thead><tr><th>Class</th><th>Class teacher</th><th class="num">Students</th><th>Roll call</th><th class="num">Absent</th><th class="num">Late</th><th class="crs-actions"></th></tr></thead>
+      <tbody id="td-list"></tbody></table>
+  </section>
+  <section class="panel" id="td-sheet" hidden></section>
+</div>
+
+<div data-panel="ptm" hidden>
+  <section class="panel" aria-labelledby="pm-h">
+    <h2 class="panel-title" id="pm-h">Set a meeting day</h2>
+    <p class="sc-hint">Every class teacher gets times for that day; parents are told and book a time with their child's class teacher in the parent portal.</p>
+    <form id="pm-form" class="pm-form" novalidate>
+      <label>Day<input type="date" id="pm-day" class="text-input" required /></label>
+      <label>From<input type="time" id="pm-start" class="text-input" value="09:00" required /></label>
+      <label>To<input type="time" id="pm-end" class="text-input" value="12:00" required /></label>
+      <label>Minutes per meeting<input type="number" id="pm-mins" class="text-input" min="5" max="60" value="10" required /></label>
+      <label class="pm-wide">Note for parents (optional)<input id="pm-note" class="text-input" maxlength="300" placeholder="e.g. Report cards will be handed over" /></label>
+      <p class="form-error pm-wide" id="pm-error" hidden></p>
+      <div class="toolbar pm-wide"><button type="submit" class="role-btn" id="pm-go">Set meeting day</button></div>
+    </form>
+  </section>
+  <section class="panel" aria-labelledby="pm-list-h"><h2 class="panel-title" id="pm-list-h">Meeting days</h2><div id="pm-list"></div></section>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script src="/static/js/school-classes.js?v={{ app_version() }}"></script>
+<script src="/static/js/school-roll.js?v={{ app_version() }}"></script>
+<script src="/static/js/school-today.js?v={{ app_version() }}"></script>
+<script src="/static/js/school-ptm.js?v={{ app_version() }}"></script>
 {% endblock %}
