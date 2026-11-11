@@ -146,6 +146,21 @@ async def test_marks_report_cards_publishing_and_the_year(app_client, admin_user
     assert (await app_client.post(f"{S}/exams/{final}/classes/{c5}/publish")).status_code == 200
     year = (await app_client.get(f"{S}/students/{p1}/report-cards/{final}")).json()["year"]
     assert year["percentage"] == pytest.approx(round((80 * 20 + 50 * 50) / 70, 2), abs=0.05)
+
+    # withdraw the 1st Term cards (with a reason) to correct a mark, then publish again
+    assert (await app_client.post(f"{S}/exams/{first_id}/classes/{c5}/withdraw", json={"reason": "x"})).status_code == 422
+    wd = await app_client.post(f"{S}/exams/{first_id}/classes/{c5}/withdraw", json={"reason": "Urdu mark corrected"})
+    assert wd.status_code == 200 and next(c for c in wd.json()["classes"] if c["program_id"] == c5)["published"] is False
+    assert (await app_client.post(f"{S}/exams/{first_id}/classes/{c5}/withdraw", json={"reason": "again please"})).status_code == 422
+    fix = await app_client.put(f"{S}/exams/{first_id}/marks/{urdu['offering_id']}", json={"entries": [{"student_id": p1, "marks": 85}]})
+    assert fix.status_code == 200, fix.text
+    await _login(app_client, w["parent"]["username"], "Parent#Pass-2026")       # password changed at the first login above
+    assert [c["name"] for c in (await app_client.get(f"{S}/students/{p1}/report-cards")).json()] == ["Final"]
+    assert (await app_client.get(f"{S}/students/{p1}/report-cards/{first_id}")).status_code == 404
+    await _login_admin(app_client)
+    assert (await app_client.post(f"{S}/exams/{first_id}/classes/{c5}/publish")).status_code == 200
+    await _login(app_client, w["parent"]["username"], "Parent#Pass-2026")
+    assert [c["name"] for c in (await app_client.get(f"{S}/students/{p1}/report-cards")).json()] == ["Final", "1st Term"]
     _ = en_pw
 
 
