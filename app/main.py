@@ -146,6 +146,12 @@ def ui_lang(request) -> str:
 
 
 templates.env.globals["ui_lang"] = ui_lang
+# School mode (Settings -> Institute type): school words in the menus, and `school_mode()` for pages.
+from app.school.nav import portal_nav  # noqa: E402
+from app.school.service import school_mode  # noqa: E402
+
+templates.env.filters["portal_nav"] = portal_nav
+templates.env.globals["school_mode"] = school_mode
 
 # Role cards shown on the landing page (Section 18 roles). Purely
 # presentational — actual authorization is still enforced entirely by the
@@ -748,6 +754,9 @@ app.include_router(teaching_router, prefix=settings.api_v1_prefix)
 from app.banners.router import router as banners_router  # noqa: E402
 
 app.include_router(banners_router, prefix=settings.api_v1_prefix)
+from app.school.router import router as school_router  # noqa: E402
+
+app.include_router(school_router, prefix=settings.api_v1_prefix)
 from app.push.router import router as push_router  # noqa: E402
 from app.push.app_shell import router as app_shell_router  # noqa: E402
 
@@ -1014,6 +1023,11 @@ async def admin_programs_page(request: Request):
     return templates.TemplateResponse(
         request, "admin/programs.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "programs"}
     )
+
+
+@app.get("/dashboard/admin/classes", include_in_schema=False)
+async def admin_classes_page(request: Request):
+    return templates.TemplateResponse(request, "admin/classes.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "classes"})
 
 
 @app.get("/dashboard/admin/courses", include_in_schema=False)

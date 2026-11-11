@@ -53,6 +53,7 @@ from app.selfservice import models as _selfservice_models  # noqa: F401
 from app.timekeeping import models as _timekeeping_models  # noqa: F401
 from app.feedback import models as _feedback_models  # noqa: F401
 from app.discipline import models as _discipline_models  # noqa: F401
+from app.school import models as _school_models  # noqa: F401
 from app.parents import models as _parents_models  # noqa: F401
 from app.students import models as _students_models  # noqa: F401
 from app.hostel import models as _hostel_models  # noqa: F401

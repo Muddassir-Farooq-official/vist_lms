@@ -1,0 +1,39 @@
+{% extends "admin/_base.html" %}
+{% block title %}Classes &amp; sections{% endblock %}
+{% block page_title %}Classes &amp; sections{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">The school's classes for a session, their sections and class teachers, the subjects each class studies and who teaches them, and which students sit in each section.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/school.css?v={{ app_version() }}" />{% endblock %}
+
+{% block content %}
+<p class="dash-alert error" id="sc-off" hidden>School mode is off. Switch it on in <a href="/dashboard/admin/settings">Settings &rarr; Institute type</a> to set up classes and sections.</p>
+
+<div class="sc-bar" id="sc-bar" hidden>
+  <label class="sc-session">Session <select id="sc-session" class="select-input"></select></label>
+  <button type="button" class="role-btn secondary-btn" id="sc-open-setup">Set up more classes</button>
+</div>
+
+<section class="panel" id="sc-setup" hidden aria-labelledby="sc-setup-h">
+  <h2 class="panel-title" id="sc-setup-h">Set up classes</h2>
+  <p class="sc-hint">Tick the classes your school runs. Each class gets its usual subjects (you can change them afterwards) and the sections you name, for the session below. Running this again only adds what is missing.</p>
+  <form id="sc-setup-form" class="form-grid" novalidate>
+    <label>Session<input id="sc-term" class="text-input" maxlength="50" placeholder="e.g. 2026-27" required /></label>
+    <label>Starts<input id="sc-start" class="text-input" type="date" /></label>
+    <label>Ends<input id="sc-end" class="text-input" type="date" /></label>
+    <label>Sections in each class<input id="sc-sections" class="text-input" value="A" placeholder="e.g. A, B" /></label>
+    <div class="span-all sc-groups" id="sc-groups"></div>
+    <p class="form-error span-all" id="sc-setup-error" role="alert" hidden></p>
+    <div class="toolbar span-all">
+      <button type="submit" class="role-btn" id="sc-setup-go">Set up</button>
+      <button type="button" class="role-btn secondary-btn" id="sc-setup-cancel">Cancel</button>
+    </div>
+  </form>
+</section>
+
+<section class="panel sc-detail" id="sc-detail" hidden aria-live="polite"></section>
+
+<div id="sc-classes"><div class="skeleton-stack"><div class="skeleton-line"></div><div class="skeleton-line"></div></div></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/school-classes.js?v={{ app_version() }}"></script>
+{% endblock %}

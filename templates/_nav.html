@@ -10,7 +10,7 @@
   </a>
   {% endif %}
   {% set ns = namespace(group=None) %}
-  {% for item in items if item.enabled %}
+  {% for item in items|portal_nav if item.enabled %}
     {% if item.group and item.group != ns.group %}
       <div class="drawer-group" role="presentation">{{ item.group }}</div>
     {% endif %}
@@ -24,7 +24,7 @@
 
 {% macro bottom_nav(items, active) %}
 <nav class="bottom-nav" aria-label="Quick navigation">
-  {% for item in items if item.enabled and item.mobile %}
+  {% for item in items|portal_nav if item.enabled and item.mobile %}
     <a href="{{ item.href }}" class="bottom-link{% if item.slug == active %} active{% endif %}"{% if item.slug == active %} aria-current="page"{% endif %}>
       {{ nav_icon(item.icon) }}<span>{{ item.short or item.label }}</span>
     </a>

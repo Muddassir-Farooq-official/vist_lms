@@ -131,6 +131,8 @@ POLICY: tuple[Policy, ...] = (
            "The goods are received, but cannot be paid until an administrator approves the higher price."),
     Policy("fee_late_fee_cap", "Late fee: most one instalment can build up (Rs., 0 = no cap)", "Fees", float, 0, 1_000_000,
            "Stops a forgotten instalment from growing a late fee without limit."),
+    Policy("school_mode", "Institute type: 0 = college / university, 1 = school", "Institute", int, 0, 1,
+           "A school gets classes (Playgroup to Class 12, O / A Levels), sections and class teachers, and school words in the menus."),
     Policy("fee_late_fee_grace_days", "Late fee: grace days after the due date", "Fees", int, 0, 60,
            "No late fee is charged for this many days after an instalment falls due; after that it counts from the end of the grace days. "
            "It never runs while a student is suspended or after they leave."),
