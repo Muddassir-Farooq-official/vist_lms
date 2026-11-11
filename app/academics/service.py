@@ -435,6 +435,11 @@ class CourseOfferingService:
                 # slots must not silently double-book that teacher.
                 await TimetableService(self.session).assert_teacher_free_for_offering(offering, assigned_teacher_id)
             offering.assigned_teacher_id = assigned_teacher_id
+            if offering.combined_group_id is not None:            # one teacher for every section of a combined class
+                from app.academics.combined import members
+
+                for other in await members(self.session, offering):
+                    other.assigned_teacher_id = assigned_teacher_id
         if capacity is not ...:
             if capacity is not None:
                 if capacity <= 0:
@@ -1121,10 +1126,12 @@ class TimetableService:
     async def _people_conflict(self, offering: CourseOffering, neighbours: list, when: str) -> str | None:
         """Everything except the room: teacher, student cohort, actual enrolled students.
         Returns the reason it cannot be placed here, or None if it can."""
-        # 2. Teacher -- one person cannot teach two classes at once.
+        # 2. Teacher -- one person cannot teach two classes at once (sections of one combined class are one class).
+        from app.academics.combined import same_group
+
         if offering.assigned_teacher_id is not None:
             for slot, other in neighbours:
-                if other.id != offering.id and other.assigned_teacher_id == offering.assigned_teacher_id:
+                if other.id != offering.id and not same_group(offering, other) and other.assigned_teacher_id == offering.assigned_teacher_id:
                     return f"This offering's teacher already has a class on {when.format(slot.start_time, slot.end_time)}."
 
         # 3. Student cohort -- the SAME section of the same program+semester cannot attend two
@@ -1164,7 +1171,11 @@ class TimetableService:
         when = f"{day_of_week.value} {{}}\u2013{{}}"
 
         # 1. Room -- a physical resource, whoever owns the booking.
+        from app.academics.combined import same_group
+
         for slot, _other in neighbours:
+            if same_group(offering, _other):          # a combined class shares its room on purpose
+                continue
             if "".join((slot.room or "").split()).lower() == "".join((room or "").split()).lower():     # "Lab 1" and "lab1" are the same room
                 raise BusinessRuleViolationError(
                     f"Room '{room}' is already booked on {when.format(slot.start_time, slot.end_time)}."
@@ -1289,9 +1300,11 @@ class TimetableService:
         """Before (re)assigning a teacher to an offering that already has
         timetable slots: none of those slots may overlap the teacher's other
         classes."""
+        from app.academics.combined import same_group
+
         for slot in await self.slot_repo.list_for_offering(offering.id):
             for other_slot, other in await self._live_neighbours(offering, slot.day_of_week, slot.start_time, slot.end_time, slot.id):
-                if other.id != offering.id and other.assigned_teacher_id == teacher_id:
+                if other.id != offering.id and not same_group(offering, other) and other.assigned_teacher_id == teacher_id:
                     raise BusinessRuleViolationError(
                         f"That teacher already teaches on {slot.day_of_week.value} "
                         f"{other_slot.start_time}\u2013{other_slot.end_time}; it clashes with this offering's "
@@ -1379,7 +1392,7 @@ class TimetableService:
 
     async def create_slot(
         self, *, course_offering_id: uuid.UUID, period_id: uuid.UUID, day_of_week: DayOfWeek,
-        room: str, actor_id: uuid.UUID, starts_from: date | None = None,
+        room: str, actor_id: uuid.UUID, starts_from: date | None = None, mirror: bool = True,
     ) -> tuple[TimetableSlot, int]:
         offering = await self.offering_repo.get_by_id(course_offering_id)
         if offering is None:
@@ -1421,7 +1434,32 @@ class TimetableService:
                 "starts_from": str(starts_from) if starts_from else None,
             },
         )
+        if mirror and offering.combined_group_id is not None:          # a combined class: the same slot in every section
+            from app.academics.combined import members
+
+            for other in await members(self.session, offering):
+                if other.id == offering.id:
+                    continue
+                if any(sl.day_of_week == day_of_week and sl.start_time == start_time for sl in await self.slot_repo.list_for_offering(other.id)):
+                    continue
+                await self.create_slot(course_offering_id=other.id, period_id=period_id, day_of_week=day_of_week, room=room,
+                                       actor_id=actor_id, starts_from=starts_from, mirror=False)
         return slot, generated_count
+
+    async def _combined_twins(self, slot: TimetableSlot) -> list[TimetableSlot]:
+        """The same weekly slot in the other sections of a combined class."""
+        from app.academics.combined import members
+
+        offering = await self.offering_repo.get_by_id(slot.course_offering_id)
+        if offering is None or offering.combined_group_id is None:
+            return []
+        out = []
+        for other in await members(self.session, offering):
+            if other.id == offering.id:
+                continue
+            out += [sl for sl in await self.slot_repo.list_for_offering(other.id)
+                    if sl.day_of_week == slot.day_of_week and sl.start_time == slot.start_time and sl.end_time == slot.end_time]
+        return out
 
     async def _find_placement(self, offering: CourseOffering, per_week: int, rooms: list[str], periods: list):
         """The greedy search shared by "auto-assign one course" and "auto-schedule the whole term".
@@ -1542,7 +1580,7 @@ class TimetableService:
     async def list_slots(self, course_offering_id: uuid.UUID) -> list[TimetableSlot]:
         return await self.slot_repo.list_for_offering(course_offering_id)
 
-    async def delete_slot(self, slot_id: uuid.UUID, *, actor_id: uuid.UUID) -> int:
+    async def delete_slot(self, slot_id: uuid.UUID, *, actor_id: uuid.UUID, mirror: bool = True) -> int:
         """Cancels this slot's not-yet-occurred SCHEDULED sessions
         (today or later), then deletes the slot itself — past sessions,
         and their attendance/content history, are untouched (ON DELETE
@@ -1550,6 +1588,9 @@ class TimetableService:
         slot = await self.slot_repo.get_by_id(slot_id)
         if slot is None:
             raise ResourceNotFoundError("Timetable slot not found.")
+        if mirror:
+            for twin in await self._combined_twins(slot):
+                await self.delete_slot(twin.id, actor_id=actor_id, mirror=False)
 
         today = institute_today()
         future_sessions = await self.session_repo.list_scheduled_from_slot_on_or_after(slot_id, today)
@@ -1638,6 +1679,7 @@ class TimetableService:
 
     async def change_slot(
         self, slot_id: uuid.UUID, *, from_date: date, day_of_week: DayOfWeek, period_id: uuid.UUID, room: str, actor_id: uuid.UUID,
+        mirror: bool = True,
     ) -> dict:
         """Move a recurring slot (day, period or room) from a date on. Classes before the date are never touched; this slot's
         upcoming classes are taken off (deleted if empty, cancelled if they already have a topic / files / marks) and the
@@ -1648,6 +1690,7 @@ class TimetableService:
         slot = await self.slot_repo.get_by_id(slot_id)
         if slot is None:
             raise ResourceNotFoundError("Timetable slot not found.")
+        twins = await self._combined_twins(slot) if mirror else []
         offering = await self.offering_repo.get_by_id(slot.course_offering_id)
         today = institute_today()
         if from_date < today:
@@ -1685,6 +1728,9 @@ class TimetableService:
         await self.audit.log(actor_user_id=actor_id, action="timetable_slot.changed", entity_type="timetable_slot", entity_id=new.id, before=before,
                              after={**after, "from_date": str(from_date), "old_slot_id": str(slot_id), "upcoming_removed": removed,
                                     "upcoming_kept_cancelled": kept, "sessions_generated": created})
+        for twin in twins:                                           # the other sections of a combined class move too
+            await self.change_slot(twin.id, from_date=from_date, day_of_week=day_of_week, period_id=period_id, room=room,
+                                   actor_id=actor_id, mirror=False)
         return {"slot": new, "from_date": from_date, "removed": removed, "kept_cancelled": kept, "sessions_generated": created}
 
 

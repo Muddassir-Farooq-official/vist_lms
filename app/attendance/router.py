@@ -31,7 +31,7 @@ from app.core.config import settings
 from app.auth.schemas import CurrentUser
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_any_permission, require_permission
-from app.core.exceptions import AuthorizationError, ResourceNotFoundError
+from app.core.exceptions import AuthorizationError, BusinessRuleViolationError, ResourceNotFoundError
 from app.employees.repository import EmployeeRepository
 from app.students.repository import StudentRepository
 
@@ -88,11 +88,43 @@ async def mark_session(
         raise ResourceNotFoundError("Class session not found.")
     await _assert_can_mark_or_view_offering(db, class_session.course_offering_id, current_user)
 
-    records = await AttendanceService(db).mark_session(
+    service = AttendanceService(db)
+    is_admin = Permissions.ATTENDANCE_LOCK in current_user.permissions
+    if payload.combined:
+        records = []
+        present = set(payload.present_student_ids)
+        twins = await _combined_sessions(db, class_session)
+        known = set()
+        for twin in twins:
+            await _assert_can_mark_or_view_offering(db, twin.course_offering_id, current_user)
+            enrolled = set(await service.repo.list_enrolled_student_ids_for_offering(twin.course_offering_id))
+            known |= enrolled
+            records += await service.mark_session(twin.id, present_student_ids=list(present & enrolled), actor_id=current_user.id,
+                                                  actor_is_admin=is_admin, late_note=payload.late_note)
+        if present - known:
+            raise BusinessRuleViolationError("One or more students in the register are not enrolled in this class.")
+        return [await _to_record_detail(db, r) for r in records]
+    records = await service.mark_session(
         class_session_id, present_student_ids=payload.present_student_ids, actor_id=current_user.id,
-        actor_is_admin=Permissions.ATTENDANCE_LOCK in current_user.permissions, late_note=payload.late_note,
+        actor_is_admin=is_admin, late_note=payload.late_note,
     )
     return [await _to_record_detail(db, r) for r in records]
+
+
+async def _combined_sessions(db, class_session) -> list:
+    """This class and the same class (date and start time) of the other sections of its combined class."""
+    from sqlalchemy import select
+
+    from app.academics.combined import member_ids
+    from app.academics.models import ClassSession, ClassSessionStatus
+
+    ids = await member_ids(db, class_session.course_offering_id)
+    if len(ids) < 2:
+        return [class_session]
+    twins = (await db.execute(select(ClassSession).where(ClassSession.course_offering_id.in_(ids), ClassSession.session_date == class_session.session_date,
+                                                         ClassSession.start_time == class_session.start_time,
+                                                         ClassSession.status != ClassSessionStatus.CANCELLED))).scalars().all()
+    return [class_session] + [t for t in twins if t.id != class_session.id]
 
 
 @router.get(
@@ -150,6 +182,7 @@ async def needs_attention(
 )
 async def get_session_attendance(
     class_session_id: uuid.UUID,
+    combined: bool = False,
     current_user: CurrentUser = Depends(require_permission(Permissions.ATTENDANCE_VIEW)),
     db=Depends(get_db),
 ) -> list[AttendanceRecordDetail]:
@@ -158,8 +191,13 @@ async def get_session_attendance(
         raise ResourceNotFoundError("Class session not found.")
     await _assert_can_mark_or_view_offering(db, class_session.course_offering_id, current_user)
 
-    records = await AttendanceRepository(db).list_for_session(class_session_id)
-    return [await _to_record_detail(db, r) for r in records]
+    if not combined:
+        records = await AttendanceRepository(db).list_for_session(class_session_id)
+        return [await _to_record_detail(db, r) for r in records]
+    out = []
+    for twin in await _combined_sessions(db, class_session):
+        out += [await _to_record_detail(db, r) for r in await AttendanceRepository(db).list_for_session(twin.id)]
+    return out
 
 
 @router.get(
@@ -371,7 +409,17 @@ async def create_correction_request(
     if class_session is None:
         raise ResourceNotFoundError("Class session not found.")
     await _assert_can_mark_or_view_offering(db, class_session.course_offering_id, current_user)
-    req = await AttendanceService(db).create_correction_request(
+    service = AttendanceService(db)
+    if payload.combined:
+        present, first = set(payload.present_student_ids), None
+        for twin in await _combined_sessions(db, class_session):
+            await _assert_can_mark_or_view_offering(db, twin.course_offering_id, current_user)
+            enrolled = set(await service.repo.list_enrolled_student_ids_for_offering(twin.course_offering_id))
+            req = await service.create_correction_request(twin.id, reason=payload.reason, present_student_ids=list(present & enrolled),
+                                                          actor_id=current_user.id)
+            first = first or req
+        return await _to_request_out(db, first)
+    req = await service.create_correction_request(
         class_session_id, reason=payload.reason, present_student_ids=payload.present_student_ids, actor_id=current_user.id,
     )
     return await _to_request_out(db, req)

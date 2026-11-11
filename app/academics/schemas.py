@@ -136,6 +136,8 @@ class CourseOfferingOut(BaseModel):
     content_locked: bool = False
     # Where the course sits in the curriculum, e.g. ["BSCS · Semester 3"] (one per program).
     curriculum: list[str] = []
+    # A combined class (one teacher, one time for several sections): the other sections' labels, e.g. ["B"].
+    combined_with: list[str] = []
 
 
 class EnrollRequest(BaseModel):
@@ -164,6 +166,9 @@ class EnrollmentOut(BaseModel):
     outcome: EnrollmentOutcome | None
     is_retake: bool
     enrolled_at: datetime
+    # Only in a combined class's roster (?combined=true): which section and program each student is from.
+    section_label: str | None = None
+    program: str | None = None
 
 
 class PeriodCreateRequest(BaseModel):

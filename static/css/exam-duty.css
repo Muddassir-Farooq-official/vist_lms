@@ -58,6 +58,7 @@
 
 /* ---- marks entry: absent in the exam */
 .mark-absent { display: block; margin-top: 2px; font-size: 0.72rem; font-weight: 700; color: var(--danger); text-transform: uppercase; letter-spacing: 0.02em; }
+.mark-from { display: block; margin-top: 1px; font-size: 0.74rem; color: var(--text-muted); }
 .mark-input.is-absent { border-color: var(--danger-border); }
 
 /* ---- teacher's duties */

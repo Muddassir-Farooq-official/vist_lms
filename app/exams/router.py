@@ -229,5 +229,6 @@ async def report_case(paper_id: uuid.UUID, payload: CaseIn, current_user: Curren
 
 
 @router.get("/offerings/{offering_id}/absences", summary="Students absent in this course's exam papers, for marks entry (the course's teacher, exam office)")
-async def absences(offering_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> list[dict]:
-    return await ExamDutyService(db).absences(offering_id, current_user)
+async def absences(offering_id: uuid.UUID, combined: bool = False, current_user: CurrentUser = Depends(get_current_user),
+                   db=Depends(get_db)) -> list[dict]:
+    return await ExamDutyService(db).absences(offering_id, current_user, combined=combined)

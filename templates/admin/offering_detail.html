@@ -39,6 +39,16 @@
   <p id="term-dates-error" class="dash-alert error" hidden></p>
   <p id="term-dates-success" class="dash-alert" hidden></p>
 </section>
+<section class="panel" id="combined-panel">
+  <div class="panel-header">
+    <div class="panel-header-left">
+      <div class="panel-icon-badge">{{ nav_icon("students") }}</div>
+      <h2>Combined class</h2>
+    </div>
+  </div>
+  <p class="panel-hint">When students of different programs study this course together (one teacher, same time, same room), combine their sections. Each section keeps its own students, attendance and marks; the teacher takes attendance and enters marks on one list, the timetable is the same for all of them, and the exam has one paper.</p>
+  <div id="combined-box"><p class="sd-dim">Loading…</p></div>
+</section>
 </div>
 
 <div class="portal-tab-panel" data-tab-panel="syllabus" hidden>
@@ -166,4 +176,5 @@
 {% block extra_scripts %}
 <script src="/static/js/teacher-picker.js"></script>
 <script src="/static/js/admin-offering-detail.js" data-offering-id="{{ offering_id }}"></script>
+<script src="/static/js/combined-class.js" data-offering-id="{{ offering_id }}"></script>
 {% endblock %}

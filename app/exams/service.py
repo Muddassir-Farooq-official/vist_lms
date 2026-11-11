@@ -92,10 +92,16 @@ class ExamScheduleService:
 
     async def add_paper(self, schedule_id: uuid.UUID, *, course_offering_id: uuid.UUID, exam_date: date, start_time, end_time,
                         room: str, invigilator_employee_id: uuid.UUID | None = None, actor_id: uuid.UUID | None = None) -> ExamPaper:
+        from app.academics.combined import member_ids
+
         sched = await self.get(schedule_id)
+        group = await member_ids(self.session, course_offering_id)
         exists = (await self.session.execute(select(ExamPaper).where(ExamPaper.schedule_id == schedule_id,
-                                                                     ExamPaper.course_offering_id == course_offering_id))).scalar_one_or_none()
+                                                                     ExamPaper.course_offering_id.in_(group)))).scalars().first()
         if exists:
+            if exists.course_offering_id != course_offering_id:
+                raise DuplicateResourceError("This is a combined class and it already has one paper on this datesheet for all its sections. "
+                                             "Change that paper instead.")
             raise DuplicateResourceError("This course already has a paper on this datesheet. Change that paper instead.")
         paper = ExamPaper(schedule_id=schedule_id, course_offering_id=course_offering_id, exam_date=exam_date, start_time=start_time,
                           end_time=end_time, room=room.strip())
@@ -159,11 +165,9 @@ class ExamScheduleService:
         label = await self._labels([p.course_offering_id for p in papers])
         out: list[dict] = []
         # students: who is enrolled in each paper's course
-        rows = (await self.session.execute(select(Enrollment.course_offering_id, Enrollment.student_id).where(
-            Enrollment.course_offering_id.in_([p.course_offering_id for p in papers]), Enrollment.status == EnrollmentStatus.ENROLLED))).all()
-        students = defaultdict(set)
-        for oid, sid in rows:
-            students[oid].add(sid)
+        students = defaultdict(set)          # a combined class's paper: the students of every section
+        for p in papers:
+            students[p.course_offering_id] = await self.paper_students(p.course_offering_id)
         for i, a in enumerate(papers):
             for b in papers[i + 1:]:
                 if not _overlap(a, b):
@@ -231,7 +235,7 @@ class ExamScheduleService:
         from app.notifications.service import create_notification
         from app.students.models import Student
 
-        offering_ids = [p.course_offering_id for p in await self.papers(sched.id)]
+        offering_ids = [m for p in await self.papers(sched.id) for m in await self._group(p.course_offering_id)]
         user_ids = set((await self.session.execute(select(Student.user_id).join(Enrollment, Enrollment.student_id == Student.id).where(
             Enrollment.course_offering_id.in_(offering_ids), Enrollment.status == EnrollmentStatus.ENROLLED, Student.user_id.is_not(None)))).scalars())
         from app.sms.service import SmsService
@@ -286,10 +290,28 @@ class ExamScheduleService:
         return {"id": s.id, "term_label": s.term_label, "name": s.name, "status": s.status.value, "instructions": s.instructions,
                 "published_at": s.published_at, "assessment_type_id": s.assessment_type_id}
 
+    async def _group(self, offering_id: uuid.UUID) -> list[uuid.UUID]:
+        from app.academics.combined import member_ids
+
+        return await member_ids(self.session, offering_id)
+
+    async def paper_students(self, offering_id: uuid.UUID) -> set[uuid.UUID]:
+        """Who sits the paper of this course section: its students, and for a combined class every section's."""
+        return set((await self.session.execute(select(Enrollment.student_id).where(
+            Enrollment.course_offering_id.in_(await self._group(offering_id)), Enrollment.status == EnrollmentStatus.ENROLLED))).scalars())
+
+    async def _my_offerings(self, student_id: uuid.UUID) -> dict[uuid.UUID, uuid.UUID]:
+        """{offering id: the student's own section} for the student's sections and their combined-class partners."""
+        out = {}
+        for oid in (await self.session.execute(select(Enrollment.course_offering_id).where(
+                Enrollment.student_id == student_id, Enrollment.status == EnrollmentStatus.ENROLLED))).scalars():
+            for m in await self._group(oid):
+                out[m] = oid
+        return out
+
     async def for_student(self, student_id: uuid.UUID) -> list[dict]:
         """Every PUBLISHED datesheet with at least one paper for a course this student is enrolled in."""
-        mine = set((await self.session.execute(select(Enrollment.course_offering_id).where(
-            Enrollment.student_id == student_id, Enrollment.status == EnrollmentStatus.ENROLLED))).scalars())
+        mine = set(await self._my_offerings(student_id))
         out = []
         for s in await self.list():
             if s.status != ScheduleStatus.PUBLISHED:
@@ -369,14 +391,13 @@ class ExamScheduleService:
         student = await self.session.get(Student, student_id)
         if student is None:
             raise ResourceNotFoundError("Student not found.")
-        mine = set((await self.session.execute(select(Enrollment.course_offering_id).where(
-            Enrollment.student_id == student_id, Enrollment.status == EnrollmentStatus.ENROLLED))).scalars())
-        papers = [p for p in await self.papers(schedule_id) if p.course_offering_id in mine]
+        own = await self._my_offerings(student_id)
+        papers = [p for p in await self.papers(schedule_id) if p.course_offering_id in own]
         if not papers:
             raise ResourceNotFoundError("This student has no paper on this datesheet.")
         rows = await self._paper_rows(papers)
         for r in rows:
-            ok, reason, pct = await self.course_eligibility(student_id, r["course_offering_id"])
+            ok, reason, pct = await self.course_eligibility(student_id, own[r["course_offering_id"]])
             r["attendance_percent"] = pct
             r["eligible"] = ok
             r["reason"] = reason

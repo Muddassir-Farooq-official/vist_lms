@@ -93,8 +93,11 @@ class ExamDutyService:
         return sched.status == ScheduleStatus.PUBLISHED and cls.started(paper)
 
     async def students_sitting(self, offering_id: uuid.UUID) -> int:
+        """A combined class's paper counts the students of every section."""
+        from app.academics.combined import member_ids
+
         return (await self.session.execute(select(func.count()).select_from(Enrollment).where(
-            Enrollment.course_offering_id == offering_id, Enrollment.status == EnrollmentStatus.ENROLLED))).scalar_one()
+            Enrollment.course_offering_id.in_(await member_ids(self.session, offering_id)), Enrollment.status == EnrollmentStatus.ENROLLED))).scalar_one()
 
     @staticmethod
     def needed(students: int) -> int:
@@ -290,16 +293,21 @@ class ExamDutyService:
         from app.students.models import Student
         from app.exams.service import ExamScheduleService
 
+        from app.academics.combined import member_ids
+
         paper, sched, off, course = await self._paper(paper_id)
         _see, can_mark = await self._access(paper, sched, user)
-        studs = (await self.session.execute(select(Student).join(Enrollment, Enrollment.student_id == Student.id).where(
-            Enrollment.course_offering_id == off.id, Enrollment.status == EnrollmentStatus.ENROLLED)
-            .order_by(Student.roll_number, Student.first_name))).scalars().all()
+        group = await member_ids(self.session, off.id)             # a combined class: every section sits this paper
+        rows = (await self.session.execute(select(Student, Enrollment.course_offering_id).join(Enrollment, Enrollment.student_id == Student.id).where(
+            Enrollment.course_offering_id.in_(group), Enrollment.status == EnrollmentStatus.ENROLLED)
+            .order_by(Student.roll_number, Student.first_name))).all()
+        studs = [st for st, _o in rows]
+        own = {st.id: o for st, o in rows}
         marks = {a.student_id: a for a in (await self.session.execute(select(ExamAttendance).where(ExamAttendance.paper_id == paper.id))).scalars()}
         svc = ExamScheduleService(self.session)
         allowed, barred = [], []
         for s in studs:
-            ok, reason, _pct = await svc.course_eligibility(s.id, off.id)
+            ok, reason, _pct = await svc.course_eligibility(s.id, own[s.id])
             reasons = ([] if ok else [reason or "attendance below the minimum"]) + await svc.withheld(s.id)
             row = {"student_id": s.id, "name": f"{s.first_name} {s.last_name}".strip(), "roll_number": s.roll_number}
             if reasons:
@@ -347,8 +355,10 @@ class ExamDutyService:
                                                  after={"paper": self._label(course, off), "changed": changed})
         return await self.roll(paper_id, user)
 
-    async def absences(self, offering_id: uuid.UUID, user) -> list[dict]:
-        """Students marked ABSENT in a published paper of this course, for marks entry."""
+    async def absences(self, offering_id: uuid.UUID, user, *, combined: bool = False) -> list[dict]:
+        """Students marked ABSENT in a published paper of this course, for marks entry.
+        combined=True: a combined class's students of every section, matched to their own section's result type."""
+        from app.academics.combined import member_ids
         from app.academics.models import AssessmentType, OfferingAssessment
 
         off = await self.session.get(CourseOffering, offering_id)
@@ -358,17 +368,20 @@ class ExamDutyService:
             emp = await self._employee_id(user)
             if emp is None or emp != off.assigned_teacher_id:
                 raise AuthorizationError("Only this course's teacher can see this.")
+        group = await member_ids(self.session, offering_id)
+        mine = group if combined else [offering_id]
         rows = (await self.session.execute(
-            select(ExamAttendance.student_id, ExamSchedule, Enrollment.id).join(ExamPaper, ExamPaper.id == ExamAttendance.paper_id)
+            select(ExamAttendance.student_id, ExamSchedule, Enrollment.id, Enrollment.course_offering_id).join(ExamPaper, ExamPaper.id == ExamAttendance.paper_id)
             .join(ExamSchedule, ExamSchedule.id == ExamPaper.schedule_id)
-            .join(Enrollment, (Enrollment.student_id == ExamAttendance.student_id) & (Enrollment.course_offering_id == ExamPaper.course_offering_id))
-            .where(ExamPaper.course_offering_id == offering_id, ExamAttendance.status == ExamAttendanceStatus.ABSENT,
+            .join(Enrollment, (Enrollment.student_id == ExamAttendance.student_id) & Enrollment.course_offering_id.in_(mine))
+            .where(ExamPaper.course_offering_id.in_(group), ExamAttendance.status == ExamAttendanceStatus.ABSENT,
                    ExamSchedule.status == ScheduleStatus.PUBLISHED))).all()
-        types = (await self.session.execute(select(OfferingAssessment.id, AssessmentType.id, AssessmentType.name)
-                                            .join(AssessmentType, AssessmentType.id == OfferingAssessment.assessment_type_id)
-                                            .where(OfferingAssessment.course_offering_id == offering_id))).all()
+        all_types = (await self.session.execute(select(OfferingAssessment.course_offering_id, OfferingAssessment.id, AssessmentType.id, AssessmentType.name)
+                                                .join(AssessmentType, AssessmentType.id == OfferingAssessment.assessment_type_id)
+                                                .where(OfferingAssessment.course_offering_id.in_(mine)))).all()
         out = []
-        for sid, sched, enr in rows:
+        for sid, sched, enr, own in rows:
+            types = [(oa, tid, n) for o, oa, tid, n in all_types if o == own]
             match = next((oa for oa, tid, _n in types if sched.assessment_type_id and tid == sched.assessment_type_id), None) \
                 or next((oa for oa, _tid, n in types if _norm(n) == _norm(sched.name)), None)
             out.append({"student_id": sid, "enrollment_id": enr, "schedule": sched.name, "offering_assessment_id": match})
@@ -383,7 +396,10 @@ class ExamDutyService:
         note = " ".join((note or "").split())
         if len(note) < 5:
             raise ValidationAppError("Write what happened.")
-        enrolled = (await self.session.execute(select(Enrollment.id).where(Enrollment.course_offering_id == off.id, Enrollment.student_id == student_id,
+        from app.academics.combined import member_ids
+
+        enrolled = (await self.session.execute(select(Enrollment.id).where(Enrollment.course_offering_id.in_(await member_ids(self.session, off.id)),
+                                                                           Enrollment.student_id == student_id,
                                                                            Enrollment.status == EnrollmentStatus.ENROLLED))).first()
         if not enrolled:
             raise ValidationAppError("That student does not sit this paper.")

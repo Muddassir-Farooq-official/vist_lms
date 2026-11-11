@@ -4014,3 +4014,14 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 #mr-form .mr-only { flex-direction: row; font-weight: 500; }
 #mr-form .mr-only input { width: 18px; height: 18px; margin: 0; }
 #mr-form button { flex: 0 0 auto; min-width: 110px; }
+
+/* Combined class panel (course section page, static/js/combined-class.js) */
+.cb-on { margin: 0 0 8px; }
+.cb-list { margin: 0 0 12px; padding-left: 18px; font-size: 0.9rem; }
+.cb-list li { margin: 4px 0; }
+.cb-join { margin-top: 14px; padding: 12px; border: 1px dashed var(--border-strong); border-radius: 12px; }
+.cb-join > p { margin: 0 0 8px; }
+.cb-opt { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 0; font-size: 0.9rem; cursor: pointer; }
+.cb-opt small { color: var(--text-muted); }
+.cb-teacher { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; font-size: 0.85rem; font-weight: 600; max-width: 360px; }
+.cb-join .panel-hint { margin: 8px 0 0; }

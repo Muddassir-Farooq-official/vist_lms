@@ -245,6 +245,7 @@ async def _to_offering_out(db, offering: CourseOffering) -> CourseOfferingOut:
         section_label=offering.section_label, capacity=offering.capacity,
         content_locked=offering.content_locked_at is not None,
         curriculum=(await _curriculum_labels(db, [offering.course_id])).get(offering.course_id, []),
+        combined_with=await _combined_with(db, [offering]),
     )
 
 
@@ -255,6 +256,7 @@ async def _to_offering_out_many(db, offerings: list) -> list[CourseOfferingOut]:
     teachers = await load_by_ids(db, Employee, [o.assigned_teacher_id for o in offerings])
     counts = await enrolled_counts(db, [o.id for o in offerings])
     curriculum = await _curriculum_labels(db, [o.course_id for o in offerings])
+    groups = await _combined_groups(db, offerings)
     out = []
     for offering in offerings:
         course = courses.get(offering.course_id)
@@ -271,8 +273,27 @@ async def _to_offering_out_many(db, offerings: list) -> list[CourseOfferingOut]:
             section_label=offering.section_label, capacity=offering.capacity,
             content_locked=offering.content_locked_at is not None,
             curriculum=curriculum.get(offering.course_id, []),
+            combined_with=groups.get(offering.combined_group_id, {}).get(offering.id, []) if offering.combined_group_id else [],
         ))
     return out
+
+
+async def _combined_groups(db, offerings) -> dict:
+    """{group id: {offering id: [the other sections' labels]}} for the combined classes among these offerings."""
+    gids = {o.combined_group_id for o in offerings if o.combined_group_id}
+    if not gids:
+        return {}
+    rows = (await db.execute(select(CourseOffering.combined_group_id, CourseOffering.id, CourseOffering.section_label)
+                             .where(CourseOffering.combined_group_id.in_(gids)))).all()
+    out: dict = {}
+    for gid, oid, label in rows:
+        out.setdefault(gid, {})[oid] = label
+    return {gid: {oid: sorted(lbl for other, lbl in m.items() if other != oid) for oid in m} for gid, m in out.items()}
+
+
+async def _combined_with(db, offerings) -> list[str]:
+    o = offerings[0]
+    return (await _combined_groups(db, offerings)).get(o.combined_group_id, {}).get(o.id, []) if o.combined_group_id else []
 
 
 async def _to_enrollment_out_many(db, enrollments: list) -> list[EnrollmentOut]:
@@ -1051,16 +1072,64 @@ async def copy_timetable_from_term(
 )
 async def get_offering_roster(
     offering_id: uuid.UUID,
+    combined: bool = False,
     current_user: CurrentUser = Depends(get_current_user),
     db=Depends(get_db),
 ) -> list[EnrollmentOut]:
+    """combined=true: for a combined class, every section's students on one list, with their section and program."""
     offering = await CourseOfferingService(db).get(offering_id)
     if Permissions.ENROLLMENT_MANAGE not in current_user.permissions:
         own_teacher_id = await _resolve_own_teacher_id(db, current_user)
         if own_teacher_id is None or offering.assigned_teacher_id != own_teacher_id:
             raise AuthorizationError("You are not the assigned teacher for this offering.")
-    enrollments = await EnrollmentService(db).list_for_offering(offering_id)
-    return await _to_enrollment_out_many(db, enrollments)
+    if not combined or offering.combined_group_id is None:
+        return await _to_enrollment_out_many(db, await EnrollmentService(db).list_for_offering(offering_id))
+    from app.academics.combined import members
+    from app.programs.models import Program
+
+    out = []
+    for m in await members(db, offering):
+        rows = await _to_enrollment_out_many(db, await EnrollmentService(db).list_for_offering(m.id))
+        students = await load_by_ids(db, Student, [r.student_id for r in rows])
+        programs = await load_by_ids(db, Program, [st.program_id for st in students.values() if st.program_id])
+        for r in rows:
+            st = students.get(r.student_id)
+            p = programs.get(st.program_id) if st and st.program_id else None
+            out.append(r.model_copy(update={"section_label": m.section_label, "program": p.name if p else None}))
+    return out
+
+
+@router.get("/offerings/{offering_id}/combined", summary="This section's combined class: its sections, and the sections that can join")
+async def combined_view(offering_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    from app.academics.combined import CombinedClassService
+
+    offering = await CourseOfferingService(db).get(offering_id)
+    if Permissions.COURSE_OFFERING_MANAGE not in current_user.permissions:
+        own_teacher_id = await _resolve_own_teacher_id(db, current_user)
+        if own_teacher_id is None or offering.assigned_teacher_id != own_teacher_id:
+            raise AuthorizationError("You are not the assigned teacher for this offering.")
+    return await CombinedClassService(db).view(offering_id)
+
+
+class CombineRequest(BaseModel):
+    offering_ids: list[uuid.UUID] = Field(min_length=1, max_length=20)
+    teacher_id: uuid.UUID | None = None
+
+
+@router.post("/offerings/{offering_id}/combine", summary="Combine this section with other sections of the same course (one teacher, one time, one room)")
+async def combine_sections(offering_id: uuid.UUID, payload: CombineRequest,
+                           current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_OFFERING_MANAGE)), db=Depends(get_db)) -> dict:
+    from app.academics.combined import CombinedClassService
+
+    return await CombinedClassService(db).combine(offering_id, payload.offering_ids, teacher_id=payload.teacher_id, actor_id=current_user.id)
+
+
+@router.post("/offerings/{offering_id}/separate", summary="Take this section out of its combined class (it keeps its timetable)")
+async def separate_section(offering_id: uuid.UUID, current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_OFFERING_MANAGE)),
+                           db=Depends(get_db)) -> dict:
+    from app.academics.combined import CombinedClassService
+
+    return await CombinedClassService(db).separate(offering_id, actor_id=current_user.id)
 
 
 # ---------------------------------------------------------------------------
