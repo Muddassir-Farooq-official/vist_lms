@@ -47,7 +47,8 @@ EVENT_SWITCH = {"ATTENDANCE_FINE": "sms_on_attendance_fine", "ATTENDANCE_WARNING
                 "RESULTS": "sms_on_results", "FEE_OVERDUE": "sms_on_fee_overdue", "ADMISSION": "sms_on_admission",
                 "SECURITY": "sms_on_security_alert", "FEE_REMINDER": "sms_on_fee_reminder", "PARENT_WEEKLY": "sms_on_parent_weekly",
                 "FEE_PAID": "sms_on_fee_paid", "WARNING": "sms_on_warning", "CERTIFICATE_READY": "sms_on_certificate_ready",
-                "EXAM_DUTY": "sms_on_exam_duty"}
+                "EXAM_DUTY": "sms_on_exam_duty", "SCHOOL_ABSENCE": "sms_on_school_absence", "SCHOOL_HOMEWORK": "sms_on_homework",
+                "SCHOOL_PTM": "sms_on_ptm"}
 
 
 def normalize_pk_mobile(raw: str | None) -> str | None:

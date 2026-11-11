@@ -1314,6 +1314,8 @@ window.VistAdmin = (function () {
       const field = kind === "none" ? "" :
         '<div class="form-field"><label for="ask-input">' + escapeHtml(o.label || "Reason (kept on record)") + "</label>" +
         (kind === "textarea" ? '<textarea id="ask-input" class="text-input" rows="3" maxlength="300"></textarea>'
+          : kind === "select" ? '<select id="ask-input" class="select-input">' + (o.options || []).map(function (x) {
+            return '<option value="' + escapeHtml(x.value) + '">' + escapeHtml(x.label) + "</option>"; }).join("") + "</select>"
           : '<input id="ask-input" class="text-input" type="' + (kind === "number" ? "number" : kind === "date" ? "date" : "text") + '"' + (kind === "number" ? ' step="0.01" inputmode="decimal"' : kind === "date" ? "" : ' maxlength="200"') + ">") + "</div>";
       d.innerHTML = '<div class="modal-body"><h2 id="ask-title">' + escapeHtml(o.title || "Are you sure?") + "</h2>" +
         (o.intro ? '<p class="cc-meta">' + escapeHtml(o.intro) + "</p>" : "") + field +
@@ -1331,6 +1333,7 @@ window.VistAdmin = (function () {
       function accept() {
         if (!input) return finish(true);
         const v = input.value.trim();
+        if (kind === "select") return finish(v);                  // a choice from the list ("" = the empty choice)
         const min = o.min == null ? (o.required === false ? 0 : 4) : o.min;
         if (kind === "number" ? (v === "" || isNaN(parseFloat(v))) : kind === "date" ? (o.required !== false && !v) : v.length < min) {
           err.textContent = kind === "number" ? "Enter an amount." : kind === "date" ? "Choose a date." : (min > 1 ? "Write a few words (at least " + min + " letters)." : "This is needed.");

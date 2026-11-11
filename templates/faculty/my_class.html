@@ -1,0 +1,22 @@
+{% extends "faculty/_base.html" %}
+{% block title %}My class{% endblock %}
+{% block page_title %}My class{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">The morning roll call of your section (parents of absent and late children are told at once), and your parent-teacher meetings.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/school-daily.css?v={{ app_version() }}" />{% endblock %}
+
+{% block content %}
+<section class="sh-card" aria-labelledby="mc-h">
+  <div class="sh-card-head"><h2 id="mc-h">Roll call</h2></div>
+  <div id="mc-tabs" class="mc-tabs" role="tablist" aria-label="Your sections"></div>
+  <div id="mc-box" class="mc-box"><div class="skeleton-stack"><div class="skeleton-line"></div></div></div>
+</section>
+<section class="sh-card" aria-labelledby="pm-h">
+  <div class="sh-card-head"><h2 id="pm-h">Parent-teacher meetings</h2></div>
+  <div id="pm-mine"><div class="skeleton-stack"><div class="skeleton-line"></div></div></div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/school-roll.js?v={{ app_version() }}"></script>
+<script src="/static/js/school-my-class.js?v={{ app_version() }}"></script>
+{% endblock %}

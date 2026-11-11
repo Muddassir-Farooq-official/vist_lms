@@ -13,7 +13,8 @@
       <p><span id="fh-date"></span><span class="dash-chip" id="fh-term" hidden></span></p>
     </div>
     <nav class="dash-actions" aria-label="Quick actions">
-      <a href="/dashboard/faculty/attendance" class="dash-action">{{ nav_icon("attendance") }}<span>Attendance</span></a>
+      {% if school_mode() %}<a href="/dashboard/faculty/my-class" class="dash-action">{{ nav_icon("attendance") }}<span>Roll call</span></a>
+      {% else %}<a href="{{ attendance_href('faculty') }}" class="dash-action">{{ nav_icon("attendance") }}<span>Attendance</span></a>{% endif %}
       <a href="/dashboard/faculty/courses" class="dash-action">{{ nav_icon("graduation-cap") }}<span>Lesson plans</span></a>
       <a href="/dashboard/faculty/grading" class="dash-action">{{ nav_icon("exams") }}<span>Grading</span></a>
       <a href="/dashboard/faculty/assignments" class="dash-action">{{ nav_icon("file") }}<span>Assignments</span></a>
@@ -34,7 +35,7 @@
       <strong class="kpi-value" id="k-students">&mdash;</strong>
       <span class="kpi-sub" id="k-students-sub">&nbsp;</span>
     </a>
-    <a class="kpi" href="/dashboard/faculty/attendance" data-tone="purple">
+    <a class="kpi" href="{{ attendance_href('faculty') }}" data-tone="purple">
       <span class="kpi-icon">{{ nav_icon("attendance") }}</span>
       <span class="kpi-label">Class attendance</span>
       <strong class="kpi-value" id="k-att">&mdash;</strong>
@@ -52,7 +53,7 @@
       <strong class="kpi-value" id="k-review">&mdash;</strong>
       <span class="kpi-sub" id="k-review-sub">&nbsp;</span>
     </a>
-    <a class="kpi" href="/dashboard/faculty/attendance" data-tone="red">
+    <a class="kpi" href="{{ attendance_href('faculty') }}" data-tone="red">
       <span class="kpi-icon">{{ nav_icon("ban") }}</span>
       <span class="kpi-label">Classes not marked</span>
       <strong class="kpi-value" id="k-unmarked">&mdash;</strong>

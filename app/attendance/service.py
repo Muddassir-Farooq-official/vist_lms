@@ -68,6 +68,10 @@ class AttendanceService:
             )
         if class_session.status == ClassSessionStatus.CANCELLED:
             raise BusinessRuleViolationError("This session has been cancelled and cannot have attendance marked.")
+        from app.school.daily import is_school_subject
+
+        if await is_school_subject(self.session, offering.id):
+            raise BusinessRuleViolationError("School classes take attendance once a day, in the morning roll call (My class).")
 
         session_start = datetime.combine(class_session.session_date, class_session.start_time)
         window_end = session_start + timedelta(minutes=settings.attendance_marking_window_minutes)
@@ -155,7 +159,13 @@ class AttendanceService:
     async def compute_percentage(self, student_id: uuid.UUID, course_offering_id: uuid.UUID) -> dict:
         """Present classes / classes taken (cancelled classes excluded).
         Attendance is Present or Absent -- nothing else. Returns 100% (nothing
-        to penalize yet) when no class has been taken."""
+        to penalize yet) when no class has been taken.
+        School mode: a school subject's attendance is the daily roll call (app/school/daily.py)."""
+        from app.school.daily import school_subject_percentage
+
+        school = await school_subject_percentage(self.session, student_id, course_offering_id)
+        if school is not None:
+            return school
         records = await self.repo.list_for_student_in_offering(student_id, course_offering_id)
         leave = sum(1 for r in records if r.status == AttendanceStatus.LEAVE)
         present = sum(1 for r in records if r.status == AttendanceStatus.PRESENT)
@@ -215,7 +225,14 @@ class AttendanceService:
         attendance ever marked. Admin resolves these via mark_session
         with actor_is_admin=True and a late_note."""
         cutoff = institute_now() - timedelta(minutes=settings.attendance_marking_window_minutes)
-        return await self.repo.list_overdue_unmarked_sessions(cutoff, course_offering_id)
+        rows = await self.repo.list_overdue_unmarked_sessions(cutoff, course_offering_id)
+        from app.school.service import school_mode
+
+        if not school_mode():
+            return rows
+        from app.school.daily import is_school_subject                 # school classes use the daily roll call instead
+
+        return [r for r in rows if not await is_school_subject(self.session, r.course_offering_id)]
 
     async def set_topic_completed(self, class_session_id: uuid.UUID, *, completed: bool, actor_id: uuid.UUID) -> ClassSession:
         """Marked by the teacher alongside attendance (or separately) —

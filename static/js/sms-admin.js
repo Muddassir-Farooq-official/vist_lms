@@ -6,7 +6,8 @@
   const esc = VA.escapeHtml;
   const ABOUT = { ATTENDANCE_FINE: "Attendance fine", DATESHEET: "Datesheet", RESULTS: "Results", FEE_OVERDUE: "Overdue fee", TEST: "Test", BULK: "Group message", PASSWORD_RESET: "Password reset", ADMISSION: "Admission",
     FEE_REMINDER: "Fee reminder", FEE_PAID: "Payment received", CERTIFICATE_READY: "Certificate ready", PARENT_WEEKLY: "Monday note to parents",
-    ATTENDANCE_WARNING: "Attendance warning", SECURITY: "Security alert", EXAM_DUTY: "Exam duty", WARNING: "Warning" };
+    ATTENDANCE_WARNING: "Attendance warning", SECURITY: "Security alert", EXAM_DUTY: "Exam duty", WARNING: "Warning",
+    SCHOOL_ABSENCE: "Absent / late (school)", SCHOOL_HOMEWORK: "Homework (school)", SCHOOL_PTM: "Parent-teacher meeting" };
   const DOC = { CHALLAN: "challan", RECEIPT: "receipt", RESULT: "result card", CERTIFICATE: "certificate" };
   const STATUS = { QUEUED: "Waiting", SENT: "Sent", FAILED: "Failed", LOGGED: "Logged (not sent)", SKIPPED: "Skipped" };
   const PILL = { QUEUED: "pending", SENT: "active", FAILED: "failed", LOGGED: "cancelled", SKIPPED: "cancelled" };

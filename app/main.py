@@ -152,6 +152,8 @@ from app.school.service import school_mode  # noqa: E402
 
 templates.env.filters["portal_nav"] = portal_nav
 templates.env.globals["school_mode"] = school_mode
+templates.env.globals["attendance_href"] = lambda portal: (("/dashboard/faculty/my-class" if portal == "faculty" else "/dashboard/student/diary")
+                                                           if school_mode() else f"/dashboard/{portal}/attendance")
 
 # Role cards shown on the landing page (Section 18 roles). Purely
 # presentational — actual authorization is still enforced entirely by the
@@ -324,6 +326,8 @@ PARENT_NAV_ITEMS = [
     _nav("fees", "Fees", "fees", "/dashboard/parent/fees", mobile=True, short="Fees"),
     _nav("marks", "Marks", "exams", "/dashboard/parent/marks", mobile=True, short="Marks"),
     _nav("timetable", "Timetable & exams", "clock", "/dashboard/parent/timetable"),
+    _nav("diary", "Diary & attendance", "attendance", "/dashboard/parent/diary"),     # School mode only
+    _nav("meetings", "Parent-teacher meetings", "students", "/dashboard/parent/meetings"),   # School mode only
     _nav("notices", "Notices", "megaphone", "/dashboard/parent/notices"),
     _nav("calendar", "Calendar", "clock", "/dashboard/parent/calendar"),
     _nav("account", "My account", "settings", "/dashboard/parent/account", mobile=True, short="Account"),
@@ -420,6 +424,7 @@ STUDENT_NAV_ITEMS = [
     _nav("courses", "My Courses", "graduation-cap", "/dashboard/student/courses", group="Study"),
     _nav("timetable", "My Timetable", "clock", "/dashboard/student/timetable", group="Study", mobile=True, short="Timetable"),
     _nav("attendance", "My Attendance", "attendance", "/dashboard/student/attendance", group="Study", mobile=True, short="Attendance"),
+    _nav("diary", "Diary & attendance", "attendance", "/dashboard/student/diary", group="Study", short="Diary"),     # School mode only
     _nav("exams", "My Exams", "clock", "/dashboard/student/exams", group="Study"),
     _nav("results", "My Results", "exams", "/dashboard/student/results", group="Study", mobile=True, short="Results"),
     _nav("feedback", "Course feedback", "check-circle", "/dashboard/student/feedback", group="Study"),
@@ -443,6 +448,8 @@ FACULTY_NAV_ITEMS = [
     _nav("assignments", "Assignments", "exams", "/dashboard/faculty/assignments", group="Teaching"),
     _nav("courses", "My Courses", "graduation-cap", "/dashboard/faculty/courses", group="Teaching", mobile=True, short="Courses"),
     _nav("attendance", "Attendance", "attendance", "/dashboard/faculty/attendance", group="Teaching", mobile=True),
+    _nav("my-class", "My class", "students", "/dashboard/faculty/my-class", group="Teaching", short="My class"),   # School mode only
+    _nav("homework", "Homework diary", "exams", "/dashboard/faculty/homework", group="Teaching"),                                # School mode only
     _nav("grading", "Grading", "exams", "/dashboard/faculty/grading", group="Teaching", mobile=True),
     _nav("watch", "Students to watch", "students", "/dashboard/faculty/watch", group="Teaching"),
     _nav("feedback", "Student feedback", "check-circle", "/dashboard/faculty/feedback", group="Teaching"),
@@ -757,6 +764,9 @@ app.include_router(banners_router, prefix=settings.api_v1_prefix)
 from app.school.router import router as school_router  # noqa: E402
 
 app.include_router(school_router, prefix=settings.api_v1_prefix)
+from app.school.daily_router import router as school_daily_router  # noqa: E402
+
+app.include_router(school_daily_router, prefix=settings.api_v1_prefix)
 from app.push.router import router as push_router  # noqa: E402
 from app.push.app_shell import router as app_shell_router  # noqa: E402
 
@@ -1615,6 +1625,31 @@ async def admin_datesheets_page(request: Request):
     return templates.TemplateResponse(request, "admin/datesheets.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "datesheets"})
 
 
+@app.get("/dashboard/faculty/my-class", include_in_schema=False)
+async def faculty_my_class_page(request: Request):
+    return templates.TemplateResponse(request, "faculty/my_class.html", {"nav_items": FACULTY_NAV_ITEMS, "active_nav": "my-class"})
+
+
+@app.get("/dashboard/faculty/homework", include_in_schema=False)
+async def faculty_homework_page(request: Request):
+    return templates.TemplateResponse(request, "faculty/homework.html", {"nav_items": FACULTY_NAV_ITEMS, "active_nav": "homework"})
+
+
+@app.get("/dashboard/student/diary", include_in_schema=False)
+async def student_diary_page(request: Request):
+    return templates.TemplateResponse(request, "student/diary.html", {"nav_items": STUDENT_NAV_ITEMS, "active_nav": "diary"})
+
+
+@app.get("/dashboard/parent/diary", include_in_schema=False)
+async def parent_diary_page(request: Request):
+    return templates.TemplateResponse(request, "parent/diary.html", {"nav_items": PARENT_NAV_ITEMS, "active_nav": "diary"})
+
+
+@app.get("/dashboard/parent/meetings", include_in_schema=False)
+async def parent_meetings_page(request: Request):
+    return templates.TemplateResponse(request, "parent/meetings.html", {"nav_items": PARENT_NAV_ITEMS, "active_nav": "meetings"})
+
+
 @app.get("/dashboard/faculty/exams", include_in_schema=False)
 async def faculty_exams_page(request: Request):
     return templates.TemplateResponse(request, "faculty/exams.html", {"nav_items": FACULTY_NAV_ITEMS, "active_nav": "exams"})
@@ -1833,6 +1868,8 @@ async def student_timetable_page(request: Request):
 
 @app.get("/dashboard/student/attendance", include_in_schema=False)
 async def student_attendance_page(request: Request):
+    if school_mode():                                  # a school: the morning roll call, shown in Diary & attendance
+        return RedirectResponse("/dashboard/student/diary", status_code=302)
     return templates.TemplateResponse(
         request, "student/attendance.html", {"nav_items": STUDENT_NAV_ITEMS, "active_nav": "attendance"}
     )
@@ -1976,6 +2013,8 @@ async def faculty_timetable_page(request: Request):
 
 @app.get("/dashboard/faculty/attendance", include_in_schema=False)
 async def faculty_attendance_page(request: Request):
+    if school_mode():                                  # a school: the class teacher's morning roll call (My class)
+        return RedirectResponse("/dashboard/faculty/my-class", status_code=302)
     return templates.TemplateResponse(
         request, "faculty/attendance.html", {"nav_items": FACULTY_NAV_ITEMS, "active_nav": "attendance"}
     )

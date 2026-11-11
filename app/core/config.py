@@ -274,6 +274,10 @@ class Settings(BaseSettings):
     phone_alert_vibrate: int = 1
     phone_alert_keep_urgent: int = 1
     monthly_report_notice: int = 1          # the 1st of each month: tell the principal last month's report is ready
+    sms_on_school_absence: int = 1           # School mode: a child marked absent or late in the morning roll call (to the guardian)
+    sms_on_homework: int = 1                 # School mode: the evening homework message (to the guardian)
+    sms_on_ptm: int = 1                      # School mode: a parent-teacher meeting day is set (to the guardian)
+    homework_digest_hour: int = 18           # School mode: when families get the day's homework (institute time, 24-hour)
     sms_on_exam_duty: int = 1                # tell a teacher by SMS / WhatsApp when they are put on (or taken off) exam duty
     sms_on_warning: int = 0                  # tell the guardian when a student is warned (app/discipline); off unless switched on
     sms_on_fee_paid: int = 1                 # a message (receipt on WhatsApp) for each fee payment
