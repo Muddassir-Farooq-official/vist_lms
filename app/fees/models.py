@@ -125,6 +125,9 @@ class FeeStructure(UUIDPKMixin, TimestampMixin, Base):
     # unpaid past its due date (e.g. 200). NULL/0 means no late fee for
     # this fee structure.
     late_fee_per_day: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    # True = late_fee_per_day is charged ONCE when an instalment becomes late (a fixed late fine, as schools do),
+    # not for every day. Used by School mode's monthly vouchers; every other fee keeps the daily late fee.
+    late_fee_once: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
 
     applies_to_students: Mapped[bool] = mapped_column(default=True, nullable=False)
     applies_to_employees: Mapped[bool] = mapped_column(default=False, nullable=False)

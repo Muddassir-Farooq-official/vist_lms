@@ -116,7 +116,13 @@ async def challan_pdf_data(db, challan: PaymentChallan, assignment: FeeAssignmen
     data = {"consumer_number": challan.consumer_number, "due_date": challan.due_date, "fee_name": structure.name, "installment_text": text,
             "payer": await AccountService(db).payer(assignment.payer_type, assignment.payer_id), "payable": float(challan.amount),
             "charged": float(entry.amount), "concession": concession, "status": challan.status.value, "paid_on": challan.paid_at,
-            "generated_on": challan.generated_at or datetime.now(timezone.utc), "late_fee_per_day": float(structure.late_fee_per_day) if structure.late_fee_per_day else None}
+            "generated_on": challan.generated_at or datetime.now(timezone.utc), "late_fee_per_day": float(structure.late_fee_per_day) if structure.late_fee_per_day else None,
+            "late_fee_once": bool(getattr(structure, "late_fee_once", False))}
+    from app.school.fees import voucher_lines
+
+    lines = await voucher_lines(db, entry.id)                   # School mode: the voucher's items (tuition, transport ...)
+    if lines:
+        data["installment_text"], data["items"] = lines["title"], lines["items"]
     return data
 
 async def receipt_pdf_data(db, entry: FeeLedgerEntry, assignment: FeeAssignment) -> dict:

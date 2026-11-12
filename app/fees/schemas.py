@@ -90,6 +90,7 @@ class FeeStructureOut(BaseModel):
     installment_interval_months: int
     effective_from: date
     late_fee_per_day: float | None
+    late_fee_once: bool = False            # True: a fixed late fine, charged once (School mode vouchers)
     applies_to_students: bool
     applies_to_employees: bool
     status: FeeStructureStatus

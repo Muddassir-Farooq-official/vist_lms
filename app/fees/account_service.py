@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ResourceNotFoundError
 from app.employees.models import Employee
-from app.fees.assignment_service import FeeStatusCalculator, late_pause
+from app.fees.assignment_service import FeeStatusCalculator, late_pause, late_rate
 from app.fees.models import AssignmentStatus, FeeStructure, FeeType, LedgerEntryType, PayerType
 from app.fees.payment_models import PaymentChallan
 from app.fees.repository import FeeAssignmentRepository
@@ -31,7 +31,8 @@ class AccountService:
                 raise ResourceNotFoundError("Student not found.")
             program = await self.session.get(Program, st.program_id) if st.program_id else None
             return {"type": "STUDENT", "id": st.id, "name": f"{st.first_name} {st.last_name}", "identifier": st.roll_number,
-                    "group": ((program.code if program else "") + (f" \u00b7 Semester {st.current_semester}" if st.current_semester else "")).strip(" \u00b7") or None}
+                    "group": (f"{program.name} \u00b7 Section {st.section_label}" if program is not None and program.school_level is not None and st.section_label
+                              else ((program.code if program else "") + (f" \u00b7 Semester {st.current_semester}" if st.current_semester else "")).strip(" \u00b7") or None)}
         em = await self.session.get(Employee, payer_id)
         if em is None:
             raise ResourceNotFoundError("Employee not found.")
@@ -45,11 +46,18 @@ class AccountService:
         for a in assignments:
             structure = await self.session.get(FeeStructure, a.fee_structure_id)
             fee_type = await self.session.get(FeeType, structure.fee_type_id)
-            late = float(structure.late_fee_per_day) if structure.late_fee_per_day else None
+            late = late_rate(structure)
             entries = await self.repo.get_ledger(a.id)
             rows = FeeStatusCalculator.installments(entries, late, pause=late_pause(a))
             status = FeeStatusCalculator.compute(entries, late, pause=late_pause(a))
             challans = {c.fee_ledger_entry_id: c for c in (await self.session.execute(select(PaymentChallan).where(PaymentChallan.fee_assignment_id == a.id))).scalars()}
+            if structure.late_fee_once:                       # School mode vouchers: the month (or "Admission fee") and its items
+                from app.school.fees import voucher_lines
+
+                for r in rows:
+                    v = await voucher_lines(self.session, r["ledger_entry_id"])
+                    if v:
+                        r["label"], r["items"] = v["title"] if v["title"] == "Admission fee" else v["title"] + " school fee", [list(x) for x in v["items"]]
             for r in rows:
                 c = challans.get(r["ledger_entry_id"])
                 r["challan"] = {"id": c.id, "consumer_number": c.consumer_number, "status": c.status.value, "amount": float(c.amount), "due_date": c.due_date} if c else None

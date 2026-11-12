@@ -182,15 +182,15 @@ class RecordsService:
     async def _student_fee_problems(self, student_id: uuid.UUID) -> list[str]:
         """Clearance needs ALL fees settled, including installments not yet due and late fees not yet posted
         (owner decision 7). Unpaid fines are checked separately."""
-        from app.fees.assignment_service import FeeStatusCalculator, late_pause
+        from app.fees.assignment_service import FeeStatusCalculator, late_pause, late_rate
         from app.fees.models import AssignmentStatus, FeeAssignment, FeeLedgerEntry, FeeStructure, PayerType
 
-        rows = (await self.session.execute(select(FeeAssignment, FeeStructure.late_fee_per_day).join(FeeStructure, FeeStructure.id == FeeAssignment.fee_structure_id).where(
+        rows = (await self.session.execute(select(FeeAssignment, FeeStructure).join(FeeStructure, FeeStructure.id == FeeAssignment.fee_structure_id).where(
             FeeAssignment.payer_type == PayerType.STUDENT, FeeAssignment.payer_id == student_id, FeeAssignment.status == AssignmentStatus.ACTIVE))).all()
         overdue = upcoming = late = 0.0
-        for a, per_day in rows:
+        for a, structure in rows:
             entries = list((await self.session.execute(select(FeeLedgerEntry).where(FeeLedgerEntry.fee_assignment_id == a.id))).scalars())
-            for r in FeeStatusCalculator.installments(entries, float(per_day) if per_day else None, pause=late_pause(a)):
+            for r in FeeStatusCalculator.installments(entries, late_rate(structure), pause=late_pause(a)):
                 if r["status"] == "OVERDUE":
                     overdue += r["remaining"]
                 else:

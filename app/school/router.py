@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from app.auth.permissions import Permissions
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser, require_permission
+from app.core.exceptions import AuthorizationError
 from app.school.service import SchoolService
 
 router = APIRouter(prefix="/school", tags=["school"])
@@ -50,6 +51,7 @@ class TeachersIn(BaseModel):
 class PlaceIn(BaseModel):
     student_ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
     optional_course_ids: list[uuid.UUID] = Field(default_factory=list)
+    charge_admission: bool = False      # new admissions: charge the class's admission fee (School fees), once per student
 
 
 @router.get("/overview", summary="Classes, sections, class teachers and subjects for a session (admin)")
@@ -114,4 +116,16 @@ async def candidates(section_id: uuid.UUID, q: str | None = None, current_user: 
 
 @router.post("/sections/{section_id}/students", summary="Put students in this section and enrol them in its subjects")
 async def place_students(section_id: uuid.UUID, payload: PlaceIn, current_user: CurrentUser = Depends(place), db=Depends(get_db)) -> dict:
-    return await SchoolService(db).place(section_id, payload.student_ids, optional_course_ids=payload.optional_course_ids, actor_id=current_user.id)
+    if payload.charge_admission and Permissions.FEE_MANAGE not in current_user.permissions:
+        raise AuthorizationError("Only the administration can charge the admission fee.")
+    res = await SchoolService(db).place(section_id, payload.student_ids, optional_course_ids=payload.optional_course_ids, actor_id=current_user.id)
+    if payload.charge_admission:
+        from app.school.fees import SchoolFeeService
+
+        fees = SchoolFeeService(db)
+        charged = 0
+        for p in res["placed"]:
+            if await fees.charge_admission(p["student_id"], current_user.id) is not None:
+                charged += 1
+        res["admission_vouchers"] = charged
+    return res

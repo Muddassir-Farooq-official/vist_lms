@@ -17,7 +17,7 @@ from app.auth.models import User
 from app.core.clock import institute_today, local_date
 from app.core.exceptions import ResourceNotFoundError, ValidationAppError
 from app.employees.models import Employee
-from app.fees.assignment_service import FeeStatusCalculator, late_pause
+from app.fees.assignment_service import FeeStatusCalculator, late_pause, late_rate
 from app.fees.models import AssignmentStatus, FeeAssignment, FeeLedgerEntry, FeeStructure, LedgerEntryType, PayerType
 from app.fines.models import Fine, FinePayerType, FineStatus
 from app.payroll.models import PayrollRun, Payslip
@@ -45,7 +45,7 @@ class FinanceReportService:
     async def defaulters(self, *, program_id: uuid.UUID | None = None, semester: int | None = None, min_amount: float | None = None,
                          student_ids: set | None = None) -> dict:
         today = institute_today()
-        stmt = (select(FeeAssignment, FeeStructure.late_fee_per_day, Student, Program.code)
+        stmt = (select(FeeAssignment, FeeStructure, Student, Program.code)
                 .join(FeeStructure, FeeStructure.id == FeeAssignment.fee_structure_id)
                 .join(Student, Student.id == FeeAssignment.payer_id)
                 .outerjoin(Program, Program.id == Student.program_id)
@@ -63,8 +63,8 @@ class FinanceReportService:
             for e in (await self.session.execute(select(FeeLedgerEntry).where(FeeLedgerEntry.fee_assignment_id.in_(ids)))).scalars():
                 entries.setdefault(e.fee_assignment_id, []).append(e)
         people: dict[uuid.UUID, dict] = {}
-        for a, late_per_day, student, program_code in found:
-            for r in FeeStatusCalculator.installments(entries.get(a.id, []), float(late_per_day) if late_per_day else None, as_of=today, pause=late_pause(a)):
+        for a, structure, student, program_code in found:
+            for r in FeeStatusCalculator.installments(entries.get(a.id, []), late_rate(structure), as_of=today, pause=late_pause(a)):
                 if r["status"] != "OVERDUE" or r["remaining"] <= 0.005 or r["due_date"] is None:
                     continue
                 p = people.setdefault(student.id, {

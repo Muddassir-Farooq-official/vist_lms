@@ -78,11 +78,12 @@ def render_challan_pdf(d: dict, *, institute_name: str | None = None) -> bytes:
         row("Student / payer", d["payer"]["name"], bold=True)
         row("Roll no. / code", d["payer"]["identifier"] or "\u2014")
         if d["payer"].get("group"):
-            row("Program", d["payer"]["group"])
+            row("Class" if d.get("items") else "Program", d["payer"]["group"])
         row("Fee", d["fee_name"])
-        row("Installment", d["installment_text"])
+        row("For" if d.get("items") else "Installment", d["installment_text"])
         c.setStrokeColor(LINE); c.line(x, y + 4 * mm, right, y + 4 * mm)
-        for label, value in (("Fee amount", d["charged"]), ("Scholarship / concession", -d["concession"] if d["concession"] else None)):
+        lines = d.get("items") or [("Fee amount", d["charged"])]
+        for label, value in (*lines, ("Scholarship / concession", -d["concession"] if d["concession"] else None)):
             if value is None:
                 continue
             c.setFillColor(MUTED); c.setFont("Helvetica", 8); c.drawString(x, y, label)
@@ -97,7 +98,11 @@ def render_challan_pdf(d: dict, *, institute_name: str | None = None) -> bytes:
             c.drawString(x, y, line); y -= 3.4 * mm
         y -= 2 * mm
         row("Due date", d["due_date"].strftime("%d %b %Y"), bold=True)
-        if d.get("late_fee_per_day"):
+        if d.get("late_fee_per_day") and d.get("late_fee_once"):
+            c.setFillColor(colors.HexColor("#92400e")); c.setFont("Helvetica", 7.4)
+            c.drawString(x, y + 1 * mm, f"Paid after the due date: Rs. {d['payable'] + d['late_fee_per_day']:,.0f} (late fine Rs. {d['late_fee_per_day']:,.0f}).")
+            y -= 3.5 * mm
+        elif d.get("late_fee_per_day"):
             c.setFillColor(colors.HexColor("#92400e")); c.setFont("Helvetica", 7.4)
             c.drawString(x, y + 1 * mm, f"Late fee: Rs. {d['late_fee_per_day']:,.0f} for every day after the due date.")
             y -= 3.5 * mm

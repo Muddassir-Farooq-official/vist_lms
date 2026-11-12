@@ -22,7 +22,7 @@
         ? '<a href="/api/v1/fees/challans/' + encodeURIComponent(ch.id) + '/pdf" target="_blank" rel="noopener">Challan ' + esc(ch.consumer_number || "") + "</a>"
         : "\u2014";
       return "<tr>" +
-        "<td>" + esc(r.installment_number != null ? String(r.installment_number) : "\u2014") + "</td>" +
+        "<td>" + esc(r.label || (r.installment_number != null ? String(r.installment_number) : "\u2014")) + "</td>" +
         "<td>" + day(r.due_date) + "</td>" +
         '<td class="num">' + esc(SU.money(r.charged)) + "</td>" +
         '<td class="num">' + esc(SU.money(r.concession)) + "</td>" +

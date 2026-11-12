@@ -189,7 +189,7 @@ async def get_statement(
     current_user: CurrentUser = Depends(_STAFF_ONLY),
     db=Depends(get_db),
 ) -> dict:
-    from app.fees.assignment_service import FeeStatusCalculator, late_pause
+    from app.fees.assignment_service import FeeStatusCalculator, late_pause, late_rate
     from app.fees.models import FeeAssignment, LedgerEntryType
 
     assignment = await db.get(FeeAssignment, assignment_id)
@@ -197,7 +197,7 @@ async def get_statement(
         raise ResourceNotFoundError("Fee assignment not found.")
     structure = await db.get(FeeStructure, assignment.fee_structure_id)
     entries = await FeeAssignmentRepository(db).get_ledger(assignment_id)
-    late = float(structure.late_fee_per_day) if structure and structure.late_fee_per_day else None
+    late = late_rate(structure)
     rows = FeeStatusCalculator.installments(entries, late, pause=late_pause(assignment))
     label = {r["ledger_entry_id"]: (f"Installment {r['installment_number']}" if r["installment_number"] else (r["description"] or "Charge")) for r in rows}
     applied: dict = {}

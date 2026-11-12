@@ -216,7 +216,7 @@ class ReportCenter:
 
     # ============================================================ FEES
     async def fee_position(self, params: dict, user) -> dict:
-        from app.fees.assignment_service import FeeStatusCalculator, late_pause
+        from app.fees.assignment_service import FeeStatusCalculator, late_pause, late_rate
         from app.fees.models import AssignmentStatus, FeeAssignment, FeeLedgerEntry, FeeStructure, FeeType, PayerType
         from app.programs.models import Program
         from app.students.models import Student
@@ -249,7 +249,7 @@ class ReportCenter:
             else:
                 k = (prog or "", st.current_semester or 0)
                 label = (prog or "No program") + (f" · semester {st.current_semester}" if st.current_semester else "")
-            s = FeeStatusCalculator.compute(entries.get(a.id, []), float(structure.late_fee_per_day) if structure.late_fee_per_day else None, pause=late_pause(a))
+            s = FeeStatusCalculator.compute(entries.get(a.id, []), late_rate(structure), pause=late_pause(a))
             g = groups.setdefault(k, {"group": label, "_students": set(), "billed": 0.0, "discount": 0.0, "payable": 0.0, "paid": 0.0,
                                       "outstanding": 0.0, "overdue": 0.0, "late_fee": 0.0})
             g["_students"].add(st.id)

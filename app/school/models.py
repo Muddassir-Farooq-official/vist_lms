@@ -234,3 +234,72 @@ class SchoolPromotion(Base):
     note: Mapped[str | None] = mapped_column(String(300), nullable=True)
     decided_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+# ---------------------------------------------------------------------------------------------- stage 4: fees
+class SchoolFeePlan(Base):
+    """A class's fees for one session: the monthly tuition, the admission fee (once, when a new student joins) and the
+    annual charges (on the student's first monthly voucher of the session). Changes count for vouchers made later."""
+    __tablename__ = "school_fee_plans"
+
+    term_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("academic_terms.id", ondelete="CASCADE"), primary_key=True)
+    program_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("programs.id", ondelete="CASCADE"), primary_key=True)
+    monthly_tuition: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    admission_fee: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    annual_charges: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+
+class TransportRoute(Base):
+    """A van / bus route with its monthly fee. Switched off, never deleted."""
+    __tablename__ = "school_transport_routes"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
+    monthly_fee: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class StudentTransport(Base):
+    """A student on a route from a month (the 1st) until a month (the 1st of the last month charged; empty = still on it)."""
+    __tablename__ = "school_student_transport"
+    __table_args__ = (Index("ix_school_student_transport_student", "student_id", "from_month"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    student_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
+    route_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("school_transport_routes.id", ondelete="RESTRICT"), nullable=False)
+    from_month: Mapped[date] = mapped_column(Date, nullable=False)
+    until_month: Mapped[date | None] = mapped_column(Date, nullable=True)
+    added_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class SchoolVoucherKind(str, enum.Enum):
+    MONTHLY = "MONTHLY"
+    ADMISSION = "ADMISSION"
+
+
+class SchoolVoucher(Base):
+    """What went on a school fee voucher, line by line (the money itself is the fee ledger's DEBIT, its challan and,
+    for the sibling discount, a CONCESSION). One monthly voucher per student per month; one admission voucher ever."""
+    __tablename__ = "school_vouchers"
+    __table_args__ = (UniqueConstraint("student_id", "kind", "month", name="uq_school_vouchers_student_kind_month"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    student_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind: Mapped[SchoolVoucherKind] = mapped_column(Enum(SchoolVoucherKind, name="school_voucher_kind"), nullable=False)
+    month: Mapped[date] = mapped_column(Date, nullable=False)                  # the 1st of the month (admission: the month joined)
+    term_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("academic_terms.id", ondelete="CASCADE"), nullable=False)
+    program_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("programs.id", ondelete="CASCADE"), nullable=False)
+    tuition: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    transport: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    route_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    annual: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    admission: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    sibling_discount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    sibling_rank: Mapped[int | None] = mapped_column(Integer, nullable=True)    # 2 = second child, 3 = third ...
+    ledger_entry_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("fee_ledger_entries.id", ondelete="SET NULL"), nullable=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

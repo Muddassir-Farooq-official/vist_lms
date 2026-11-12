@@ -771,8 +771,10 @@ from app.school.daily_router import router as school_daily_router  # noqa: E402
 
 app.include_router(school_daily_router, prefix=settings.api_v1_prefix)
 from app.school.results_router import router as school_results_router  # noqa: E402
+from app.school.fees_router import router as school_fees_router  # noqa: E402
 
 app.include_router(school_results_router, prefix=settings.api_v1_prefix)
+app.include_router(school_fees_router, prefix=settings.api_v1_prefix)
 from app.push.router import router as push_router  # noqa: E402
 from app.push.app_shell import router as app_shell_router  # noqa: E402
 

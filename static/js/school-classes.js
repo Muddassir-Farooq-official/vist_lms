@@ -172,6 +172,7 @@
       (optional.length ? '<fieldset class="sc-opt"><legend>Their choice subjects</legend>' + optional.map(function (s) {
         return '<label><input type="checkbox" value="' + esc(s.course_id) + '"> ' + esc(s.title) + "</label>";
       }).join("") + "</fieldset>" : "") +
+      '<label class="sc-adm"><input type="checkbox" id="sc-adm"> New admission: charge the admission fee (School fees; once per student)</label>' +
       '<p class="form-error" id="sc-place-error" hidden></p><button type="button" class="role-btn" id="sc-place-go">Put the ticked students in Section ' + esc(d.label) + "</button>" +
       '<p class="sc-hint">They are enrolled in every subject of the class' + (optional.length ? " and the choice subjects ticked" : "") +
       ". A student moving from another section takes their subjects along (before classes start).</p></div>" +
@@ -256,12 +257,14 @@
     if (!ids.length) { err.textContent = "Tick the students to add."; err.hidden = false; return; }
     const opt = Array.prototype.map.call(document.querySelectorAll(".sc-opt input:checked"), function (c) { return c.value; });
     $("sc-place-go").disabled = true;
-    const r = await VA.fetchJson(API + "/sections/" + current.id + "/students", json("POST", { student_ids: ids, optional_course_ids: opt }));
+    const r = await VA.fetchJson(API + "/sections/" + current.id + "/students", json("POST", { student_ids: ids, optional_course_ids: opt,
+      charge_admission: !!($("sc-adm") && $("sc-adm").checked) }));
     $("sc-place-go").disabled = false;
     if (!r.ok) { err.textContent = msg(r, "Could not add them."); err.hidden = false; return; }
     current = r.body.section;
     drawSection();
-    if (r.body.placed.length) VA.toast(r.body.placed.length + " student" + (r.body.placed.length === 1 ? "" : "s") + " added to Section " + current.label + ".", "success");
+    if (r.body.placed.length) VA.toast(r.body.placed.length + " student" + (r.body.placed.length === 1 ? "" : "s") + " added to Section " + current.label + "." +
+      (r.body.admission_vouchers != null ? " Admission vouchers: " + r.body.admission_vouchers + "." : ""), "success");
     if (r.body.failed.length) {
       const e2 = $("sc-place-error");
       e2.textContent = "Not added: " + r.body.failed.map(function (f) { return (f.name || "a student") + " (" + f.reason + ")"; }).join("; ");
