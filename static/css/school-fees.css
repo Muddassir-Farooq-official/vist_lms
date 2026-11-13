@@ -1,0 +1,21 @@
+/* School mode, stage 4: Classes & sections -> Fees */
+.sf-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 10px 0; }
+.sf-stat { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; background: var(--surface); }
+.sf-stat span { display: block; font-size: 0.78rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+.sf-stat strong { font-size: 1.15rem; }
+.sf-plan .text-input { min-width: 0; width: 100%; max-width: 150px; text-align: right; }
+.sf-unset td:first-child strong { color: var(--text-muted); }
+.sf-add { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+.sf-add .text-input { min-width: 0; flex: 1 1 180px; }
+.sf-add input[type="number"] { flex: 0 1 170px; }
+.sf-rd { list-style: none; margin: 8px 0; padding: 0; }
+.sf-rd li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
+.sf-rd li:first-child { border-top: none; }
+.sf-sub { margin: 14px 0 4px; font-size: 1rem; }
+.sc-adm { display: flex; align-items: center; gap: 6px; margin: 10px 0 4px; font-size: 0.88rem; }
+#sf-month { min-width: 0; width: auto; }
+
+@media (max-width: 640px) {
+  .sf-plan .text-input { max-width: none; }
+  .sf-rd li { flex-wrap: wrap; }
+}

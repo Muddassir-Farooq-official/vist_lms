@@ -71,6 +71,9 @@ async def send_due(session: AsyncSession, *, time_budget: float = 20) -> dict:
     from app.school.daily import homework_digest
 
     await homework_digest(session)                                       # School mode: the day's homework to families, once each evening; never raises
+    from app.school.fees import monthly_round
+
+    await monthly_round(session)                                         # School mode: this month's fee vouchers, from 6 AM daily; never raises
     await certificate_round(session)                                     # paid certificate fees -> certificate ready; never raises
     from app.notifications.family import payment_messages
 

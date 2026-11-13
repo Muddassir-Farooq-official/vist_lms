@@ -216,7 +216,15 @@ class FeeStatusCalculator:
                 late_from = max(late_from, due + timedelta(days=grace))     # no late fee during the grace days after the due date
             late_fee = 0.0
             rate_now, rises_on = None, None
-            if late_fee_per_day:
+            if late_fee_per_day and getattr(late_fee_per_day, "once", False):
+                # a fixed late fine, charged once when the instalment is late (School mode's monthly vouchers)
+                if remaining > 0.005 and late_from < today and FeeStatusCalculator._late_days(late_from, today, pause) > 0:
+                    late_fee = float(late_fee_per_day)
+                elif remaining <= 0.005 and owed > 1e-9:
+                    settled_on = settled_at if settled_at else today
+                    if settled_on > late_from and FeeStatusCalculator._late_days(late_from, settled_on, pause) > 0:
+                        late_fee = float(late_fee_per_day)
+            elif late_fee_per_day:
                 if remaining > 0.005 and late_from < today:
                     days_late = FeeStatusCalculator._late_days(late_from, today, pause)
                     late_fee = FeeStatusCalculator.late_amount(days_late, late_fee_per_day)
@@ -312,11 +320,26 @@ def late_pause(assignment) -> tuple | None:
     return (start, getattr(assignment, "late_fee_paused_until", None)) if start else None
 
 
+class LateRate(float):
+    """A fee's late fee rate (Rs.), carrying whether it is charged once (a fixed late fine) or for every late day."""
+
+    once: bool = False
+
+
+def late_rate(structure) -> LateRate | None:
+    """The late fee rate to give FeeStatusCalculator for a fee structure: None when it has no late fee. Always use this
+    (never structure.late_fee_per_day directly), so a fixed late fine is not counted as a daily one."""
+    if structure is None or not structure.late_fee_per_day:
+        return None
+    r = LateRate(float(structure.late_fee_per_day))
+    r.once = bool(getattr(structure, "late_fee_once", False))
+    return r
+
+
 async def _late_fee_per_day(session: AsyncSession, assignment: FeeAssignment) -> float | None:
     from app.fees.models import FeeStructure
 
-    structure = await session.get(FeeStructure, assignment.fee_structure_id)
-    return float(structure.late_fee_per_day) if structure is not None and structure.late_fee_per_day else None
+    return late_rate(await session.get(FeeStructure, assignment.fee_structure_id))
 
 
 async def outstanding_on(session: AsyncSession, assignment: FeeAssignment) -> float:
@@ -407,7 +430,7 @@ async def post_settled_late_fees(session: AsyncSession, assignment: FeeAssignmen
             if structure is None or not structure.late_fee_per_day:
                 return 0.0
             entries = await FeeAssignmentRepository(session).get_ledger(assignment.id)
-            rows = FeeStatusCalculator.installments(entries, float(structure.late_fee_per_day), pause=late_pause(assignment))
+            rows = FeeStatusCalculator.installments(entries, late_rate(structure), pause=late_pause(assignment))
             svc = FeeAssignmentService(session)
             total = 0.0
             for r in rows:
@@ -443,8 +466,7 @@ class FeeAssignmentService:
     async def get_status(self, assignment: FeeAssignment) -> dict:
         entries = await self.repo.get_ledger(assignment.id)
         structure = await self.structure_repo.get_by_id(assignment.fee_structure_id)
-        late_fee = float(structure.late_fee_per_day) if structure and structure.late_fee_per_day else None
-        return FeeStatusCalculator.compute(entries, late_fee, pause=late_pause(assignment))
+        return FeeStatusCalculator.compute(entries, late_rate(structure), pause=late_pause(assignment))
 
     async def record_payment(
         self, assignment_id: uuid.UUID, data: RecordPaymentRequest, *, actor_id: uuid.UUID
@@ -467,7 +489,7 @@ class FeeAssignmentService:
         # every balance. Refunds/advances are handled outside this screen.
         structure = await self.structure_repo.get_by_id(assignment.fee_structure_id)
         rows = FeeStatusCalculator.installments(
-            await self.repo.get_ledger(assignment.id), float(structure.late_fee_per_day) if structure and structure.late_fee_per_day else None,
+            await self.repo.get_ledger(assignment.id), late_rate(structure),
             pause=late_pause(assignment))
         outstanding = round(sum(r["remaining"] for r in rows), 2)
         if outstanding <= 0.005:
@@ -538,7 +560,7 @@ class FeeAssignmentService:
 
         entries = await self.repo.get_ledger(assignment.id)
         current_total_fine = FeeStatusCalculator.compute_fine_for_debit(
-            entries, debit.id, float(structure.late_fee_per_day), pause=late_pause(assignment)
+            entries, debit.id, late_rate(structure), pause=late_pause(assignment)
         )
         already_charged = float(debit.late_fee_charged_amount or 0)
         new_amount = round(current_total_fine - already_charged, 2)

@@ -92,6 +92,7 @@ async def _to_structure_out(db, structure) -> FeeStructureOut:
         installment_interval_months=structure.installment_interval_months,
         effective_from=structure.effective_from,
         late_fee_per_day=float(structure.late_fee_per_day) if structure.late_fee_per_day else None,
+        late_fee_once=bool(structure.late_fee_once),
         applies_to_students=structure.applies_to_students,
         applies_to_employees=structure.applies_to_employees,
         status=structure.status,
@@ -136,6 +137,16 @@ class UndoActivationIn(BaseModel):
     reason: str = Field(min_length=5, max_length=300)
 
 
+async def _not_school_fees(db, structure_id: uuid.UUID) -> None:
+    """School mode's 'School fees' structures are run by Classes & sections -> Fees (vouchers, fine from Settings)."""
+    from app.core.exceptions import BusinessRuleViolationError
+    from app.fees.models import FeeStructure
+
+    s = await db.get(FeeStructure, structure_id)
+    if s is not None and s.late_fee_once:
+        raise BusinessRuleViolationError("School fees are managed on Classes & sections → Fees (the late fine is in Settings).")
+
+
 @structures_router.post("/{structure_id}/undo-activation", summary="Undo a mistaken activation (only while nobody has paid on it)")
 async def undo_fee_activation(
     structure_id: uuid.UUID,
@@ -143,6 +154,7 @@ async def undo_fee_activation(
     current_user: CurrentUser = Depends(require_permission(Permissions.FEE_MANAGE)),
     db=Depends(get_db),
 ) -> dict:
+    await _not_school_fees(db, structure_id)
     return await FeeStructureService(db).undo_activation(structure_id, reason=payload.reason, actor_id=current_user.id)
 
 
@@ -155,6 +167,7 @@ async def activate_fee_structure(
     current_user: CurrentUser = Depends(require_permission(Permissions.FEE_MANAGE)),
     db=Depends(get_db),
 ) -> dict:
+    await _not_school_fees(db, structure_id)
     return await FeeStructureService(db).activate(structure_id, actor_id=current_user.id)
 
 
@@ -168,6 +181,7 @@ async def close_fee_structure(
     current_user: CurrentUser = Depends(require_permission(Permissions.FEE_MANAGE)),
     db=Depends(get_db),
 ) -> FeeStructureOut:
+    await _not_school_fees(db, structure_id)
     structure = await FeeStructureService(db).close(structure_id, actor_id=current_user.id)
     return await _to_structure_out(db, structure)
 
@@ -184,6 +198,7 @@ async def clone_fee_structure(
     current_user: CurrentUser = Depends(require_permission(Permissions.FEE_MANAGE)),
     db=Depends(get_db),
 ) -> FeeStructureOut:
+    await _not_school_fees(db, structure_id)
     clone = await FeeStructureService(db).clone(structure_id, payload, actor_id=current_user.id)
     return await _to_structure_out(db, clone)
 
@@ -206,6 +221,7 @@ async def change_due_date_for_all(
 ) -> dict:
     from app.fees.assignment_service import FeeAssignmentService
 
+    await _not_school_fees(db, structure_id)
     return await FeeAssignmentService(db).change_due_date_for_structure(structure_id, installment_number, new_date=payload.due_date,
                                                                        reason=payload.reason, actor_id=current_user.id)
 
@@ -228,6 +244,7 @@ async def set_late_fee(
     from app.audit.service import AuditService
     from app.core.exceptions import ResourceNotFoundError
 
+    await _not_school_fees(db, structure_id)
     structure = await FeeStructureRepository(db).get_by_id(structure_id)
     if structure is None:
         raise ResourceNotFoundError("Fee structure not found.")

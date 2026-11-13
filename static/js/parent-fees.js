@@ -31,7 +31,9 @@
         const st = STATUS[i.status] || [i.status, ""];
         const li = el("li", "pp-row");
         const body = el("div", "pp-row-body");
-        body.appendChild(el("strong", null, (a.fee_name || "Fee") + (a.installments.length > 1 ? " · instalment " + i.installment_number : "")));
+        body.appendChild(el("strong", null, i.label || ((a.fee_name || "Fee") + (a.installments.length > 1 ? " · instalment " + i.installment_number : ""))));
+        if (i.items && i.items.length) body.appendChild(el("small", "pf-items", i.items.map(function (x) { return x[0] + " " + P.money(x[1]); }).join(" + ") +
+          (i.concession ? " − discount " + P.money(i.concession) : "")));
         body.appendChild(el("small", null, "Due " + P.day(i.due_date) + (i.late_fee ? " · late fee so far " + P.money(i.late_fee) : "") +
           (i.challan && i.challan.consumer_number ? " · consumer no. " + i.challan.consumer_number : "")));
         li.appendChild(body);

@@ -12,7 +12,7 @@ from collections import defaultdict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.fees.assignment_service import FeeAssignmentService, FeeStatusCalculator, late_pause
+from app.fees.assignment_service import FeeAssignmentService, FeeStatusCalculator, late_pause, late_rate
 from app.fees.models import AssignmentStatus, FeeAssignment, FeeLedgerEntry, FeeStructure, PayerType
 
 
@@ -30,7 +30,7 @@ async def _rows(session: AsyncSession):
             ledger[e.fee_assignment_id].append(e)
     out = []
     for a, s in pairs:
-        for r in FeeStatusCalculator.installments(ledger[a.id], float(s.late_fee_per_day), pause=late_pause(a)):
+        for r in FeeStatusCalculator.installments(ledger[a.id], late_rate(s), pause=late_pause(a)):
             unposted = round(r["late_fee"] - float(r.get("late_fee_posted") or 0), 2)
             if r["remaining"] > 0.005 and unposted > 0.005:
                 out.append((a, s, r, unposted))

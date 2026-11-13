@@ -281,6 +281,12 @@ class Settings(BaseSettings):
     school_weight_mid_term: float = 30           # ... of the Mid-Term
     school_weight_final: float = 50              # ... of the Final
     school_pass_percent: float = 33              # pass: at least this % overall ...
+    school_fee_due_day: int = 10                 # School mode: monthly vouchers are due on this day of the month (1-28)
+    school_late_fine: float = 200                # ... and a voucher paid after it gets this fine, once (Rs.; 0 = none)
+    school_sibling_discount_second: float = 10   # % off the tuition of the 2nd child (same guardian CNIC)
+    school_sibling_discount_third: float = 20    # % off the tuition of the 3rd and later children
+    school_admission_due_days: int = 7           # an admission voucher (or a month's voucher made late) is due this many days later
+    sms_on_school_fee: int = 1                   # School mode: tell the guardian when a fee voucher is ready
     school_subject_pass_percent: float = 33      # ... and at least this % in every subject
     homework_digest_hour: int = 18           # School mode: when families get the day's homework (institute time, 24-hour)
     sms_on_exam_duty: int = 1                # tell a teacher by SMS / WhatsApp when they are put on (or taken off) exam duty

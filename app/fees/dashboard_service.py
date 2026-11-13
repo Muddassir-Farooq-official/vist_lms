@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.fees.assignment_service import FeeAssignmentService, FeeStatusCalculator, late_pause
+from app.fees.assignment_service import FeeAssignmentService, FeeStatusCalculator, late_pause, late_rate
 from app.fees.models import (
     AssignmentStatus,
     FeeLedgerEntry,
@@ -63,8 +63,7 @@ class FeeDashboardService:
             for assignment in active_assignments:
                 entries = entries_by_assignment.get(assignment.id, [])
                 structure = structures_by_id.get(assignment.fee_structure_id)
-                late_fee = float(structure.late_fee_per_day) if structure and structure.late_fee_per_day else None
-                status_data = FeeStatusCalculator.compute(entries, late_fee, pause=late_pause(assignment))
+                status_data = FeeStatusCalculator.compute(entries, late_rate(structure), pause=late_pause(assignment))
 
                 total_charged += status_data["total_payable"]
                 total_outstanding += status_data["total_remaining"]

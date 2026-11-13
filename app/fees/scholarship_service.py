@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.audit.service import AuditService
 from app.core.clock import institute_today, local_date
 from app.core.exceptions import BusinessRuleViolationError, ResourceNotFoundError
-from app.fees.assignment_service import FeeStatusCalculator, late_pause, lock_assignment, sync_challans
+from app.fees.assignment_service import FeeStatusCalculator, late_pause, late_rate, lock_assignment, sync_challans
 from app.fees.models import (
     AssignmentStatus,
     FeeAssignment,
@@ -325,7 +325,7 @@ class ScholarshipService:
                 continue
             structure = await self.session.get(FeeStructure, assignment.fee_structure_id)
             rows = {r["ledger_entry_id"]: r for r in FeeStatusCalculator.installments(
-                entries, float(structure.late_fee_per_day) if structure.late_fee_per_day else None, pause=late_pause(assignment))}
+                entries, late_rate(structure), pause=late_pause(assignment))}
             debits = {e.id: e for e in entries if e.entry_type == LedgerEntryType.DEBIT}
             here = Decimal(0)
             for c, amount in live:
@@ -387,7 +387,7 @@ class ScholarshipService:
         kept = sum((a for _, a in live), Decimal(0))
         # Only installments due inside the scholarship's dates: one granted for next term leaves this term alone,
         # and one that starts this term never reaches dues from earlier terms.
-        rows = [r for r in FeeStatusCalculator.installments(entries, float(structure.late_fee_per_day) if structure.late_fee_per_day else None,
+        rows = [r for r in FeeStatusCalculator.installments(entries, late_rate(structure),
                                                             pause=late_pause(assignment))
                 if r["remaining"] > 0.005 and covers(s, r["due_date"]) and r["ledger_entry_id"] not in has]
         if not rows:

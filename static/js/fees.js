@@ -293,18 +293,18 @@
           '<td class="num">' + money(s.total_amount) + "</td>" +
           "<td>" + VA.escapeHtml(scope) + "</td>" +
           "<td>" + statusPill + "</td>" +
-          '<td class="num">' +
-          (s.status === "DRAFT" || s.status === "ACTIVE"
+          '<td class="num">' + (s.late_fee_once ? '<small class="list-sub">Managed on Classes &amp; sections \u2192 Fees</small>' : "") +
+          (!s.late_fee_once && (s.status === "DRAFT" || s.status === "ACTIVE")
             ? '<button type="button" class="row-action activate-structure-btn" data-id="' + s.id + '">' +
               (s.status === "DRAFT" ? "Activate" : "Re-check") + "</button>"
             : "") +
-          (s.status === "ACTIVE" ? ' &middot; <button type="button" class="row-action undo-activation-btn" data-id="' + s.id + '">Undo activation\u2026</button>' : "") +
-          (s.status === "ACTIVE" || s.status === "DRAFT" ? ' &middot; <button type="button" class="row-action late-rate-btn" data-id="' + s.id + '" data-rate="' + (s.late_fee_per_day || 0) +
-            '" data-name="' + VA.escapeHtml(s.name) + '">Late fee' + (s.late_fee_per_day ? " (" + money(s.late_fee_per_day) + "/day)" : "") + "\u2026</button>" : "") +
-          (s.status === "ACTIVE" ? ' &middot; <button type="button" class="row-action due-all-btn" data-id="' + s.id + '" data-count="' + s.installment_count +
+          (s.status === "ACTIVE" && !s.late_fee_once ? ' &middot; <button type="button" class="row-action undo-activation-btn" data-id="' + s.id + '">Undo activation\u2026</button>' : "") +
+          (!s.late_fee_once && (s.status === "ACTIVE" || s.status === "DRAFT") ? ' &middot; <button type="button" class="row-action late-rate-btn" data-id="' + s.id + '" data-rate="' + (s.late_fee_per_day || 0) +
+            '" data-name="' + VA.escapeHtml(s.name) + '">Late fee' + (s.late_fee_per_day ? " (" + money(s.late_fee_per_day) + (s.late_fee_once ? " once" : "/day") + ")" : "") + "\u2026</button>" : "") +
+          (s.status === "ACTIVE" && !s.late_fee_once ? ' &middot; <button type="button" class="row-action due-all-btn" data-id="' + s.id + '" data-count="' + s.installment_count +
             '" data-name="' + VA.escapeHtml(s.name) + '">Change due date\u2026</button>' : "") +
-          ' &middot; <button type="button" class="row-action clone-structure-btn" data-id="' + s.id +
-          '" data-name="' + VA.escapeHtml(s.name) + '" data-amount="' + s.total_amount + '">Clone &amp; Adjust</button>' +
+          (s.late_fee_once ? "" : ' &middot; <button type="button" class="row-action clone-structure-btn" data-id="' + s.id +
+          '" data-name="' + VA.escapeHtml(s.name) + '" data-amount="' + s.total_amount + '">Clone &amp; Adjust</button>') +
           "</td>";
         structuresTbody.appendChild(tr);
       });

@@ -16,6 +16,7 @@
         if (b.dataset.tab === "today") load();
         if (b.dataset.tab === "ptm" && window.VistPtm) window.VistPtm.load();
         if (b.dataset.tab === "results" && window.VistResults) window.VistResults.load();
+        if (b.dataset.tab === "fees" && window.VistSchoolFees) window.VistSchoolFees.load();
       });
     });
   }

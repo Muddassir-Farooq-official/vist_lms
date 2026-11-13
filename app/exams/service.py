@@ -357,7 +357,7 @@ class ExamScheduleService:
     async def withheld(self, student_id: uuid.UUID) -> list[str]:
         """Why the whole admit card is held: an unpaid attendance fine, or (by policy) overdue fees."""
         from app.attendance.holds import unpaid_attendance_fines
-        from app.fees.assignment_service import FeeStatusCalculator, late_pause
+        from app.fees.assignment_service import FeeStatusCalculator, late_pause, late_rate
         from app.fees.models import AssignmentStatus, FeeAssignment, FeeStructure, PayerType
 
         withheld = []
@@ -373,7 +373,7 @@ class ExamScheduleService:
             repo = FeeAssignmentRepository(self.session)
             for a in assignments:
                 structure = await self.session.get(FeeStructure, a.fee_structure_id)
-                for row in FeeStatusCalculator.installments(await repo.get_ledger(a.id), float(structure.late_fee_per_day) if structure.late_fee_per_day else None,
+                for row in FeeStatusCalculator.installments(await repo.get_ledger(a.id), late_rate(structure),
                                                             pause=late_pause(a)):
                     if row["status"] == "OVERDUE":
                         overdue += row["remaining"]

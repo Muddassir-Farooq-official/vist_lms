@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.20.0",
+    "date": "2026-11-12",
+    "title": "School mode: school fees",
+    "summary": "For schools: monthly fee vouchers made on the 1st with tuition, transport and annual charges, sibling discounts, admission fees and a fixed late fine.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Classes & sections has a Fees tab: set each class's monthly tuition, admission fee and annual charges for the session, add van and bus routes with their monthly fee, and put students on a route."
+      },
+      {
+        "kind": "new",
+        "for": "Parents",
+        "text": "Each month your child gets one fee voucher on the 1st: tuition, transport (if on a route) and, on the first voucher of the session, the annual charges. It is due on the 10th (set in Settings). Pay it at the bank, by 1Bill or at the school, as before. You are told when it is ready."
+      },
+      {
+        "kind": "new",
+        "for": "Everyone",
+        "text": "Brothers and sisters (same guardian CNIC) get a sibling discount on tuition: 10% for the second child and 20% for the third and later (set in Settings). It is shown on the voucher."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "A voucher paid after its due date has a fixed late fine, once (Rs. 200 unless changed in Settings), not a daily one. When you put a new student in a section, tick New admission to charge the class's admission fee."
+      }
+    ]
+  },
+  {
     "version": "1.19.0",
     "date": "2026-11-11",
     "title": "School mode: exams, report cards and promotion",
