@@ -114,21 +114,17 @@ async def test_a_payment_dated_earlier_keeps_the_fine_unless_an_administrator_re
     on_time = due.isoformat()                                   # "it was paid on the due date": no late days at all
     pay = {"amount": first["remaining"], "method": "CASH", "paid_on": on_time}
 
-    # an accounts officer: asked; cannot remove; keeping posts the whole fine up to today
+    # an accounts officer: asked first (nothing saved); can keep the fine or remove it
     await _login_admin(app_client)
     user, pw = await _staff(app_client, db_session, "ACC", "ACCOUNTS_OFFICER", "35202-7100093-3")
-    new_pw = await _first_login(app_client, user, pw)
+    await _first_login(app_client, user, pw)
     asked = await app_client.post(f"/api/v1/fees/assignments/{aid}/payments", json=pay)
-    if asked.status_code == 403:                                # the counter screen is the administrator's here: use the challan
-        pytest.skip("accounts officers record payments through challans in this set-up")
-    assert asked.status_code == 409 and asked.json()["error"]["details"]["can_remove"] is False
+    assert asked.status_code == 409 and asked.json()["error"]["details"]["can_remove"] is True
     assert asked.json()["error"]["details"]["late_fine"] == first["late_fee"]
     db_session.expire_all()
     credits = (await db_session.execute(select(FeeLedgerEntry).where(FeeLedgerEntry.fee_assignment_id == uuid.UUID(aid),
                                                                      FeeLedgerEntry.entry_type == LedgerEntryType.CREDIT))).scalars().all()
     assert credits == []                                         # refused: nothing was saved
-    no = await app_client.post(f"/api/v1/fees/assignments/{aid}/payments", json={**pay, "late_fine": "REMOVE", "late_fine_reason": "Paid on time"})
-    assert no.status_code == 403
     ok = await app_client.post(f"/api/v1/fees/assignments/{aid}/payments", json={**pay, "late_fine": "KEEP"})
     assert ok.status_code == 201, ok.text
     assert ok.json()["late_fee_posted"] == first["late_fee"]
@@ -136,10 +132,8 @@ async def test_a_payment_dated_earlier_keeps_the_fine_unless_an_administrator_re
     paid = (await db_session.execute(select(FeeLedgerEntry).where(FeeLedgerEntry.fee_assignment_id == uuid.UUID(aid),
                                                                   FeeLedgerEntry.entry_type == LedgerEntryType.CREDIT))).scalars().one()
     assert paid.paid_on == due                                   # the payment keeps its real date
-    _ = new_pw
 
-    # the administrator, on the next instalment, removes it with a reason (on record)
-    await _login_admin(app_client)
+    # the same accounts officer, on the next instalment, removes it: a reason is required and it is kept on record
     second = rows[1]
     pay2 = {"amount": second["remaining"], "method": "CASH", "paid_on": second["due_date"]}
     assert (await app_client.post(f"/api/v1/fees/assignments/{aid}/payments", json={**pay2, "late_fine": "REMOVE"})).status_code == 422   # no reason
@@ -147,7 +141,11 @@ async def test_a_payment_dated_earlier_keeps_the_fine_unless_an_administrator_re
     assert r.status_code == 201, r.text
     assert sum(float(f.amount) for f in await _fines(db_session, sid)) == first["late_fee"]
     log = (await db_session.execute(select(AuditLog).where(AuditLog.action == "fee.late_fine_removed"))).scalars().all()
-    assert len(log) == 1 and log[0].after["why"] == "payment dated earlier"
+    assert len(log) == 1 and log[0].after["why"] == "payment dated earlier" and log[0].after["reason"] == "Bank slip shows the due date"
+    from app.auth.models import User
+
+    officer = (await db_session.execute(select(User).where(User.username == user))).scalar_one()
+    assert log[0].actor_user_id == officer.id                   # recorded with the accountant's name
 
     # today's date: no question at all
     third = rows[2]
