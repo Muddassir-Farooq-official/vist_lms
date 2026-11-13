@@ -457,6 +457,7 @@ class SchoolService:
             if s is None or s.status != StudentStatus.ACTIVE:
                 failed.append({"student_id": sid, "reason": "Not an active student."})
                 continue
+            name = f"{s.first_name} {s.last_name}".strip()      # read now: a rolled-back savepoint expires the row
             try:
                 async with self.session.begin_nested():
                     moved = await self._release_other_sections(s, term, program, sec)
@@ -480,7 +481,7 @@ class SchoolService:
                         count += 1
                     placed.append({"student_id": s.id, "name": f"{s.first_name} {s.last_name}".strip(), "subjects": count})
             except AppError as e:
-                failed.append({"student_id": sid, "name": f"{s.first_name} {s.last_name}".strip(), "reason": e.message})
+                failed.append({"student_id": sid, "name": name, "reason": e.message})
         if placed:
             await self.audit.log(actor_user_id=actor_id, action="school.students_placed", entity_type="school_section", entity_id=sec.id,
                                  after={"class": program.name, "section": sec.label, "students": len(placed)})

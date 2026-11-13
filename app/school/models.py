@@ -14,7 +14,8 @@ import enum
 import uuid
 from datetime import date, datetime, time
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Index, Integer, String, Time, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Index, Integer, Numeric, String, Time, UniqueConstraint, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -133,3 +134,103 @@ class PtmSlot(Base):
     booked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     notes: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     attended: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+
+
+# ---------------------------------------------------------------- stage 3: exams, report cards, promotion (app/school/results.py)
+class ExamKind(str, enum.Enum):
+    FIRST_TERM = "FIRST_TERM"
+    MID_TERM = "MID_TERM"
+    FINAL = "FINAL"
+
+
+class SchoolExam(Base):
+    """One of the session's three exams. Subject teachers enter marks; the office publishes it class by class."""
+    __tablename__ = "school_exams"
+    __table_args__ = (UniqueConstraint("term_id", "kind", name="uq_school_exams_term_kind"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    term_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("academic_terms.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind: Mapped[ExamKind] = mapped_column(Enum(ExamKind, name="school_exam_kind"), nullable=False)
+    marks_open: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)      # teachers may enter / change marks
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class SchoolExamSubject(Base):
+    """A subject's total marks in one exam (default 100; e.g. Drawing 50)."""
+    __tablename__ = "school_exam_subjects"
+
+    exam_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("school_exams.id", ondelete="CASCADE"), primary_key=True)
+    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), primary_key=True)
+    program_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("programs.id", ondelete="CASCADE"), nullable=False, index=True)
+    total_marks: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+
+
+class SchoolMark(Base):
+    __tablename__ = "school_marks"
+    __table_args__ = (UniqueConstraint("exam_id", "student_id", "course_id", name="uq_school_marks_exam_student_course"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    exam_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("school_exams.id", ondelete="CASCADE"), nullable=False, index=True)
+    student_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True)
+    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    marks: Mapped[float | None] = mapped_column(Numeric(6, 2), nullable=True)
+    absent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    entered_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    entered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class SchoolSkill(Base):
+    """A skills & behaviour line on report cards (rated A-D by the class teacher). The admin can change the list."""
+    __tablename__ = "school_skills"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(60), nullable=False, unique=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class ReportCardNote(Base):
+    """The class teacher's remarks and skills ratings for one student in one exam."""
+    __tablename__ = "school_report_notes"
+
+    exam_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("school_exams.id", ondelete="CASCADE"), primary_key=True)
+    student_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), primary_key=True)
+    remarks: Mapped[str | None] = mapped_column(String(600), nullable=True)
+    skills: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)          # {skill id: "A" | "B" | "C" | "D"}
+    entered_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    entered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class ReportPublication(Base):
+    """An exam's report cards of one class, published to students and parents (kept on record; can be withdrawn)."""
+    __tablename__ = "school_report_publications"
+
+    exam_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("school_exams.id", ondelete="CASCADE"), primary_key=True)
+    program_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("programs.id", ondelete="CASCADE"), primary_key=True)
+    published_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class PromotionDecision(str, enum.Enum):
+    PROMOTED = "PROMOTED"                      # passed
+    PROMOTED_ON_APPROVAL = "PROMOTED_ON_APPROVAL"   # did not pass, moved up by the office's decision
+    KEPT_BACK = "KEPT_BACK"                    # repeats the class
+
+
+class SchoolPromotion(Base):
+    """Who moved from which class to which, for which session, and why. Never deleted."""
+    __tablename__ = "school_promotions"
+    __table_args__ = (UniqueConstraint("student_id", "from_term_id", name="uq_school_promotions_student_term"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    student_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True)
+    from_term_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("academic_terms.id", ondelete="CASCADE"), nullable=False)
+    to_term_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("academic_terms.id", ondelete="CASCADE"), nullable=False)
+    from_program_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("programs.id", ondelete="CASCADE"), nullable=False)
+    to_program_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("programs.id", ondelete="CASCADE"), nullable=False)
+    decision: Mapped[PromotionDecision] = mapped_column(Enum(PromotionDecision, name="school_promotion_decision"), nullable=False)
+    percentage: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    note: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    decided_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

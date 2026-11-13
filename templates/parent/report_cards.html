@@ -1,0 +1,15 @@
+{% extends "parent/_base.html" %}
+{% block title %}Report cards{% endblock %}
+{% block page_title %}Report cards{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Your child's report cards for each exam, once the school publishes them.</div>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/parent.css?v={{ app_version() }}" /><link rel="stylesheet" href="/static/css/school-results.css?v={{ app_version() }}" />{% endblock %}
+{% block content %}
+{% include "parent/_child_bar.html" %}
+<section class="panel pp-panel" id="prc-view" hidden aria-label="Report cards"><div id="prc-cards"></div></section>
+{% endblock %}
+{% block extra_scripts %}
+<script src="/static/js/dash-common.js"></script>
+<script src="/static/js/parent-child.js?v={{ app_version() }}"></script>
+<script src="/static/js/school-cards-view.js?v={{ app_version() }}"></script>
+<script src="/static/js/parent-report-cards.js?v={{ app_version() }}"></script>
+{% endblock %}

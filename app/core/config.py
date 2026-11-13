@@ -277,6 +277,11 @@ class Settings(BaseSettings):
     sms_on_school_absence: int = 1           # School mode: a child marked absent or late in the morning roll call (to the guardian)
     sms_on_homework: int = 1                 # School mode: the evening homework message (to the guardian)
     sms_on_ptm: int = 1                      # School mode: a parent-teacher meeting day is set (to the guardian)
+    school_weight_first_term: float = 20         # School mode: share of the 1st Term exam in the year's result (%)
+    school_weight_mid_term: float = 30           # ... of the Mid-Term
+    school_weight_final: float = 50              # ... of the Final
+    school_pass_percent: float = 33              # pass: at least this % overall ...
+    school_subject_pass_percent: float = 33      # ... and at least this % in every subject
     homework_digest_hour: int = 18           # School mode: when families get the day's homework (institute time, 24-hour)
     sms_on_exam_duty: int = 1                # tell a teacher by SMS / WhatsApp when they are put on (or taken off) exam duty
     sms_on_warning: int = 0                  # tell the guardian when a student is warned (app/discipline); off unless switched on

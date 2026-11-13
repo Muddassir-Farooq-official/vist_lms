@@ -2,7 +2,7 @@
 {% block title %}Classes &amp; sections{% endblock %}
 {% block page_title %}Classes &amp; sections{% endblock %}
 {% block page_subtitle %}<div class="content-subtitle">The school's classes for a session, their sections and class teachers, the subjects each class studies and who teaches them, and which students sit in each section.</div>{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="/static/css/school.css?v={{ app_version() }}" /><link rel="stylesheet" href="/static/css/school-daily.css?v={{ app_version() }}" />{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/css/school.css?v={{ app_version() }}" /><link rel="stylesheet" href="/static/css/school-daily.css?v={{ app_version() }}" /><link rel="stylesheet" href="/static/css/school-results.css?v={{ app_version() }}" />{% endblock %}
 
 {% block content %}
 <p class="dash-alert error" id="sc-off" hidden>School mode is off. Switch it on in <a href="/dashboard/admin/settings">Settings &rarr; Institute type</a> to set up classes and sections.</p>
@@ -11,6 +11,7 @@
   <button type="button" class="mc-tab active" role="tab" aria-selected="true" data-tab="classes">Classes</button>
   <button type="button" class="mc-tab" role="tab" aria-selected="false" data-tab="today">Roll call</button>
   <button type="button" class="mc-tab" role="tab" aria-selected="false" data-tab="ptm">Parent-teacher meetings</button>
+  <button type="button" class="mc-tab" role="tab" aria-selected="false" data-tab="results">Exams &amp; results</button>
 </div>
 
 <div data-panel="classes">
@@ -68,6 +69,21 @@
   </section>
   <section class="panel" aria-labelledby="pm-list-h"><h2 class="panel-title" id="pm-list-h">Meeting days</h2><div id="pm-list"></div></section>
 </div>
+<div data-panel="results" hidden>
+  <section class="panel" aria-labelledby="rs-h">
+    <h2 class="panel-title" id="rs-h">Exams &amp; results</h2>
+    <p class="sc-hint" id="rs-rule"></p>
+    <div class="toolbar" id="rs-create"></div>
+    <div id="rs-exams"></div>
+  </section>
+  <section class="panel" id="rs-totals" hidden></section>
+  <section class="panel" id="rs-promo" hidden></section>
+  <section class="panel" aria-labelledby="rs-sk-h">
+    <h2 class="panel-title" id="rs-sk-h">Skills &amp; behaviour on report cards</h2>
+    <p class="sc-hint">Class teachers rate each one A (Excellent), B (Good), C (Fair) or D (Needs improvement). Switching one off keeps it on report cards already given.</p>
+    <div id="rs-skills"></div>
+  </section>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -75,4 +91,5 @@
 <script src="/static/js/school-roll.js?v={{ app_version() }}"></script>
 <script src="/static/js/school-today.js?v={{ app_version() }}"></script>
 <script src="/static/js/school-ptm.js?v={{ app_version() }}"></script>
+<script src="/static/js/school-results.js?v={{ app_version() }}"></script>
 {% endblock %}

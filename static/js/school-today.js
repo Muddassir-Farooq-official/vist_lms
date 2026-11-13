@@ -15,6 +15,7 @@
         document.querySelectorAll("[data-panel]").forEach(function (p) { p.hidden = p.getAttribute("data-panel") !== b.dataset.tab; });
         if (b.dataset.tab === "today") load();
         if (b.dataset.tab === "ptm" && window.VistPtm) window.VistPtm.load();
+        if (b.dataset.tab === "results" && window.VistResults) window.VistResults.load();
       });
     });
   }
