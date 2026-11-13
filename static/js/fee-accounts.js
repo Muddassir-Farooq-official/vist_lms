@@ -178,8 +178,12 @@
     const method = $("cp-method").value;
     if (method !== "CASH" && !$("cp-ref").value.trim()) return fail("cp-error", "Enter the slip, transaction or cheque number (needed to match the bank statement).");
     $("cp-ok").disabled = true;
-    const r = await VA.fetchJson("/api/v1/fees/challans/" + challan.id + "/mark-paid", json("POST", { method: method, reference: $("cp-ref").value.trim() || null, paid_on: $("cp-date").value || null }));
+    const r = await VA.withLateFine(function (extra) {
+      return VA.fetchJson("/api/v1/fees/challans/" + challan.id + "/mark-paid", json("POST", Object.assign({ method: method, reference: $("cp-ref").value.trim() || null,
+        paid_on: $("cp-date").value || null }, extra)));
+    }, { reasonField: "late_fine_reason" });
     $("cp-ok").disabled = false;
+    if (!r) return;
     if (!r.ok) return fail("cp-error", msg(r.body, "Could not record it."));
     $("cp-modal").close();
     VA.toast("Recorded. A receipt has been issued." + (r.body && r.body.late_fee_posted ? " Its late fee of " + money(r.body.late_fee_posted) +

@@ -2,10 +2,17 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.fees.models import AssignmentStatus, FeeStructureStatus, LedgerEntryType, PayerType, PaymentMethod
+from app.fees.models import (
+    AssignmentStatus,
+    FeeStructureStatus,
+    LedgerEntryType,
+    PayerType,
+    PaymentMethod,
+)
 
 
 class FeeTypeCreateRequest(BaseModel):
@@ -157,6 +164,10 @@ class PaymentDetails(BaseModel):
     method: PaymentMethod
     reference: str | None = Field(default=None, max_length=100, description="Deposit slip / transaction / cheque number. Required unless CASH.")
     paid_on: date | None = Field(default=None, description="The day the money was paid. Defaults to today.")
+    # An earlier date that would remove a late fine must say what to do with it: KEEP (posted as a fine) or REMOVE
+    # (administrator, with late_fine_reason). Without it such a request is refused with LATE_FINE_CONFIRM (409).
+    late_fine: Literal["KEEP", "REMOVE"] | None = None
+    late_fine_reason: str | None = Field(default=None, max_length=300)
 
     @model_validator(mode="after")
     def _reference_needed(self):

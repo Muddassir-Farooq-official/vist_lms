@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -35,6 +35,7 @@ class InstituteProfile(Base):
     bank_branch: Mapped[str | None] = mapped_column(String(150), nullable=True)
     signatory_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     signatory_title: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    card_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)                # the back of ID cards, one per line
     logo_key: Mapped[str | None] = mapped_column(String(255), nullable=True)           # files under var/storage/branding/
     logo_dark_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
     favicon_key: Mapped[str | None] = mapped_column(String(255), nullable=True)

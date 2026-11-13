@@ -188,11 +188,104 @@ def render_certificate_pdf(*, institute: str, kind: str, reference: str, code: s
     return buf.getvalue()
 
 
-def render_id_cards_pdf(*, institute: str, cards: list[dict]) -> bytes:
+def _card_back(c: canvas.Canvas, x: float, y: float, cw: float, ch: float, back: dict, logo, sig, accent) -> None:
+    """The back of a card: the institute's logo (faint, in the middle), numbered instructions, where to return a found
+    card, and the signatory."""
+    c.setStrokeColor(LINE)
+    c.setFillColor(colors.white)
+    c.roundRect(x, y, cw, ch, 3 * mm, stroke=1, fill=1)
+    size, wy = 26 * mm, y + 19 * mm                                         # the logo, faint, behind the instructions
+    _draw_logo(c, x + (cw - size) / 2, wy, size, logo)
+    c.saveState()
+    c.setFillColor(colors.white)
+    c.setFillAlpha(0.86)
+    c.rect(x + (cw - size) / 2 - 1, wy - 1, size + 2, size + 2, stroke=0, fill=1)
+    c.restoreState()
+    # title band
+    c.saveState()
+    clip = c.beginPath()
+    clip.roundRect(x, y, cw, ch, 3 * mm)
+    c.clipPath(clip, stroke=0, fill=0)
+    c.setFillColor(accent)
+    c.rect(x, y + ch - 6.5 * mm, cw, 6.5 * mm, stroke=0, fill=1)
+    c.restoreState()
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 7)
+    c.drawCentredString(x + cw / 2, y + ch - 4.4 * mm, "INSTRUCTIONS")
+    # instructions, numbered, wrapped
+    c.setFillColor(INK)
+    top, floor = y + ch - 10 * mm, y + 18.5 * mm
+    size = 6.6
+    lines = []
+    for i, text in enumerate(back.get("instructions") or [], 1):
+        parts = _wrap(c, text, "Helvetica", size, cw - 10 * mm)
+        lines += [(f"{i}.", parts[0])] + [("", p) for p in parts[1:]]
+    if len(lines) * 3.2 * mm > top - floor:                                 # many lines: a little smaller
+        size = 5.4
+        lines = []
+        for i, text in enumerate(back.get("instructions") or [], 1):
+            parts = _wrap(c, text, "Helvetica", size, cw - 10 * mm)
+            lines += [(f"{i}.", parts[0])] + [("", p) for p in parts[1:]]
+    step = (3.2 if size > 6 else 2.5) * mm
+    yy = top
+    for num, text in lines:
+        if yy < floor:
+            break
+        c.setFont("Helvetica-Bold", size)
+        c.drawString(x + 3.5 * mm, yy, num)
+        c.setFont("Helvetica", size)
+        c.drawString(x + 6.5 * mm, yy, _fit(c, text, "Helvetica", size, cw - 10 * mm))
+        yy -= step
+    # return address + signature
+    c.setStrokeColor(LINE)
+    c.setLineWidth(0.4)
+    c.line(x + 3.5 * mm, y + 16.5 * mm, x + cw - 3.5 * mm, y + 16.5 * mm)
+    _draw_logo(c, x + 3.5 * mm, y + 4.5 * mm, 9 * mm, logo)            # the logo (or the lettered badge)
+    tx = x + 14 * mm
+    tw = cw - (tx - x) - 27 * mm
+    c.setFillColor(MUTED)
+    c.setFont("Helvetica-Bold", 5.6)
+    c.drawString(tx, y + 13.3 * mm, "If found, please return to:")
+    c.setFillColor(INK)
+    c.setFont("Helvetica-Bold", 6.2)
+    c.drawString(tx, y + 10.5 * mm, _fit(c, back.get("institute") or "", "Helvetica-Bold", 6.2, tw))
+    c.setFont("Helvetica", 5.6)
+    row = 7.9
+    for part in _wrap(c, back.get("address") or "", "Helvetica", 5.6, tw)[:2]:
+        c.drawString(tx, y + row * mm, part)
+        row -= 2.4
+    contact = "  ".join(v for v in ((f"Ph: {back['phone']}" if back.get("phone") else ""), back.get("website") or "") if v)
+    if contact:
+        c.drawString(tx, y + row * mm, _fit(c, contact, "Helvetica", 5.6, tw))
+    sx = x + cw - 25.5 * mm
+    if sig is not None:
+        try:
+            c.drawImage(sig, sx + 1 * mm, y + 6.6 * mm, 20 * mm, 7 * mm, preserveAspectRatio=True, mask="auto")
+        except Exception:  # noqa: BLE001 - a bad signature file must not stop the cards
+            pass
+    c.line(sx, y + 6 * mm, sx + 22 * mm, y + 6 * mm)
+    c.setFillColor(MUTED)
+    c.setFont("Helvetica", 5.6)
+    c.drawCentredString(sx + 11 * mm, y + 3.6 * mm, _fit(c, back.get("signatory") or "Principal", "Helvetica", 5.6, 22 * mm))
+
+
+def _signature_reader():
+    from app.core import brand
+
+    p = brand.signature_path()
+    try:
+        return ImageReader(str(p)) if p else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def render_id_cards_pdf(*, institute: str, cards: list[dict], back: dict | None = None) -> bytes:
     """Credit-card sized cards (85.6 x 54 mm), eight to an A4 page, with cut marks.
 
     Each card: logo + full institute name in the header, photo, name, details, QR code, number and validity.
     Students get a navy header, staff a green one.
+    With `back`, every page of fronts is followed by a page of backs placed for double-sided printing (flip on the long
+    edge): the back of the card on the left is on the right, so each back lands behind its own front.
     """
     buf = io.BytesIO()
     w, h = A4
@@ -205,9 +298,21 @@ def render_id_cards_pdf(*, institute: str, cards: list[dict]) -> bytes:
     words = institute.upper().split()
     half = (len(words) + 1) // 2
     head1, head2 = " ".join(words[:half]), " ".join(words[half:])           # "VERTEX INSTITUTE OF" / "SCIENCE & TECHNOLOGY"
+    sig = _signature_reader() if back else None
+
+    def backs(page_cards: list[dict]) -> None:
+        c.showPage()
+        for j, pc in enumerate(page_cards):
+            bx = 14 * mm + (1 - j % 2) * (cw + 6 * mm)                     # mirrored: left front -> right back
+            by = h - 14 * mm - ch - (j // 2) * (ch + 6 * mm)
+            accent_b = TEAL if pc.get("kind") == "STAFF" else colors.HexColor(brand.color("#14307a"))
+            _card_back(c, bx, by, cw, ch, back, logo, sig, accent_b)
+
     for i, card in enumerate(cards):
         pos = i % 8
         if i and pos == 0:
+            if back:
+                backs(cards[i - 8:i])
             c.showPage()
         x = 14 * mm + (pos % 2) * (cw + 6 * mm)
         y = h - 14 * mm - ch - (pos // 2) * (ch + 6 * mm)
@@ -283,6 +388,8 @@ def render_id_cards_pdf(*, institute: str, cards: list[dict]) -> bytes:
         c.setFont("Helvetica", 6)
         c.drawString(x + 3.5 * mm, y + 3.2 * mm, f"{card['reference']}  \u00b7  valid to {card['valid_to']}")
         c.drawRightString(x + cw - 3.5 * mm, y + 3.2 * mm, "Scan to verify")
+    if back and cards:
+        backs(cards[(len(cards) - 1) // 8 * 8:])
     c.showPage()
     c.save()
     return buf.getvalue()

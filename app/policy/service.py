@@ -137,6 +137,8 @@ POLICY: tuple[Policy, ...] = (
            "A longer pattern for urgent notices. iPhones always use their own setting."),
     Policy("phone_alert_keep_urgent", "Urgent alerts stay until tapped (1 = yes, 0 = no)", "Notifications", int, 0, 1,
            "On computers and many Android phones the alert stays on screen until it is opened."),
+    Policy("student_card_valid_months", "Student ID cards are valid for (months)", "Certificates", int, 1, 36,
+           "From the day the card is printed; usually a term (4 to 6 months). The online check shows 'Expired' after it. Staff cards: 1 year."),
     Policy("certificate_fee_bonafide", "Bonafide certificate fee (Rs., 0 = free)", "Certificates", float, 0, 1_000_000,
            "Charged when the office approves a student's request; the student downloads it once the challan is paid."),
     Policy("certificate_fee_character", "Character certificate fee (Rs., 0 = free)", "Certificates", float, 0, 1_000_000,

@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.21.0",
+    "date": "2026-11-13",
+    "title": "Late fines are protected; ID cards with a back side",
+    "summary": "A late fine already built up no longer disappears without a warning, and ID cards have a validity you set and a printed back side.",
+    "changes": [
+      {
+        "kind": "improved",
+        "for": "Administrators",
+        "text": "Moving a due date when a late fine has already built up now shows a warning with the amount. The fine so far is kept (added to Fines) and lateness counts again from the new date. Only an administrator can remove it instead, and that is kept on record."
+      },
+      {
+        "kind": "improved",
+        "for": "Accounts office",
+        "text": "Recording a payment or a challan with an earlier date that would take away a late fine now shows a warning. The fine is kept (added to Fines) and the payment keeps its real date. Only an administrator can remove the fine, with a reason kept on record."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Student ID cards are valid for the number of months set in Settings \u2192 Rules \u2192 Certificates (6 unless changed); staff cards for a year. Scanning an expired card shows that it has expired."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "ID cards now have a back side: the logo, numbered instructions, where to return a found card, and the signature. It prints on the next page, placed for double-sided printing. Write your own instructions in Settings \u2192 Look & documents \u2192 Back of ID cards."
+      }
+    ]
+  },
+  {
     "version": "1.20.0",
     "date": "2026-11-12",
     "title": "School mode: school fees",

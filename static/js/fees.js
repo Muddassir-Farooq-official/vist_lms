@@ -380,13 +380,18 @@
             installments: count,
           });
           if (!r) return;
-          const res = await VA.fetchJson("/api/v1/fees/structures/" + btn.getAttribute("data-id") + "/installments/" + r.installment + "/due-date", {
-            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ due_date: r.date, reason: r.reason }),
+          const res = await VA.withLateFine(function (extra) {
+            return VA.fetchJson("/api/v1/fees/structures/" + btn.getAttribute("data-id") + "/installments/" + r.installment + "/due-date", {
+              method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.assign({ due_date: r.date, reason: r.reason }, extra)),
+            });
           });
+          if (!res) return;
           if (!res.ok) { VA.showError(extractErrorMessage(res.body, "Could not change the due date.")); return; }
           const b = res.body;
           VA.toast("Instalment " + r.installment + " now due " + r.date + " for " + b.changed + " student" + (b.changed === 1 ? "" : "s") +
             (b.already_paid ? "; " + b.already_paid + " already paid" : "") + (b.already_on_that_date ? "; " + b.already_on_that_date + " already on that date" : "") +
+            (b.late_fines_kept ? ". Late fines kept: " + money(b.late_fines_kept) + " (" + b.with_late_fine_kept + " student" + (b.with_late_fine_kept === 1 ? "" : "s") + ", on Fines)" : "") +
+            (b.late_fines_removed ? ". Late fines removed: " + money(b.late_fines_removed) : "") +
             (b.with_late_fee_already_posted ? ". " + b.with_late_fee_already_posted + " had a late fee already posted as a fine \u2014 waive those under Fines if they should not be charged." : "."));
         });
       });
@@ -605,11 +610,15 @@
           const d = await dueDateDialog({ title: "Change the due date of " + r.label, intro: "Now due " + (r.due_date || "\u2014") + ". " + money(r.remaining) +
             " still to pay. The amount does not change; the open challan gets the new date and the student is told.", value: r.due_date });
           if (!d) return;
-          const res = await VA.fetchJson("/api/v1/fees/assignments/" + assignmentId + "/installments/" + r.ledger_entry_id + "/due-date", {
-            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ due_date: d.date, reason: d.reason }),
+          const res = await VA.withLateFine(function (extra) {
+            return VA.fetchJson("/api/v1/fees/assignments/" + assignmentId + "/installments/" + r.ledger_entry_id + "/due-date", {
+              method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.assign({ due_date: d.date, reason: d.reason }, extra)),
+            });
           });
+          if (!res) return;
           if (!res.ok) { VA.toast(extractErrorMessage(res.body, "Could not change the due date."), "error"); return; }
-          VA.toast("Now due " + d.date + "." + (res.body.late_fee_already_posted ? " A late fee of " + money(res.body.late_fee_already_posted) +
+          VA.toast("Now due " + d.date + "." + (res.body.late_fine_kept ? " The late fine of " + money(res.body.late_fine_kept) + " so far is kept (on Fines)." : "") +
+            (res.body.late_fine_removed ? " The late fine of " + money(res.body.late_fine_removed) + " was removed." : "") + (res.body.late_fee_already_posted ? " A late fee of " + money(res.body.late_fee_already_posted) +
             " was already posted as a fine; waive it under Fines if it should not be charged." : ""));
           loadLedger(assignmentId);
         });
@@ -741,14 +750,17 @@
     assignmentModalError.hidden = true;
     assignmentModalSuccess.hidden = true;
 
-    const result = await VA.fetchJson("/api/v1/fees/assignments/" + activeAssignmentId + "/payments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        amount: amount, description: paymentDescription.value.trim() || null, method: paymentMethod.value,
-        reference: paymentReference.value.trim() || null, paid_on: paymentPaidOn.value || null,
-      }),
-    });
+    const result = await VA.withLateFine(function (extra) {
+      return VA.fetchJson("/api/v1/fees/assignments/" + activeAssignmentId + "/payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.assign({
+          amount: amount, description: paymentDescription.value.trim() || null, method: paymentMethod.value,
+          reference: paymentReference.value.trim() || null, paid_on: paymentPaidOn.value || null,
+        }, extra)),
+      });
+    }, { reasonField: "late_fine_reason" });
+    if (!result) { recordPaymentBtn.disabled = false; return; }
 
     recordPaymentBtn.disabled = false;
 

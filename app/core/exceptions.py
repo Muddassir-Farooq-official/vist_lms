@@ -51,6 +51,14 @@ class BusinessRuleViolationError(AppError):
     status_code = 422
 
 
+class LateFineConfirmationRequired(AppError):
+    """A change would take away a late fine already built up: the caller must say whether to keep it (posted to Fines)
+    or, as an administrator, remove it. `details` carries the amount; the request changed nothing."""
+
+    code = "LATE_FINE_CONFIRM"
+    status_code = 409
+
+
 class ImportError_(AppError):
     """Named with a trailing underscore to avoid shadowing the builtin ImportError."""
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
+from typing import Literal
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -206,6 +207,7 @@ async def clone_fee_structure(
 class DueDateForAll(BaseModel):
     due_date: date
     reason: str = Field(min_length=4, max_length=300)
+    late_fine: Literal["KEEP", "REMOVE"] | None = None      # needed when late fines have built up (else 409 LATE_FINE_CONFIRM)
 
 
 @structures_router.post(
@@ -222,8 +224,9 @@ async def change_due_date_for_all(
     from app.fees.assignment_service import FeeAssignmentService
 
     await _not_school_fees(db, structure_id)
-    return await FeeAssignmentService(db).change_due_date_for_structure(structure_id, installment_number, new_date=payload.due_date,
-                                                                       reason=payload.reason, actor_id=current_user.id)
+    return await FeeAssignmentService(db).change_due_date_for_structure(
+        structure_id, installment_number, new_date=payload.due_date, reason=payload.reason, actor_id=current_user.id, late_fine=payload.late_fine,
+        may_remove_fine=Permissions.PAYMENT_REVERSE in (current_user.permissions or []))
 
 
 class LateFeeRate(BaseModel):

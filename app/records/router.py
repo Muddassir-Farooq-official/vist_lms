@@ -136,7 +136,7 @@ async def remind_incomplete(payload: RemindIn, current_user: CurrentUser = Depen
 @router.post("/id-cards", summary="ID cards for students and / or staff (a PDF, eight to a page)")
 async def id_cards(payload: IdCardsIn, current_user: CurrentUser = Depends(issue), db=Depends(get_db)) -> Response:
     result = await RecordsService(db).id_cards(student_ids=payload.student_ids, employee_ids=payload.employee_ids, actor_id=current_user.id)
-    return _pdf(await run_in_threadpool(render_id_cards_pdf, institute=result["institute"], cards=result["cards"]), "id-cards.pdf")
+    return _pdf(await run_in_threadpool(render_id_cards_pdf, institute=result["institute"], cards=result["cards"], back=result.get("back")), "id-cards.pdf")
 
 
 @router.post("/students/{student_id}/certificates/{kind}", summary="Issue a bonafide, character or completion certificate (a PDF)")

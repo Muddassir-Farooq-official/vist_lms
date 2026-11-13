@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from app.core.clock import institute_today
-
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
@@ -9,10 +7,24 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import AuditService
+from app.core.clock import institute_today
 from app.core.config import settings
-from app.core.exceptions import BusinessRuleViolationError, ResourceNotFoundError, ValidationAppError
+from app.core.exceptions import (
+    AuthorizationError,
+    BusinessRuleViolationError,
+    LateFineConfirmationRequired,
+    ResourceNotFoundError,
+    ValidationAppError,
+)
 from app.employees.models import Employee
-from app.fees.models import AssignmentStatus, FeeAssignment, FeeLedgerEntry, FeeStructure, LedgerEntryType, PayerType
+from app.fees.models import (
+    AssignmentStatus,
+    FeeAssignment,
+    FeeLedgerEntry,
+    FeeStructure,
+    LedgerEntryType,
+    PayerType,
+)
 from app.fees.payment_gateway import get_payment_gateway
 from app.fees.payment_models import ChallanStatus, PaymentChallan
 from app.fees.repository import ChallanRepository, FeeAssignmentRepository, FeeStructureRepository
@@ -443,6 +455,76 @@ async def post_settled_late_fees(session: AsyncSession, assignment: FeeAssignmen
         return 0.0
 
 
+async def backdated_fine_lost(session: AsyncSession, assignment: FeeAssignment, *, amount: float, paid_on: date | None,
+                              applies_to: uuid.UUID | None = None) -> float:
+    """How much late fine a payment of `amount` dated `paid_on` would take away compared with the same payment dated
+    today (a payment counts as paid on its date, so the late days in between disappear). Writes nothing: the payment is
+    tried in memory only. 0 for today's date or a fee without a late fee."""
+    today = institute_today()
+    if paid_on is None or paid_on >= today:
+        return 0.0
+    structure = await session.get(FeeStructure, assignment.fee_structure_id)
+    rate = late_rate(structure)
+    if not rate:
+        return 0.0
+    entries = list(await FeeAssignmentRepository(session).get_ledger(assignment.id))
+
+    def fine_if_paid(day: date) -> float:
+        trial = FeeLedgerEntry(id=uuid.uuid4(), fee_assignment_id=assignment.id, entry_type=LedgerEntryType.CREDIT, amount=amount,
+                               paid_on=day, applies_to_entry_id=applies_to, created_at=datetime.now(timezone.utc))
+        return sum(r["late_fee"] for r in FeeStatusCalculator.installments(entries + [trial], rate, pause=late_pause(assignment)))
+
+    with session.no_autoflush:
+        return round(fine_if_paid(today) - fine_if_paid(paid_on), 2)
+
+
+def ask_about_backdated_fine(lost: float, paid_on: date | None, *, late_fine: str | None, may_remove_fine: bool, reason: str | None) -> None:
+    """Before anything is written: refuse (LATE_FINE_CONFIRM) when a fine would go and no choice was made, and check a
+    REMOVE is allowed (administrator) and has a reason."""
+    if lost <= 0.005:
+        return
+    if late_fine not in ("KEEP", "REMOVE"):
+        raise LateFineConfirmationRequired(
+            f"Dated {paid_on:%d %b %Y}, this payment would remove a late fine of Rs. {lost:,.0f} (the fine up to today). Keep the fine "
+            + ("or remove it." if may_remove_fine else "\u2014 only an administrator can remove it."),
+            details={"late_fine": lost, "paid_on": str(paid_on), "can_remove": may_remove_fine})
+    if late_fine == "REMOVE":
+        if not may_remove_fine:
+            raise AuthorizationError("Only an administrator can remove a late fine. Keep it, or ask the administrator.")
+        if len((reason or "").strip()) < 4:
+            raise ValidationAppError("Write why the late fine is removed (it is kept on record).")
+
+
+async def settle_backdated_fine(session: AsyncSession, assignment: FeeAssignment, credit: FeeLedgerEntry, lost: float, *, late_fine: str | None,
+                                reason: str | None, actor_id: uuid.UUID | None) -> float:
+    """After the payment is written (ask_about_backdated_fine already said yes): KEEP posts the lost amount as a Fine
+    (the payment keeps its real date); REMOVE is kept on record. Returns the amount kept as a fine."""
+    if lost <= 0.005:
+        return 0.0
+    today = institute_today()
+    day = credit.paid_on
+    audit = AuditService(session)
+    if late_fine == "REMOVE":
+        await audit.log(actor_user_id=actor_id, action="fee.late_fine_removed", entity_type="fee_assignment", entity_id=assignment.id,
+                        after={"amount": lost, "why": "payment dated earlier", "paid_on": str(day), "recorded_on": str(today),
+                               "reason": (reason or "").strip()[:300], "payment_entry_id": str(credit.id)})
+        return 0.0
+    from app.fines.models import FinePayerType, FineSource
+    from app.fines.service import FineService
+
+    structure = await session.get(FeeStructure, assignment.fee_structure_id)
+    target = credit.applies_to_entry_id
+    fine = await FineService(session).issue(
+        payer_type=FinePayerType.STUDENT if assignment.payer_type == PayerType.STUDENT else FinePayerType.EMPLOYEE,
+        payer_id=assignment.payer_id, amount=lost,
+        reason=f"Late payment fee \u2014 {structure.name}: paid on {day:%d %b %Y} but recorded on {today:%d %b %Y}",
+        source=FineSource.FEE_LATE_PAYMENT, actor_id=actor_id,
+        related_entity_type="fee_ledger_entry" if target else "fee_assignment", related_entity_id=target or assignment.id)
+    await audit.log(actor_user_id=actor_id, action="fee.late_fine_kept", entity_type="fee_assignment", entity_id=assignment.id,
+                    after={"amount": lost, "paid_on": str(day), "recorded_on": str(today), "fine_id": str(fine.id), "payment_entry_id": str(credit.id)})
+    return lost
+
+
 class FeeAssignmentService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -469,7 +551,7 @@ class FeeAssignmentService:
         return FeeStatusCalculator.compute(entries, late_rate(structure), pause=late_pause(assignment))
 
     async def record_payment(
-        self, assignment_id: uuid.UUID, data: RecordPaymentRequest, *, actor_id: uuid.UUID
+        self, assignment_id: uuid.UUID, data: RecordPaymentRequest, *, actor_id: uuid.UUID, may_remove_fine: bool = False
     ) -> FeeLedgerEntry:
         await self.get(assignment_id)
         assignment = await lock_assignment(self.session, assignment_id)      # a second cashier on this fee waits here
@@ -498,6 +580,8 @@ class FeeAssignmentService:
             raise BusinessRuleViolationError(
                 f"Rs. {data.amount:,.2f} is more than what is still owed on this fee (Rs. {outstanding:,.2f}). "
                 "Record at most the outstanding amount.", details={"outstanding": outstanding})
+        lost = await backdated_fine_lost(self.session, assignment, amount=data.amount, paid_on=paid_on)       # asked before anything is written
+        ask_about_backdated_fine(lost, paid_on, late_fine=data.late_fine, may_remove_fine=may_remove_fine, reason=data.late_fine_reason)
 
         entry = FeeLedgerEntry(
             fee_assignment_id=assignment.id,
@@ -516,6 +600,8 @@ class FeeAssignmentService:
         await self.repo.add_ledger_entry(entry)
         await sync_challans(self.session, assignment)        # challans of installments this payment settled stop being payable
         self.late_fee_posted = await post_settled_late_fees(self.session, assignment, actor_id)
+        self.late_fee_posted += await settle_backdated_fine(self.session, assignment, entry, lost, late_fine=data.late_fine,
+                                                            reason=data.late_fine_reason, actor_id=actor_id)
 
         await self.audit.log(
             actor_user_id=actor_id,
@@ -594,7 +680,8 @@ class FeeAssignmentService:
         )
         return fine
 
-    async def change_due_date(self, ledger_entry_id: uuid.UUID, *, new_date: date, reason: str, actor_id: uuid.UUID) -> dict:
+    async def change_due_date(self, ledger_entry_id: uuid.UUID, *, new_date: date, reason: str, actor_id: uuid.UUID,
+                              late_fine: str | None = None, may_remove_fine: bool = False) -> dict:
         """Move one instalment's due date (e.g. an extension for a student, or the whole class). Only an instalment that is
         still owed, only to today or later (never backwards into the past, which would charge late fees for days that
         were not late), always with a reason. The ledger amounts are not touched; the instalment's open challan gets the
@@ -624,6 +711,26 @@ class FeeAssignmentService:
         old = debit.due_date
         if old == new_date:
             raise ValidationAppError("That is already its due date.")
+        # A late fine built up so far would vanish with a later due date: never silently. Keep it (posted to Fines, the
+        # default) or, only with the right to correct payments (administrator), remove it on record.
+        posted_before = float(debit.late_fee_charged_amount or 0)
+        built_up = round(max(float(row["late_fee"]) - posted_before, 0.0), 2)
+        kept_fine = removed_fine = 0.0
+        if built_up > 0.005:
+            if late_fine not in ("KEEP", "REMOVE"):
+                raise LateFineConfirmationRequired(
+                    f"This instalment has a late fine of Rs. {built_up:,.0f} so far. Moving the due date would remove it. Keep it "
+                    "(it is added to the student's fines) " + ("or remove it." if may_remove_fine else "— only an administrator can remove it."),
+                    details={"late_fine": built_up, "can_remove": may_remove_fine, "students": 1})
+            if late_fine == "REMOVE":
+                if not may_remove_fine:
+                    raise AuthorizationError("Only an administrator can remove a late fine. Keep it, or ask the administrator.")
+                removed_fine = built_up
+            else:
+                fine = await self.post_late_fee(debit.id, actor_id=actor_id)
+                kept_fine = round(float(fine.amount), 2) if fine is not None else 0.0
+        if float(debit.late_fee_charged_amount or 0) > 0:
+            debit.late_fee_charged_amount = 0     # what was earned so far is on the Fines list; lateness counts again from the new date
         debit.due_date = new_date
         challans = (await self.session.execute(select(PaymentChallan).where(
             PaymentChallan.fee_ledger_entry_id == debit.id, PaymentChallan.status.in_((ChallanStatus.PENDING, ChallanStatus.EXPIRED))))).scalars().all()
@@ -631,11 +738,15 @@ class FeeAssignmentService:
             ch.due_date = new_date
             if ch.status == ChallanStatus.EXPIRED:
                 ch.status = ChallanStatus.PENDING          # payable again until the new date
-        posted = round(float(debit.late_fee_charged_amount or 0), 2)
+        posted = round(posted_before, 2)
         await self.audit.log(actor_user_id=actor_id, action="fee.due_date_changed", entity_type="fee_ledger_entry", entity_id=debit.id,
                              before={"due_date": str(old) if old else None},
                              after={"due_date": str(new_date), "reason": reason[:300], "assignment_id": str(assignment.id),
-                                    "remaining": row["remaining"], "late_fee_before": row["late_fee"], "late_fee_already_posted": posted})
+                                    "remaining": row["remaining"], "late_fee_before": row["late_fee"], "late_fee_already_posted": posted,
+                                    "late_fine_kept": kept_fine, "late_fine_removed": removed_fine})
+        if removed_fine:
+            await self.audit.log(actor_user_id=actor_id, action="fee.late_fine_removed", entity_type="fee_ledger_entry", entity_id=debit.id,
+                                 after={"amount": removed_fine, "why": "due date moved", "reason": reason[:300], "assignment_id": str(assignment.id)})
         payer_user_id = await _resolve_payer_user_id(self.session, assignment.payer_type, assignment.payer_id)
         if payer_user_id is not None:
             await create_notification(
@@ -645,10 +756,10 @@ class FeeAssignmentService:
             )
         await self.session.flush()
         return {"ledger_entry_id": debit.id, "assignment_id": assignment.id, "old_due_date": old, "new_due_date": new_date,
-                "remaining": row["remaining"], "late_fee_already_posted": posted}
+                "remaining": row["remaining"], "late_fee_already_posted": posted, "late_fine_kept": kept_fine, "late_fine_removed": removed_fine}
 
     async def change_due_date_for_structure(self, structure_id: uuid.UUID, installment_number: int, *, new_date: date, reason: str,
-                                            actor_id: uuid.UUID) -> dict:
+                                            actor_id: uuid.UUID, late_fine: str | None = None, may_remove_fine: bool = False) -> dict:
         """The same change for one instalment of a fee for everyone on it (e.g. "2nd instalment of Fall 2026 tuition now
         due 30 Nov"). Instalments already paid in full are left as they are and counted."""
         structure = await self.structure_repo.get_by_id(structure_id)
@@ -665,7 +776,26 @@ class FeeAssignmentService:
             .where(FeeAssignment.fee_structure_id == structure_id, FeeAssignment.status == AssignmentStatus.ACTIVE,
                    FeeLedgerEntry.entry_type == LedgerEntryType.DEBIT, FeeLedgerEntry.installment_number == installment_number)
             .order_by(FeeLedgerEntry.created_at))).scalars().all()
-        changed = paid = same = other = posted = 0
+        if late_fine not in ("KEEP", "REMOVE"):              # first: would any late fine vanish? Ask once, for everyone.
+            total, who = 0.0, 0
+            for d in debits:
+                if FeeStatusCalculator._is_reversal(d) or d.due_date == new_date:
+                    continue
+                a = await self.session.get(FeeAssignment, d.fee_assignment_id)
+                r = next((x for x in FeeStatusCalculator.installments(await self.repo.get_ledger(a.id), late_rate(structure), pause=late_pause(a))
+                          if x["ledger_entry_id"] == d.id), None)
+                left = round(max(float(r["late_fee"]) - float(d.late_fee_charged_amount or 0), 0.0), 2) if r and r["remaining"] > 0.005 else 0.0
+                if left > 0.005:
+                    total, who = total + left, who + 1
+            if who:
+                raise LateFineConfirmationRequired(
+                    f"{who} student{'s have' if who > 1 else ' has'} late fines of Rs. {total:,.0f} in all on this instalment. Moving the due date "
+                    "would remove them. Keep them (added to their fines) " + ("or remove them." if may_remove_fine else "— only an administrator can remove them."),
+                    details={"late_fine": round(total, 2), "students": who, "can_remove": may_remove_fine})
+        if late_fine == "REMOVE" and not may_remove_fine:
+            raise AuthorizationError("Only an administrator can remove late fines. Keep them, or ask the administrator.")
+        changed = paid = same = other = posted = kept = 0
+        kept_total = removed_total = 0.0
         for d in debits:
             if FeeStatusCalculator._is_reversal(d):
                 continue
@@ -673,7 +803,8 @@ class FeeAssignmentService:
                 same += 1
                 continue
             try:
-                r = await self.change_due_date(d.id, new_date=new_date, reason=reason, actor_id=actor_id)
+                r = await self.change_due_date(d.id, new_date=new_date, reason=reason, actor_id=actor_id, late_fine=late_fine or "KEEP",
+                                               may_remove_fine=may_remove_fine)
             except BusinessRuleViolationError as exc:
                 if "paid in full" in str(exc):
                     paid += 1
@@ -682,10 +813,15 @@ class FeeAssignmentService:
                 continue
             changed += 1
             posted += 1 if r["late_fee_already_posted"] > 0 else 0
+            kept += 1 if r["late_fine_kept"] > 0 else 0
+            kept_total += r["late_fine_kept"]
+            removed_total += r["late_fine_removed"]
         await self.audit.log(actor_user_id=actor_id, action="fee.due_date_changed_for_all", entity_type="fee_structure", entity_id=structure.id,
                              after={"installment_number": installment_number, "due_date": str(new_date), "reason": reason.strip()[:300],
-                                    "changed": changed, "already_paid": paid, "already_on_that_date": same, "skipped": other})
-        return {"changed": changed, "already_paid": paid, "already_on_that_date": same, "skipped": other, "with_late_fee_already_posted": posted}
+                                    "changed": changed, "already_paid": paid, "already_on_that_date": same, "skipped": other,
+                                    "late_fines_kept": round(kept_total, 2), "late_fines_removed": round(removed_total, 2)})
+        return {"changed": changed, "already_paid": paid, "already_on_that_date": same, "skipped": other, "with_late_fee_already_posted": posted,
+                "late_fines_kept": round(kept_total, 2), "with_late_fine_kept": kept, "late_fines_removed": round(removed_total, 2)}
 
     async def change_status(
         self, assignment_id: uuid.UUID, *, status: AssignmentStatus, actor_id: uuid.UUID, reason: str | None = None, approved: bool = False
@@ -792,9 +928,10 @@ class ChallanService:
     async def mark_paid_by_staff(
         self, challan_id: uuid.UUID, *, actor_id: uuid.UUID, note: str | None = None,
         method: str = "BANK_DEPOSIT", reference: str | None = None, paid_on: date | None = None,
+        late_fine: str | None = None, late_fine_reason: str | None = None, may_remove_fine: bool = False,
     ) -> PaymentChallan:
         """An accounts officer confirms a challan was paid (the main way payments are recorded while the 1LINK gateway
-        is not live)."""
+        is not live). A date earlier than today that would remove a late fine needs a choice (guard_backdated_fine)."""
         challan, assignment = await self._locked(challan_id)
         if challan.status != ChallanStatus.PENDING:
             raise BusinessRuleViolationError(f"This challan is already {challan.status.value.lower()}.")
@@ -804,10 +941,16 @@ class ChallanService:
 
         await ensure_open(self.session, day, "This payment")
         await refuse_reused_reference(self.session, reference, method)
+        lost = await backdated_fine_lost(self.session, assignment, amount=float(challan.amount), paid_on=day, applies_to=challan.fee_ledger_entry_id)
+        ask_about_backdated_fine(lost, day, late_fine=late_fine, may_remove_fine=may_remove_fine, reason=late_fine_reason)
         challan = await self._mark_paid(
             challan, assignment, gateway_reference=reference or f"CASH-{uuid.uuid4().hex[:8].upper()}",
             paid_at=datetime.now(timezone.utc), actor_id=actor_id, method=method, paid_on=day,
         )
+        credit = await self.session.get(FeeLedgerEntry, challan.paid_entry_id) if challan.paid_entry_id else None
+        if credit is not None and lost > 0.005:
+            kept = await settle_backdated_fine(self.session, assignment, credit, lost, late_fine=late_fine, reason=late_fine_reason, actor_id=actor_id)
+            challan.late_fee_posted = round(float(getattr(challan, "late_fee_posted", 0) or 0) + kept, 2)
         await self.audit.log(
             actor_user_id=actor_id,
             action="fee.payment_marked_paid_by_staff",

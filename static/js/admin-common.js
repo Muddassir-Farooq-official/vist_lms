@@ -272,6 +272,30 @@ window.VistAdmin = (function () {
       .replace(/^Field required$/, "is required").replace(/^Input should be greater than (.*)$/, "must be more than $1")
       .replace(/^Input should be a valid (.*)$/, "must be a valid $1");
   }
+  // A request that would take away a late fine already built up (moving a due date, a payment dated earlier) is refused
+  // with LATE_FINE_CONFIRM. This shows the warning, asks Keep / Remove (Remove only for an administrator), and sends the
+  // same request again with the answer. send(extra) must return VA.fetchJson(...) with `extra` merged into the body.
+  // Returns the final result, or null when the person cancels.
+  async function withLateFine(send, opts) {
+    opts = opts || {};
+    const res = await send({});
+    if (res.ok || res.status !== 409 || !res.body || !res.body.error || res.body.error.code !== "LATE_FINE_CONFIRM") return res;
+    const d = res.body.error.details || {};
+    const amount = formatMoney(d.late_fine || 0);
+    const options = [{ value: "KEEP", label: "Keep the fine (" + amount + ", added to " + (d.students > 1 ? "their" : "the") + " fines)" }];
+    if (d.can_remove) options.push({ value: "REMOVE", label: "Remove the fine (kept on record)" });
+    const choice = await ask({ title: "Late fine of " + amount, intro: res.body.error.message, label: "What should happen to the fine?",
+      input: "select", value: "KEEP", options: options, ok: "Continue" });
+    if (!choice) return null;
+    const extra = { late_fine: choice };
+    if (choice === "REMOVE" && opts.reasonField) {
+      const why = await ask({ title: "Remove the late fine", intro: "This is kept on record with your name.", label: "Why is it removed?", ok: "Remove", danger: true });
+      if (!why) return null;
+      extra[opts.reasonField] = why;
+    }
+    return send(extra);
+  }
+
   function normaliseError(status, body) {
     if (body && body.error && body.error.message) return body;
     if (body && Array.isArray(body.detail)) {
@@ -1437,6 +1461,7 @@ window.VistAdmin = (function () {
   document.addEventListener("vistadmin:ready", function () { setTimeout(function () { labelInputs(document); }, 0); });
 
   return {
+    withLateFine: withLateFine,
     ask: ask,
     confirm: confirmDialog,
     promptText: promptText,

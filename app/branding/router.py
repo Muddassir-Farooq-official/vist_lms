@@ -34,6 +34,7 @@ class ProfileIn(BaseModel):
     bank_branch: str | None = Field(default=None, max_length=150)
     signatory_name: str | None = Field(default=None, max_length=120)
     signatory_title: str | None = Field(default=None, max_length=120)
+    card_instructions: str | None = Field(default=None, max_length=1500)      # the back of ID cards, one per line
 
 
 @router.get("/profile", summary="The institute's name, contact details, logos, colour, bank details and signatory (administrator)")

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
+from typing import Literal
 
-from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, Query, Response
+from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, or_, select
 
 from app.auth.permissions import Permissions, Roles
@@ -12,6 +13,7 @@ from app.auth.schemas import CurrentUser
 from app.core.database import get_db
 from app.core.dependencies import require_any_role, require_permission
 from app.core.exceptions import AuthorizationError, ResourceNotFoundError
+from app.employees.models import Employee
 from app.employees.repository import EmployeeRepository
 from app.fees.assignment_service import ChallanService, FeeAssignmentService
 from app.fees.models import AssignmentStatus, FeeAssignment, FeeStructure, PayerType
@@ -23,9 +25,8 @@ from app.fees.schemas import (
     LedgerEntryOut,
     RecordPaymentRequest,
 )
-from app.students.repository import StudentRepository
 from app.students.models import Student
-from app.employees.models import Employee
+from app.students.repository import StudentRepository
 
 router = APIRouter(prefix="/fees/assignments", tags=["fees"])
 
@@ -290,7 +291,8 @@ async def record_payment(
     db=Depends(get_db),
 ) -> FeeAssignmentOut:
     service = FeeAssignmentService(db)
-    await service.record_payment(assignment_id, payload, actor_id=current_user.id)
+    await service.record_payment(assignment_id, payload, actor_id=current_user.id,
+                                 may_remove_fine=Permissions.PAYMENT_REVERSE in (current_user.permissions or []))
     assignment = await service.get(assignment_id)
     out = await _to_assignment_out(db, assignment)
     return out.model_copy(update={"late_fee_posted": getattr(service, "late_fee_posted", 0.0) or None})
@@ -320,6 +322,7 @@ async def post_late_fee(
 class DueDateChange(BaseModel):
     due_date: date
     reason: str = Field(min_length=4, max_length=300)
+    late_fine: Literal["KEEP", "REMOVE"] | None = None      # needed when a late fine has built up (else 409 LATE_FINE_CONFIRM)
 
 
 @router.post(
@@ -338,7 +341,9 @@ async def change_installment_due_date(
     entry = await db.get(FeeLedgerEntry, ledger_entry_id)
     if entry is None or entry.fee_assignment_id != assignment_id:
         raise ResourceNotFoundError("Instalment not found.")
-    return await FeeAssignmentService(db).change_due_date(ledger_entry_id, new_date=payload.due_date, reason=payload.reason, actor_id=current_user.id)
+    return await FeeAssignmentService(db).change_due_date(ledger_entry_id, new_date=payload.due_date, reason=payload.reason, actor_id=current_user.id,
+                                                          late_fine=payload.late_fine,
+                                                          may_remove_fine=Permissions.PAYMENT_REVERSE in (current_user.permissions or []))
 
 
 @router.patch("/{assignment_id}/status", response_model=FeeAssignmentOut, summary="Change an assignment's status")
