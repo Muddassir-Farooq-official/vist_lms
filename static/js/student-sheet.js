@@ -26,6 +26,8 @@
       (s.has_photo ? '<img src="/api/v1/students/' + esc(s.id) + '/photo" alt="" loading="lazy" />' : esc(initials(name))) + "</span>";
   }
   function money(v) { return VA.formatMoney(v || 0); }
+  // The accounts office's lookup page says where the fee account is (data-fee-link): the sheet then links to it.
+  const FEE_LINK = (function () { const el = document.querySelector("[data-fee-link]"); return el ? el.getAttribute("data-fee-link") : ""; })();
   function fmtDate(d) { return d ? new Date(d + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : ""; }
 
   // ---- the directory row (admin Students and the lookup pages)
@@ -34,7 +36,7 @@
     const place = [s.current_semester ? "Semester " + s.current_semester : "", s.section_label ? "Section " + s.section_label : ""].filter(Boolean).join(" · ");
     return '<tr data-open="' + esc(s.id) + '" tabindex="0" aria-label="Open ' + esc(name) + '">' +
       '<td class="sd-who"><div>' + avatarHtml(s) + '<span class="sd-name"><strong>' + esc(name) + "</strong><small>" + esc(s.roll_number || "No roll number yet") +
-        (s.gender ? " · " + esc(s.gender) : "") + "</small></span></div></td>" +
+        (s.guardian_label ? " · " + esc(s.guardian_label) : (s.gender ? " · " + esc(s.gender) : "")) + "</small></span></div></td>" +
       '<td class="sd-prog"><div><strong title="' + esc(s.program_name || "") + '">' + esc(s.program_code || "—") + "</strong><small>" + esc(place || "—") + "</small></div></td>" +
       '<td class="sd-contact">' + (s.contact_no ? '<a href="tel:' + esc(s.contact_no) + '">' + esc(s.contact_no) + "</a>" : '<span class="sd-dim">—</span>') + "</td>" +
       '<td class="sd-session">' + esc(s.admission_session || "—") + "</td>" +
@@ -102,7 +104,8 @@
       ["Complaints", String(c.filed_against_them || 0), c.filed_against_them > 0, "against · " + (c.filed_by_them || 0) + " filed by them"],
     ].map(function (k) {
       return '<div class="ss-kpi' + (k[2] ? " bad" : "") + '"><span>' + esc(k[0]) + "</span><strong>" + esc(k[1]) + "</strong><small>" + esc(k[3]) + "</small></div>";
-    }).join("");
+    }).join("") + (FEE_LINK ? '<a class="role-btn small-btn ss-fee-link" href="' + esc(FEE_LINK) + "?student=" + encodeURIComponent(p.id) +
+      '#accounts">Open the fee account \u2192</a>' : "");
     $("ss-admission").innerHTML = dl([["Roll number", p.roll_number], ["Program", p.program_name], ["Semester", p.current_semester], ["Section / shift", p.section_label],
       ["Session", p.admission_session], ["Category", p.admission_category], ["Enrolled on", fmtDate(p.enrollment_date)],
       ["Admission fee", p.admission_fee_paid === null || p.admission_fee_paid === undefined ? "" : (p.admission_fee_paid ? "Paid" : "Not paid")]]);

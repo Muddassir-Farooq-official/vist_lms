@@ -37,6 +37,11 @@
     if (!st) return say("No student with roll number " + roll + ".");
     const a = await VA.fetchJson("/api/v1/fees/accounts/students/" + st.id);
     if (!a.ok) return say(errText(a));
+    const p = a.body.payer || {};
+    const who = document.getElementById("rf-who");
+    who.innerHTML = "<strong>" + esc(p.name || "") + "</strong>" + (p.guardian_label ? " " + esc(p.guardian_label) : "") +
+      " \u00b7 " + esc([p.identifier, p.group].filter(Boolean).join(" \u00b7 "));
+    who.hidden = false;
     const fees = (a.body.assignments || []).filter(function (x) { return x.status === "ACTIVE"; });
     const sel = document.getElementById("rf-fee");
     sel.innerHTML = '<option value="">Choose the fee…</option>' + fees.map(function (f) {
@@ -92,7 +97,7 @@
       if (x.status === "APPROVED") act = '<button type="button" class="role-btn small-btn" data-pay="' + x.id + '">Pay out</button><button type="button" class="sd-view tt-del" data-cancel="' + x.id + '">Cancel\u2026</button>';
       if (x.status === "PAID") act = '<a href="/api/v1/fees/receipts/' + x.ledger_entry_id + '/pdf" target="_blank" rel="noopener">' + esc(x.voucher_number) + "</a>";
       const pill = { REQUESTED: "pending", APPROVED: "approved", PAID: "active", REJECTED: "rejected", CANCELLED: "cancelled" }[x.status] || "pending";
-      return '<tr><td><span class="vl-c"><strong>' + esc(x.payer ? x.payer.name || "" : "") + "</strong><small>" + esc([x.payer && x.payer.identifier, "requested " + VA.formatDateLong(String(x.requested_at).slice(0, 10))].filter(Boolean).join(" \u00b7 ")) + "</small></span></td><td>" + esc(x.fee) +
+      return '<tr><td><span class="vl-c"><strong>' + esc(x.payer ? x.payer.name || "" : "") + "</strong><small>" + esc([x.payer && x.payer.guardian_label, x.payer && x.payer.identifier, "requested " + VA.formatDateLong(String(x.requested_at).slice(0, 10))].filter(Boolean).join(" \u00b7 ")) + "</small></span></td><td>" + esc(x.fee) +
         '</td><td class="num"><strong>' + esc(money(x.amount)) + '</strong></td><td class="num">' + (Number(x.write_off) ? esc(money(x.write_off)) : '<span class="sd-dim">\u2014</span>') +
         '</td><td class="rf-reason">' + esc(x.reason) + (x.decision_note ? "<small>" + esc(x.decision_note) + "</small>" : "") +
         '</td><td><span class="status-pill ' + pill + '">' + esc(STATUS[x.status] || x.status) + '</span></td><td class="crs-actions">' + act + "</td></tr>";

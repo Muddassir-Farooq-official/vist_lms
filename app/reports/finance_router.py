@@ -40,9 +40,9 @@ async def defaulters(program_id: uuid.UUID | None = None, semester: int | None =
 async def defaulters_csv(program_id: uuid.UUID | None = None, semester: int | None = None, min_amount: float | None = None,
                          current_user: CurrentUser = Depends(view), db=Depends(get_db)) -> Response:
     r = await FinanceReportService(db).defaulters(program_id=program_id, semester=semester, min_amount=min_amount)
-    rows = [[s["roll_number"], s["name"], s["program"] or "", s["semester"] or "", s["phone"] or "", s["guardian_phone"] or "", s["oldest_due"], s["days_overdue"],
+    rows = [[s["roll_number"], s["name"], s.get("father") or "", s["program"] or "", s["semester"] or "", s["phone"] or "", s["guardian_phone"] or "", s["oldest_due"], s["days_overdue"],
              *[s[b] for b in BUCKETS], s["overdue"], s["late_fee_accrued"], s["fines_pending"]] for s in r["students"]]
-    return _csv(rows, ["Roll number", "Name", "Program", "Semester", "Phone", "Guardian phone", "Oldest due", "Days overdue", *[b + " days" for b in BUCKETS], "Total overdue", "Late fee accrued", "Fines pending"],
+    return _csv(rows, ["Roll number", "Name", "Father / guardian", "Program", "Semester", "Phone", "Guardian phone", "Oldest due", "Days overdue", *[b + " days" for b in BUCKETS], "Total overdue", "Late fee accrued", "Fines pending"],
                 f"defaulters-{r['as_of']}.csv")
 
 

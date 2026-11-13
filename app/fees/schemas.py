@@ -138,6 +138,7 @@ class FeeAssignmentOut(BaseModel):
     total_due_now: float
     is_in_good_standing: bool
     payer_identifier: str | None = None     # roll number or employee code
+    payer_guardian: str | None = None       # students: "s/o Ahmed Khan" (father, else the main guardian)
     term_label: str | None = None
 
 

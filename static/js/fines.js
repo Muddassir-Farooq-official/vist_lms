@@ -229,7 +229,7 @@
       result.body.forEach(function (person) {
         const item = document.createElement("div");
         item.className = "search-result-item";
-        item.textContent = person.name + (person.identifier ? " (" + person.identifier + ")" : "");
+        item.textContent = person.name + (person.guardian_label ? " " + person.guardian_label : "") + (person.identifier ? " (" + person.identifier + ")" : "");
         item.addEventListener("click", function () {
           finePayerId.value = person.id;
           finePayerSearch.value = item.textContent;

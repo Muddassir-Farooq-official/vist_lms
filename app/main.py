@@ -398,6 +398,7 @@ ACCOUNTS_NAV_ITEMS = [
     _nav("announcements", "Announcements", "megaphone", "/dashboard/accounts/announcements"),
     _nav("my-announcements", "Post an announcement", "megaphone", "/dashboard/accounts/my-announcements"),
     _nav("fees", "Fees", "fees", "/dashboard/accounts/fees", mobile=True),
+    _nav("students", "Student lookup", "students", "/dashboard/accounts/students"),
     _nav("finance", "Accounts", "tasks", "/dashboard/accounts/finance", mobile=True),
     _nav("reports", "Reports", "exams", "/dashboard/accounts/reports", mobile=False),
     _nav("finance-reports", "Finance reports", "exams", "/dashboard/accounts/finance-reports"),
@@ -1531,8 +1532,9 @@ async def principal_progress_page(request: Request):
                                                                         "allowed_roles": "ADMIN,PRINCIPAL"})
 
 
-def _lookup(request: Request, nav, roles: str):
-    return templates.TemplateResponse(request, "shared/student_lookup.html", {"nav_items": nav, "active_nav": "students", "allowed_roles": roles})
+def _lookup(request: Request, nav, roles: str, *, fee_link: str | None = None):
+    return templates.TemplateResponse(request, "shared/student_lookup.html", {"nav_items": nav, "active_nav": "students", "allowed_roles": roles,
+                                                                              "fee_link": fee_link})
 
 
 @app.get("/dashboard/principal/students", include_in_schema=False)
@@ -1543,6 +1545,13 @@ async def principal_students_page(request: Request):
 @app.get("/dashboard/hod/students", include_in_schema=False)
 async def hod_students_page(request: Request):
     return _lookup(request, HOD_NAV_ITEMS, "ADMIN,HOD")
+
+
+@app.get("/dashboard/accounts/students", include_in_schema=False)
+async def accounts_students_page(request: Request):
+    """The accounts office's read-only student lookup: who the student is (with the father / guardian) and their fees,
+    with a link straight to the student's fee account. Searches the father's name and CNIC too."""
+    return _lookup(request, ACCOUNTS_NAV_ITEMS, "ADMIN,ACCOUNTS_OFFICER", fee_link="/dashboard/accounts/fees")
 
 
 @app.get("/dashboard/exam/students", include_in_schema=False)
