@@ -301,8 +301,9 @@ async def record_payment(
     db=Depends(get_db),
 ) -> FeeAssignmentOut:
     service = FeeAssignmentService(db)
-    await service.record_payment(assignment_id, payload, actor_id=current_user.id,
-                                 may_remove_fine=Permissions.PAYMENT_REVERSE in (current_user.permissions or []))
+    # Whoever records the payment may remove a late fine its earlier date would take away (a slip, e.g. the payment was
+    # marked late by mistake): after the warning, with a reason, kept on record with their name.
+    await service.record_payment(assignment_id, payload, actor_id=current_user.id, may_remove_fine=True)
     assignment = await service.get(assignment_id)
     out = await _to_assignment_out(db, assignment)
     return out.model_copy(update={"late_fee_posted": getattr(service, "late_fee_posted", 0.0) or None})

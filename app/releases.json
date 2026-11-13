@@ -1,5 +1,18 @@
 [
   {
+    "version": "1.22.1",
+    "date": "2026-11-13",
+    "title": "The accounts office can remove a wrong late fine",
+    "summary": "When a payment is recorded with an earlier date, the accounts office can now remove the late fine itself, with a reason kept on record.",
+    "changes": [
+      {
+        "kind": "improved",
+        "for": "Accounts office",
+        "text": "Recording a payment or a challan with an earlier date still shows the late fine it would take away. You can now choose either to keep it or to remove it yourself (for example when the payment was marked late by mistake); removing needs a reason, which is kept on record with your name. Moving a due date is unchanged."
+      }
+    ]
+  },
+  {
     "version": "1.22.0",
     "date": "2026-11-13",
     "title": "Father's name in the accounts office; student lookup",

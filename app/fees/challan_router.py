@@ -72,7 +72,7 @@ async def mark_challan_paid(
         challan_id, actor_id=current_user.id, note=payload.note,
         method=payload.method.value, reference=payload.reference, paid_on=payload.paid_on,
         late_fine=payload.late_fine, late_fine_reason=payload.late_fine_reason,
-        may_remove_fine=Permissions.PAYMENT_REVERSE in (current_user.permissions or []),
+        may_remove_fine=True,      # the person confirming the payment may remove the fine: warned, with a reason, on record
     )
     return ChallanOut.model_validate(challan).model_copy(update={"late_fee_posted": getattr(challan, "late_fee_posted", 0.0) or None})
 
