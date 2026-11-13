@@ -15,12 +15,19 @@
         <span class="auth-logo{% if brand.has_logo %} has-logo{% endif %}" aria-hidden="true">{% if brand.has_logo %}<img src="{{ brand.logo_url }}" alt="" />{% else %}{{ brand.initials }}{% endif %}</span>
         <span class="auth-brand-text"><strong>{{ brand.name }}</strong><small>Certificate check</small></span>
       </div>
-      {% if result and not result.revoked %}
+      {% if result and not result.revoked and result.expired %}
+      <h1 id="auth-title">&#9888; Genuine, but expired</h1>
+      <p class="auth-error" role="alert">{{ result.kind_label }} <strong>{{ result.reference }}</strong> issued to {{ result.owner_name }} by {{ brand.name }} was valid until <strong>{{ result.valid_to.strftime("%d %B %Y") }}</strong>. It is <strong>no longer valid</strong>; a new card is needed.</p>
+      <dl class="auth-help">
+        <dt>Issued on</dt><dd>{{ result.issued_on.strftime("%d %B %Y") }}</dd>
+      </dl>
+      {% elif result and not result.revoked %}
       <h1 id="auth-title">&#10003; This is genuine</h1>
       <p class="auth-sub">{{ result.kind_label }} <strong>{{ result.reference }}</strong> was issued by {{ brand.name }}.</p>
       <dl class="auth-help">
         <dt>Issued to</dt><dd><strong>{{ result.owner_name }}</strong></dd>
         <dt>Issued on</dt><dd>{{ result.issued_on.strftime("%d %B %Y") }}</dd>
+        {% if result.valid_to %}<dt>Valid until</dt><dd>{{ result.valid_to.strftime("%d %B %Y") }}</dd>{% endif %}
       </dl>
       <p class="auth-help">Compare the name and date above with the paper in your hand.</p>
       {% elif result %}

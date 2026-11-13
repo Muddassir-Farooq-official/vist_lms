@@ -115,6 +115,7 @@ UI: dict[str, dict] = {
     "purchase_over_estimate_percent": {"section": "Purchases", "label": "Re-approve when the price is more than the estimate by",
                                        "control": "number", "after": "%"},
     # ---------------------------------------------------------------- sms
+    "student_card_valid_months": {"section": "Certificates", "label": "Student ID cards are valid for", "control": "number", "after": "months"},
     "certificate_fee_bonafide": {"section": "Certificates", "label": "Bonafide certificate", "control": "number", "before": "Rs."},
     "certificate_fee_character": {"section": "Certificates", "label": "Character certificate", "control": "number", "before": "Rs."},
     "certificate_fee_completion": {"section": "Certificates", "label": "Completion certificate", "control": "number", "before": "Rs."},

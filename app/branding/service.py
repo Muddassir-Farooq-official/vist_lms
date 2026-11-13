@@ -41,6 +41,7 @@ FIELDS = {
     "bank_branch": ("Branch", 150, False),
     "signatory_name": ("Signatory name", 120, False),
     "signatory_title": ("Signatory title", 120, False),
+    "card_instructions": ("ID card instructions", 900, False),
 }
 # profile field -> settings attribute
 TO_SETTINGS = {
@@ -48,7 +49,7 @@ TO_SETTINGS = {
     "city": "institute_city", "phone": "institute_phone", "email": "institute_email", "website": "institute_website",
     "registration_no": "institute_registration_no", "primary_color": "brand_color", "document_footer": "document_footer",
     "bank_name": "bank_name", "bank_account_title": "bank_account_title", "bank_account_no": "bank_account_no", "bank_branch": "bank_branch",
-    "signatory_name": "institute_signatory_name", "signatory_title": "institute_signatory_title",
+    "signatory_name": "institute_signatory_name", "signatory_title": "institute_signatory_title", "card_instructions": "card_instructions",
 }
 _DEFAULTS: dict = {}
 
@@ -131,6 +132,17 @@ async def get(session: AsyncSession) -> dict:
 
 def _clean(field: str, value) -> str | None:
     label, n, required = FIELDS[field]
+    if field == "card_instructions":                     # several lines: one instruction each
+        lines = [" ".join(x.split()).lstrip("-*\u2022 ").strip() for x in str(value or "").splitlines()]
+        lines = [x for x in lines if x]
+        if len(lines) > 8:
+            raise ValidationAppError("ID card instructions: at most 8 lines (they must fit on the back of the card).")
+        if any(len(x) > 140 for x in lines):
+            raise ValidationAppError("ID card instructions: keep each line under 140 characters.")
+        v = "\n".join(lines)
+        if len(v) > n:
+            raise ValidationAppError(f"{label}: at most {n} characters.")
+        return v or None
     v = " ".join(str(value or "").split())
     if required and len(v) < 2:
         raise ValidationAppError(f"{label} is needed.")

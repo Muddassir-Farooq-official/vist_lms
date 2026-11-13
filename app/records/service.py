@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,6 +31,34 @@ OWNER = {"students": "STUDENT", "employees": "EMPLOYEE"}
 
 def reference_of(d: IssuedDocument) -> str:
     return f"{PREFIX.get(d.kind, 'DOC')}-{(d.created_at or datetime.now(timezone.utc)).year}-{d.serial_no:05d}"
+
+
+def add_months(d, months: int):
+    """The same day `months` later (the last day of the month when that day does not exist: 31 Aug + 6 -> 28/29 Feb)."""
+    import calendar
+
+    y, m = divmod(d.month - 1 + months, 12)
+    y, m = d.year + y, m + 1
+    return d.replace(year=y, month=m, day=min(d.day, calendar.monthrange(y, m)[1]))
+
+
+CARD_INSTRUCTIONS = (
+    "This card must be carried at all times on the campus and shown when asked.",
+    "It is not transferable. Misuse leads to disciplinary action.",
+    "Report a lost card to the office at once; a duplicate is issued on payment.",
+    "Return the card when you leave the institute.",
+)
+
+
+def card_back() -> dict:
+    """What is printed on the back of every ID card: the instructions (Settings -> Institute; the ready-made ones when
+    none are set), where to return a found card, and who signs."""
+    from app.core import brand
+
+    lines = [x for x in (settings.card_instructions or "").splitlines() if x.strip()] or list(CARD_INSTRUCTIONS)
+    return {"instructions": lines[:8], "institute": brand.name(), "address": brand.address_line(),
+            "phone": settings.institute_phone or "", "website": settings.institute_website or "",
+            "signatory": settings.institute_signatory_title or "Principal", "signatory_name": settings.institute_signatory_name or ""}
 
 
 def verify_url(code: str) -> str:
@@ -320,26 +348,27 @@ class RecordsService:
         if len(student_ids) + len(employee_ids) > 200:
             raise ValidationAppError("At most 200 ID cards at a time.")
         today = institute_today()
-        valid_to = today.replace(year=today.year + 1).strftime("%d/%m/%Y")
+        months = max(1, min(int(getattr(settings, "student_card_valid_months", 6) or 6), 36))
+        student_until, staff_until = add_months(today, months), add_months(today, 12)       # Settings -> Certificates; staff: a year
         cards = []
         for sid in student_ids:
             s = await self._student(sid)
             program = await self.session.get(Program, s.program_id) if s.program_id else None
             name = f"{s.first_name} {s.last_name}"
-            doc = await self._register("CARD", "STUDENT", sid, name, {"roll_number": s.roll_number}, actor_id)
+            doc = await self._register("CARD", "STUDENT", sid, name, {"roll_number": s.roll_number, "valid_to": student_until.isoformat()}, actor_id)
             cards.append({"kind": "STUDENT", "name": name, "photo_key": s.photo_storage_key,
                           "fields": [("Roll No", s.roll_number), ("Program", program.name if program else None), ("Semester", str(s.current_semester) if s.current_semester else None),
                                      ("CNIC No", s.cnic), ("Contact", s.contact_no)],
-                          "verify_url": verify_url(doc.verification_code), "reference": reference_of(doc), "valid_to": valid_to})
+                          "verify_url": verify_url(doc.verification_code), "reference": reference_of(doc), "valid_to": student_until.strftime("%d/%m/%Y")})
         for eid in employee_ids:
             e = await self._employee(eid)
             title = (await self.session.execute(select(JobRole.title).where(JobRole.id == e.job_role_id))).scalar_one_or_none() or "Staff"
             name = f"{e.first_name} {e.last_name}"
-            doc = await self._register("CARD", "EMPLOYEE", eid, name, {"employee_code": e.employee_code}, actor_id)
+            doc = await self._register("CARD", "EMPLOYEE", eid, name, {"employee_code": e.employee_code, "valid_to": staff_until.isoformat()}, actor_id)
             cards.append({"kind": "STAFF", "name": name, "photo_key": e.photo_storage_key, "title": title,
                           "fields": [("Code", e.employee_code), ("Designation", title), ("Department", e.department), ("CNIC No", e.cnic), ("Contact", e.contact_no)],
-                          "verify_url": verify_url(doc.verification_code), "reference": reference_of(doc), "valid_to": valid_to})
-        return {"institute": settings.institute_name, "cards": cards}
+                          "verify_url": verify_url(doc.verification_code), "reference": reference_of(doc), "valid_to": staff_until.strftime("%d/%m/%Y")})
+        return {"institute": settings.institute_name, "cards": cards, "back": card_back()}
 
     async def issued_for(self, owner_type: str, owner_id: uuid.UUID) -> list[dict]:
         rows = (await self.session.execute(select(IssuedDocument).where(IssuedDocument.owner_type == owner_type, IssuedDocument.owner_id == owner_id)
@@ -363,8 +392,15 @@ class RecordsService:
         d = (await self.session.execute(select(IssuedDocument).where(IssuedDocument.verification_code == code))).scalar_one_or_none() if code else None
         if d is None:
             return None
+        valid_to = None
+        if d.kind == "CARD" and (d.details or {}).get("valid_to"):
+            try:
+                valid_to = date.fromisoformat(d.details["valid_to"])
+            except ValueError:
+                valid_to = None
         return {"reference": reference_of(d), "kind": d.kind, "kind_label": CERTIFICATES.get(d.kind, d.kind), "owner_name": d.owner_name,
-                "issued_on": d.created_at.date(), "revoked": d.revoked_at is not None, "revoke_reason": d.revoke_reason}
+                "issued_on": d.created_at.date(), "revoked": d.revoked_at is not None, "revoke_reason": d.revoke_reason,
+                "valid_to": valid_to, "expired": valid_to is not None and valid_to < institute_today()}
 
     # ------------------------------------------------------------------ documents on file
     @staticmethod

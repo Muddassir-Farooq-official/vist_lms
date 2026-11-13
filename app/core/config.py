@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     institute_signatory_name: str = ""
     institute_signatory_title: str = "Principal"
     brand_color: str = ""                    # e.g. #0b6b5d; empty = the standard blue theme
+    card_instructions: str = ""             # the back of ID cards, one instruction per line ("" = the ready-made ones)
     document_footer: str = ""                # printed at the foot of receipts, certificates and challans
     bank_name: str = ""
     bank_account_title: str = ""
@@ -260,6 +261,7 @@ class Settings(BaseSettings):
     sms_on_fee_overdue: int = 1
     sms_on_fee_reminder: int = 1             # 7 and 3 days before a challan is due, and on the day
     # Certificates on request (app/records/requests.py): fee per kind, Rs. 0 = free. Editable in Settings.
+    student_card_valid_months: int = 6          # student ID cards: valid this many months from printing (staff cards: 12)
     certificate_fee_bonafide: float = 300.0
     certificate_fee_character: float = 300.0
     certificate_fee_completion: float = 500.0
