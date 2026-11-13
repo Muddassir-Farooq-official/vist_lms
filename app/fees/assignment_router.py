@@ -48,9 +48,13 @@ async def _to_assignment_out(db, assignment) -> FeeAssignmentOut:
     structure = await db.get(FeeStructure, assignment.fee_structure_id)
     payer_name = await service.resolve_payer_name(assignment.payer_type, assignment.payer_id)
     status_data = await service.get_status(assignment)
+    guardian = None
     if assignment.payer_type == PayerType.STUDENT:
         who = await db.get(Student, assignment.payer_id)
         identifier = who.roll_number if who else None
+        from app.students.family import guardian_labels
+
+        guardian = (await guardian_labels(db, [assignment.payer_id])).get(assignment.payer_id)
     else:
         who = await db.get(Employee, assignment.payer_id)
         identifier = who.employee_code if who else None
@@ -65,6 +69,7 @@ async def _to_assignment_out(db, assignment) -> FeeAssignmentOut:
         status=assignment.status,
         is_in_good_standing=status_data["total_due_now"] <= 0 and assignment.status.value == "ACTIVE",
         payer_identifier=identifier,
+        payer_guardian=guardian["label"] if guardian else None,
         term_label=structure.term_label if structure else None,
         **status_data,
     )
@@ -86,7 +91,7 @@ async def _resolve_own_payer(db, current_user: CurrentUser) -> tuple[PayerType, 
 @router.get("", response_model=list[FeeAssignmentOut], summary="Fee assignments, with optional search, filters and pages (Admin/Accounts Officer only)")
 async def list_assignments(
     response: Response,
-    q: str | None = Query(None, max_length=100, description="Name, roll number or employee code"),
+    q: str | None = Query(None, max_length=100, description="Name, roll number, employee code, fee, or the father's name / CNIC"),
     payer_type: PayerType | None = None,
     status: AssignmentStatus | None = None,
     term_label: str | None = Query(None, max_length=60),
@@ -106,9 +111,14 @@ async def list_assignments(
             .outerjoin(Employee, and_(FeeAssignment.payer_type == PayerType.EMPLOYEE, Employee.id == FeeAssignment.payer_id)))
     if q and q.strip():
         like = f"%{q.strip().lower()}%"
+        from app.students.models import StudentGuardian
+
+        digits = "".join(ch for ch in q if ch.isdigit())
+        cnic = f"{digits[:5]}-{digits[5:12]}-{digits[12]}" if len(digits) == 13 else q.strip()
+        by_father = Student.id.in_(select(StudentGuardian.student_id).where(or_(func.lower(StudentGuardian.name).like(like), StudentGuardian.cnic == cnic)))
         stmt = stmt.where(or_(func.lower(func.concat(Student.first_name, " ", Student.last_name)).like(like), func.lower(Student.roll_number).like(like),
                               func.lower(func.concat(Employee.first_name, " ", Employee.last_name)).like(like), func.lower(Employee.employee_code).like(like),
-                              func.lower(FeeStructure.name).like(like)))
+                              func.lower(FeeStructure.name).like(like), Student.cnic == cnic, by_father))
     if payer_type is not None:
         stmt = stmt.where(FeeAssignment.payer_type == payer_type)
     if status is not None:

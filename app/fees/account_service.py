@@ -30,13 +30,19 @@ class AccountService:
             if st is None:
                 raise ResourceNotFoundError("Student not found.")
             program = await self.session.get(Program, st.program_id) if st.program_id else None
+            from app.students.family import guardian_labels
+
+            fam = (await guardian_labels(self.session, [st.id])).get(st.id)
             return {"type": "STUDENT", "id": st.id, "name": f"{st.first_name} {st.last_name}", "identifier": st.roll_number,
+                    "guardian_name": fam["name"] if fam else None, "guardian_label": fam["label"] if fam else None,
+                    "guardian_relation": fam["relation"] if fam else None,
                     "group": (f"{program.name} \u00b7 Section {st.section_label}" if program is not None and program.school_level is not None and st.section_label
                               else ((program.code if program else "") + (f" \u00b7 Semester {st.current_semester}" if st.current_semester else "")).strip(" \u00b7") or None)}
         em = await self.session.get(Employee, payer_id)
         if em is None:
             raise ResourceNotFoundError("Employee not found.")
-        return {"type": "EMPLOYEE", "id": em.id, "name": f"{em.first_name} {em.last_name}", "identifier": em.employee_code, "group": None}
+        return {"type": "EMPLOYEE", "id": em.id, "name": f"{em.first_name} {em.last_name}", "identifier": em.employee_code, "group": None,
+                "guardian_name": None, "guardian_label": None, "guardian_relation": None}
 
     async def build(self, payer_type: PayerType, payer_id: uuid.UUID, *, staff_view: bool) -> dict:
         payer = await self.payer(payer_type, payer_id)

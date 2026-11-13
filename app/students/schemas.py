@@ -56,6 +56,10 @@ class StudentListItem(BaseModel):
     contact_no: str | None = None
     admission_session: str | None = None
     has_photo: bool = False
+    # Only for the administration and the accounts office (app/students/family.py): the father's (else the main
+    # guardian's) name and relation, e.g. "s/o Ahmed Khan" / "Guardian: Sara Bibi (Mother)". Never the CNIC or phone.
+    guardian_name: str | None = None
+    guardian_label: str | None = None
 
 
 class StudentAdminDetail(BaseModel):

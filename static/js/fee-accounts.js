@@ -33,7 +33,8 @@
         if (!r.ok) return;
         (r.body.items || []).forEach(function (s) {
           const b = document.createElement("button"); b.type = "button"; b.className = "picker-item";
-          b.innerHTML = "<strong>" + esc(s.first_name + " " + s.last_name) + "</strong><br><small>" + esc(s.roll_number || "no roll number") +
+          b.innerHTML = "<span><strong>" + esc(s.first_name + " " + s.last_name) + "</strong>" + (s.guardian_label ? ' <span class="picker-family">' + esc(s.guardian_label) + "</span>" : "") +
+            "</span><small>" + esc(s.roll_number || "no roll number") + (s.program_code ? " · " + esc(s.program_code) : "") +
             (s.current_semester ? " · semester " + s.current_semester : "") + " · " + esc(String(s.status).toLowerCase()) + "</small>";
           b.addEventListener("click", function () { input.value = s.first_name + " " + s.last_name + (s.roll_number ? " (" + s.roll_number + ")" : ""); list.innerHTML = ""; onPick(s); });
           list.appendChild(b);
@@ -53,7 +54,8 @@
     if (!r.ok) { VA.toast(msg(r.body, "Could not open this student's fees."), "error"); return; }
     const a = r.body; current = a;
     $("sa-account").hidden = false;
-    $("sa-title").textContent = a.payer.name + (a.payer.identifier ? " · " + a.payer.identifier : "") + (a.payer.group ? " · " + a.payer.group : "");
+    $("sa-title").textContent = a.payer.name + (a.payer.guardian_label ? " " + a.payer.guardian_label : "") + (a.payer.identifier ? " · " + a.payer.identifier : "") +
+      (a.payer.group ? " · " + a.payer.group : "");
     const s = a.summary;
     $("sa-tiles").innerHTML = '<div class="kpi-grid kpi-grid-6">' +
       tile("Payable", money(s.charged - s.concession), s.concession ? money(s.concession) + " discount" : "") +
@@ -159,6 +161,14 @@
   }
   function refresh() { if (current) loadAccount(current.payer.id); }
   studentPicker($("sa-search"), $("sa-results"), function (s) { if (s) loadAccount(s.id); });
+  // Opened from the student lookup ("Open the fee account"): ?student=<id> opens that student's account straight away.
+  (function () {
+    let id = null;
+    try { id = new URLSearchParams(location.search).get("student"); } catch (e) { id = null; }
+    if (id && /^[0-9a-f-]{36}$/i.test(id)) {
+      loadAccount(id).then(function () { const el = $("sa-account"); if (el && !el.hidden) el.scrollIntoView({ behavior: "smooth", block: "start" }); });
+    }
+  })();
   document.addEventListener("fees:changed", refresh);
 
   // marking a challan paid

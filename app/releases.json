@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.22.0",
+    "date": "2026-11-13",
+    "title": "Father's name in the accounts office; student lookup",
+    "summary": "The accounts office now sees each student's father (or guardian) wherever it searches, lists or prints fees, can find a student by the father's name or CNIC, and has a read-only Student lookup.",
+    "changes": [
+      {
+        "kind": "improved",
+        "for": "Accounts office",
+        "text": "Wherever you search or pick a student (Student accounts, Fees list, Refunds, Previous dues, Fines), each student shows the father, e.g. 'Ali Khan s/o Ahmed Khan', so two students with the same name are easy to tell apart. When no father is on record, the main guardian is shown with the relation, e.g. 'Guardian: Sara Bibi (Mother)'."
+      },
+      {
+        "kind": "improved",
+        "for": "Accounts office",
+        "text": "You can now find a student by the father's name or the father's CNIC (with or without dashes); brothers and sisters come up together."
+      },
+      {
+        "kind": "improved",
+        "for": "Everyone",
+        "text": "Fee challans, payment receipts, fee statements and the defaulters list (also its spreadsheet) show the father's name."
+      },
+      {
+        "kind": "new",
+        "for": "Accounts office",
+        "text": "Student lookup in the accounts menu: find any student and open a read-only record with their details, father / guardian and fees, and a button straight to their fee account."
+      }
+    ]
+  },
+  {
     "version": "1.21.0",
     "date": "2026-11-13",
     "title": "Late fines are protected; ID cards with a back side",

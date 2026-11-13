@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.pagination import PageParams
-from app.core.search import name_search_condition
-from app.students.models import Student, StudentAddress, StudentStatus
+from app.core.search import _escape_like, name_search_condition
+from app.students.models import Student, StudentAddress, StudentGuardian, StudentStatus
 
 
 class StudentRepository:
@@ -47,6 +47,7 @@ class StudentRepository:
         status: StudentStatus | None = None,
         semester: int | None = None,
         section: str | None = None,
+        guardians: bool = False,
     ) -> tuple[list[Student], int]:
         stmt = select(Student)
         count_stmt = select(func.count()).select_from(Student)
@@ -55,12 +56,21 @@ class StudentRepository:
             # Exact-match first-class fields (roll number, CNIC) go through
             # index lookups; free-text name search assumes pg_trgm index in
             # production (see migration) rather than a blind LIKE '%x%'.
-            cond = or_(
+            matches = [
                 name_search_condition(Student.first_name, Student.last_name, query),
                 Student.roll_number == query,
                 Student.cnic == query,
                 Student.contact_no == query,
-            )
+            ]
+            if guardians:
+                # The accounts office can also find a student by the father's (guardian's) name or CNIC: every word in
+                # the guardian's name, or the CNIC typed with or without dashes. Brothers and sisters come up together.
+                digits = "".join(ch for ch in query if ch.isdigit())
+                cnic = f"{digits[:5]}-{digits[5:12]}-{digits[12]}" if len(digits) == 13 else query.strip()
+                words = [w for w in query.split() if w]
+                by_name = and_(*[StudentGuardian.name.ilike(f"%{_escape_like(w)}%", escape="\\") for w in words]) if words else false()
+                matches.append(Student.id.in_(select(StudentGuardian.student_id).where(or_(by_name, StudentGuardian.cnic == cnic))))
+            cond = or_(*matches)
             stmt = stmt.where(cond)
             count_stmt = count_stmt.where(cond)
 

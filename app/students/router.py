@@ -110,7 +110,12 @@ async def list_students(
     endpoint over other students' data."""
     _assert_directory_access(current_user, allow_exam_department=True)
 
-    result = await StudentService(db).search_students(page=page, query=q, program_id=program_id, status=status, semester=semester, section=section)
+    from app.students.family import guardian_labels, sees_guardians
+
+    fees_office = sees_guardians(current_user)
+    result = await StudentService(db).search_students(page=page, query=q, program_id=program_id, status=status, semester=semester, section=section,
+                                                      guardians=fees_office)
+    family = await guardian_labels(db, [s.id for s in result.items]) if fees_office else {}
     ids = {s.program_id for s in result.items if s.program_id}
     programs = {p.id: p for p in (await db.execute(select(Program).where(Program.id.in_(ids)))).scalars()} if ids else {}
 
@@ -118,6 +123,9 @@ async def list_students(
         item = StudentListItem.model_validate(s)
         p = programs.get(s.program_id)
         item.program_code, item.program_name = (p.code, p.name) if p else (None, None)
+        g = family.get(s.id)
+        if g:
+            item.guardian_name, item.guardian_label = g["name"], g["label"]
         return item
 
     return Page[StudentListItem](

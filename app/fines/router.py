@@ -86,9 +86,14 @@ async def search_payers(
     against. Returns name + identifier only, nothing else."""
     page = PageParams(page=1, page_size=10)
     if payer_type == FinePayerType.STUDENT:
-        students, _ = await StudentRepository(db).search(page=page, query=q)
+        from app.students.family import guardian_labels, sees_guardians
+
+        office = sees_guardians(current_user)
+        students, _ = await StudentRepository(db).search(page=page, query=q, guardians=office)
+        fam = await guardian_labels(db, [s.id for s in students]) if office else {}
         return [
-            FinePayerSearchResult(id=s.id, name=f"{s.first_name} {s.last_name}", identifier=s.roll_number)
+            FinePayerSearchResult(id=s.id, name=f"{s.first_name} {s.last_name}", identifier=s.roll_number,
+                                  guardian_label=(fam.get(s.id) or {}).get("label"))
             for s in students
         ]
 

@@ -3,12 +3,12 @@
 {% block allowed_roles %}{{ allowed_roles|default("ADMIN") }}{% endblock %}
 {% block title %}Students{% endblock %}
 {% block page_title %}Students{% endblock %}
-{% block page_subtitle %}<div class="content-subtitle">Find a student and open their record: details, guardians, courses and transcript. Read-only.</div>{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">{% if fee_link %}Find a student (also by the father&rsquo;s name or CNIC) and open their record: details, father / guardian and fees, with a link to the fee account. Read-only.{% else %}Find a student and open their record: details, guardians, courses and transcript. Read-only.{% endif %}</div>{% endblock %}
 
 {% block content %}
-<section class="panel sd-panel">
+<section class="panel sd-panel"{% if fee_link %} data-fee-link="{{ fee_link }}"{% endif %}>
   <div class="sd-toolbar">
-    <label class="sd-search">{{ nav_icon("search") }}<input id="sl-q" type="search" placeholder="Search name, roll number or CNIC" aria-label="Search students" autofocus /></label>
+    <label class="sd-search">{{ nav_icon("search") }}<input id="sl-q" type="search" placeholder="{% if fee_link %}Search name, father&rsquo;s name, roll number or CNIC{% else %}Search name, roll number or CNIC{% endif %}" aria-label="Search students" autofocus /></label>
     <select id="sl-status" class="select-input" aria-label="Status">
       <option value="">All statuses</option>
       <option value="ACTIVE">Active</option>

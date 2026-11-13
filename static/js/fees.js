@@ -25,6 +25,11 @@
       activateTab(btn.dataset.tab);
     });
   });
+  // A link with #accounts (e.g. "Open the fee account" from the student lookup) opens that tab.
+  (function () {
+    const want = (location.hash || "").replace("#", "");
+    if (want && Array.prototype.some.call(tabButtons, function (b) { return b.dataset.tab === want; })) activateTab(want);
+  })();
 
   const feeTypesSection = document.getElementById("fee-types-section");
   const structuresSection = document.getElementById("fee-structures-section");
@@ -561,7 +566,7 @@
     assignments.forEach(function (a) {
       const tr = document.createElement("tr");
       tr.innerHTML =
-        "<td><strong>" + VA.escapeHtml(a.payer_name) + '</strong><small class="fn-sub">' + VA.escapeHtml([a.payer_identifier, a.payer_type === "STUDENT" ? "Student" : "Staff"].filter(Boolean).join(" \u00b7 ")) + "</small></td>" +
+        "<td><strong>" + VA.escapeHtml(a.payer_name) + '</strong><small class="fn-sub">' + VA.escapeHtml([a.payer_guardian, a.payer_identifier, a.payer_type === "STUDENT" ? "Student" : "Staff"].filter(Boolean).join(" \u00b7 ")) + "</small></td>" +
         "<td>" + VA.escapeHtml(a.fee_structure_name) + (a.term_label ? '<small class="fn-sub">' + VA.escapeHtml(a.term_label) + "</small>" : "") + "</td>" +
         '<td class="num">' + money(a.total_payable) + "</td>" +
         '<td class="num">' + money(a.total_paid) + "</td>" +
@@ -718,7 +723,7 @@
     }
 
     const a = result.body;
-    assignmentModalTitle.textContent = a.payer_name + " \u2014 " + a.fee_structure_name;
+    assignmentModalTitle.textContent = a.payer_name + (a.payer_guardian ? " " + a.payer_guardian : "") + " \u2014 " + a.fee_structure_name;
     assignmentDetailList.innerHTML =
       "<dt>Charged</dt><dd>" + money(a.total_charged) + "</dd>" +
       (a.total_concession ? "<dt>Discounts</dt><dd>" + money(a.total_concession) + "</dd>" : "") +

@@ -4025,3 +4025,5 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 .cb-opt small { color: var(--text-muted); }
 .cb-teacher { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; font-size: 0.85rem; font-weight: 600; max-width: 360px; }
 .cb-join .panel-hint { margin: 8px 0 0; }
+.picker-item .picker-family { font-weight: 500; color: var(--text-secondary); font-size: 0.86rem; }
+.ss-kpis .ss-fee-link { grid-column: 1 / -1; justify-self: start; }

@@ -76,6 +76,9 @@ def render_challan_pdf(d: dict, *, institute_name: str | None = None) -> bytes:
 
         row("Consumer number", d["consumer_number"], bold=True, size=11)
         row("Student / payer", d["payer"]["name"], bold=True)
+        if d["payer"].get("guardian_name"):
+            rel = d["payer"].get("guardian_relation") or "Guardian"
+            row("Father's name" if rel == "Father" else f"Guardian ({rel})", d["payer"]["guardian_name"])
         row("Roll no. / code", d["payer"]["identifier"] or "\u2014")
         if d["payer"].get("group"):
             row("Class" if d.get("items") else "Program", d["payer"]["group"])

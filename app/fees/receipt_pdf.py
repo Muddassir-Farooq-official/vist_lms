@@ -41,6 +41,8 @@ def render_receipt_pdf(data: dict) -> bytes:
     payer = data.get("payer") or {}
     rows = [
         ("Paid back to" if refund else "Received from", payer.get("name") or "\u2014"),
+        *([("Father's name" if payer.get("guardian_relation") == "Father" else f"Guardian ({payer.get('guardian_relation') or 'Guardian'})",
+            payer["guardian_name"])] if payer.get("guardian_name") else []),
         ("Roll / Employee no.", payer.get("identifier") or "\u2014"),
         ("Program / Group", payer.get("group") or "\u2014"),
         ("For" if data.get("kind") == "sale" else "Fee", data.get("fee_name") or "\u2014"),

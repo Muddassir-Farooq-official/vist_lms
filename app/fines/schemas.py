@@ -89,6 +89,7 @@ class FinePayerSearchResult(BaseModel):
     id: uuid.UUID
     name: str
     identifier: str | None
+    guardian_label: str | None = None      # students, for the administration / accounts office: "s/o Ahmed Khan"
 
 
 class FineBalanceOut(BaseModel):

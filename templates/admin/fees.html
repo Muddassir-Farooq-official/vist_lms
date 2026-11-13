@@ -49,7 +49,7 @@
 <section class="panel">
   <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("students") }}</div><h2>Student fee account</h2></div></div>
   <p class="panel-hint">Find a student to see every fee they owe, installment by installment, with its challan, what was paid, discounts and receipts. Take a payment at the counter, or confirm a challan the bank has collected.</p>
-  <div class="form-field"><label for="sa-search">Student</label><input id="sa-search" class="text-input" type="search" placeholder="Name or roll number&hellip;" autocomplete="off" /><div id="sa-results" class="picker-list"></div></div>
+  <div class="form-field"><label for="sa-search">Student</label><input id="sa-search" class="text-input" type="search" placeholder="Name, father&rsquo;s name, roll no. or CNIC&hellip;" autocomplete="off" /><div id="sa-results" class="picker-list"></div></div>
   <div id="sa-account" hidden>
     <h3 class="modal-subhead" id="sa-title"></h3>
     <div id="sa-tiles"></div>
@@ -70,7 +70,7 @@
   <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("graduation-cap") }}</div><h2>Give a scholarship or discount</h2></div></div>
   <p class="panel-hint">Students in the same class can pay different amounts: a scholarship or discount takes a percentage (e.g. 25%) or a fixed amount (e.g. Rs. 10,000) off their unpaid installments, and their challans change to the new amount. It never rewrites what was already paid.</p>
   <form id="sc-form" class="form-grid two-col" novalidate>
-    <div class="form-field two-span"><label for="sc-student">Student</label><input id="sc-student" class="text-input" type="search" placeholder="Name or roll number&hellip;" autocomplete="off" /><div id="sc-student-list" class="picker-list"></div></div>
+    <div class="form-field two-span"><label for="sc-student">Student</label><input id="sc-student" class="text-input" type="search" placeholder="Name, father&rsquo;s name, roll no. or CNIC&hellip;" autocomplete="off" /><div id="sc-student-list" class="picker-list"></div></div>
     <div class="form-field"><label for="sc-name">Name</label><input id="sc-name" class="text-input" maxlength="120" placeholder="e.g. Merit scholarship, Sibling discount" /></div>
     <div class="form-field"><span class="kind-label" id="sc-kind-h">Discount type</span>
       <div class="seg seg-kind" role="radiogroup" aria-labelledby="sc-kind-h">
@@ -166,7 +166,7 @@
   <p class="panel-hint">What each student already owed in the old (manual) system. Enter the amount still owed today. It becomes a normal payable charge with its own challan, shown as "Previous dues" on the student's account. Scholarships never reduce previous dues.</p>
   <h3 class="modal-subhead">One student</h3>
   <form id="pd-form" class="form-grid two-col" novalidate>
-    <div class="form-field two-span"><label for="pd-student">Student</label><input id="pd-student" class="text-input" type="search" placeholder="Name or roll number&hellip;" autocomplete="off" /><div id="pd-student-list" class="picker-list"></div></div>
+    <div class="form-field two-span"><label for="pd-student">Student</label><input id="pd-student" class="text-input" type="search" placeholder="Name, father&rsquo;s name, roll no. or CNIC&hellip;" autocomplete="off" /><div id="pd-student-list" class="picker-list"></div></div>
     <div class="form-field"><label for="pd-amount">Amount still owed (Rs.)</label><input id="pd-amount" class="text-input" type="number" min="1" step="0.01" /></div>
     <div class="form-field"><label for="pd-due">Pay by</label><input id="pd-due" class="text-input" type="date" /></div>
     <div class="form-field two-span"><label for="pd-note">Note</label><input id="pd-note" class="text-input" maxlength="300" placeholder="e.g. Balance of Spring 2026 from the fee register" /></div>
@@ -280,7 +280,7 @@
 <div class="portal-tab-panel" data-tab-panel="assignments" hidden>
 <section class="panel sd-panel">
   <div class="sd-toolbar">
-    <label class="sd-search">{{ nav_icon("search") }}<input type="search" id="as-q" placeholder="Name, roll no., employee code or fee" aria-label="Search fee assignments" /></label>
+    <label class="sd-search">{{ nav_icon("search") }}<input type="search" id="as-q" placeholder="Name, father's name, roll no., CNIC or fee" aria-label="Search fee assignments" /></label>
     <select id="as-term" class="select-input" aria-label="Term"><option value="">All terms</option></select>
     <select id="as-program" class="select-input" aria-label="Program"><option value="">All programs</option></select>
     <select id="as-payer" class="select-input" aria-label="Payer"><option value="">Students and staff</option><option value="STUDENT">Students</option><option value="EMPLOYEE">Staff</option></select>

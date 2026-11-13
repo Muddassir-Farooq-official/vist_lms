@@ -352,7 +352,7 @@ class ReportCenter:
         if s.get("credit_balance"):
             notes.append(f"Paid more than owed: Rs. {s['credit_balance']:,.2f} can be refunded.")
         notes.append("Lines of waived or cancelled fees are listed but not counted in the balance.")
-        out = table(columns, lines, notes=notes, subtitle=f"{p['name']} · {p.get('identifier') or ''} · {p.get('group') or ''}")
+        out = table(columns, lines, notes=notes, subtitle=" · ".join(x for x in (p["name"], p.get("guardian_label"), p.get("identifier"), p.get("group")) if x))
         out["totals"]["balance"] = bal
         return out
 

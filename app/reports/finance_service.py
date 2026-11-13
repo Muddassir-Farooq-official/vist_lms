@@ -69,7 +69,7 @@ class FinanceReportService:
                     continue
                 p = people.setdefault(student.id, {
                     "student_id": student.id, "name": f"{student.first_name} {student.last_name}", "roll_number": student.roll_number, "program": program_code,
-                    "semester": student.current_semester, "phone": student.contact_no, "guardian_phone": None, "oldest_due": r["due_date"], "days_overdue": 0,
+                    "semester": student.current_semester, "phone": student.contact_no, "guardian_phone": None, "father": None, "oldest_due": r["due_date"], "days_overdue": 0,
                     **{b: 0.0 for b in BUCKETS}, "overdue": 0.0, "late_fee_accrued": 0.0, "fines_pending": 0.0})
                 days = (today - r["due_date"]).days
                 p[_bucket(max(days, 1))] = round(p[_bucket(max(days, 1))] + r["remaining"], 2)
@@ -81,6 +81,10 @@ class FinanceReportService:
             for sid, phone in (await self.session.execute(select(StudentGuardian.student_id, StudentGuardian.contact_no).where(
                     StudentGuardian.student_id.in_(people), StudentGuardian.contact_no.is_not(None)).order_by(StudentGuardian.is_primary))).all():
                 people[sid]["guardian_phone"] = people[sid]["guardian_phone"] or phone
+            from app.students.family import guardian_labels
+
+            for sid, g in (await guardian_labels(self.session, list(people))).items():
+                people[sid]["father"] = g["label"]
             for sid, total in (await self.session.execute(select(Fine.payer_id, func.sum(Fine.amount)).where(
                     Fine.payer_type == FinePayerType.STUDENT, Fine.status == FineStatus.PENDING, Fine.payer_id.in_(people)).group_by(Fine.payer_id))).all():
                 people[sid]["fines_pending"] = _f(total)
