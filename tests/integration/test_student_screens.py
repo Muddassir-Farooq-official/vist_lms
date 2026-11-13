@@ -11,7 +11,10 @@ async def test_directory_rows_are_readable_but_hold_no_cnic_guardian_or_address(
     row = (await app_client.get("/api/v1/students")).json()["items"][0]
     for key in ("program_code", "program_name", "gender", "contact_no", "admission_session", "has_photo", "current_semester", "section_label"):
         assert key in row
-    assert not {"cnic", "guardian_name", "guardian_cnic", "present_address"} & set(row)
+    assert not {"cnic", "guardian_cnic", "guardian_contact_no", "present_address"} & set(row)
+    # The one deliberate exception (owner decision, Nov 2026): staff who handle fees see the father's / guardian's
+    # NAME (and relation) to tell students apart; never the CNIC or phone. Others get none (test_accounts_father_lookup).
+    assert row["guardian_name"] == "Guardian" and row["guardian_label"] == "d/o Guardian"     # the administrator handles fees
     assert (await app_client.get("/api/v1/students/programs")).status_code == 200
 
     page = (await app_client.get("/dashboard/admin/students")).text

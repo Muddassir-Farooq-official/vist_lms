@@ -36,8 +36,9 @@ def _normalize_phone(value: str) -> str:
 
 class StudentListItem(BaseModel):
     """Compact row shape for list/search endpoints — deliberately excludes
-    CNIC, guardian info, and address to minimize sensitive-data exposure
-    (Section 43) on high-traffic list views."""
+    CNIC, guardian CNIC/phone, and address to minimize sensitive-data exposure
+    (Section 43) on high-traffic list views. The only guardian data is the
+    father's / guardian's NAME, filled in for staff who handle fees only."""
 
     model_config = ConfigDict(from_attributes=True)
 
