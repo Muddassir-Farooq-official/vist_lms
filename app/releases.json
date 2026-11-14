@@ -2,13 +2,18 @@
   {
     "version": "1.23.0",
     "date": "2026-11-14",
-    "title": "Move a due date for one program, semester or section",
-    "summary": "Changing a due date for many students can now be limited to one program, semester or section, with a count before you confirm.",
+    "title": "Due dates for one program or semester; short attendance shown clearly",
+    "summary": "Change a due date for one program, semester or section, and results no longer show short-attendance students as Failed during the term.",
     "changes": [
       {
         "kind": "new",
         "for": "Administrators",
-        "text": "Fee structures \u2192 Change due date: choose a program, semester and/or section to move the instalment only for those students (leave them blank for everyone on the fee). While you choose, it shows how many students it will move and any late fines built up, which you are asked to keep or remove before anything changes."
+        "text": "Fee structures → Change due date: choose a program, semester and/or section to move the instalment only for those students (leave them blank for everyone on the fee). While you choose, it shows how many students it will move and any late fines built up, which you are asked to keep or remove before anything changes."
+      },
+      {
+        "kind": "improved",
+        "for": "Everyone",
+        "text": "Results: a student below the minimum attendance is no longer shown as Failed while the term runs. The result sheet shows the grade their marks earn and \"Short attendance\": they are barred from the final exam (as on the exam roll and admit card). If still short when results are published, the subject is recorded as Short attendance and must be repeated."
       }
     ]
   },
@@ -85,12 +90,12 @@
       {
         "kind": "new",
         "for": "Administrators",
-        "text": "Student ID cards are valid for the number of months set in Settings \u2192 Rules \u2192 Certificates (6 unless changed); staff cards for a year. Scanning an expired card shows that it has expired."
+        "text": "Student ID cards are valid for the number of months set in Settings → Rules → Certificates (6 unless changed); staff cards for a year. Scanning an expired card shows that it has expired."
       },
       {
         "kind": "new",
         "for": "Administrators",
-        "text": "ID cards now have a back side: the logo, numbered instructions, where to return a found card, and the signature. It prints on the next page, placed for double-sided printing. Write your own instructions in Settings \u2192 Look & documents \u2192 Back of ID cards."
+        "text": "ID cards now have a back side: the logo, numbered instructions, where to return a found card, and the signature. It prints on the next page, placed for double-sided printing. Write your own instructions in Settings → Look & documents → Back of ID cards."
       }
     ]
   },

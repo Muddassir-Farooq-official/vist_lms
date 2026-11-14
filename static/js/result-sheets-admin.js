@@ -69,7 +69,7 @@
     const st = d.stats;
     $("rs-stats").innerHTML = tile("Students", st.students, "") + tile("Average", st.average === null ? "\u2014" : st.average + "%", "") + tile("Highest", st.highest === null ? "\u2014" : st.highest + "%", "") +
       tile("Lowest", st.lowest === null ? "\u2014" : st.lowest + "%", "") + tile(d.status === "PUBLISHED" ? "Passed" : "Would pass", st.passed + " of " + st.students, st.pass_rate === null ? "" : st.pass_rate + "%", "good") +
-      tile("Below attendance limit", st.ineligible_for_attendance, "can only fail", st.ineligible_for_attendance ? "warn" : "");
+      tile("Short attendance", st.ineligible_for_attendance, "barred from the final exam", st.ineligible_for_attendance ? "warn" : "");
     $("rs-projection").hidden = d.status === "PUBLISHED";
     const dist = d.stats.distribution || [];
     let strip = $("rs-dist");
@@ -91,7 +91,8 @@
         tr.appendChild(td);
       });
       tr.insertAdjacentHTML("beforeend", "<td>" + (r.percentage === null ? "\u2014" : r.percentage + "%") + "</td><td" + (r.attendance_eligible === false ? ' class="warn"' : "") + ">" + (r.attendance_percentage === null ? "\u2014" : Math.round(r.attendance_percentage) + "%") + "</td><td><b>" + esc(r.grade || "\u2014") + "</b></td>" +
-        '<td class="' + (r.outcome === "PASSED" ? "ok" : r.outcome === "FAILED" ? "bad" : "") + '">' + (r.outcome ? esc(r.outcome.charAt(0) + r.outcome.slice(1).toLowerCase()) : "\u2014") + "</td>");
+        '<td class="' + (r.outcome === "PASSED" ? "ok" : r.outcome === "FAILED" ? "bad" : r.outcome === "SHORT_ATTENDANCE" ? "warn" : "") + '">' +
+        (r.outcome === "SHORT_ATTENDANCE" ? "Short attendance" : r.outcome ? esc(r.outcome.charAt(0) + r.outcome.slice(1).toLowerCase()) : "\u2014") + "</td>");
       $("rs-tbody").appendChild(tr);
     });
     const bar = $("rs-actions");
