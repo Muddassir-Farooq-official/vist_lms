@@ -1,5 +1,18 @@
 [
   {
+    "version": "1.23.0",
+    "date": "2026-11-14",
+    "title": "Move a due date for one program, semester or section",
+    "summary": "Changing a due date for many students can now be limited to one program, semester or section, with a count before you confirm.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Fee structures \u2192 Change due date: choose a program, semester and/or section to move the instalment only for those students (leave them blank for everyone on the fee). While you choose, it shows how many students it will move and any late fines built up, which you are asked to keep or remove before anything changes."
+      }
+    ]
+  },
+  {
     "version": "1.22.2",
     "date": "2026-11-14",
     "title": "The accounts office can move a due date",

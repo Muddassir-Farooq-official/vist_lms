@@ -759,9 +759,13 @@ class FeeAssignmentService:
                 "remaining": row["remaining"], "late_fee_already_posted": posted, "late_fine_kept": kept_fine, "late_fine_removed": removed_fine}
 
     async def change_due_date_for_structure(self, structure_id: uuid.UUID, installment_number: int, *, new_date: date, reason: str,
-                                            actor_id: uuid.UUID, late_fine: str | None = None, may_remove_fine: bool = False) -> dict:
+                                            actor_id: uuid.UUID, late_fine: str | None = None, may_remove_fine: bool = False,
+                                            program_id: uuid.UUID | None = None, semester: int | None = None, section: str | None = None,
+                                            preview: bool = False) -> dict:
         """The same change for one instalment of a fee for everyone on it (e.g. "2nd instalment of Fall 2026 tuition now
-        due 30 Nov"). Instalments already paid in full are left as they are and counted."""
+        due 30 Nov") -- or only for the students of one program, semester and/or section (their current program, semester
+        and section). Instalments already paid in full are left as they are and counted. preview=True changes nothing and
+        says how many students it would move and the late fines built up on them."""
         structure = await self.structure_repo.get_by_id(structure_id)
         if structure is None:
             raise ResourceNotFoundError("Fee structure not found.")
@@ -771,12 +775,22 @@ class FeeAssignmentService:
             raise ValidationAppError("Write the reason for changing the due date (it is kept on record).")
         if new_date < institute_today():
             raise ValidationAppError("The new due date must be today or later.")
-        debits = (await self.session.execute(
-            select(FeeLedgerEntry).join(FeeAssignment, FeeAssignment.id == FeeLedgerEntry.fee_assignment_id)
-            .where(FeeAssignment.fee_structure_id == structure_id, FeeAssignment.status == AssignmentStatus.ACTIVE,
-                   FeeLedgerEntry.entry_type == LedgerEntryType.DEBIT, FeeLedgerEntry.installment_number == installment_number)
-            .order_by(FeeLedgerEntry.created_at))).scalars().all()
-        if late_fine not in ("KEEP", "REMOVE"):              # first: would any late fine vanish? Ask once, for everyone.
+        q = (select(FeeLedgerEntry).join(FeeAssignment, FeeAssignment.id == FeeLedgerEntry.fee_assignment_id)
+             .where(FeeAssignment.fee_structure_id == structure_id, FeeAssignment.status == AssignmentStatus.ACTIVE,
+                    FeeLedgerEntry.entry_type == LedgerEntryType.DEBIT, FeeLedgerEntry.installment_number == installment_number))
+        narrowed = program_id is not None or semester is not None or bool((section or "").strip())
+        if narrowed:                                          # only some students: by their current program / semester / section
+            from app.students.models import Student
+
+            q = q.join(Student, (Student.id == FeeAssignment.payer_id) & (FeeAssignment.payer_type == PayerType.STUDENT))
+            if program_id is not None:
+                q = q.where(Student.program_id == program_id)
+            if semester is not None:
+                q = q.where(Student.current_semester == semester)
+            if (section or "").strip():
+                q = q.where(func.upper(Student.section_label) == section.strip().upper())
+        debits = (await self.session.execute(q.order_by(FeeLedgerEntry.created_at))).scalars().all()
+        if preview or late_fine not in ("KEEP", "REMOVE"):    # first: would any late fine vanish? Ask once, for everyone.
             total, who = 0.0, 0
             for d in debits:
                 if FeeStatusCalculator._is_reversal(d) or d.due_date == new_date:
@@ -787,6 +801,10 @@ class FeeAssignmentService:
                 left = round(max(float(r["late_fee"]) - float(d.late_fee_charged_amount or 0), 0.0), 2) if r and r["remaining"] > 0.005 else 0.0
                 if left > 0.005:
                     total, who = total + left, who + 1
+            if preview:
+                live = [d for d in debits if not FeeStatusCalculator._is_reversal(d)]
+                return {"students": len({d.fee_assignment_id for d in live}), "already_on_that_date": sum(1 for d in live if d.due_date == new_date),
+                        "with_late_fine": who, "late_fine_total": round(total, 2)}
             if who:
                 raise LateFineConfirmationRequired(
                     f"{who} student{'s have' if who > 1 else ' has'} late fines of Rs. {total:,.0f} in all on this instalment. Moving the due date "
@@ -819,7 +837,9 @@ class FeeAssignmentService:
         await self.audit.log(actor_user_id=actor_id, action="fee.due_date_changed_for_all", entity_type="fee_structure", entity_id=structure.id,
                              after={"installment_number": installment_number, "due_date": str(new_date), "reason": reason.strip()[:300],
                                     "changed": changed, "already_paid": paid, "already_on_that_date": same, "skipped": other,
-                                    "late_fines_kept": round(kept_total, 2), "late_fines_removed": round(removed_total, 2)})
+                                    "late_fines_kept": round(kept_total, 2), "late_fines_removed": round(removed_total, 2),
+                                    "only": {"program_id": str(program_id) if program_id else None, "semester": semester,
+                                             "section": (section or "").strip().upper() or None} if narrowed else None})
         return {"changed": changed, "already_paid": paid, "already_on_that_date": same, "skipped": other, "with_late_fee_already_posted": posted,
                 "late_fines_kept": round(kept_total, 2), "with_late_fine_kept": kept, "late_fines_removed": round(removed_total, 2)}
 

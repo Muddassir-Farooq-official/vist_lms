@@ -4027,3 +4027,8 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 .cb-join .panel-hint { margin: 8px 0 0; }
 .picker-item .picker-family { font-weight: 500; color: var(--text-secondary); font-size: 0.86rem; }
 .ss-kpis .ss-fee-link { grid-column: 1 / -1; justify-self: start; }
+/* Bulk due-date change: "Only these students" */
+.dd-only { border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px 6px; margin: 6px 0 12px; }
+.dd-only legend { font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); padding: 0 6px; }
+.dd-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+#dd-preview { min-height: 1.2em; font-weight: 600; }
