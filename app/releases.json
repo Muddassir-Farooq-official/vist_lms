@@ -1,5 +1,18 @@
 [
   {
+    "version": "1.22.2",
+    "date": "2026-11-14",
+    "title": "The accounts office can move a due date",
+    "summary": "The accounts office can now move one student's instalment due date (it used to get a missing permission error).",
+    "changes": [
+      {
+        "kind": "fixed",
+        "for": "Accounts office",
+        "text": "Changing the due date of a student's instalment no longer says the permission is missing. If a late fine has built up you are warned first: keep it (added to Fines) or remove it, for example when the payment was marked late by mistake. Removing is kept on record with your reason and name. Moving a due date for everyone on a fee stays with the administrator."
+      }
+    ]
+  },
+  {
     "version": "1.22.1",
     "date": "2026-11-13",
     "title": "The accounts office can remove a wrong late fine",

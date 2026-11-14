@@ -205,3 +205,37 @@ async def test_id_cards_valid_for_the_months_in_settings_with_a_back_side(app_cl
 
     assert add_months(date(2026, 8, 31), 6) == date(2027, 2, 28) and add_months(date(2026, 1, 15), 12) == date(2027, 1, 15)
     _ = datetime, timezone, _login
+
+
+async def test_the_accounts_office_moves_one_students_due_date_and_may_remove_the_fine(app_client, admin_user, db_session):
+    from app.auth.models import User
+
+    sid, aid, rows = await _late_fee_account(app_client, db_session, "75201-0000036-1")
+    first, second = rows[0], rows[1]
+    structure_id = (await app_client.get(f"/api/v1/fees/assignments/{aid}")).json()["fee_structure_id"]
+    later = (institute_today() + timedelta(days=10)).isoformat()
+    await _login_admin(app_client)
+    user, pw = await _staff(app_client, db_session, "ACD", "ACCOUNTS_OFFICER", "35202-7100096-3")
+    await _first_login(app_client, user, pw)
+
+    # one student's instalment: allowed; warned first, and the accountant may remove the fine
+    url = f"/api/v1/fees/assignments/{aid}/installments/{first['ledger_entry_id']}/due-date"
+    asked = await app_client.post(url, json={"due_date": later, "reason": "Marked late by mistake"})
+    assert asked.status_code == 409 and asked.json()["error"]["details"]["can_remove"] is True
+    removed = await app_client.post(url, json={"due_date": later, "reason": "Marked late by mistake", "late_fine": "REMOVE"})
+    assert removed.status_code == 200, removed.text
+    assert removed.json()["late_fine_removed"] == first["late_fee"] and removed.json()["new_due_date"] == later
+    assert await _fines(db_session, sid) == []
+    officer = (await db_session.execute(select(User).where(User.username == user))).scalar_one()
+    log = (await db_session.execute(select(AuditLog).where(AuditLog.action == "fee.late_fine_removed"))).scalars().all()
+    assert len(log) == 1 and log[0].actor_user_id == officer.id and log[0].after["reason"] == "Marked late by mistake"
+
+    # keeping works the same for the accountant
+    kept = await app_client.post(f"/api/v1/fees/assignments/{aid}/installments/{second['ledger_entry_id']}/due-date",
+                                 json={"due_date": later, "reason": "Family asked for time", "late_fine": "KEEP"})
+    assert kept.status_code == 200 and kept.json()["late_fine_kept"] == second["late_fee"]
+
+    # moving a due date for everyone on a fee stays with the administration
+    everyone = await app_client.post(f"/api/v1/fees/structures/{structure_id}/installments/3/due-date",
+                                     json={"due_date": later, "reason": "Term moved", "late_fine": "KEEP"})
+    assert everyone.status_code == 403

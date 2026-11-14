@@ -11,7 +11,7 @@ from sqlalchemy import and_, func, or_, select
 from app.auth.permissions import Permissions, Roles
 from app.auth.schemas import CurrentUser
 from app.core.database import get_db
-from app.core.dependencies import require_any_role, require_permission
+from app.core.dependencies import require_any_permission, require_any_role, require_permission
 from app.core.exceptions import AuthorizationError, ResourceNotFoundError
 from app.employees.models import Employee
 from app.employees.repository import EmployeeRepository
@@ -344,7 +344,8 @@ async def change_installment_due_date(
     assignment_id: uuid.UUID,
     ledger_entry_id: uuid.UUID,
     payload: DueDateChange,
-    current_user: CurrentUser = Depends(require_permission(Permissions.FEE_MANAGE)),
+    # The administration and the accounts office (one student's instalment; "for everyone on a fee" stays fee.manage).
+    current_user: CurrentUser = Depends(require_any_permission(Permissions.FEE_MANAGE, Permissions.PAYMENT_RECORD)),
     db=Depends(get_db),
 ) -> dict:
     from app.fees.models import FeeLedgerEntry
@@ -354,7 +355,7 @@ async def change_installment_due_date(
         raise ResourceNotFoundError("Instalment not found.")
     return await FeeAssignmentService(db).change_due_date(ledger_entry_id, new_date=payload.due_date, reason=payload.reason, actor_id=current_user.id,
                                                           late_fine=payload.late_fine,
-                                                          may_remove_fine=Permissions.PAYMENT_REVERSE in (current_user.permissions or []))
+                                                          may_remove_fine=True)    # warned first; the reason is kept on record with the name
 
 
 @router.patch("/{assignment_id}/status", response_model=FeeAssignmentOut, summary="Change an assignment's status")
