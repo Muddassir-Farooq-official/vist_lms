@@ -94,6 +94,13 @@
       for (let i = 1; i <= (o.installments || 0); i++) opts += '<option value="' + i + '">Instalment ' + i + "</option>";
       d.innerHTML = '<div class="modal-body"><h2>' + VA.escapeHtml(o.title) + '</h2><p class="cc-meta">' + VA.escapeHtml(o.intro || "") + "</p>" +
         (o.installments ? '<div class="form-field"><label for="dd-inst">Instalment</label><select id="dd-inst" class="select-input">' + opts + "</select></div>" : "") +
+        (o.narrow ? '<fieldset class="dd-only"><legend>Only these students (leave blank for everyone on the fee)</legend>' +
+          '<div class="form-field"><label for="dd-prog">Program</label><select id="dd-prog" class="select-input"><option value="">All programs</option>' +
+          (programsCache || []).map(function (p) { return '<option value="' + VA.escapeHtml(p.id) + '">' + VA.escapeHtml(p.code + " \u2014 " + p.name) + "</option>"; }).join("") +
+          '</select></div><div class="dd-row"><div class="form-field"><label for="dd-sem">Semester</label><select id="dd-sem" class="select-input"><option value="">All</option>' +
+          [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(function (n) { return '<option value="' + n + '">' + n + "</option>"; }).join("") +
+          '</select></div><div class="form-field"><label for="dd-sec">Section</label><input type="text" id="dd-sec" class="text-input" maxlength="10" placeholder="All"></div></div>' +
+          '<p class="cc-meta" id="dd-preview" aria-live="polite"></p></fieldset>' : "") +
         '<div class="form-field"><label for="dd-date">New due date</label><input type="date" id="dd-date" class="text-input" min="' + today + '"></div>' +
         '<div class="form-field"><label for="dd-reason">Reason (kept on record)</label><input type="text" id="dd-reason" class="text-input" maxlength="300" placeholder="e.g. Extension approved by the principal"></div>' +
         '<p class="dash-alert error" role="alert" hidden></p><div class="form-actions"><button type="button" class="role-btn" data-dd="ok">Change the due date</button></div>' +
@@ -107,8 +114,28 @@
         const date = d.querySelector("#dd-date").value, reason = d.querySelector("#dd-reason").value.trim(), err = d.querySelector(".dash-alert");
         if (!date || date < today) { err.textContent = "Choose a date from today on."; err.hidden = false; return; }
         if (reason.length < 4) { err.textContent = "Write the reason (at least 4 letters)."; err.hidden = false; return; }
-        finish({ installment: o.installments ? parseInt(d.querySelector("#dd-inst").value, 10) : null, date: date, reason: reason });
+        const only = o.narrow ? { program_id: d.querySelector("#dd-prog").value || null, semester: d.querySelector("#dd-sem").value ? parseInt(d.querySelector("#dd-sem").value, 10) : null,
+          section: d.querySelector("#dd-sec").value.trim() || null } : {};
+        finish(Object.assign({ installment: o.installments ? parseInt(d.querySelector("#dd-inst").value, 10) : null, date: date, reason: reason }, only));
       });
+      if (o.narrow && o.preview) {                      // "N students; late fines Rs. X" as the choices change
+        let timer = null;
+        const show = function () {
+          clearTimeout(timer);
+          timer = setTimeout(async function () {
+            const date = d.querySelector("#dd-date").value, box = d.querySelector("#dd-preview");
+            if (!date || date < today) { box.textContent = "Choose the new date to see how many students it moves."; return; }
+            const p = await o.preview({ installment: o.installments ? parseInt(d.querySelector("#dd-inst").value, 10) : null, date: date,
+              program_id: d.querySelector("#dd-prog").value || null, semester: d.querySelector("#dd-sem").value ? parseInt(d.querySelector("#dd-sem").value, 10) : null,
+              section: d.querySelector("#dd-sec").value.trim() || null });
+            box.textContent = p ? p.students + " student" + (p.students === 1 ? "" : "s") + " on this instalment" +
+              (p.with_late_fine ? "; " + p.with_late_fine + " with late fines of " + money(p.late_fine_total) + " so far (you will be asked to keep or remove them)" : "; no late fines") + "." : "";
+          }, 300);
+        };
+        ["#dd-inst", "#dd-date", "#dd-prog", "#dd-sem"].forEach(function (s) { const el = d.querySelector(s); if (el) el.addEventListener("change", show); });
+        d.querySelector("#dd-sec").addEventListener("input", show);
+        show();
+      }
       d.showModal();
     });
   }
@@ -379,15 +406,23 @@
       structuresTbody.querySelectorAll(".due-all-btn").forEach(function (btn) {
         btn.addEventListener("click", async function () {
           const count = parseInt(btn.getAttribute("data-count"), 10) || 1;
+          const url = function (inst) { return "/api/v1/fees/structures/" + btn.getAttribute("data-id") + "/installments/" + inst + "/due-date"; };
+          if (!programsCache || !programsCache.length) await loadPrograms();
           const r = await dueDateDialog({
-            title: "Change a due date for everyone on \u201c" + btn.getAttribute("data-name") + "\u201d",
-            intro: "Moves the chosen instalment's due date for every student on this fee. Instalments already paid in full stay as they are. Amounts never change; each open challan gets the new date and each student is told.",
-            installments: count,
+            title: "Change a due date on \u201c" + btn.getAttribute("data-name") + "\u201d",
+            intro: "Moves the chosen instalment's due date for every student on this fee, or only for one program, semester or section. Instalments already paid in full stay as they are. Amounts never change; each open challan gets the new date and each student is told.",
+            installments: count, narrow: true,
+            preview: async function (p) {
+              const x = await VA.fetchJson(url(p.installment), { method: "POST", headers: { "Content-Type": "application/json" }, quiet: true,
+                body: JSON.stringify({ due_date: p.date, reason: "preview", preview: true, program_id: p.program_id, semester: p.semester, section: p.section }) });
+              return x.ok ? x.body : null;
+            },
           });
           if (!r) return;
           const res = await VA.withLateFine(function (extra) {
-            return VA.fetchJson("/api/v1/fees/structures/" + btn.getAttribute("data-id") + "/installments/" + r.installment + "/due-date", {
-              method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.assign({ due_date: r.date, reason: r.reason }, extra)),
+            return VA.fetchJson(url(r.installment), {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(Object.assign({ due_date: r.date, reason: r.reason, program_id: r.program_id, semester: r.semester, section: r.section }, extra)),
             });
           });
           if (!res) return;

@@ -279,16 +279,27 @@ class ResultSheetService:
             if ev:
                 percentages.append(ev["percentage"])
             published = info["status"] == ResultSheetStatus.PUBLISHED and e.id in frozen
-            letter, points = (frozen[e.id].letter_grade, float(frozen[e.id].grade_points)) if published else (grade_for(scale, ev["percentage"], ev["outcome"].value == "PASSED") if ev else (None, None))
+            short = bool(ev) and not ev["eligible"]
+            if published:
+                letter, points = frozen[e.id].letter_grade, float(frozen[e.id].grade_points)
+                outcome = "SHORT_ATTENDANCE" if frozen[e.id].failed_for_attendance else (e.outcome.value if e.outcome else None)
+            elif ev:
+                # Short attendance bars the student from the final paper; it is NOT shown as a failed grade during the
+                # term: the projection shows the grade the marks earn, and "Short attendance" instead of Pass/Fail.
+                by_marks = ev["percentage"] >= settings.marks_pass_threshold_percent
+                letter, points = grade_for(scale, ev["percentage"], by_marks if short else ev["outcome"].value == "PASSED")
+                outcome = "SHORT_ATTENDANCE" if short else ev["outcome"].value
+            else:
+                letter, points, outcome = None, None, None
             rows.append({"enrollment_id": e.id, "student_name": f"{st.first_name} {st.last_name}", "roll_number": st.roll_number, "grade": letter, "grade_points": points,
                          "marks": [marks.get(a.id) for a in assessments], "percentage": ev["percentage"] if ev else None, "attendance_percentage": ev["attendance_percentage"] if ev else None,
-                         "attendance_eligible": ev["eligible"] if ev else None, "outcome": (e.outcome.value if e.outcome and info["status"] == ResultSheetStatus.PUBLISHED else (ev["outcome"].value if ev else None)),
-                         "is_projection": info["status"] != ResultSheetStatus.PUBLISHED})
+                         "attendance_eligible": ev["eligible"] if ev else None, "outcome": outcome, "is_projection": info["status"] != ResultSheetStatus.PUBLISHED})
         passed = sum(1 for r in rows if r["outcome"] == "PASSED")
         return {**info, "section_label": offering.section_label, "term_label": offering.term_label,
                 "assessments_list": [{"id": a.id, "name": types[a.id].name, "max_marks": float(types[a.id].max_marks)} for a in assessments], "rows": rows,
                 "stats": {"students": len(rows), "average": round(sum(percentages) / len(percentages), 1) if percentages else None, "highest": max(percentages) if percentages else None,
-                          "lowest": min(percentages) if percentages else None, "passed": passed, "failed": sum(1 for r in rows if r["outcome"] == "FAILED"),
+                          "lowest": min(percentages) if percentages else None, "passed": passed, "failed": sum(1 for r in rows if r["outcome"] in ("FAILED", "SHORT_ATTENDANCE")),
                           "pass_rate": round(passed / len(rows) * 100, 1) if rows else None,
                           "ineligible_for_attendance": sum(1 for r in rows if r["attendance_eligible"] is False),
+                          "short_attendance": sum(1 for r in rows if r["outcome"] == "SHORT_ATTENDANCE"),
                           "distribution": [{"grade": e.letter, "count": sum(1 for r in rows if r["grade"] == e.letter)} for e in scale if any(r["grade"] == e.letter for r in rows)]}}

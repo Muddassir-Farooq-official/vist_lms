@@ -306,7 +306,8 @@ class GradingService:
             offering = await self.offering_repo.get_by_id(enrollment.course_offering_id)
             course = await self.session.get(Course, offering.course_id) if offering else None
             code = course.code if course else "your course"
-            why = "" if ev["eligible"] else f" (attendance below {settings.attendance_eligibility_threshold_percent}% \u2014 ineligible for a pass regardless of score)"
+            why = "" if ev["eligible"] else (f" Short attendance: below the minimum {settings.attendance_eligibility_threshold_percent:g}%, so you were not allowed "
+                                             "in the final exam and this subject must be repeated.")
             await create_notification(
                 self.session, user_id=student.user_id, category=NotificationCategory.RESULT,
                 title=(f"Your result for {code} was corrected: {outcome.value.title()}" if corrected else f"Result published for {code}: {outcome.value.title()}"),

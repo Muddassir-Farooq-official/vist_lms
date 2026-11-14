@@ -208,6 +208,11 @@ class DueDateForAll(BaseModel):
     due_date: date
     reason: str = Field(min_length=4, max_length=300)
     late_fine: Literal["KEEP", "REMOVE"] | None = None      # needed when late fines have built up (else 409 LATE_FINE_CONFIRM)
+    # Only some students on the fee (their current program / semester / section); none = everyone on it.
+    program_id: uuid.UUID | None = None
+    semester: int | None = Field(default=None, ge=1, le=20)
+    section: str | None = Field(default=None, max_length=10)
+    preview: bool = False                                    # true: change nothing, say how many students and late fines
 
 
 @structures_router.post(
@@ -226,7 +231,8 @@ async def change_due_date_for_all(
     await _not_school_fees(db, structure_id)
     return await FeeAssignmentService(db).change_due_date_for_structure(
         structure_id, installment_number, new_date=payload.due_date, reason=payload.reason, actor_id=current_user.id, late_fine=payload.late_fine,
-        may_remove_fine=Permissions.PAYMENT_REVERSE in (current_user.permissions or []))
+        may_remove_fine=Permissions.PAYMENT_REVERSE in (current_user.permissions or []), program_id=payload.program_id, semester=payload.semester,
+        section=payload.section, preview=payload.preview)
 
 
 class LateFeeRate(BaseModel):
