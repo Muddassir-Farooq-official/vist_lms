@@ -235,6 +235,24 @@ async def change_due_date_for_all(
         section=payload.section, preview=payload.preview)
 
 
+class TermChange(BaseModel):
+    term_label: str = Field(min_length=1, max_length=50)     # an open term, or "All batches" for each student's own term
+
+
+@structures_router.post(
+    "/{structure_id}/term",
+    summary="Change the term a fee shows (one batch's term, or each student's own term). Amounts and payments are not touched",
+)
+async def change_structure_term(
+    structure_id: uuid.UUID,
+    payload: TermChange,
+    current_user: CurrentUser = Depends(require_permission(Permissions.FEE_MANAGE)),
+    db=Depends(get_db),
+) -> dict:
+    await _not_school_fees(db, structure_id)
+    return await FeeStructureService(db).change_term(structure_id, payload.term_label, actor_id=current_user.id)
+
+
 class LateFeeRate(BaseModel):
     late_fee_per_day: float = Field(ge=0, le=100_000)          # 0 = no late fee on this fee
     reason: str = Field(min_length=4, max_length=300)

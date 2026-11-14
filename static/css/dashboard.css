@@ -3340,7 +3340,7 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 .crs-menu .sd-menu-list { min-width: 220px; }
 .sd-menu-list > .danger, .sd-menu-list > .danger svg { color: var(--danger); }
 .crs-off tbody tr, .crs-terms tbody tr { cursor: default; }
-.crs-term-form { grid-template-columns: 1fr 180px 180px auto; }
+.crs-term-form { grid-template-columns: 1fr 160px 160px 150px 110px auto; }
 .crs-head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding-bottom: 12px; }
 .crs-head-row .panel-hint { margin: 4px 0 0; }
 .crs-res { color: var(--text-secondary); white-space: nowrap; }

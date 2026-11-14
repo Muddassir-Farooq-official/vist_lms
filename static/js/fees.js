@@ -321,7 +321,7 @@
         tr.innerHTML =
           "<td>" + VA.escapeHtml(s.name) + "</td>" +
           "<td>" + VA.escapeHtml(s.fee_type_name) + "</td>" +
-          "<td>" + VA.escapeHtml(s.term_label) + "</td>" +
+          "<td>" + (s.term_label === "All batches" ? '<span title="Each student sees the term of their own batch">Each student\u2019s own term</span>' : VA.escapeHtml(s.term_label)) + "</td>" +
           '<td class="num">' + money(s.total_amount) + "</td>" +
           "<td>" + VA.escapeHtml(scope) + "</td>" +
           "<td>" + statusPill + "</td>" +
@@ -335,6 +335,8 @@
             '" data-name="' + VA.escapeHtml(s.name) + '">Late fee' + (s.late_fee_per_day ? " (" + money(s.late_fee_per_day) + (s.late_fee_once ? " once" : "/day") + ")" : "") + "\u2026</button>" : "") +
           (s.status === "ACTIVE" && !s.late_fee_once ? ' &middot; <button type="button" class="row-action due-all-btn" data-id="' + s.id + '" data-count="' + s.installment_count +
             '" data-name="' + VA.escapeHtml(s.name) + '">Change due date\u2026</button>' : "") +
+          (!s.late_fee_once && s.term_label !== "Carried forward" ? ' &middot; <button type="button" class="row-action term-btn" data-id="' + s.id + '" data-term="' + VA.escapeHtml(s.term_label) +
+            '" data-name="' + VA.escapeHtml(s.name) + '">Term\u2026</button>' : "") +
           (s.late_fee_once ? "" : ' &middot; <button type="button" class="row-action clone-structure-btn" data-id="' + s.id +
           '" data-name="' + VA.escapeHtml(s.name) + '" data-amount="' + s.total_amount + '">Clone &amp; Adjust</button>') +
           "</td>";
@@ -382,6 +384,30 @@
           structureSuccess.textContent =
             'Created "' + result.body.name + '" as a draft at ' + money(result.body.total_amount) + ". Activate it when ready.";
           structureSuccess.hidden = false;
+          loadStructures();
+        });
+      });
+
+      structuresTbody.querySelectorAll(".term-btn").forEach(function (btn) {
+        btn.addEventListener("click", async function () {
+          const open = window.VistTerms ? window.VistTerms.open() : [];
+          const options = [{ value: "All batches", label: "Each student\u2019s own term (several batches)" }].concat(open.map(function (t) {
+            return { value: t.label, label: t.label };
+          }));
+          const cur = btn.getAttribute("data-term");
+          const pick = await VA.ask({ title: "Term for \u201c" + btn.getAttribute("data-name") + "\u201d",
+            intro: "What fee screens, challans and receipts show from now on. \u201cEach student\u2019s own term\u201d shows every student the term of their own batch " +
+              "(the batch is set on Courses \u2192 Academic terms). Amounts, instalments, payments and fines are not changed.",
+            label: "Term", input: "select", value: options.some(function (o) { return o.value === cur; }) ? cur : "All batches", options: options, ok: "Change term" });
+          if (pick == null || (pick === cur && cur !== "All batches")) return;
+          const res = await VA.fetchJson("/api/v1/fees/structures/" + btn.getAttribute("data-id") + "/term", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ term_label: pick }) });
+          if (!res.ok) { VA.showError(extractErrorMessage(res.body, "Could not change the term.")); return; }
+          const b = res.body;
+          VA.toast(pick === "All batches"
+            ? "Each student now sees their own batch term (" + b.student_terms_filled + " filled in" +
+              (b.students_without_batch_term ? "; " + b.students_without_batch_term + " students have no batch term yet: set it on Academic terms, then press Term\u2026 again" : "") + ")."
+            : "Term changed to " + pick + ".");
           loadStructures();
         });
       });
@@ -552,7 +578,9 @@
       canViewPrograms ? VA.fetchJson("/api/v1/programs", { quiet: true }) : Promise.resolve({ ok: false })]);
     const termSel = document.getElementById("as-term"), progSel = document.getElementById("as-program");
     if (termSel && s.ok) {
-      const terms = Array.from(new Set(s.body.map(function (x) { return x.term_label; }).filter(Boolean)));
+      const terms = Array.from(new Set(s.body.map(function (x) { return x.term_label; })
+        .concat(window.VistTerms ? window.VistTerms.open().map(function (t) { return t.label; }) : [])
+        .filter(function (x) { return x && x !== "All batches"; })));
       termSel.innerHTML = '<option value="">All terms</option>' + terms.map(function (t) { return '<option value="' + VA.escapeHtml(t) + '">' + VA.escapeHtml(t) + "</option>"; }).join("");
     }
     if (progSel && !pr.ok) progSel.hidden = true;           // nothing to filter by without the program list
