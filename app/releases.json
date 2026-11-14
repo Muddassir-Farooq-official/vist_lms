@@ -1,5 +1,28 @@
 [
   {
+    "version": "1.24.0",
+    "date": "2026-11-14",
+    "title": "Each batch keeps its own term",
+    "summary": "A term can belong to one batch (program + semester), and a fee for several batches shows every student their own batch term.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Courses → Academic terms: give a term its batch (program and semester), e.g. \"Fall 2026 BSN 8TH\" = BSN, semester 8. Terms whose name already says so were filled in for you; check the new Batch column."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Fee structures: a fee for several batches can use \"Each student's own term\". Every student's fee, challan and receipt then shows the term of their own batch instead of one batch's term. A batch's own term can no longer be put on a fee that covers other programs or semesters."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Fee structures → Term…: correct the term on an existing fee. Amounts, instalments, payments and fines are not changed; it is recorded in the audit log."
+      }
+    ]
+  },
+  {
     "version": "1.23.0",
     "date": "2026-11-14",
     "title": "Due dates for one program or semester; short attendance shown clearly",

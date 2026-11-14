@@ -11,6 +11,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
+from app.fees.batch_terms import shown_term
 from app.auth.permissions import Permissions, Roles
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser, get_current_user, require_any_permission, require_any_role, require_permission
@@ -132,7 +133,7 @@ async def receipt_pdf_data(db, entry: FeeLedgerEntry, assignment: FeeAssignment)
     structure = await db.get(FeeStructure, assignment.fee_structure_id)
     data = {"institute": settings.app_name, "receipt_number": entry.receipt_number, "paid_on": entry.paid_on, "recorded_on": entry.created_at.date(),
             "payer": await AccountService(db).payer(assignment.payer_type, assignment.payer_id), "fee_name": structure.name,
-            "term_label": structure.term_label, "amount": float(entry.amount), "method": entry.payment_method,
+            "term_label": shown_term(assignment, structure), "amount": float(entry.amount), "method": entry.payment_method,
             "reference": entry.payment_reference, "description": entry.description,
             "kind": "refund" if entry.entry_type == LedgerEntryType.REFUND else "receipt",
             "void": entry.entry_type == LedgerEntryType.CREDIT and await ChallanService(db).payment_is_reversed(entry.id)}

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, or_, select
 
+from app.fees.batch_terms import shown_term
 from app.auth.permissions import Permissions, Roles
 from app.auth.schemas import CurrentUser
 from app.core.database import get_db
@@ -70,7 +71,7 @@ async def _to_assignment_out(db, assignment) -> FeeAssignmentOut:
         is_in_good_standing=status_data["total_due_now"] <= 0 and assignment.status.value == "ACTIVE",
         payer_identifier=identifier,
         payer_guardian=guardian["label"] if guardian else None,
-        term_label=structure.term_label if structure else None,
+        term_label=shown_term(assignment, structure),
         **status_data,
     )
 
@@ -124,7 +125,7 @@ async def list_assignments(
     if status is not None:
         stmt = stmt.where(FeeAssignment.status == status)
     if term_label:
-        stmt = stmt.where(FeeStructure.term_label == term_label)
+        stmt = stmt.where(func.coalesce(FeeAssignment.term_label, FeeStructure.term_label) == term_label)
     if fee_structure_id is not None:
         stmt = stmt.where(FeeAssignment.fee_structure_id == fee_structure_id)
     if program_id is not None:

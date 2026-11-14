@@ -2125,6 +2125,8 @@ class AcademicTermIn(BaseModel):
     label: str = Field(min_length=1, max_length=50)
     start_date: date
     end_date: date
+    program_id: uuid.UUID | None = None          # the batch this term belongs to (program + semester), if it is one batch's term
+    semester: int | None = Field(default=None, ge=1, le=20)
 
 
 class AcademicTermPatch(BaseModel):
@@ -2132,6 +2134,8 @@ class AcademicTermPatch(BaseModel):
     start_date: date | None = None
     end_date: date | None = None
     status: TermStatus | None = None
+    program_id: uuid.UUID | None = None          # send both (or both null to clear); leave both out to keep
+    semester: int | None = Field(default=None, ge=1, le=20)
 
 
 @router.get("/academic-terms", summary="The institute's academic terms with dates and status")
@@ -2148,14 +2152,15 @@ async def list_academic_terms(current_user: CurrentUser = Depends(get_current_us
 async def create_academic_term(payload: AcademicTermIn, current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_OFFERING_MANAGE)),
                                db=Depends(get_db)) -> dict:
     return to_dict(await AcademicTermService(db).create(label=payload.label, start_date=payload.start_date, end_date=payload.end_date,
-                                                        actor_id=current_user.id))
+                                                        actor_id=current_user.id, program_id=payload.program_id, semester=payload.semester))
 
 
 @router.patch("/academic-terms/{term_id}", summary="Change a term's dates, close / reopen it, or rename it while nothing uses it yet (administration)")
 async def update_academic_term(term_id: uuid.UUID, payload: AcademicTermPatch,
                                current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_OFFERING_MANAGE)), db=Depends(get_db)) -> dict:
+    batch = (payload.program_id, payload.semester) if {"program_id", "semester"} & payload.model_fields_set else None
     return to_dict(await AcademicTermService(db).update(term_id, start_date=payload.start_date, end_date=payload.end_date,
-                                                        status=payload.status, actor_id=current_user.id, label=payload.label))
+                                                        status=payload.status, actor_id=current_user.id, label=payload.label, batch=batch))
 
 
 @router.get(

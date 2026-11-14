@@ -19,6 +19,7 @@ from typing import Any, Awaitable, Callable
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.fees.batch_terms import shown_term
 from app.auth.permissions import Permissions as P
 from app.core.clock import institute_today, local_date
 from app.core.config import settings
@@ -243,7 +244,7 @@ class ReportCenter:
             if group_by == "fee_head":
                 k, label = type_name, type_name
             elif group_by == "term":
-                k, label = structure.term_label, structure.term_label
+                k = label = shown_term(a, structure) or "No term"
             elif group_by == "structure":
                 k, label = structure.id, f"{structure.name} ({structure.term_label})"
             else:
