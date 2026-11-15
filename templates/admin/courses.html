@@ -102,18 +102,21 @@
     <div class="jr-head">
       <h2 id="terms-h">Academic terms</h2>
       <p class="panel-hint">Offerings, fee structures, datesheets and admissions pick their term from this list, so a term is never typed two ways.
-        Edit a term any time: a new name is written on every record that uses it. Close a term once it is over; it stays on records and result cards.</p>
+        Edit a term any time: a new name is written on every record that uses it. Close a term once it is over; it stays on records and result cards.
+        When each batch runs on its own dates, give the term its batch (program + semester): a fee charged to several batches then shows each student their own batch term.</p>
     </div>
     <form class="jr-form crs-term-form" id="term-add-form" novalidate>
       <label>Name<input type="text" id="term-new-label" class="text-input" maxlength="50" placeholder="e.g. Spring 2027" /></label>
       <label>Starts<input type="date" id="term-new-start" class="text-input" /></label>
       <label>Ends<input type="date" id="term-new-end" class="text-input" /></label>
+      <label>Batch program<select id="term-new-program" class="select-input term-program"><option value="">Not one batch</option></select></label>
+      <label>Semester<select id="term-new-semester" class="select-input term-semester"><option value="">&mdash;</option></select></label>
       <button type="submit" class="role-btn" id="term-add-btn">{{ nav_icon("plus") }}<span>Add term</span></button>
     </form>
     <p id="terms-error" class="dash-alert error crs-pad" hidden></p>
     <div class="sd-table-wrap">
       <table class="dash-table sd-table no-stack crs-terms" id="terms-table">
-        <thead><tr><th>Term</th><th>Dates</th><th>Used by</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead>
+        <thead><tr><th>Term</th><th>Batch</th><th>Dates</th><th>Used by</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead>
         <tbody id="terms-tbody"></tbody>
       </table>
     </div>
@@ -146,6 +149,10 @@
     <div class="form-grid two-col">
       <div class="form-field"><label for="te-start">Starts</label><input id="te-start" type="date" class="text-input" /></div>
       <div class="form-field"><label for="te-end">Ends</label><input id="te-end" type="date" class="text-input" /></div>
+    </div>
+    <div class="form-grid two-col">
+      <div class="form-field"><label for="te-program">Batch program</label><select id="te-program" class="select-input term-program"><option value="">Not one batch</option></select></div>
+      <div class="form-field"><label for="te-semester">Semester</label><select id="te-semester" class="select-input term-semester"><option value="">&mdash;</option></select></div>
     </div>
     <div class="form-field"><label for="te-status">Status</label>
       <select id="te-status" class="select-input"><option value="OPEN">Open: can be used for new offerings and fees</option><option value="CLOSED">Closed: kept for records only</option></select></div>

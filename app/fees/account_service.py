@@ -7,6 +7,7 @@ from datetime import date
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.fees.batch_terms import shown_term
 from app.core.exceptions import ResourceNotFoundError
 from app.employees.models import Employee
 from app.fees.assignment_service import FeeStatusCalculator, late_pause, late_rate
@@ -88,7 +89,7 @@ class AccountService:
                 totals["charged"] += charged; totals["concession"] += concession; totals["paid"] += paid; totals["remaining"] += remaining
                 totals["overdue"] += status["overdue_principal"]; totals["late_fee_accrued"] += status["accrued_fine"]
                 upcoming += [(r["due_date"], r["remaining"]) for r in rows if r["remaining"] > 0.005 and r["due_date"] and r["status"] in ("UPCOMING", "PARTIAL")]
-            out.append({"id": a.id, "fee_name": structure.name, "term_label": structure.term_label, "is_previous_dues": fee_type.code == OPENING_CODE, "status": a.status.value,
+            out.append({"id": a.id, "fee_name": structure.name, "term_label": shown_term(a, structure), "is_previous_dues": fee_type.code == OPENING_CODE, "status": a.status.value,
                         "late_fee_per_day": late, "charged": round(charged, 2), "concession": round(concession, 2), "payable": round(charged - concession, 2), "paid": round(paid, 2),
                         "remaining": round(remaining, 2), "overdue": round(status["overdue_principal"], 2), "late_fee_accrued": round(status["accrued_fine"], 2),
                         "credit": status["credit"], "late_fee_paused_from": a.late_fee_paused_from, "late_fee_paused_until": a.late_fee_paused_until,

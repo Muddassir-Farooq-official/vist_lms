@@ -18,6 +18,7 @@ from datetime import date, datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.fees.batch_terms import shown_term
 from app.core.clock import institute_today
 from app.core.exceptions import AuthorizationError, BusinessRuleViolationError, ResourceNotFoundError, ValidationAppError
 from app.fees.assignment_service import FeeStatusCalculator, lock_assignment, validate_paid_on
@@ -248,7 +249,7 @@ class RefundService:
         out = []
         for r, a, s in (await self.session.execute(stmt)).all():
             payer = await acc.payer(a.payer_type, a.payer_id)
-            out.append({"id": r.id, "fee_assignment_id": a.id, "fee": s.name, "term_label": s.term_label, "payer": payer,
+            out.append({"id": r.id, "fee_assignment_id": a.id, "fee": s.name, "term_label": shown_term(a, s), "payer": payer,
                         "kind": r.kind.value, "amount": float(r.amount), "write_off": float(r.write_off), "reason": r.reason,
                         "status": r.status.value, "requested_by": r.requested_by, "requested_at": r.requested_at,
                         "decided_at": r.decided_at, "decision_note": r.decision_note, "voucher_number": r.voucher_number,

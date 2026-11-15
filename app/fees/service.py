@@ -108,7 +108,11 @@ class FeeStructureService:
     async def create(self, data: FeeStructureCreateRequest, *, actor_id: uuid.UUID) -> FeeStructure:
         from app.academics.terms import AcademicTermService
 
-        await AcademicTermService(self.session).require_usable(data.term_label)
+        from app.fees.batch_terms import check_term_fits
+
+        await AcademicTermService(self.session).require_usable(data.term_label, all_batches_ok=True)
+        await check_term_fits(self.session, data.term_label, program_ids=list(data.program_ids), semester_numbers=list(data.semester_numbers),
+                              course_id=data.course_id, applies_to_employees=data.applies_to_employees)
         fee_type = await self.fee_type_repo.get_by_id(data.fee_type_id)
         if fee_type is None:
             raise ResourceNotFoundError("Fee type not found.")
@@ -186,6 +190,56 @@ class FeeStructureService:
         )
         return structure
 
+    async def change_term(self, structure_id: uuid.UUID, new_label: str, *, actor_id: uuid.UUID) -> dict:
+        """Put the right term on a fee, e.g. one created with a single batch's term though it covers many batches.
+        Changes what fee screens, challans and receipts show from now on; amounts, instalments, payments and fines are
+        not touched. To "each student's own term": every student charge not yet stamped gets the student's current batch
+        term (pressing again later fills in students whose batch term has been set up since). To one term: the
+        per-student stamps are cleared, so every charge shows that term."""
+        from app.academics.terms import ALL_BATCHES, AcademicTermService
+        from app.fees.batch_terms import check_term_fits, student_batch_term
+
+        new_label = " ".join(new_label.split())
+        structure = await self.get(structure_id)
+        if structure.late_fee_once or structure.term_label == "Carried forward":
+            raise BusinessRuleViolationError("This fee's term is managed elsewhere and cannot be changed here.")
+        await AcademicTermService(self.session).require_usable(new_label, all_batches_ok=True)
+        await check_term_fits(self.session, new_label, program_ids=[x.program_id for x in await self.repo.get_program_links(structure.id)],
+                              semester_numbers=[x.semester_number for x in await self.repo.get_semester_links(structure.id)],
+                              course_id=structure.course_id, applies_to_employees=structure.applies_to_employees)
+        old = structure.term_label
+        assignments = await self.assignment_repo.list_for_structure(structure.id)
+        stamped = missing = cleared = 0
+        if new_label == ALL_BATCHES:
+            for a in assignments:
+                if a.term_label or a.payer_type != PayerType.STUDENT:
+                    continue
+                if a.enrollment_id is not None:
+                    from app.academics.models import CourseOffering, Enrollment
+
+                    enrollment = await self.session.get(Enrollment, a.enrollment_id)
+                    offering = await self.session.get(CourseOffering, enrollment.course_offering_id) if enrollment else None
+                    label = offering.term_label if offering else None
+                else:
+                    term = await student_batch_term(self.session, a.payer_id)
+                    label = term.label if term else None
+                if label:
+                    a.term_label = label
+                    stamped += 1
+                else:
+                    missing += 1
+        else:
+            for a in assignments:
+                if a.term_label:
+                    a.term_label = None
+                    cleared += 1
+        structure.term_label = new_label
+        await self.session.flush()
+        await self.audit.log(actor_user_id=actor_id, action="fee_structure.term_changed", entity_type="fee_structure", entity_id=structure.id,
+                             before={"term_label": old}, after={"term_label": new_label},
+                             metadata={"student_terms_filled": stamped, "students_without_batch_term": missing, "student_terms_cleared": cleared})
+        return {"term_label": new_label, "student_terms_filled": stamped, "students_without_batch_term": missing, "student_terms_cleared": cleared}
+
     async def get(self, structure_id: uuid.UUID) -> FeeStructure:
         structure = await self.repo.get_by_id(structure_id)
         if structure is None:
@@ -204,8 +258,13 @@ class FeeStructureService:
         untouched."""
         from app.academics.terms import AcademicTermService
 
-        await AcademicTermService(self.session).require_usable(data.new_term_label)
+        from app.fees.batch_terms import check_term_fits
+
+        await AcademicTermService(self.session).require_usable(data.new_term_label, all_batches_ok=True)
         source = await self.get(structure_id)
+        await check_term_fits(self.session, data.new_term_label, program_ids=[x.program_id for x in await self.repo.get_program_links(source.id)],
+                              semester_numbers=[x.semester_number for x in await self.repo.get_semester_links(source.id)],
+                              course_id=source.course_id, applies_to_employees=source.applies_to_employees)
 
         new_amount = round(float(source.total_amount) * (1 + data.percentage_change / 100), 2)
         if new_amount <= 0:
@@ -546,14 +605,20 @@ class FeeStructureService:
 
         return newly_assigned
 
-    async def _still_current(self, structure: FeeStructure) -> bool:
+    async def _still_current(self, structure: FeeStructure, student: Student | None = None) -> bool:
         """Whether a still-ACTIVE fee belongs to a term that is running now, so a student admitted, moved or promoted
         today should be charged it. A fee whose academic term is closed, or whose term's end date has passed, is not.
-        (Every fee structure names its term; on the live system terms must be registered, so this is always known.)"""
-        from app.academics.terms import AcademicTermService, TermStatus
+        (Every fee structure names its term; on the live system terms must be registered, so this is always known.)
+        A fee for each student's own term goes by that student's batch term (no batch term set up: charged)."""
+        from app.academics.terms import ALL_BATCHES, AcademicTermService, TermStatus
         from app.core.clock import institute_today
 
-        term = await AcademicTermService(self.session).by_label(structure.term_label)
+        if structure.term_label == ALL_BATCHES:
+            if student is None:
+                return True
+            term = await AcademicTermService(self.session).batch_term(student.program_id, student.current_semester)
+        else:
+            term = await AcademicTermService(self.session).by_label(structure.term_label)
         if term is None:
             return True
         return not (term.status == TermStatus.CLOSED or (term.end_date is not None and term.end_date < institute_today()))
@@ -582,7 +647,7 @@ class FeeStructureService:
 
         newly_assigned = 0
         for structure in active_structures:
-            if not await self._still_current(structure):
+            if not await self._still_current(structure, student):
                 continue                                   # an earlier term's fee: never charged to someone joining or moving now
             program_links = await self.repo.get_program_links(structure.id)
             if program_links and student.program_id not in [link.program_id for link in program_links]:

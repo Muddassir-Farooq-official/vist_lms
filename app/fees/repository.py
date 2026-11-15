@@ -109,6 +109,9 @@ class FeeAssignmentRepository:
         return (await self.session.execute(stmt)).scalar_one_or_none()
 
     async def create(self, assignment: FeeAssignment) -> FeeAssignment:
+        from app.fees.batch_terms import term_for_new_charge
+
+        assignment.term_label = assignment.term_label or await term_for_new_charge(self.session, assignment)
         self.session.add(assignment)
         await self.session.flush()
         return assignment

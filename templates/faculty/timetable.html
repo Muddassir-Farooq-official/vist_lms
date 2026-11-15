@@ -8,6 +8,7 @@
 <div class="portal-tabs" role="tablist" data-auto-tabs>
   <button class="portal-tab active" data-tab="weekly" role="tab" aria-selected="true"><span>Weekly timetable</span></button>
   <button class="portal-tab" data-tab="upcoming" role="tab" aria-selected="false"><span>Upcoming classes</span></button>
+  <button class="portal-tab" data-tab="extra" role="tab" aria-selected="false"><span>Free slots &amp; extra classes</span></button>
 </div>
 
 <div class="portal-tab-panel" data-tab-panel="weekly">
@@ -23,9 +24,32 @@
   <p class="empty-state" id="my-schedule-empty" hidden>No upcoming classes.</p>
 </section>
 </div>
+
+<div class="portal-tab-panel" data-tab-panel="extra" hidden>
+<section class="sh-card" aria-labelledby="cr-h">
+  <div class="sh-card-head"><h2 id="cr-h">Book a make-up or extra class</h2></div>
+  <p class="panel-hint">Pick your course to see the periods when you, its students and a room are all free. Missed a class? Book a make-up for it.
+    Course behind? Book an extra class and say why. An administrator approves it; the slot is held for you meanwhile, and once approved the class
+    appears on the timetable and attendance and the students are told.</p>
+  <div class="cr-bar">
+    <label>Course<select id="cr-course" class="select-input"><option value="">Loading…</option></select></label>
+    <label>Type<select id="cr-kind" class="select-input"><option value="MAKEUP">Make-up for a missed class</option><option value="EXTRA">Extra class (course behind)</option></select></label>
+    <label id="cr-missed-wrap">Missed class<select id="cr-missed" class="select-input"></select></label>
+    <label>From<input type="date" id="cr-from" class="text-input" /></label>
+    <label>Days<select id="cr-days" class="select-input"><option>7</option><option>14</option><option>21</option></select></label>
+  </div>
+  <p id="cr-course-note" class="cc-meta"></p>
+  <div id="cr-slots" class="cr-slots" aria-live="polite"></div>
+</section>
+<section class="sh-card" aria-labelledby="cr-mine-h">
+  <div class="sh-card-head"><h2 id="cr-mine-h">My requests</h2></div>
+  <div id="cr-mine"><p class="cc-meta">Loading…</p></div>
+</section>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script src="/static/js/weekly-timetable.js"></script>
 <script src="/static/js/faculty-timetable.js"></script>
+<script src="/static/js/class-requests.js"></script>
 {% endblock %}

@@ -375,6 +375,8 @@ window.VistAdmin = (function () {
       a.click();
       a.remove();
       setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+      const notice = resp.headers.get("X-Notice");       // e.g. ID cards printed without a batch term
+      if (notice) toast(notice, "error");
       return true;
     } catch (err) {
       toast("Can't reach the server. Check your internet connection and try again.", "error");

@@ -358,6 +358,20 @@ async def _slot(s, *, action, before, after, entity_id=None, **_):
     return [Note(students, "Timetable change", text, STUDENT_LINKS["timetable"]), Note(teacher, "Timetable change", text, TEACHER_TIMETABLE)]
 
 
+async def _extra_class(s, *, after, **_):
+    after = after or {}
+    students, teacher, label = await _offering_people(s, after.get("course_offering_id"))
+    from datetime import date as _date
+
+    try:
+        day = _date.fromisoformat(after.get("session_date")).strftime("%a %d %b")
+    except (TypeError, ValueError):
+        day = after.get("session_date") or ""
+    what = "a make-up class" if after.get("kind") == "MAKEUP" else "an extra class"
+    text = f"{label}: {what} on {day} {_hm(after.get('start_time'))}\u2013{_hm(after.get('end_time'))}, room {after.get('room')}. It counts for attendance."
+    return [Note(students, "Extra class added", text, STUDENT_LINKS["timetable"]), Note(teacher, "Extra class added", text, TEACHER_TIMETABLE)]
+
+
 async def _offering(s, *, entity_id, before, after, **_):
     before, after = before or {}, after or {}
     if str(before.get("assigned_teacher_id")) == str(after.get("assigned_teacher_id")) and before.get("section_label") == after.get("section_label"):
@@ -404,6 +418,7 @@ RULES: dict[str, Callable[..., Awaitable["Note | list[Note] | None"]]] = {
     "fee.payment_marked_paid_by_staff": _challan_paid, "fee.due_date_changed_for_all": _due_dates_for_all,
     # classes
     "timetable_slot.created": _slot, "timetable_slot.changed": _slot, "timetable_slot.deleted": _slot,
+    "class_session.extra_added": _extra_class,
     "course_offering.updated": _offering,
 }
 

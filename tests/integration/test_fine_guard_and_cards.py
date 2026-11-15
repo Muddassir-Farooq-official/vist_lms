@@ -187,7 +187,8 @@ async def test_id_cards_valid_for_the_months_in_settings_with_a_back_side(app_cl
 
     until = add_months(institute_today(), 5)
     front, back = pdf.pages[0].extract_text(), pdf.pages[1].extract_text()
-    assert f"valid to {until:%d/%m/%Y}" in front
+    assert f"valid {institute_today():%d/%m/%Y} to {until:%d/%m/%Y}" in front    # no batch term set up: N months, with a warning
+    assert "batch term is not set up" in r.headers.get("X-Notice", "")
     assert "INSTRUCTIONS" in back and "Do not lend it to anyone." in back and "If found, please return to" in back
 
     doc = (await db_session.execute(select(IssuedDocument).where(IssuedDocument.owner_id == sid, IssuedDocument.kind == "CARD"))).scalars().one()
@@ -205,6 +206,33 @@ async def test_id_cards_valid_for_the_months_in_settings_with_a_back_side(app_cl
 
     assert add_months(date(2026, 8, 31), 6) == date(2027, 2, 28) and add_months(date(2026, 1, 15), 12) == date(2027, 1, 15)
     _ = datetime, timezone, _login
+
+
+async def test_a_student_card_runs_for_the_students_batch_term(app_client, admin_user, db_session):
+    from pypdf import PdfReader
+
+    from app.programs.models import Program
+    from app.students.models import Student
+    from tests.integration.test_fees import _create_and_activate_student
+
+    sid, _ = await _create_and_activate_student(app_client, cnic="75201-0000037-1")
+    await _login_admin(app_client)
+    prog = Program(code="BCARD", name="Card program", duration_years=4, total_semesters=8, max_credit_hours_per_semester=21)
+    db_session.add(prog)
+    await db_session.flush()
+    pid = prog.id
+    await db_session.execute(update(Student).where(Student.id == uuid.UUID(str(sid))).values(program_id=pid, current_semester=3))
+    await db_session.commit()
+    start, end = institute_today() - timedelta(days=30), institute_today() + timedelta(days=100)
+    t = await app_client.post("/api/v1/academics/academic-terms", json={"label": "Fall 2026 BCARD 3RD", "start_date": str(start), "end_date": str(end),
+                                                                        "program_id": str(pid), "semester": 3})
+    assert t.status_code == 201, t.text
+    r = await app_client.post("/api/v1/records/id-cards", json={"student_ids": [str(sid)], "employee_ids": []})
+    assert r.status_code == 200 and "X-Notice" not in r.headers
+    front = PdfReader(io.BytesIO(r.content)).pages[0].extract_text()
+    assert f"valid {start:%d/%m/%Y} to {end:%d/%m/%Y}" in front
+    doc = (await db_session.execute(select(IssuedDocument).where(IssuedDocument.owner_id == uuid.UUID(str(sid)), IssuedDocument.kind == "CARD"))).scalars().one()
+    assert doc.details["valid_from"] == start.isoformat() and doc.details["valid_to"] == end.isoformat() and doc.details["term"] == "Fall 2026 BCARD 3RD"
 
 
 async def test_the_accounts_office_moves_one_students_due_date_and_may_remove_the_fine(app_client, admin_user, db_session):

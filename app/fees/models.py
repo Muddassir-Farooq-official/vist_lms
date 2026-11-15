@@ -250,6 +250,9 @@ class FeeAssignment(UUIDPKMixin, TimestampMixin, Base):
     # (empty = still paused). Set by a student status change.
     late_fee_paused_from: Mapped[date | None] = mapped_column(Date, nullable=True)
     late_fee_paused_until: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # The term shown for this one charge. Set only when the fee is charged to "each student's own term" (several
+    # batches): the student's batch term at the time they were charged. Empty = show the fee's own term.
+    term_label: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     fee_structure: Mapped[FeeStructure] = relationship(back_populates="assignments")
     ledger_entries: Mapped[list["FeeLedgerEntry"]] = relationship(back_populates="assignment", passive_deletes="all")

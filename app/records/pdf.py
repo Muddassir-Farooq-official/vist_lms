@@ -386,7 +386,7 @@ def render_id_cards_pdf(*, institute: str, cards: list[dict], back: dict | None 
         c.line(x + 3.5 * mm, y + 6.4 * mm, x + cw - 3.5 * mm, y + 6.4 * mm)
         c.setFillColor(MUTED)
         c.setFont("Helvetica", 6)
-        c.drawString(x + 3.5 * mm, y + 3.2 * mm, f"{card['reference']}  \u00b7  valid to {card['valid_to']}")
+        c.drawString(x + 3.5 * mm, y + 3.2 * mm, f"{card['reference']}  \u00b7  " + (f"valid {card['valid_from']} to {card['valid_to']}" if card.get("valid_from") else f"valid to {card['valid_to']}"))
         c.drawRightString(x + cw - 3.5 * mm, y + 3.2 * mm, "Scan to verify")
     if back and cards:
         backs(cards[(len(cards) - 1) // 8 * 8:])
