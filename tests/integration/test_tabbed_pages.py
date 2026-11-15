@@ -20,7 +20,7 @@ TABBED = {
     "/dashboard/admin/staff-attendance": ["daily", "month", "timings", "leave", "tools"],
     "/dashboard/admin/payroll": ["runs", "items", "advances", "security"],
     "/dashboard/admin/finance": ["overview", "book", "expenses", "purchasing", "income", "vendors", "categories"],
-    "/dashboard/admin/result-sheets": ["SUBMITTED", "APPROVED", "PUBLISHED", "RETURNED", "OUTSTANDING", "CARDS", "SCALE", "TABLES"],
+    "/dashboard/admin/result-sheets": ["SUBMITTED", "APPROVED", "PUBLISHED", "RETURNED", "OUTSTANDING", "CARDS", "SCALE", "CLASS", "TABLES"],
     "/dashboard/faculty/tasks": ["inbox", "todo", "sent", "new", "mine", "map", "covers"],
     "/dashboard/library/tasks": ["inbox", "todo", "sent", "new", "mine", "map", "covers"],
     "/dashboard/accounts/tasks": ["inbox", "todo", "sent", "new", "mine", "map", "covers"],

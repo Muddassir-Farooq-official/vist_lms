@@ -289,7 +289,8 @@ class ResultSheetService:
             else:
                 letter, points, outcome = None, None, None
             rows.append({"enrollment_id": e.id, "student_name": f"{st.first_name} {st.last_name}", "roll_number": st.roll_number, "grade": letter, "grade_points": points,
-                         "marks": [marks.get(a.id) for a in assessments], "percentage": ev["percentage"] if ev else None, "attendance_percentage": ev["attendance_percentage"] if ev else None,
+                         "marks": [marks.get(a.id) for a in assessments],
+                         "percentage": float(frozen[e.id].percentage) if published else (ev["percentage"] if ev else None), "attendance_percentage": ev["attendance_percentage"] if ev else None,
                          "attendance_eligible": ev["eligible"] if ev else None, "outcome": outcome, "is_projection": info["status"] != ResultSheetStatus.PUBLISHED,
                          "theory_percent": ev.get("theory_percent") if ev else None, "practical_percent": ev.get("practical_percent") if ev else None,
                          "failed_parts": ev.get("failed_parts") if ev else [], "missing_parts": ev.get("missing_parts") if ev else []})

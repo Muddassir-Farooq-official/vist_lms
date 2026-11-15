@@ -26,6 +26,7 @@ class RegisterIn(BaseModel):
 
 class MarkIn(BaseModel):
     obtained_marks: float | None = Field(default=None, ge=0)
+    second_obtained_marks: float | None = Field(default=None, ge=0)     # the practical paper, when both parts are re-sat
     absent: bool = False
 
 
@@ -52,7 +53,8 @@ async def register(payload: RegisterIn, current_user: CurrentUser = Depends(mana
 @router.post("/attempts/{attempt_id}/mark", summary="Enter the supplementary paper's mark, or mark the student absent (exam office)")
 async def mark(attempt_id: uuid.UUID, payload: MarkIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
     svc = SupplementaryService(db)
-    a = await svc.enter_mark(attempt_id, obtained=payload.obtained_marks, absent=payload.absent, actor_id=current_user.id)
+    a = await svc.enter_mark(attempt_id, obtained=payload.obtained_marks, absent=payload.absent, actor_id=current_user.id,
+                             second_obtained=payload.second_obtained_marks)
     return {"id": a.id, "status": a.status.value, "preview": await svc.preview(a)}
 
 

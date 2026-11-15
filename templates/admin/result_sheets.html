@@ -14,6 +14,7 @@
   <button class="portal-tab" data-tab="OUTSTANDING" role="tab" aria-selected="false"><span id="rs-tab-OUTSTANDING">Not submitted</span></button>
   <button class="portal-tab" data-tab="CARDS" role="tab" aria-selected="false"><span>Result cards</span></button>
   <button class="portal-tab" data-tab="SCALE" role="tab" aria-selected="false"><span>Default scale</span></button>
+  <button class="portal-tab" data-tab="CLASS" role="tab" aria-selected="false"><span>Class results &amp; promotion</span></button>
   <button class="portal-tab" data-tab="TABLES" role="tab" aria-selected="false"><span>Grading tables &amp; mark split</span></button>
 </div>
 
@@ -41,6 +42,26 @@
   <div class="table-scroll"><table class="tk-table" id="gs-table"><thead><tr><th>Grade</th><th>From (%)</th><th>Grade points</th><th>Passing</th><th></th></tr></thead><tbody id="gs-body"></tbody></table></div>
   <div class="form-actions" style="margin-top:12px"><button type="button" class="role-btn secondary-btn" id="gs-add">+ Add a grade</button><button type="button" class="role-btn" id="gs-save">Save the grading scale</button><button type="button" class="role-btn secondary-btn" id="gs-reset">Start again from the standard scale</button></div>
   <p id="gs-error" class="dash-alert error" hidden></p><p id="gs-warning" class="dash-alert" hidden></p>
+</section></div>
+
+<div class="portal-tab-panel" data-tab-panel="CLASS" hidden><section class="sh-card">
+  <div class="sh-card-head"><h2>Class results &amp; promotion</h2></div>
+  <p class="panel-hint">Pick a program, semester (year, for annual programs) and term to see everyone's GPA &mdash; or total, % and division &mdash; and their status from the program's grading table.
+    Print the <b>result cards</b> and the <b>result gazette</b>, then tick who moves up and press <b>Promote</b>. A promotion can be undone.</p>
+  <div class="cr-bar">
+    <label>Program<select id="cl-program" class="select-input"></select></label>
+    <label>Semester / year<input id="cl-semester" type="number" min="1" max="20" value="1" class="text-input" /></label>
+    <label>Term<select id="cl-term" class="select-input"></select></label>
+    <div class="att-go"><button type="button" class="role-btn" id="cl-load">Show</button></div>
+  </div>
+  <div id="cl-summary" class="kpi-grid kpi-grid-6"></div>
+  <div class="form-actions" id="cl-actions" hidden>
+    <a class="role-btn secondary-btn" id="cl-cards" href="#" data-download="result-cards.pdf" data-label="file">Result cards (PDF)</a>
+    <a class="role-btn secondary-btn" id="cl-gazette" href="#" data-download="gazette.pdf" data-label="file">Result gazette (PDF)</a>
+    <button type="button" class="role-btn" id="cl-promote">Promote ticked students</button>
+    <button type="button" class="role-btn secondary-btn" id="cl-undo" hidden>Undo this promotion</button>
+  </div>
+  <div class="table-scroll"><table class="tk-table" id="cl-table"><thead></thead><tbody></tbody></table></div>
 </section></div>
 
 <div class="portal-tab-panel" data-tab-panel="TABLES" hidden>
@@ -123,4 +144,5 @@
 {% block extra_scripts %}
 <script src="/static/js/result-sheets-admin.js"></script>
 <script src="/static/js/grading-tables.js"></script>
+<script src="/static/js/class-results.js"></script>
 {% endblock %}

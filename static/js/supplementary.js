@@ -47,9 +47,12 @@
       const res = done ? (x.result.changed ? '<span class="status-pill passed">Passed ' + esc(x.result.letter_grade + " (" + x.result.percentage + "%)") + "</span>"
                                             : (x.result.absent ? '<span class="status-pill failed">Absent \u2014 repeat course</span>' : '<span class="status-pill failed">Not passed (' + esc(String(x.result.percentage)) + "%)</span>"))
                        : (x.status === "MARKED" ? '<span class="status-pill approved">Marked, not published</span>' : '<span class="status-pill pending">Waiting for marks</span>');
-      return "<tr><td>" + esc(x.roll_number || "") + '</td><td><span class="crs-code">' + esc(x.course_code) + "</span></td><td>" + esc(x.component + " / " + x.component_max) + "</td><td>" +
-        (done ? esc(x.obtained_marks === null ? "—" : String(x.obtained_marks)) :
-          '<input type="number" min="0" max="' + x.component_max + '" step="0.5" class="text-input small-input" data-mark="' + x.id + '" value="' + (x.obtained_marks === null ? "" : x.obtained_marks) + '" aria-label="Marks" />') +
+      const two = x.second;      // failed both parts: two papers (final + practical)
+      return "<tr><td>" + esc(x.roll_number || "") + '</td><td><span class="crs-code">' + esc(x.course_code) + "</span></td><td>" + esc(x.component + " / " + x.component_max) +
+        (two ? "<br>" + esc(two.component + " / " + two.component_max) : "") + "</td><td>" +
+        (done ? esc(x.obtained_marks === null ? "—" : String(x.obtained_marks)) + (two ? "<br>" + esc(two.obtained_marks === null ? "—" : String(two.obtained_marks)) : "") :
+          '<input type="number" min="0" max="' + x.component_max + '" step="0.5" class="text-input small-input" data-mark="' + x.id + '" value="' + (x.obtained_marks === null ? "" : x.obtained_marks) + '" aria-label="Marks" />' +
+          (two ? '<br><input type="number" min="0" max="' + two.component_max + '" step="0.5" class="text-input small-input" data-mark2="' + x.id + '" value="' + (two.obtained_marks === null ? "" : two.obtained_marks) + '" aria-label="Practical marks" />' : "")) +
         "</td><td>" + (done ? (x.absent ? "Yes" : "") : '<input type="checkbox" data-absent="' + x.id + '"' + (x.absent ? " checked" : "") + ' aria-label="Absent" />') +
         "</td><td>" + res + '</td><td class="crs-actions">' + (done ? "" : '<button type="button" class="sd-view" data-save="' + x.id + '">Save</button><button type="button" class="sd-view tt-del" data-cancel="' + x.id + '">Cancel</button>') + "</td></tr>";
     }).join("");
@@ -67,7 +70,9 @@
   async function save(id) {
     const absent = document.querySelector('[data-absent="' + id + '"]').checked;
     const raw = document.querySelector('[data-mark="' + id + '"]').value;
-    const body = absent ? { absent: true } : { obtained_marks: raw === "" ? null : Number(raw) };
+    const second = document.querySelector('[data-mark2="' + id + '"]');
+    const body = absent ? { absent: true } : { obtained_marks: raw === "" ? null : Number(raw),
+      second_obtained_marks: second ? (second.value === "" ? null : Number(second.value)) : null };
     const r = await VA.fetchJson(API + "/attempts/" + id + "/mark", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     if (!r.ok) return say(errText(r));
     const p = r.body.preview;

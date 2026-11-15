@@ -28,6 +28,9 @@ class SupplementaryAttempt(Base):
     status: Mapped[SupplementaryStatus] = mapped_column(Enum(SupplementaryStatus, name="supplementary_status"), nullable=False,
                                                         default=SupplementaryStatus.REGISTERED)
     obtained_marks: Mapped[float | None] = mapped_column(Numeric(6, 2), nullable=True)
+    # A subject failed in BOTH theory and practical is re-sat in two papers: the second paper (the practical) and its mark.
+    second_assessment_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("offering_assessments.id", ondelete="CASCADE"), nullable=True)
+    second_obtained_marks: Mapped[float | None] = mapped_column(Numeric(6, 2), nullable=True)
     absent: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="false")
     original_result: Mapped[dict] = mapped_column(JSON, nullable=False)       # the failed result, kept for the record
     new_result: Mapped[dict | None] = mapped_column(JSON, nullable=True)      # what publishing produced
