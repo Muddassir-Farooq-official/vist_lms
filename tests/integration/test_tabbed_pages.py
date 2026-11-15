@@ -41,7 +41,7 @@ TABBED = {
     "/dashboard/library/journals": ["journals", "eres"],
     "/dashboard/admin/timetable": ["weekly", "slots", "periods"],
     "/dashboard/student/timetable": ["weekly", "upcoming"],
-    "/dashboard/faculty/timetable": ["weekly", "upcoming"],
+    "/dashboard/faculty/timetable": ["weekly", "upcoming", "extra"],
 }
 
 
