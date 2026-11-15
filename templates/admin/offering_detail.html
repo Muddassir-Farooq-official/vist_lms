@@ -97,7 +97,7 @@
         <option value="SUNDAY">Sunday</option>
       </select>
     </div>
-    <div class="form-field"><label for="ts-room">Room</label><input type="text" id="ts-room" class="text-input" maxlength="50" required placeholder="e.g. Room 204" /></div>
+    <datalist id="room-options"></datalist><div class="form-field"><label for="ts-room">Room</label><input type="text" id="ts-room" list="room-options" class="text-input" maxlength="50" required placeholder="e.g. Room 204" /></div>
     <div class="form-field two-span">
       <label for="ts-period">Period</label>
       <select id="ts-period" class="select-input" required></select>
@@ -118,7 +118,7 @@
       <option value="MONDAY">Monday</option><option value="TUESDAY">Tuesday</option><option value="WEDNESDAY">Wednesday</option>
       <option value="THURSDAY">Thursday</option><option value="FRIDAY">Friday</option><option value="SATURDAY">Saturday</option><option value="SUNDAY">Sunday</option></select></div>
     <div class="form-field"><label for="sc-period">New period</label><select id="sc-period" class="select-input"></select></div>
-    <div class="form-field"><label for="sc-room">Room</label><input type="text" id="sc-room" class="text-input" maxlength="50" /></div>
+    <div class="form-field"><label for="sc-room">Room</label><input type="text" id="sc-room" list="room-options" class="text-input" maxlength="50" /></div>
     <p class="dash-alert" id="sc-preview" hidden></p>
     <p class="dash-alert error" id="sc-error" role="alert" hidden></p>
     <div class="form-actions"><button type="button" class="role-btn" id="sc-save">Apply the change</button></div>
@@ -130,7 +130,7 @@
   <p class="panel-hint">Tell it how many sessions/week this course needs and a room — it finds a non-conflicting period, spread across the week, and creates all the slots at once. A simple assigner, not a full optimizer: it tries one period at a time and stops at the first one with enough free weekdays.</p>
   <form id="auto-assign-form" class="form-grid two-col">
     <div class="form-field"><label for="aa-sessions-per-week">Sessions per Week</label><input type="number" id="aa-sessions-per-week" class="text-input" min="1" max="5" required /></div>
-    <div class="form-field"><label for="aa-room">Room</label><input type="text" id="aa-room" class="text-input" maxlength="50" required placeholder="e.g. Room 204" /></div>
+    <div class="form-field"><label for="aa-room">Room</label><input type="text" id="aa-room" list="room-options" class="text-input" maxlength="50" required placeholder="e.g. Room 204" /></div>
     <div class="form-actions two-span"><button type="submit" class="role-btn" id="auto-assign-submit">Auto-Assign</button></div>
   </form>
   <p id="auto-assign-error" class="dash-alert error" hidden></p>

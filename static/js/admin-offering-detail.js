@@ -669,4 +669,14 @@
     });
   }
   document.querySelectorAll('.portal-tab[data-tab="students"]').forEach(function (t) { t.addEventListener("click", loadRoster); });
+  // Room suggestions from the room list (Timetable -> Rooms), with seats.
+  (async function () {
+    const dl = document.getElementById("room-options");
+    if (!dl) return;
+    const r = await VA.fetchJson("/api/v1/academics/rooms", { quiet: true });
+    if (!r.ok) return;
+    dl.innerHTML = r.body.filter(function (x) { return x.is_active; }).map(function (x) {
+      return '<option value="' + VA.escapeHtml(x.name) + '">' + VA.escapeHtml(x.kind_label + (x.seats ? " \u00b7 " + x.seats + " seats" : "")) + "</option>";
+    }).join("");
+  })();
 })();

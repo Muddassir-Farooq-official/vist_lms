@@ -90,8 +90,15 @@ class ClassRequestService:
                 ApprovalRequest.kind == KIND, ApprovalRequest.status == "REQUESTED"))).scalars().all())
         return self._waiting_memo
 
-    async def _rooms(self) -> list[str]:
-        """The institute's rooms: every room used on the weekly timetable."""
+    async def _rooms(self, offering: CourseOffering | None = None) -> list[str]:
+        """The institute's rooms: the room list (Timetable -> Rooms; active ones with enough seats for this class) or,
+        while that list is empty, every room used on the weekly timetable."""
+        from app.academics.rooms import RoomService
+
+        listed = await RoomService(self.session).listing(active_only=True)
+        if listed:
+            need = len(await self.tt._enrolled_for(offering.id)) if offering is not None else 0
+            return [r.name for r in listed if r.seats is None or r.seats >= need]
         rows = (await self.session.execute(select(TimetableSlot.room).distinct())).scalars().all()
         seen: dict[str, str] = {}
         for r in rows:
@@ -114,6 +121,23 @@ class ClassRequestService:
         for e in rows:
             d = max(e.start_date, start)
             while d <= min(e.end_date, end):
+                out.add(d)
+                d += timedelta(days=1)
+        return out
+
+    async def _leave_days(self, teacher_id: uuid.UUID | None, start: date, end: date) -> set[date]:
+        """Days the teacher is on APPROVED leave (no classes can be booked for them then)."""
+        from app.timekeeping.models import LeaveRequest
+
+        if teacher_id is None:
+            return set()
+        out: set[date] = set()
+        rows = (await self.session.execute(select(LeaveRequest).where(
+            LeaveRequest.employee_id == teacher_id, LeaveRequest.status == "APPROVED",
+            LeaveRequest.first_day <= end, LeaveRequest.last_day >= start))).scalars().all()
+        for lv in rows:
+            d = max(lv.first_day, start)
+            while d <= min(lv.last_day, end):
                 out.add(d)
                 d += timedelta(days=1)
         return out
@@ -149,10 +173,11 @@ class ClassRequestService:
         if offering.term_end_date:
             end = min(end, offering.term_end_date)
         periods = sorted(await self.tt.period_repo.list_all(), key=lambda p: p.period_number)
-        rooms = await self._rooms()
+        rooms = await self._rooms(offering)
         if not periods or not rooms or end < start:
             return []
         working, holidays = await self._working_days(), await self._holidays(start, end)
+        holidays |= await self._leave_days(offering.assigned_teacher_id, start, end)
         out = []
         d = start
         while d <= end:
@@ -258,6 +283,8 @@ async def book(session: AsyncSession, r: ApprovalRequest, actor_id) -> dict:
     day, start, end = date.fromisoformat(pl["session_date"]), time.fromisoformat(pl["start_time"]), time.fromisoformat(pl["end_time"])
     if datetime.combine(day, start) <= datetime.combine(institute_today(), institute_now().time()):
         raise BusinessRuleViolationError("This class would start in the past. Reject it and ask the teacher to book another slot.")
+    if day in await svc._leave_days(offering.assigned_teacher_id, day, day):
+        raise BusinessRuleViolationError("The teacher is on approved leave that day. Reject it and ask the teacher to book another day.")
     busy = await svc._busy_on(day, skip_request=r.id)
     problem = await svc._problem(offering, day, start, end, busy)
     if problem:

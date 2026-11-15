@@ -9,6 +9,7 @@
   <button class="portal-tab active" data-tab="weekly" role="tab" aria-selected="true"><span>Weekly view</span></button>
   <button class="portal-tab" data-tab="slots" role="tab" aria-selected="false"><span>All slots</span></button>
   <button class="portal-tab" data-tab="periods" role="tab" aria-selected="false"><span>Daily periods</span></button>
+  <button class="portal-tab" data-tab="rooms" role="tab" aria-selected="false"><span>Rooms</span></button>
 </div>
 
 <div class="portal-tab-panel" data-tab-panel="weekly">
@@ -40,6 +41,27 @@
 </section>
 </div>
 
+<div class="portal-tab-panel" data-tab-panel="rooms" hidden>
+<section class="panel">
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("dashboard") }}</div><h2>Rooms</h2></div></div>
+  <p class="panel-hint">List the classrooms, labs and halls with their seats. While this list is empty any room typed on the timetable is accepted.
+    Once you add rooms, the timetable only takes listed rooms big enough for the class, and teachers booking make-up or extra classes are offered only rooms that fit.</p>
+  <table class="dash-table" id="rooms-table">
+    <thead><tr><th>Room</th><th>Type</th><th>Seats</th><th>Status</th><th class="crs-actions"></th></tr></thead>
+    <tbody id="rooms-tbody"></tbody>
+  </table>
+  <p class="empty-state" id="rooms-empty" hidden>No rooms listed yet.</p>
+  <h3 class="tt-sub">Add a room</h3>
+  <form id="add-room-form" class="ar-form">
+    <label>Name<input type="text" id="room-name" class="text-input" maxlength="50" placeholder="e.g. Room 101, Anatomy Lab" required /></label>
+    <label>Type<select id="room-kind" class="select-input"><option value="CLASS">Classroom</option><option value="LAB">Lab</option><option value="HALL">Hall</option></select></label>
+    <label>Seats<input type="number" id="room-seats" class="text-input" min="1" max="5000" placeholder="e.g. 40" /></label>
+    <div class="att-go"><button type="submit" class="role-btn">Add room</button></div>
+  </form>
+  <p id="add-room-error" class="dash-alert error" hidden></p>
+</section>
+</div>
+
 <div class="portal-tab-panel" data-tab-panel="slots" hidden>
 <section class="panel sd-panel">
   <div class="sd-toolbar">
@@ -68,4 +90,5 @@
 {% block extra_scripts %}
 <script src="/static/js/weekly-timetable.js"></script>
 <script src="/static/js/admin-timetable.js"></script>
+<script src="/static/js/admin-rooms.js"></script>
 {% endblock %}

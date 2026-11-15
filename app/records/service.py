@@ -409,15 +409,17 @@ class RecordsService:
         d = (await self.session.execute(select(IssuedDocument).where(IssuedDocument.verification_code == code))).scalar_one_or_none() if code else None
         if d is None:
             return None
-        valid_to = None
-        if d.kind == "CARD" and (d.details or {}).get("valid_to"):
+        valid_to = valid_from = None
+        if d.kind == "CARD":
             try:
-                valid_to = date.fromisoformat(d.details["valid_to"])
+                valid_to = date.fromisoformat(d.details["valid_to"]) if (d.details or {}).get("valid_to") else None
+                valid_from = date.fromisoformat(d.details["valid_from"]) if (d.details or {}).get("valid_from") else None
             except ValueError:
-                valid_to = None
+                valid_to = valid_from = None
         return {"reference": reference_of(d), "kind": d.kind, "kind_label": CERTIFICATES.get(d.kind, d.kind), "owner_name": d.owner_name,
                 "issued_on": d.created_at.date(), "revoked": d.revoked_at is not None, "revoke_reason": d.revoke_reason,
-                "valid_to": valid_to, "expired": valid_to is not None and valid_to < institute_today()}
+                "valid_from": valid_from, "valid_to": valid_to, "expired": valid_to is not None and valid_to < institute_today(),
+                "not_yet": valid_from is not None and valid_from > institute_today()}
 
     # ------------------------------------------------------------------ documents on file
     @staticmethod
