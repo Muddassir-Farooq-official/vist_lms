@@ -27,6 +27,7 @@ from app.policy.router import router as policy_router
 from app.notifications.email_router import me_router as email_me_router, router as email_settings_router, status_router as system_status_router
 from app.parents.router import router as parents_router
 from app.academics.router import router as academics_router
+from app.academics.class_requests import router as class_requests_router
 from app.attendance.router import router as attendance_router
 from app.audit.activity import router as activity_router
 from app.audit.router import router as audit_router
@@ -718,6 +719,7 @@ app.include_router(performance_router, prefix=settings.api_v1_prefix)
 app.include_router(admissions_router, prefix=settings.api_v1_prefix)
 app.include_router(parents_router, prefix=settings.api_v1_prefix)
 app.include_router(audit_router, prefix=settings.api_v1_prefix)
+app.include_router(class_requests_router, prefix=settings.api_v1_prefix)
 app.include_router(academics_router, prefix=settings.api_v1_prefix)
 app.include_router(attendance_router, prefix=settings.api_v1_prefix)
 app.include_router(complaints_router, prefix=settings.api_v1_prefix)

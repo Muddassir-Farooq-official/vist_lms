@@ -1,5 +1,28 @@
 [
   {
+    "version": "1.25.0",
+    "date": "2026-11-15",
+    "title": "Make-up and extra classes; cards for the batch term",
+    "summary": "Teachers find free periods and book make-up or extra classes for approval. Student ID cards run for the student's batch term.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "My Timetable → Free slots & extra classes: pick your course to see the periods when you, its students and a room are all free. Book a make-up for a missed class (cancelled or attendance not taken) or an extra class for a course that is behind. The slot is held while an administrator decides."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Make-up and extra class requests arrive in Approvals. Approving checks the slot again, adds the class to the timetable and attendance, marks the missed class as made up and tells the students and the teacher."
+      },
+      {
+        "kind": "improved",
+        "for": "Administrators",
+        "text": "Student ID cards are valid from the start to the end of the student's own batch term (Courses → Academic terms). If a student's batch term is not set up, the card runs the months in Settings and a warning names those students."
+      }
+    ]
+  },
+  {
     "version": "1.24.0",
     "date": "2026-11-14",
     "title": "Each batch keeps its own term",

@@ -261,7 +261,7 @@ class Settings(BaseSettings):
     sms_on_fee_overdue: int = 1
     sms_on_fee_reminder: int = 1             # 7 and 3 days before a challan is due, and on the day
     # Certificates on request (app/records/requests.py): fee per kind, Rs. 0 = free. Editable in Settings.
-    student_card_valid_months: int = 6          # student ID cards: valid this many months from printing (staff cards: 12)
+    student_card_valid_months: int = 6          # student ID cards run for the batch term; this many months only when none is set up (staff: 12)
     certificate_fee_bonafide: float = 300.0
     certificate_fee_character: float = 300.0
     certificate_fee_completion: float = 500.0

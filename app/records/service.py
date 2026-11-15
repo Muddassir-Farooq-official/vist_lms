@@ -347,19 +347,31 @@ class RecordsService:
             raise ValidationAppError("Choose at least one person.")
         if len(student_ids) + len(employee_ids) > 200:
             raise ValidationAppError("At most 200 ID cards at a time.")
+        from app.academics.terms import AcademicTermService
+
         today = institute_today()
         months = max(1, min(int(getattr(settings, "student_card_valid_months", 6) or 6), 36))
-        student_until, staff_until = add_months(today, months), add_months(today, 12)       # Settings -> Certificates; staff: a year
-        cards = []
+        fallback_until, staff_until = add_months(today, months), add_months(today, 12)       # Settings -> Certificates; staff: a year
+        terms = AcademicTermService(self.session)
+        cards, without_term = [], []
         for sid in student_ids:
             s = await self._student(sid)
             program = await self.session.get(Program, s.program_id) if s.program_id else None
             name = f"{s.first_name} {s.last_name}"
-            doc = await self._register("CARD", "STUDENT", sid, name, {"roll_number": s.roll_number, "valid_to": student_until.isoformat()}, actor_id)
+            # A student card runs for the student's own batch term (start -> end). No batch term set up yet: N months.
+            term = await terms.batch_term(s.program_id, s.current_semester)
+            if term is not None and term.end_date is not None and term.end_date >= today:
+                student_from, student_until, term_label = term.start_date or today, term.end_date, term.label
+            else:
+                student_from, student_until, term_label = today, fallback_until, None
+                without_term.append(s.roll_number or name)
+            doc = await self._register("CARD", "STUDENT", sid, name, {"roll_number": s.roll_number, "valid_from": student_from.isoformat(),
+                                                                      "valid_to": student_until.isoformat(), "term": term_label}, actor_id)
             cards.append({"kind": "STUDENT", "name": name, "photo_key": s.photo_storage_key,
                           "fields": [("Roll No", s.roll_number), ("Program", program.name if program else None), ("Semester", str(s.current_semester) if s.current_semester else None),
                                      ("CNIC No", s.cnic), ("Contact", s.contact_no)],
-                          "verify_url": verify_url(doc.verification_code), "reference": reference_of(doc), "valid_to": student_until.strftime("%d/%m/%Y")})
+                          "verify_url": verify_url(doc.verification_code), "reference": reference_of(doc), "valid_to": student_until.strftime("%d/%m/%Y"),
+                          "valid_from": student_from.strftime("%d/%m/%Y")})
         for eid in employee_ids:
             e = await self._employee(eid)
             title = (await self.session.execute(select(JobRole.title).where(JobRole.id == e.job_role_id))).scalar_one_or_none() or "Staff"
@@ -368,7 +380,12 @@ class RecordsService:
             cards.append({"kind": "STAFF", "name": name, "photo_key": e.photo_storage_key, "title": title,
                           "fields": [("Code", e.employee_code), ("Designation", title), ("Department", e.department), ("CNIC No", e.cnic), ("Contact", e.contact_no)],
                           "verify_url": verify_url(doc.verification_code), "reference": reference_of(doc), "valid_to": staff_until.strftime("%d/%m/%Y")})
-        return {"institute": settings.institute_name, "cards": cards, "back": card_back()}
+        notice = None
+        if without_term:
+            shown = ", ".join(str(x) for x in without_term[:10]) + (f" and {len(without_term) - 10} more" if len(without_term) > 10 else "")
+            notice = (f"{len(without_term)} card(s) run {months} months from today because the student's batch term is not set up "
+                      f"(or has ended): {shown}. Set the batch on Courses -> Academic terms and print again.")
+        return {"institute": settings.institute_name, "cards": cards, "back": card_back(), "notice": notice}
 
     async def issued_for(self, owner_type: str, owner_id: uuid.UUID) -> list[dict]:
         rows = (await self.session.execute(select(IssuedDocument).where(IssuedDocument.owner_type == owner_type, IssuedDocument.owner_id == owner_id)
