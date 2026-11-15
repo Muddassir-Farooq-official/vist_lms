@@ -1238,9 +1238,25 @@ async def create_assessment_type(
     db=Depends(get_db),
 ) -> AssessmentTypeOut:
     assessment_type = await AssessmentTypeService(db).create(
-        name=payload.name, category=payload.category, max_marks=payload.max_marks, actor_id=current_user.id,
+        name=payload.name, category=payload.category, max_marks=payload.max_marks, actor_id=current_user.id, component=payload.component,
     )
     return AssessmentTypeOut.model_validate(assessment_type)
+
+
+class AssessmentComponentIn(BaseModel):
+    component: str | None = Field(default=None, pattern="^(SESSIONAL|MID|FINAL|PRACTICAL)$")
+
+
+@router.put(
+    "/assessment-types/{assessment_type_id}/component", response_model=AssessmentTypeOut,
+    summary="Say which part of the mark split a catalog type counts in (Sessional / Mid / Final / Practical); published results are not changed",
+)
+async def set_assessment_component(
+    assessment_type_id: uuid.UUID, payload: AssessmentComponentIn,
+    current_user: CurrentUser = Depends(require_any_permission(Permissions.ENROLLMENT_MANAGE, Permissions.RESULT_APPROVE)),
+    db=Depends(get_db),
+) -> AssessmentTypeOut:
+    return AssessmentTypeOut.model_validate(await AssessmentTypeService(db).set_component(assessment_type_id, payload.component, actor_id=current_user.id))
 
 
 @router.delete(

@@ -4047,3 +4047,10 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 .cr-status.APPROVED { background: #e5f6ea; color: #17733a; }
 .cr-status.REJECTED { background: #fde8e8; color: #a12020; }
 .cr-status.REQUESTED { background: #fff4d6; color: #8a5a00; }
+
+/* Results -> Grading tables */
+.gt-list { display: flex; flex-direction: column; gap: 10px; }
+.gt-card { display: flex; justify-content: space-between; gap: 12px; border: 1px solid var(--border, #e3e6ee); border-radius: 10px; padding: 10px 12px; }
+.gt-card-actions { white-space: nowrap; }
+#gt-bands .text-input { min-width: 60px; padding: 4px 6px; }
+.check-inline { display: flex; gap: 8px; align-items: center; margin: 6px 0; font-size: 14px; }

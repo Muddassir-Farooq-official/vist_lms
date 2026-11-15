@@ -45,7 +45,7 @@ class AssessmentTypeService:
         return list((await self.session.execute(stmt)).scalars())
 
     async def create(
-        self, *, name: str, category: str | None, max_marks: float, actor_id: uuid.UUID
+        self, *, name: str, category: str | None, max_marks: float, actor_id: uuid.UUID, component: str | None = None
     ) -> AssessmentType:
         if max_marks <= 0:
             raise BusinessRuleViolationError("max_marks must be greater than 0.")
@@ -54,7 +54,7 @@ class AssessmentTypeService:
             raise BusinessRuleViolationError(f"A type named '{name.strip()}' already exists.")
 
         assessment_type = AssessmentType(
-            name=name.strip(), category=(category.strip() if category else None), max_marks=max_marks
+            name=name.strip(), category=(category.strip() if category else None), max_marks=max_marks, component=component
         )
         self.session.add(assessment_type)
         await self.session.flush()
@@ -63,6 +63,17 @@ class AssessmentTypeService:
             actor_user_id=actor_id, action="assessment_type.created", entity_type="assessment_type",
             entity_id=assessment_type.id, after={"name": assessment_type.name, "max_marks": max_marks},
         )
+        return assessment_type
+
+    async def set_component(self, assessment_type_id: uuid.UUID, component: str | None, *, actor_id: uuid.UUID) -> AssessmentType:
+        assessment_type = await self.session.get(AssessmentType, assessment_type_id)
+        if assessment_type is None:
+            raise ResourceNotFoundError("Assessment type not found.")
+        before = assessment_type.component
+        assessment_type.component = component
+        await self.session.flush()
+        await self.audit.log(actor_user_id=actor_id, action="assessment_type.component_set", entity_type="assessment_type",
+                             entity_id=assessment_type.id, before={"component": before}, after={"component": component})
         return assessment_type
 
     async def delete(self, assessment_type_id: uuid.UUID, *, actor_id: uuid.UUID) -> None:
@@ -203,6 +214,11 @@ class GradingService:
         assessment_type = await self.session.get(AssessmentType, offering_assessment.assessment_type_id)
         if obtained_marks < 0 or obtained_marks > float(assessment_type.max_marks):
             raise BusinessRuleViolationError(f"obtained_marks must be between 0 and {assessment_type.max_marks}.")
+        from app.academics.grading_schemes import COMPONENT_LABELS, OFFICE_ONLY
+
+        if assessment_type.component in OFFICE_ONLY and not is_admin:
+            raise BusinessRuleViolationError(f"{assessment_type.name} is a {COMPONENT_LABELS[assessment_type.component].lower()} mark, "
+                                             "entered by the exam office.")
 
         # The marks belong to a result sheet that is draft, locked for approval, or published -- and what may be done depends on which.
         status = await self._sheet_status(enrollment.course_offering_id)
@@ -259,21 +275,49 @@ class GradingService:
         stmt = select(StudentMark).where(StudentMark.enrollment_id == enrollment_id)
         return list((await self.session.execute(stmt)).scalars())
 
-    async def evaluate(self, enrollment: Enrollment) -> dict | None:
-        """What this student's result WOULD be, from their marks (nothing is saved). None while any assessment still has no mark."""
+    async def evaluate(self, enrollment: Enrollment, *, override: dict | None = None) -> dict | None:
+        """What this student's result WOULD be, from their marks (nothing is saved). None while any assessment still has no mark.
+        `override` = {offering_assessment_id: marks} replaces some marks (a supplementary re-sit preview).
+
+        The program's grading table decides the pass mark and the grade (app/academics/grading_schemes.py). With a mark split
+        (program or subject), each part (Sessional / Mid / Final / Practical) is scaled to its marks and theory and practical
+        must each be passed; without one, the result is the plain sum of the marks, as before."""
+        from app.academics.grading_schemes import rules_for_program, split_for, weighted_result
+
         offering_assessments = await self.list_offering_assessments(enrollment.course_offering_id)
         if not offering_assessments:
             return None
-        marks_by_assessment = {m.offering_assessment_id: m for m in await self.get_marks_for_enrollment(enrollment.id)}
-        if not all(oa.id in marks_by_assessment for oa in offering_assessments):
+        marks = {m.offering_assessment_id: float(m.obtained_marks) for m in await self.get_marks_for_enrollment(enrollment.id)}
+        marks.update(override or {})
+        if not all(oa.id in marks for oa in offering_assessments):
             return None  # incomplete -- at least one assessment still has no mark
         types = {oa.id: await self.session.get(AssessmentType, oa.assessment_type_id) for oa in offering_assessments}
-        total_obtained = sum(float(marks_by_assessment[oa.id].obtained_marks) for oa in offering_assessments)
-        total_max = sum(float(types[oa.id].max_marks) for oa in offering_assessments)
-        if total_max <= 0:
-            return None
-        # The raw sum over the raw total: any mix of catalog types gives a sensible percentage without the components adding up to 100.
-        final_percentage = round((total_obtained / total_max) * 100, 2)
+        student = await self.session.get(Student, enrollment.student_id)
+        program_id = student.program_id if student else None
+        rules = await rules_for_program(self.session, program_id)
+        offering = await self.offering_repo.get_by_id(enrollment.course_offering_id)
+        split = await split_for(self.session, course_id=offering.course_id if offering else None, program_id=program_id)
+        theory = practical = None
+        failed_parts: list[str] = []
+        missing_parts: list[str] = []
+        if split:
+            parts: dict[str, tuple[float, float]] = {}
+            for oa in offering_assessments:
+                comp = types[oa.id].component or "SESSIONAL"
+                o, m = parts.get(comp, (0.0, 0.0))
+                parts[comp] = (o + marks[oa.id], m + float(types[oa.id].max_marks))
+            w = weighted_result(split, parts, rules)
+            if w["total_max"] <= 0:
+                return None
+            final_percentage, total_obtained, total_max = w["percentage"], w["total_obtained"], w["total_max"]
+            theory, practical, failed_parts, missing_parts = w["theory_percent"], w["practical_percent"], w["failed_parts"], w["missing_parts"]
+        else:
+            total_obtained = sum(marks[oa.id] for oa in offering_assessments)
+            total_max = sum(float(types[oa.id].max_marks) for oa in offering_assessments)
+            if total_max <= 0:
+                return None
+            # The raw sum over the raw total: any mix of catalog types gives a sensible percentage without the components adding up to 100.
+            final_percentage = round((total_obtained / total_max) * 100, 2)
         # The attendance-eligibility rule, checked live: below it a course can only be FAILED, whatever the score.
         from app.attendance.service import AttendanceService
 
@@ -284,9 +328,15 @@ class GradingService:
             from app.attendance.shortfall import cleared
 
             eligible = await cleared(self.session, enrollment.student_id, enrollment.course_offering_id, attendance["percentage"])
-        outcome = EnrollmentOutcome.PASSED if eligible and final_percentage >= settings.marks_pass_threshold_percent else EnrollmentOutcome.FAILED
-        return {"percentage": final_percentage, "total_obtained": total_obtained, "total_max": total_max, "attendance_percentage": attendance["percentage"],
-                "eligible": eligible, "outcome": outcome, "marks": {oa.id: float(marks_by_assessment[oa.id].obtained_marks) for oa in offering_assessments}}
+        marks_passed = final_percentage >= rules.pass_percent and not failed_parts
+        outcome = EnrollmentOutcome.PASSED if eligible and marks_passed else EnrollmentOutcome.FAILED
+        letter, points, division = rules.grade(final_percentage, outcome == EnrollmentOutcome.PASSED)
+        marks_letter, marks_points, _ = rules.grade(final_percentage, marks_passed)
+        return {"percentage": final_percentage, "total_obtained": round(total_obtained, 2), "total_max": round(total_max, 2),
+                "attendance_percentage": attendance["percentage"], "eligible": eligible, "outcome": outcome, "marks_passed": marks_passed,
+                "letter": letter, "grade_points": points, "division": division, "marks_letter": marks_letter, "marks_grade_points": marks_points,
+                "theory_percent": theory, "practical_percent": practical, "failed_parts": failed_parts, "missing_parts": missing_parts,
+                "scheme_name": rules.name, "rules": rules, "marks": {oa.id: marks[oa.id] for oa in offering_assessments}}
 
     async def _maybe_recompute_outcome(self, enrollment: Enrollment, *, actor_id: uuid.UUID, corrected: bool = False) -> None:
         ev = await self.evaluate(enrollment)
@@ -316,12 +366,10 @@ class GradingService:
 
     async def _store_result(self, enrollment: Enrollment, ev: dict, *, outcome: EnrollmentOutcome | None = None) -> tuple[str, float]:
         """Freeze this attempt's result (percentage, letter, grade points, credit hours) so a later change to the grading scale never alters it."""
-        from app.academics.grade_scale import GradeScaleService, grade_for
-
         outcome = outcome or ev["outcome"]
         offering = await self.offering_repo.get_by_id(enrollment.course_offering_id)
         course = await self.session.get(Course, offering.course_id)
-        letter, points = grade_for(await GradeScaleService(self.session).entries(), ev["percentage"], outcome == EnrollmentOutcome.PASSED)
+        letter, points, division = ev["rules"].grade(ev["percentage"], outcome == EnrollmentOutcome.PASSED)
         row = (await self.session.execute(select(EnrollmentResult).where(EnrollmentResult.enrollment_id == enrollment.id))).scalar_one_or_none()
         if row is None:
             row = EnrollmentResult(enrollment_id=enrollment.id)
@@ -330,6 +378,9 @@ class GradingService:
         row.letter_grade, row.grade_points, row.credit_hours = letter, points, course.credit_hours
         row.outcome, row.attendance_percentage = outcome.value, ev["attendance_percentage"]
         row.failed_for_attendance = (outcome == EnrollmentOutcome.FAILED) and not ev["eligible"]
+        row.theory_percent, row.practical_percent = ev.get("theory_percent"), ev.get("practical_percent")
+        row.failed_part = "+".join(ev.get("failed_parts") or []) or None if outcome == EnrollmentOutcome.FAILED else None
+        row.scheme_name, row.division = ev.get("scheme_name"), division
         row.computed_at = datetime.now(timezone.utc)
         await self.session.flush()
         return letter, points

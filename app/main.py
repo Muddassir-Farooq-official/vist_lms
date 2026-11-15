@@ -30,6 +30,7 @@ from app.academics.router import router as academics_router
 from app.academics.class_requests import router as class_requests_router
 from app.academics.rooms import router as rooms_router
 import app.fees.move_payment  # noqa: F401,E402  (registers the PAYMENT_MOVE approval)
+import app.academics.grading_schemes  # noqa: F401,E402  (grading tables: programs.grading_scheme_id points at them)
 from app.attendance.router import router as attendance_router
 from app.audit.activity import router as activity_router
 from app.audit.router import router as audit_router

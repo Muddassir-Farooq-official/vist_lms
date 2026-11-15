@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.academics.grade_scale import GradeScaleService, grade_for
 from app.academics.grading_service import GradingService
 from app.academics.models import (
     AssessmentType,
@@ -269,7 +268,6 @@ class ResultSheetService:
         types = {a.id: await self.session.get(AssessmentType, a.assessment_type_id) for a in assessments}
         enrollments = list((await self.session.execute(select(Enrollment).where(Enrollment.course_offering_id == offering_id, Enrollment.status != EnrollmentStatus.WITHDRAWN))).scalars())
         students = {s.id: s for s in (await self.session.execute(select(Student).where(Student.id.in_([e.student_id for e in enrollments])))).scalars()} if enrollments else {}
-        scale = await GradeScaleService(self.session).entries()
         frozen = {r.enrollment_id: r for r in (await self.session.execute(select(EnrollmentResult).where(EnrollmentResult.enrollment_id.in_([e.id for e in enrollments])))).scalars()} if enrollments else {}
         rows, percentages = [], []
         for e in sorted(enrollments, key=lambda e: (students[e.student_id].roll_number or "")):
@@ -286,14 +284,15 @@ class ResultSheetService:
             elif ev:
                 # Short attendance bars the student from the final paper; it is NOT shown as a failed grade during the
                 # term: the projection shows the grade the marks earn, and "Short attendance" instead of Pass/Fail.
-                by_marks = ev["percentage"] >= settings.marks_pass_threshold_percent
-                letter, points = grade_for(scale, ev["percentage"], by_marks if short else ev["outcome"].value == "PASSED")
+                letter, points = (ev["marks_letter"], ev["marks_grade_points"]) if short else (ev["letter"], ev["grade_points"])
                 outcome = "SHORT_ATTENDANCE" if short else ev["outcome"].value
             else:
                 letter, points, outcome = None, None, None
             rows.append({"enrollment_id": e.id, "student_name": f"{st.first_name} {st.last_name}", "roll_number": st.roll_number, "grade": letter, "grade_points": points,
                          "marks": [marks.get(a.id) for a in assessments], "percentage": ev["percentage"] if ev else None, "attendance_percentage": ev["attendance_percentage"] if ev else None,
-                         "attendance_eligible": ev["eligible"] if ev else None, "outcome": outcome, "is_projection": info["status"] != ResultSheetStatus.PUBLISHED})
+                         "attendance_eligible": ev["eligible"] if ev else None, "outcome": outcome, "is_projection": info["status"] != ResultSheetStatus.PUBLISHED,
+                         "theory_percent": ev.get("theory_percent") if ev else None, "practical_percent": ev.get("practical_percent") if ev else None,
+                         "failed_parts": ev.get("failed_parts") if ev else [], "missing_parts": ev.get("missing_parts") if ev else []})
         passed = sum(1 for r in rows if r["outcome"] == "PASSED")
         return {**info, "section_label": offering.section_label, "term_label": offering.term_label,
                 "assessments_list": [{"id": a.id, "name": types[a.id].name, "max_marks": float(types[a.id].max_marks)} for a in assessments], "rows": rows,
@@ -302,4 +301,5 @@ class ResultSheetService:
                           "pass_rate": round(passed / len(rows) * 100, 1) if rows else None,
                           "ineligible_for_attendance": sum(1 for r in rows if r["attendance_eligible"] is False),
                           "short_attendance": sum(1 for r in rows if r["outcome"] == "SHORT_ATTENDANCE"),
-                          "distribution": [{"grade": e.letter, "count": sum(1 for r in rows if r["grade"] == e.letter)} for e in scale if any(r["grade"] == e.letter for r in rows)]}}
+                          "distribution": [{"grade": g, "count": sum(1 for r in rows if r["grade"] == g)}
+                                           for g in sorted({r["grade"] for r in rows if r["grade"]}, key=lambda g: -max(float(r["grade_points"] or 0) for r in rows if r["grade"] == g))]}}
