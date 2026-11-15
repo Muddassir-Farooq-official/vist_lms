@@ -292,6 +292,8 @@ async def _fee_assignment(s, *, entity_id, action, before, after, metadata, **_)
         text = f"Instalments not yet due ({_money(m.get('amount'))}) were cancelled" + (f": {m.get('why')}." if m.get("why") else ".")
     elif action == "fee.credit_moved":
         text = f"{_money(m.get('amount'))} of your credit was moved to another of your fees."
+    elif action == "fee.payment_moved":
+        text = f"Your payment of {_money(m.get('amount'))} (receipt {m.get('receipt')}) was put on the right fee: moved from {m.get('from')} to {m.get('to')}."
     else:      # scholarship.withdrawn
         text = "A scholarship or discount on one of your fees was withdrawn. See your fees for the new amounts."
     return Note(users, "Your fees were changed", text, STUDENT_LINKS["fees"], "FEE")
@@ -413,7 +415,7 @@ RULES: dict[str, Callable[..., Awaitable["Note | list[Note] | None"]]] = {
     "attendance.leave_granted": _leave_from_classes,
     "hostel.checked_in": _hostel, "hostel.checked_out": _hostel,
     "fee.late_fee_posted": _fee_entry, "fee.payment_reversed": _fee_entry,
-    "fee_assignment.status_changed": _fee_assignment, "fee.future_installments_cancelled": _fee_assignment, "fee.credit_moved": _fee_assignment,
+    "fee_assignment.status_changed": _fee_assignment, "fee.future_installments_cancelled": _fee_assignment, "fee.credit_moved": _fee_assignment, "fee.payment_moved": _fee_assignment,
     "scholarship.withdrawn": _fee_assignment,
     "fee.payment_marked_paid_by_staff": _challan_paid, "fee.due_date_changed_for_all": _due_dates_for_all,
     # classes

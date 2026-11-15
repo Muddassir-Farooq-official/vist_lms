@@ -1167,6 +1167,9 @@ class TimetableService:
         room: str, exclude_slot_id: uuid.UUID | None = None,
     ) -> None:
         offering = await self._offering(course_offering_id)
+        from app.academics.rooms import RoomService       # once rooms are listed: a listed room with enough seats
+
+        await RoomService(self.session).check_for_class(room, len(await self._enrolled_for(course_offering_id)))
         neighbours = await self._live_neighbours(offering, day_of_week, start_time, end_time, exclude_slot_id)
         when = f"{day_of_week.value} {{}}\u2013{{}}"
 

@@ -26,6 +26,7 @@ LABELS = {
     "SCHOLARSHIP": "Scholarship or discount",
     "SCHOLARSHIP_EDIT": "Change a scholarship or discount",
     "CLASS_REQUEST": "Make-up or extra class",
+    "PAYMENT_MOVE": "Move a payment to the right fee",
 }
 EXECUTORS: dict[str, Callable[[AsyncSession, ApprovalRequest, uuid.UUID], Awaitable[dict]]] = {}
 

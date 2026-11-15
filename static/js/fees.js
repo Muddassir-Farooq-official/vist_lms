@@ -725,7 +725,7 @@
     });
 
     result.body.lines.forEach(function (l) {
-      const adds = l.type === "DEBIT" || l.type === "REFUND";
+      const adds = l.type === "DEBIT" || l.type === "REFUND" || l.type === "CREDIT_OUT";
       const when = l.paid_on || (l.created_at || "").slice(0, 10);
       const details = [];
       if (l.type === "DEBIT" && l.due_date) details.push("due " + l.due_date);
@@ -745,8 +745,9 @@
         '<td class="num">' + money(l.balance) + "</td>" +
         "<td>" + VA.escapeHtml(details.join(" \u00b7 ")) +
           (l.receipt_number ? ' \u00b7 <a href="/api/v1/fees/receipts/' + encodeURIComponent(l.id) + '/pdf" target="_blank" rel="noopener">Receipt ' + VA.escapeHtml(l.receipt_number) + "</a>" : "") +
-          (l.reversed ? ' <span class="status-pill dropped">Reversed</span>' : "") + "</td>";
-      if (l.type === "CREDIT" && !l.reversed) {
+          (l.reversed ? ' <span class="status-pill dropped">Reversed</span>' : "") +
+          (l.moved ? ' <span class="status-pill">Moved to another fee</span>' : "") + "</td>";
+      if (l.type === "CREDIT" && !l.reversed && !l.moved) {
         const rev = document.createElement("button");
         rev.type = "button";
         rev.className = "role-btn small-btn secondary-btn";
@@ -763,10 +764,39 @@
         });
         tr.lastElementChild.appendChild(document.createTextNode(" "));
         tr.lastElementChild.appendChild(rev);
+        if (activePayer && activePayer.type === "STUDENT" && l.receipt_number) {
+          const mv = document.createElement("button");
+          mv.type = "button";
+          mv.className = "role-btn small-btn secondary-btn";
+          mv.textContent = "Move to another fee\u2026";
+          mv.addEventListener("click", async function () {
+            const acc = await VA.fetchJson("/api/v1/fees/accounts/students/" + activePayer.id);
+            if (!acc.ok) { VA.toast(extractErrorMessage(acc.body, "Could not load this student's fees."), "error"); return; }
+            const options = acc.body.assignments.filter(function (x) { return x.id !== assignmentId && x.status === "ACTIVE"; }).map(function (x) {
+              return { value: x.id, label: x.fee_name + (x.term_label ? " (" + x.term_label + ")" : "") + " \u2014 still due " + money(x.remaining) };
+            });
+            if (!options.length) { VA.toast("This student has no other active fee to move the payment to.", "error"); return; }
+            const to = await VA.ask({ title: "Move this payment", input: "select", options: options, value: options[0].value, label: "The fee it should have paid", ok: "Next",
+              intro: money(l.amount) + ", receipt " + l.receipt_number + ". The receipt keeps its number and will name the right fee. An administrator approves the move." });
+            if (!to) return;
+            const reason = await VA.ask({ title: "Why is it on the wrong fee?", label: "Reason", min: 5, ok: "Send for approval",
+              intro: "For example: tuition paid, entered on hostel by mistake." });
+            if (!reason) return;
+            const res = await VA.fetchJson("/api/v1/fees/assignments/payments/" + l.id + "/move", {
+              method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ to_assignment_id: to, reason: reason }) });
+            if (!res.ok) { VA.toast(extractErrorMessage(res.body, "Could not move the payment."), "error"); return; }
+            VA.toast(res.body.message || "Sent for approval.");
+            loadLedger(assignmentId); loadAssignments(); loadDashboard();
+          });
+          tr.lastElementChild.appendChild(document.createTextNode(" "));
+          tr.lastElementChild.appendChild(mv);
+        }
       }
       ledgerTbody.appendChild(tr);
     });
   }
+
+  let activePayer = null;     // whose fee is open (for moving a payment to another of their fees)
 
   async function openAssignmentModal(assignmentId) {
     activeAssignmentId = assignmentId;
@@ -786,6 +816,7 @@
     }
 
     const a = result.body;
+    activePayer = { type: a.payer_type, id: a.payer_id };
     assignmentModalTitle.textContent = a.payer_name + (a.payer_guardian ? " " + a.payer_guardian : "") + " \u2014 " + a.fee_structure_name;
     assignmentDetailList.innerHTML =
       "<dt>Charged</dt><dd>" + money(a.total_charged) + "</dd>" +

@@ -21,12 +21,20 @@
       <dl class="auth-help">
         <dt>Issued on</dt><dd>{{ result.issued_on.strftime("%d %B %Y") }}</dd>
       </dl>
+      {% elif result and not result.revoked and result.not_yet %}
+      <h1 id="auth-title">&#9888; Genuine, but not valid yet</h1>
+      <p class="auth-error" role="alert">{{ result.kind_label }} <strong>{{ result.reference }}</strong> issued to {{ result.owner_name }} by {{ brand.name }} is valid from
+        <strong>{{ result.valid_from.strftime("%d %B %Y") }}</strong> to <strong>{{ result.valid_to.strftime("%d %B %Y") }}</strong>. Its term has <strong>not started yet</strong>.</p>
+      <dl class="auth-help">
+        <dt>Issued on</dt><dd>{{ result.issued_on.strftime("%d %B %Y") }}</dd>
+      </dl>
       {% elif result and not result.revoked %}
       <h1 id="auth-title">&#10003; This is genuine</h1>
       <p class="auth-sub">{{ result.kind_label }} <strong>{{ result.reference }}</strong> was issued by {{ brand.name }}.</p>
       <dl class="auth-help">
         <dt>Issued to</dt><dd><strong>{{ result.owner_name }}</strong></dd>
         <dt>Issued on</dt><dd>{{ result.issued_on.strftime("%d %B %Y") }}</dd>
+        {% if result.valid_from %}<dt>Valid from</dt><dd>{{ result.valid_from.strftime("%d %B %Y") }}</dd>{% endif %}
         {% if result.valid_to %}<dt>Valid until</dt><dd>{{ result.valid_to.strftime("%d %B %Y") }}</dd>{% endif %}
       </dl>
       <p class="auth-help">Compare the name and date above with the paper in your hand.</p>

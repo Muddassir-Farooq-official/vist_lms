@@ -137,6 +137,15 @@ async def receipt_pdf_data(db, entry: FeeLedgerEntry, assignment: FeeAssignment)
             "reference": entry.payment_reference, "description": entry.description,
             "kind": "refund" if entry.entry_type == LedgerEntryType.REFUND else "receipt",
             "void": entry.entry_type == LedgerEntryType.CREDIT and await ChallanService(db).payment_is_reversed(entry.id)}
+    if entry.entry_type == LedgerEntryType.CREDIT:          # moved to the right fee: the receipt keeps its number, names that fee
+        from app.fees.move_payment import moved_to
+
+        landed = await moved_to(db, entry.id)
+        if landed is not None:
+            target = await db.get(FeeAssignment, landed.fee_assignment_id)
+            target_structure = await db.get(FeeStructure, target.fee_structure_id)
+            data["fee_name"], data["term_label"] = target_structure.name, shown_term(target, target_structure)
+            data["description"] = f"{entry.description or ''} — moved from {structure.name} on {landed.created_at:%d %b %Y}".strip(" —")
     return data
 
 

@@ -64,6 +64,7 @@ from app.todos import models as _todos_models  # noqa: F401
 from app.teaching import models as _teaching_models  # noqa: F401
 from app.banners import models as _banners_models  # noqa: F401
 from app.push import models as _push_models  # noqa: F401
+from app.academics import rooms as _rooms_models  # noqa: F401
 
 TEST_DATABASE_URL = settings.database_url.rsplit("/", 1)[0] + "/vist_lms_test"
 
