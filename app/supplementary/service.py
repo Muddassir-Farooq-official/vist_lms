@@ -151,27 +151,36 @@ class SupplementaryService:
 
     # ---------------------------------------------------------------- publish
     async def preview(self, a: SupplementaryAttempt) -> dict:
-        """What publishing would give (nothing saved)."""
-        from app.academics.grade_scale import GradeScaleService, grade_for
+        """What publishing would give (nothing saved). The re-sit mark replaces the old one and the subject is graded again by
+        the program's grading table (and mark split); the table's re-sit cap limits the percentage a re-sit can earn."""
+        from app.academics.grading_service import GradingService
 
         if a.absent or a.obtained_marks is None:
             return {**a.original_result, "absent": True, "changed": False}
-        mark = (await self.session.execute(select(StudentMark).where(StudentMark.enrollment_id == a.enrollment_id,
-                                                                    StudentMark.offering_assessment_id == a.offering_assessment_id))).scalar_one_or_none()
-        old_component = float(mark.obtained_marks) if mark else 0.0
         orig = a.original_result
-        total = orig["total_obtained"] - old_component + float(a.obtained_marks)
-        pct = round(total / orig["total_max"] * 100, 2) if orig["total_max"] else 0.0
-        passed = pct >= settings.marks_pass_threshold_percent
-        scale = await GradeScaleService(self.session).entries()
-        letter, points = grade_for(scale, pct, passed)
-        cap = float(settings.supplementary_max_grade_points or 0)
+        enrollment = await self.session.get(Enrollment, a.enrollment_id)
+        ev = await GradingService(self.session).evaluate(enrollment, override={a.offering_assessment_id: float(a.obtained_marks)})
+        if ev is None:                 # marks missing (should not happen for a published result): plain arithmetic as a fallback
+            mark = (await self.session.execute(select(StudentMark).where(StudentMark.enrollment_id == a.enrollment_id,
+                                                                        StudentMark.offering_assessment_id == a.offering_assessment_id))).scalar_one_or_none()
+            total = orig["total_obtained"] - (float(mark.obtained_marks) if mark else 0.0) + float(a.obtained_marks)
+            pct = round(total / orig["total_max"] * 100, 2) if orig["total_max"] else 0.0
+            from app.academics.grading_schemes import rules_for_student
+
+            rules = await rules_for_student(self.session, enrollment.student_id)
+            passed, total_max = pct >= rules.pass_percent, orig["total_max"]
+        else:
+            rules, pct, total, total_max, passed = ev["rules"], ev["percentage"], ev["total_obtained"], ev["total_max"], ev["marks_passed"]
         capped = False
+        if passed and rules.resit_cap is not None and pct > rules.resit_cap:
+            pct, capped = rules.resit_cap, True
+        letter, points, _division = rules.grade(pct, passed)
+        cap = float(settings.supplementary_max_grade_points or 0)
         if passed and cap and points > cap:
-            allowed = sorted([e for e in scale if e.is_passing and float(e.grade_points) <= cap], key=lambda e: float(e.grade_points), reverse=True)
+            allowed = sorted([b for b in rules.bands if b.is_passing and b.points <= cap], key=lambda b: b.points, reverse=True)
             if allowed:
-                letter, points, capped = allowed[0].letter, float(allowed[0].grade_points), True
-        return {"percentage": pct, "total_obtained": round(total, 2), "total_max": orig["total_max"], "letter_grade": letter,
+                letter, points, capped = allowed[0].letter, float(allowed[0].points), True
+        return {"percentage": pct, "total_obtained": round(total, 2), "total_max": total_max, "letter_grade": letter,
                 "grade_points": points, "outcome": "PASSED" if passed else "FAILED", "capped": capped, "absent": False, "changed": passed}
 
     async def publish(self, attempt_ids: list[uuid.UUID], *, actor_id: uuid.UUID) -> dict:

@@ -368,6 +368,9 @@ class AssessmentType(UUIDPKMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     category: Mapped[str | None] = mapped_column(String(50), nullable=True)
     max_marks: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
+    # Which part of the mark split it counts in: SESSIONAL, MID, FINAL or PRACTICAL (app/academics/grading_schemes.py).
+    # Empty = Sessional. FINAL and PRACTICAL marks are entered by the exam office.
+    component: Mapped[str | None] = mapped_column(String(10), nullable=True)
 
 
 class OfferingAssessment(UUIDPKMixin, TimestampMixin, Base):
@@ -478,6 +481,12 @@ class EnrollmentResult(UUIDPKMixin, TimestampMixin, Base):
     outcome: Mapped[str] = mapped_column(String(10), nullable=False)               # PASSED or FAILED
     attendance_percentage: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
     failed_for_attendance: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Frozen with the result (grading tables): theory and practical percentages, which part was failed, the table and division.
+    theory_percent: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    practical_percent: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    failed_part: Mapped[str | None] = mapped_column(String(20), nullable=True)            # THEORY, PRACTICAL or THEORY+PRACTICAL
+    scheme_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    division: Mapped[str | None] = mapped_column(String(40), nullable=True)
     # True when this pass was earned in a supplementary (reappear) exam; shown as (S) on the result card.
     supplementary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

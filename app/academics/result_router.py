@@ -133,6 +133,102 @@ async def put_scale(payload: ScaleIn, current_user: CurrentUser = Depends(approv
     return {"entries": _scale_out(entries), "warning": warning}
 
 
+# ============================================================ grading tables (per affiliating body) and mark splits
+class BandIn(BaseModel):
+    letter: str = Field(min_length=1, max_length=4)
+    min_percent: float = Field(ge=0, le=100)
+    grade_points: float = Field(ge=0, le=10)
+    grade_points_low: float | None = Field(default=None, ge=0, le=10)
+    is_passing: bool
+    division: str | None = Field(default=None, max_length=40)
+    remark: str | None = Field(default=None, max_length=60)
+
+
+class GradingTableIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    body: str | None = Field(default=None, max_length=150)
+    system: str = Field(default="SEMESTER", pattern="^(SEMESTER|ANNUAL)$")
+    pass_percent: float = Field(ge=0, le=100)
+    theory_pass_percent: float | None = Field(default=None, ge=0, le=100)
+    practical_pass_percent: float | None = Field(default=None, ge=0, le=100)
+    resit_cap_percent: float | None = Field(default=None, ge=0, le=100)
+    min_gpa_promotion: float | None = Field(default=None, ge=0, le=10)
+    probation_gpa: float | None = Field(default=None, ge=0, le=10)
+    min_cgpa_degree: float | None = Field(default=None, ge=0, le=10)
+    sliding_points: bool = False
+    is_draft: bool = False
+    notes: str | None = Field(default=None, max_length=2000)
+    bands: list[BandIn] = Field(min_length=2, max_length=25)
+
+
+class ProgramTableIn(BaseModel):
+    scheme_id: uuid.UUID | None = None
+
+
+class SplitIn(BaseModel):
+    program_id: uuid.UUID | None = None
+    course_id: uuid.UUID | None = None
+    values: dict[str, float] | None = None       # {"SESSIONAL": 20, "MID": 30, "FINAL": 50, "PRACTICAL": 0}; null = remove
+
+
+@router.get("/grading-tables", summary="Grading tables (one per affiliating body) with the programs using each")
+async def grading_tables(current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> list[dict]:
+    from app.academics.grading_schemes import GradingSchemeService
+
+    return await GradingSchemeService(db).listing()
+
+
+@router.post("/grading-tables", status_code=201, summary="Add a grading table (approver)")
+async def add_grading_table(payload: GradingTableIn, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
+    from app.academics.grading_schemes import GradingSchemeService
+
+    return await GradingSchemeService(db).save(payload.model_dump(), actor_id=current_user.id)
+
+
+@router.put("/grading-tables/{scheme_id}", summary="Change a grading table (approver). Published results keep their grades")
+async def edit_grading_table(scheme_id: uuid.UUID, payload: GradingTableIn, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
+    from app.academics.grading_schemes import GradingSchemeService
+
+    return await GradingSchemeService(db).save(payload.model_dump(), actor_id=current_user.id, scheme_id=scheme_id)
+
+
+@router.delete("/grading-tables/{scheme_id}", status_code=204, summary="Delete a grading table no program uses (approver)")
+async def delete_grading_table(scheme_id: uuid.UUID, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> None:
+    from app.academics.grading_schemes import GradingSchemeService
+
+    await GradingSchemeService(db).delete(scheme_id, actor_id=current_user.id)
+
+
+@router.post("/grading-tables/drafts", summary="Add ready-made DRAFT tables (AUST, KMU, Sarhad, Board) to check and edit (approver)")
+async def add_draft_tables(current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
+    from app.academics.grading_schemes import GradingSchemeService
+
+    return {"added": await GradingSchemeService(db).add_ready_made_drafts(actor_id=current_user.id)}
+
+
+@router.put("/programs/{program_id}/grading-table", summary="Choose the grading table a program's results use (approver); empty = institute default")
+async def set_program_table(program_id: uuid.UUID, payload: ProgramTableIn, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
+    from app.academics.grading_schemes import GradingSchemeService
+
+    await GradingSchemeService(db).assign(program_id, payload.scheme_id, actor_id=current_user.id)
+    return {"program_id": program_id, "scheme_id": payload.scheme_id}
+
+
+@router.get("/mark-splits", summary="Mark splits per program and per subject")
+async def mark_splits(current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> list[dict]:
+    from app.academics.grading_schemes import GradingSchemeService
+
+    return await GradingSchemeService(db).splits()
+
+
+@router.put("/mark-splits", summary="Set (or remove) a program's or a subject's mark split (approver)")
+async def set_mark_split(payload: SplitIn, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
+    from app.academics.grading_schemes import GradingSchemeService
+
+    values = {k.upper(): v for k, v in payload.values.items()} if payload.values is not None else None
+    return {"split": await GradingSchemeService(db).set_split(program_id=payload.program_id, course_id=payload.course_id, values=values, actor_id=current_user.id)}
+
+
 # ============================================================ the result card (transcript)
 async def _own_student_id(db, user: CurrentUser):
     student = await StudentRepository(db).get_by_user_id(user.id)

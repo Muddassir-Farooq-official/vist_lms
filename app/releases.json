@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.28.0",
+    "date": "2026-11-15",
+    "title": "Grading tables for each university and board",
+    "summary": "Each program can use its own grading table (KMU, AUST, Sarhad, Board ...), with a mark split, theory and practical passed separately, and a re-sit cap.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "Results → Grading tables & mark split: one fully editable table per affiliating body: letters, grade points (fixed or sliding inside a band), divisions, overall/theory/practical pass marks, the re-sit cap, promotion and degree GPA, Semester or Annual. Ready-made drafts (AUST, KMU, Sarhad, Board) arrive marked Draft to be checked first."
+      },
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "Each program picks its table and its mark split (Sessional / Mid / Final / Practical); a subject can have its own split. Teachers' quizzes and assignments are scaled into Sessional."
+      },
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "Final and Practical marks are entered by the exam office; teachers enter Sessional and Mid-term."
+      },
+      {
+        "kind": "improved",
+        "for": "Everyone",
+        "text": "Theory and practical/clinical must each be passed; the result shows which part was failed. A re-sit is capped by the table's limit. Published results never change when a table is edited."
+      }
+    ]
+  },
+  {
     "version": "1.27.0",
     "date": "2026-11-15",
     "title": "Move a payment to the right fee",

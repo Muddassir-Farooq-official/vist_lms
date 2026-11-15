@@ -534,6 +534,7 @@ class AssessmentTypeCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     category: str | None = Field(default=None, max_length=50)
     max_marks: float = Field(gt=0)
+    component: str | None = Field(default=None, pattern="^(SESSIONAL|MID|FINAL|PRACTICAL)$")   # part of the mark split; empty = Sessional
 
 
 class AssessmentTypeOut(BaseModel):
@@ -543,6 +544,7 @@ class AssessmentTypeOut(BaseModel):
     name: str
     category: str | None
     max_marks: float
+    component: str | None = None
 
 
 class AddOfferingAssessmentRequest(BaseModel):

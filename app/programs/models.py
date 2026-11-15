@@ -23,6 +23,8 @@ class Program(UUIDPKMixin, TimestampMixin, Base):
     # global constant) — this is the actual enrollment/retake gate; see
     # app/academics/service.py EnrollmentService.
     max_credit_hours_per_semester: Mapped[int] = mapped_column(Integer, nullable=False, default=18)
+    # Which grading table (Results -> Grading tables) this program's results use. Empty = the institute's default scale.
+    grading_scheme_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("grading_schemes.id", ondelete="SET NULL"), nullable=True)
 
     # School mode (app/school): a program can be a school CLASS, e.g. "Class 9 (Science)". Set only for classes;
     # all four stay empty for college / university programs.

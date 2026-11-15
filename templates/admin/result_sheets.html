@@ -13,7 +13,8 @@
   <button class="portal-tab" data-tab="RETURNED" role="tab" aria-selected="false"><span id="rs-tab-RETURNED">Sent back</span></button>
   <button class="portal-tab" data-tab="OUTSTANDING" role="tab" aria-selected="false"><span id="rs-tab-OUTSTANDING">Not submitted</span></button>
   <button class="portal-tab" data-tab="CARDS" role="tab" aria-selected="false"><span>Result cards</span></button>
-  <button class="portal-tab" data-tab="SCALE" role="tab" aria-selected="false"><span>Grading scale</span></button>
+  <button class="portal-tab" data-tab="SCALE" role="tab" aria-selected="false"><span>Default scale</span></button>
+  <button class="portal-tab" data-tab="TABLES" role="tab" aria-selected="false"><span>Grading tables &amp; mark split</span></button>
 </div>
 
 <div class="portal-tab-panel" data-tab-panel="SUBMITTED"><section class="sh-card"><div id="rs-list-SUBMITTED" class="asg-list"></div><p class="empty-state" id="rs-empty-SUBMITTED" hidden>Nothing is waiting for approval.</p></section></div>
@@ -34,12 +35,63 @@
 </section></div>
 
 <div class="portal-tab-panel" data-tab-panel="SCALE" hidden><section class="sh-card">
-  <div class="sh-card-head"><h2>Grading scale</h2></div>
+  <div class="sh-card-head"><h2>Default grading scale</h2></div>
+  <p class="panel-hint">Used by every program that has no grading table of its own (see <b>Grading tables &amp; mark split</b>).</p>
   <p class="panel-hint">A student who <b>passes</b> gets the highest grade whose &ldquo;from&rdquo; percentage they reach. A student who <b>fails</b> (low marks, or attendance below the limit) always gets the failing grade. GPA is the average of grade points weighted by credit hours. <b>Changing the scale does not change results that are already published.</b></p>
   <div class="table-scroll"><table class="tk-table" id="gs-table"><thead><tr><th>Grade</th><th>From (%)</th><th>Grade points</th><th>Passing</th><th></th></tr></thead><tbody id="gs-body"></tbody></table></div>
   <div class="form-actions" style="margin-top:12px"><button type="button" class="role-btn secondary-btn" id="gs-add">+ Add a grade</button><button type="button" class="role-btn" id="gs-save">Save the grading scale</button><button type="button" class="role-btn secondary-btn" id="gs-reset">Start again from the standard scale</button></div>
   <p id="gs-error" class="dash-alert error" hidden></p><p id="gs-warning" class="dash-alert" hidden></p>
 </section></div>
+
+<div class="portal-tab-panel" data-tab-panel="TABLES" hidden>
+<section class="sh-card">
+  <div class="sh-card-head"><h2>Grading tables</h2>
+    <div class="form-actions"><button type="button" class="role-btn secondary-btn" id="gt-drafts">Add ready-made drafts</button><button type="button" class="role-btn" id="gt-new">+ New table</button></div></div>
+  <p class="panel-hint">One table per affiliating body (KMU, AUST, Sarhad, Board &hellip;): letters, grade points (fixed or sliding inside a band), divisions,
+    pass marks for theory and practical, the re-sit cap and the semester rules. Every value can be edited at any time. <b>Published results never change.</b>
+    Ready-made tables arrive as <b>Draft</b>: check each row against the official table, untick Draft, then give it to programs.</p>
+  <div id="gt-list" class="gt-list"><p class="cc-meta">Loading&hellip;</p></div>
+</section>
+<section class="sh-card">
+  <div class="sh-card-head"><h2>Programs: table and mark split</h2></div>
+  <p class="panel-hint">Pick each program's grading table, and how a subject's marks are split. Teachers' quizzes and assignments count in <b>Sessional</b>,
+    scaled to its marks; <b>Final</b> and <b>Practical</b> marks are entered by the exam office. Leave the split empty to keep adding up the marks as they are.</p>
+  <div class="table-scroll"><table class="tk-table" id="gt-programs"><thead><tr><th>Program</th><th>Grading table</th><th>Sessional</th><th>Mid</th><th>Final</th><th>Practical</th><th></th></tr></thead><tbody></tbody></table></div>
+</section>
+<section class="sh-card">
+  <div class="sh-card-head"><h2>Subjects with their own split</h2><button type="button" class="role-btn secondary-btn" id="gt-add-course">+ Subject split</button></div>
+  <p class="panel-hint">For example a theory-only subject (Practical 0), or a lab subject with a bigger practical.</p>
+  <div class="table-scroll"><table class="tk-table" id="gt-courses"><thead><tr><th>Subject</th><th>Sessional</th><th>Mid</th><th>Final</th><th>Practical</th><th></th></tr></thead><tbody></tbody></table></div>
+</section>
+<section class="sh-card">
+  <div class="sh-card-head"><h2>Which part each assessment counts in</h2></div>
+  <p class="panel-hint">Quizzes, assignments and anything left as Sessional are scaled into the Sessional marks.</p>
+  <div class="table-scroll"><table class="tk-table" id="gt-types"><thead><tr><th>Assessment</th><th>Marks</th><th>Part</th></tr></thead><tbody></tbody></table></div>
+</section>
+</div>
+
+<dialog id="gt-modal" class="modal modal-wide" aria-labelledby="gt-title"><div class="modal-body">
+  <h2 id="gt-title">Grading table</h2>
+  <div class="form-grid two-col">
+    <div class="form-field"><label for="gt-name">Name</label><input id="gt-name" class="text-input" maxlength="100" placeholder="e.g. KMU" /></div>
+    <div class="form-field"><label for="gt-body">Affiliating body (printed on documents)</label><input id="gt-body" class="text-input" maxlength="150" placeholder="e.g. Khyber Medical University, Peshawar" /></div>
+    <div class="form-field"><label for="gt-system">Results</label><select id="gt-system" class="select-input"><option value="SEMESTER">Semester (GPA / CGPA)</option><option value="ANNUAL">Annual (total, %, division)</option></select></div>
+    <div class="form-field"><label for="gt-pass">Pass mark, overall (%)</label><input id="gt-pass" type="number" min="0" max="100" step="0.5" class="text-input" /></div>
+    <div class="form-field"><label for="gt-tpass">Theory pass mark (%)</label><input id="gt-tpass" type="number" min="0" max="100" step="0.5" class="text-input" placeholder="empty = not checked" /></div>
+    <div class="form-field"><label for="gt-ppass">Practical / clinical pass mark (%)</label><input id="gt-ppass" type="number" min="0" max="100" step="0.5" class="text-input" placeholder="empty = not checked" /></div>
+    <div class="form-field"><label for="gt-cap">Re-sit can earn at most (%)</label><input id="gt-cap" type="number" min="0" max="100" step="0.5" class="text-input" placeholder="empty = no cap" /></div>
+    <div class="form-field"><label for="gt-promo">GPA to be promoted</label><input id="gt-promo" type="number" min="0" max="10" step="0.01" class="text-input" /></div>
+    <div class="form-field"><label for="gt-prob">Probation from GPA</label><input id="gt-prob" type="number" min="0" max="10" step="0.01" class="text-input" /></div>
+    <div class="form-field"><label for="gt-degree">CGPA for the degree</label><input id="gt-degree" type="number" min="0" max="10" step="0.01" class="text-input" /></div>
+  </div>
+  <label class="check-inline"><input type="checkbox" id="gt-sliding" /> Grade points slide inside a band (e.g. 76&ndash;79% = 3.6&ndash;3.9)</label>
+  <label class="check-inline"><input type="checkbox" id="gt-draft" /> Draft (not checked yet: programs cannot use it)</label>
+  <div class="table-scroll"><table class="tk-table"><thead><tr><th>Grade</th><th>From (%)</th><th>Points</th><th class="gt-low">Points at the bottom</th><th>Passing</th><th>Division</th><th>Remark</th><th></th></tr></thead><tbody id="gt-bands"></tbody></table></div>
+  <div class="form-actions"><button type="button" class="role-btn secondary-btn" id="gt-add-band">+ Add a grade</button></div>
+  <div class="form-field"><label for="gt-notes">Notes (where the table came from)</label><textarea id="gt-notes" class="text-input" rows="2" maxlength="2000"></textarea></div>
+  <p id="gt-error" class="dash-alert error" hidden></p>
+  <div class="form-actions"><button type="button" class="role-btn" id="gt-save">Save table</button></div>
+  <button id="gt-close" class="back-link modal-close-btn" type="button">Close</button></div></dialog>
 
 <dialog id="rc-modal" class="modal modal-wide" aria-labelledby="rc-title"><div class="modal-body">
   <h2 id="rc-title"></h2><p class="cc-meta" id="rc-meta"></p>
@@ -70,4 +122,5 @@
 
 {% block extra_scripts %}
 <script src="/static/js/result-sheets-admin.js"></script>
+<script src="/static/js/grading-tables.js"></script>
 {% endblock %}
