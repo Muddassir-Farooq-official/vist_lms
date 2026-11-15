@@ -7,7 +7,7 @@ import structlog
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.exception_handlers import http_exception_handler as default_http_exception_handler
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -270,6 +270,7 @@ ADMIN_NAV_ITEMS = [
     _nav("sms", "SMS & WhatsApp", "megaphone", "/dashboard/admin/sms", group="System"),
     _nav("activity", "Activity log", "clock", "/dashboard/admin/activity", group="System"),
     _nav("settings", "Settings", "settings", "/dashboard/admin/settings", group="System"),
+    _nav("help", "Help & manual", "file", "/dashboard/admin/help", group="System"),
 ]
 
 # Library staff (ADMIN + LIBRARIAN). Student/teacher borrowing lives in their
@@ -291,6 +292,7 @@ LIBRARY_NAV_ITEMS = [
     _nav("calendar", "Calendar", "clock", "/dashboard/library/calendar", group="Services"),
     _nav("profile", "My Profile", "user", "/dashboard/library/profile", group="Services"),
     _nav("my-warnings", "My warnings", "alert", "/dashboard/library/my-warnings", group="Services"),
+    _nav("help", "Help & manual", "file", "/dashboard/library/help"),
 ]
 
 # Accounts Officer's own portal.
@@ -308,6 +310,7 @@ GATE_NAV_ITEMS = [
     _nav("calendar", "Calendar", "clock", "/dashboard/gate/calendar"),
     _nav("profile", "My Profile", "user", "/dashboard/gate/profile"),
     _nav("my-warnings", "My warnings", "alert", "/dashboard/gate/my-warnings"),
+    _nav("help", "Help & manual", "file", "/dashboard/gate/help"),
 ]
 
 # General staff (office boy, IT, driver, cleaner...): only their own things.
@@ -323,6 +326,7 @@ STAFF_NAV_ITEMS = [
     _nav("calendar", "Calendar", "clock", "/dashboard/staff/calendar", group="Account"),
     _nav("profile", "My Profile", "user", "/dashboard/staff/profile", group="Account"),
     _nav("my-warnings", "My warnings", "alert", "/dashboard/staff/my-warnings", group="Account"),
+    _nav("help", "Help & manual", "file", "/dashboard/staff/help", group="Account"),
 ]
 
 PARENT_NAV_ITEMS = [
@@ -336,6 +340,7 @@ PARENT_NAV_ITEMS = [
     _nav("notices", "Notices", "megaphone", "/dashboard/parent/notices"),
     _nav("calendar", "Calendar", "clock", "/dashboard/parent/calendar"),
     _nav("account", "My account", "settings", "/dashboard/parent/account", mobile=True, short="Account"),
+    _nav("help", "Help & manual", "file", "/dashboard/parent/help"),
 ]
 
 PRINCIPAL_NAV_ITEMS = [
@@ -352,6 +357,7 @@ PRINCIPAL_NAV_ITEMS = [
     _nav("hostel", "Hostel", "students", "/dashboard/principal/hostel"),
     _nav("assets", "Fixed assets", "tasks", "/dashboard/principal/assets"),
     _nav("activity", "Activity log", "clock", "/dashboard/principal/activity"),
+    _nav("help", "Help & manual", "file", "/dashboard/principal/help"),
 ]
 
 HOD_NAV_ITEMS = [
@@ -362,6 +368,7 @@ HOD_NAV_ITEMS = [
     _nav("reports", "Reports", "exams", "/dashboard/hod/reports"),
     _nav("calendar", "Calendar", "clock", "/dashboard/hod/calendar"),
     _nav("my-announcements", "Post an announcement", "megaphone", "/dashboard/hod/my-announcements"),
+    _nav("help", "Help & manual", "file", "/dashboard/hod/help"),
 ]
 
 EXAM_NAV_ITEMS = [
@@ -381,6 +388,7 @@ EXAM_NAV_ITEMS = [
     _nav("calendar", "Calendar", "clock", "/dashboard/exam/calendar"),
     _nav("profile", "My Profile", "user", "/dashboard/exam/profile"),
     _nav("my-warnings", "My warnings", "alert", "/dashboard/exam/my-warnings"),
+    _nav("help", "Help & manual", "file", "/dashboard/exam/help"),
 ]
 
 WARDEN_NAV_ITEMS = [
@@ -395,6 +403,7 @@ WARDEN_NAV_ITEMS = [
     _nav("calendar", "Calendar", "clock", "/dashboard/warden/calendar"),
     _nav("profile", "My Profile", "user", "/dashboard/warden/profile"),
     _nav("my-warnings", "My warnings", "alert", "/dashboard/warden/my-warnings"),
+    _nav("help", "Help & manual", "file", "/dashboard/warden/help"),
 ]
 
 ACCOUNTS_NAV_ITEMS = [
@@ -419,6 +428,7 @@ ACCOUNTS_NAV_ITEMS = [
     _nav("calendar", "Calendar", "clock", "/dashboard/accounts/calendar"),
     _nav("profile", "My Profile", "user", "/dashboard/accounts/profile"),
     _nav("my-warnings", "My warnings", "alert", "/dashboard/accounts/my-warnings"),
+    _nav("help", "Help & manual", "file", "/dashboard/accounts/help"),
 ]
 
 # Student self-service. Home is a real overview; Library is one service among
@@ -445,6 +455,7 @@ STUDENT_NAV_ITEMS = [
     _nav("profile", "My Profile", "user", "/dashboard/student/profile", group="Account"),
     _nav("my-warnings", "My warnings", "alert", "/dashboard/student/my-warnings", group="Account"),
     _nav("calendar", "Calendar", "clock", "/dashboard/student/calendar", group="Services"),
+    _nav("help", "Help & manual", "file", "/dashboard/student/help", group="Account"),
 ]
 
 # Teacher self-service.
@@ -473,6 +484,7 @@ FACULTY_NAV_ITEMS = [
     _nav("profile", "My Profile", "user", "/dashboard/faculty/profile", group="Account"),
     _nav("my-warnings", "My warnings", "alert", "/dashboard/faculty/my-warnings", group="Account"),
     _nav("calendar", "Calendar", "clock", "/dashboard/faculty/calendar", group="Services"),
+    _nav("help", "Help & manual", "file", "/dashboard/faculty/help", group="Account"),
 ]
 
 
@@ -910,6 +922,43 @@ async def calendar_page(portal: str, request: Request):
     base, nav, roles = _CALENDAR_PAGES[portal]
     return templates.TemplateResponse(request, "shared/calendar.html", {"base_template": base, "nav_items": globals()[nav], "active_nav": "calendar",
                                                                        "allowed_roles": roles})
+
+
+@app.get("/dashboard/{portal}/help", include_in_schema=False)
+async def help_page(portal: str, request: Request):
+    """Help & manual: the chapters for this portal (the administrator sees them all), plus What changed."""
+    if portal not in _CALENDAR_PAGES:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404)
+    from app import help as manual
+
+    base, nav, roles = _CALENDAR_PAGES[portal]
+    chapters = [{"slug": c["slug"], "title": c["title"], "html": manual.to_html(c["text"], c["slug"])}
+                for c in manual.chapters_for(portal) + [manual.what_changed()]]
+    return templates.TemplateResponse(request, "shared/help.html", {"base_template": base, "nav_items": globals()[nav], "active_nav": "help",
+                                                                   "allowed_roles": roles, "chapters": chapters, "portal": portal,
+                                                                   "manual_version": manual.index()["version"]})
+
+
+def _current_user_dep():
+    from app.core.dependencies import get_current_user
+
+    return get_current_user
+
+
+@app.get("/api/v1/help/manual.pdf", include_in_schema=False)
+async def manual_pdf(portal: str | None = None, current_user=Depends(_current_user_dep())):
+    """The manual as a PDF: one portal's chapters, or (no portal) the whole manual. Any signed-in person."""
+    from starlette.concurrency import run_in_threadpool
+
+    from app import help as manual
+
+    if portal is not None and portal not in _CALENDAR_PAGES:
+        portal = None
+    pdf = await run_in_threadpool(manual.render_pdf, None if portal in (None, "admin") else portal)
+    name = "user-manual" + (f"-{portal}" if portal and portal != "admin" else "") + ".pdf"
+    return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{name}"', "X-Content-Type-Options": "nosniff"})
 
 
 @app.get("/verify/{code}", include_in_schema=False)

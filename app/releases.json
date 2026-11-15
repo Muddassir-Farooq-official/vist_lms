@@ -1,5 +1,23 @@
 [
   {
+    "version": "1.30.0",
+    "date": "2026-11-16",
+    "title": "User manual",
+    "summary": "A Help & manual page in every portal and the full manual as a PDF, updated with every version.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Everyone",
+        "text": "Help & manual in the menu: your own chapter of the manual, with a search box, and a Download as PDF button."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Dashboard → User manual (PDF): the complete manual, every role's chapter included, with a What changed chapter built from these release notes. The manual is updated with every new version."
+      }
+    ]
+  },
+  {
     "version": "1.29.0",
     "date": "2026-11-16",
     "title": "Re-sit the failed part, promotion list, result documents",
