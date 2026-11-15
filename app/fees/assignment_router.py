@@ -181,6 +181,19 @@ async def reverse_payment(entry_id: uuid.UUID, payload: ReversePaymentIn,
     return {"reversed": True}
 
 
+class MovePaymentIn(BaseModel):
+    to_assignment_id: uuid.UUID
+    reason: str = Field(min_length=5, max_length=255)
+
+
+@router.post("/payments/{entry_id}/move", summary="Move a payment recorded on the wrong fee to the right fee of the same person (an administrator approves)")
+async def move_payment(entry_id: uuid.UUID, payload: MovePaymentIn,
+                       current_user: CurrentUser = Depends(require_permission(Permissions.PAYMENT_RECORD)), db=Depends(get_db)) -> dict:
+    from app.fees.move_payment import request_move
+
+    return await request_move(db, credit_id=entry_id, to_assignment_id=payload.to_assignment_id, reason=payload.reason, actor_id=current_user.id)
+
+
 @router.get(
     "/{assignment_id}/ledger",
     response_model=list[LedgerEntryOut],
@@ -220,8 +233,11 @@ async def get_statement(
     from app.fees.assignment_service import credit_is_reversed
 
     reversed_ids = {e.id for e in entries if e.entry_type == LedgerEntryType.CREDIT and await credit_is_reversed(db, e)}
-    sign = {LedgerEntryType.DEBIT: 1, LedgerEntryType.CONCESSION: -1, LedgerEntryType.CREDIT: -1, LedgerEntryType.REFUND: 1}
-    names = {LedgerEntryType.DEBIT: "Charge", LedgerEntryType.CONCESSION: "Discount", LedgerEntryType.CREDIT: "Payment", LedgerEntryType.REFUND: "Refund paid back"}
+    moved_ids = {e.applies_to_entry_id for e in entries if e.entry_type == LedgerEntryType.CREDIT_OUT and e.applies_to_entry_id}
+    sign = {LedgerEntryType.DEBIT: 1, LedgerEntryType.CONCESSION: -1, LedgerEntryType.CREDIT: -1, LedgerEntryType.REFUND: 1,
+            LedgerEntryType.CREDIT_OUT: 1, LedgerEntryType.CREDIT_IN: -1}
+    names = {LedgerEntryType.DEBIT: "Charge", LedgerEntryType.CONCESSION: "Discount", LedgerEntryType.CREDIT: "Payment", LedgerEntryType.REFUND: "Refund paid back",
+             LedgerEntryType.CREDIT_OUT: "Moved to another fee", LedgerEntryType.CREDIT_IN: "Brought from another fee"}
     ordered = sorted(entries, key=lambda e: (e.created_at, 0 if e.entry_type == LedgerEntryType.DEBIT else 1))
     conc_ids = {e.id for e in entries if e.entry_type == LedgerEntryType.CONCESSION}
     balance, lines = 0.0, []
@@ -238,7 +254,7 @@ async def get_statement(
                       "paid_on": e.paid_on, "created_at": e.created_at, "description": e.description,
                       "payment_method": e.payment_method.value if hasattr(e.payment_method, "value") else e.payment_method,
                       "payment_reference": e.payment_reference, "receipt_number": e.receipt_number,
-                      "reversed": e.id in reversed_ids, "applied_to": applied.get(e.id, []), "balance": round(balance, 2)})
+                      "reversed": e.id in reversed_ids, "moved": e.id in moved_ids, "applied_to": applied.get(e.id, []), "balance": round(balance, 2)})
     for r in rows:
         r["label"] = label[r["ledger_entry_id"]]
     return {"installments": rows, "lines": lines, "balance": round(balance, 2)}

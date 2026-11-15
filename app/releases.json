@@ -1,5 +1,28 @@
 [
   {
+    "version": "1.27.0",
+    "date": "2026-11-15",
+    "title": "Move a payment to the right fee",
+    "summary": "A payment recorded on the wrong fee can be moved to the right fee of the same student, with an administrator's approval.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Accounts office",
+        "text": "Fee → payment row → Move to another fee…: pick the fee it should have paid and say why. It goes to Approvals; nothing changes until an administrator approves."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Approving a move puts the money on the right fee as paid on the original day, makes the wrong fee owed again with a 7-day fine-free pause, and keeps the receipt number (the receipt now names the right fee). Recorded in the audit log and the money review."
+      },
+      {
+        "kind": "improved",
+        "for": "Accounts office",
+        "text": "Fee statements now show credit moved to or from another fee in the running balance."
+      }
+    ]
+  },
+  {
     "version": "1.26.0",
     "date": "2026-11-15",
     "title": "Room list, teacher leave, card check",

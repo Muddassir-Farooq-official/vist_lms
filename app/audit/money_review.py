@@ -37,6 +37,7 @@ KINDS: dict[str, tuple[str, str]] = {          # action -> (label, group)
     "fee.late_fee_rate_changed": ("Late-fee rate changed", "rule"),
     "fee.future_installments_cancelled": ("Future instalments cancelled", "rule"),
     "fee.credit_moved": ("Credit moved between fees", "rule"),
+    "fee.payment_moved": ("Payment moved to the right fee", "rule"),
     "accounts.income_voided": ("Income entry voided", "voided"),
     "accounts.expense_voided": ("Expense entry voided", "voided"),
 }

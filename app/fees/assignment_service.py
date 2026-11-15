@@ -146,8 +146,14 @@ class FeeStatusCalculator:
         # unlinked reversals come off the newest payments first.
         left = 0.0
         for e in entries:
-            if e.entry_type == LedgerEntryType.CREDIT_OUT:          # advance credit moved to another fee
-                left += float(e.amount)
+            if e.entry_type == LedgerEntryType.CREDIT_OUT:          # advance credit (or one payment) moved to another fee
+                target = by_credit.get(getattr(e, "applies_to_entry_id", None))     # a moved payment: it no longer pays here
+                if target is not None:
+                    take = min(target[0], float(e.amount))
+                    target[0] -= take
+                    left += float(e.amount) - take
+                else:
+                    left += float(e.amount)
                 continue
             if not FeeStatusCalculator._is_reversal(e):
                 continue
@@ -1009,6 +1015,10 @@ class ChallanService:
         assignment = await lock_assignment(self.session, e.fee_assignment_id)
         if await credit_is_reversed(self.session, e):
             raise BusinessRuleViolationError("This payment was already reversed.")
+        from app.fees.move_payment import moved_to
+
+        if await moved_to(self.session, e.id) is not None:
+            raise BusinessRuleViolationError("This payment was moved to another fee, so it cannot be reversed here. Ask an administrator.")
         await ensure_open(self.session, e.paid_on or local_date(e.created_at), "This payment")
         today = institute_today()
         reversal = FeeLedgerEntry(fee_assignment_id=e.fee_assignment_id, entry_type=LedgerEntryType.DEBIT, amount=float(e.amount), due_date=today,
