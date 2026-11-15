@@ -102,6 +102,9 @@ class Rules:
     resit_cap: float | None
     sliding: bool
     bands: list[Band] = field(default_factory=list)
+    min_gpa_promotion: float | None = None
+    probation_gpa: float | None = None
+    min_cgpa_degree: float | None = None
 
     def grade(self, percentage: float, passed: bool) -> tuple[str, float, str | None]:
         """(letter, grade points, division). A failed student gets a failing band whatever the percentage; a passed one the
@@ -131,7 +134,8 @@ def _rules_of(scheme: GradingScheme, bands: list[GradingBand]) -> Rules:
     f = lambda v: float(v) if v is not None else None      # noqa: E731
     return Rules(scheme.id, scheme.name, scheme.body, scheme.system, float(scheme.pass_percent), f(scheme.theory_pass_percent),
                  f(scheme.practical_pass_percent), f(scheme.resit_cap_percent), bool(scheme.sliding_points),
-                 [Band(b.letter, float(b.min_percent), float(b.grade_points), f(b.grade_points_low), b.is_passing, b.division, b.remark) for b in bands])
+                 [Band(b.letter, float(b.min_percent), float(b.grade_points), f(b.grade_points_low), b.is_passing, b.division, b.remark) for b in bands],
+                 f(scheme.min_gpa_promotion), f(scheme.probation_gpa), f(scheme.min_cgpa_degree))
 
 
 async def rules_for_program(session: AsyncSession, program_id: uuid.UUID | None) -> Rules:

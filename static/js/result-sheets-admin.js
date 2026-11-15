@@ -101,6 +101,11 @@
     if (d.status === "SUBMITTED") add("Approve", "", function () { act("approve", "Approved."); });
     if (d.status === "APPROVED") add("Publish to students", "", publish);
     if (d.status === "SUBMITTED" || d.status === "APPROVED") add("Send back\u2026", "danger-btn", sendBack);
+    const award = document.createElement("a");      // award list of this subject, with the affiliating body
+    award.className = "role-btn small-btn secondary-btn"; award.textContent = "Award list (PDF)";
+    award.href = API + "/sheets/" + d.course_offering_id + "/award-list.pdf";
+    award.setAttribute("data-download", "award-list-" + (d.course_code || "subject") + ".pdf"); award.setAttribute("data-label", "file");
+    bar.appendChild(award);
     showError("");
   }
 

@@ -30,6 +30,9 @@ def render_transcript_pdf(data: dict, *, institute_name: str | None = None) -> b
     small = ParagraphStyle("small", parent=base["Normal"], fontName="Helvetica", fontSize=7.5, textColor=MUTED, leading=10)
     cell = ParagraphStyle("cell", parent=base["Normal"], fontName="Helvetica", fontSize=8.5, leading=10.5, textColor=INK)
     story = brand.platypus_header(A4[0] - 30 * mm) + [Paragraph("RESULT CARD (TRANSCRIPT)", sub)]
+    body = (data.get("grading") or {}).get("body")
+    if body:                     # the affiliating body, from the program's grading table
+        story.append(Paragraph(f"Affiliated with {body}", sub))
     _ = h1
 
     s, summ = data["student"], data["summary"]
@@ -72,7 +75,7 @@ def render_transcript_pdf(data: dict, *, institute_name: str | None = None) -> b
     story.append(box)
     if not data["terms"]:
         story.append(Paragraph("No results have been published yet.", small))
-    story += [Spacer(1, 8), Paragraph("<b>Grading scale</b>: " + "  \u00b7  ".join(f"{e['letter']} {e['min_percent']:g}%+ = {e['grade_points']:.2f}" for e in data["scale"]), small),
+    story += [Spacer(1, 8), Paragraph(f"<b>Grading scale ({(data.get('grading') or {}).get('name') or 'Institute default'})</b>: " + "  \u00b7  ".join(f"{e['letter']} {e['min_percent']:g}%+ = {e['grade_points']:.2f}" for e in data["scale"]), small),
               Paragraph("Cr = credit hours, GP = grade points, QP = quality points (GP \u00d7 Cr). GPA = total quality points \u00f7 total credit hours. A repeated course replaces its earlier attempt in the CGPA.", small)]
 
     issued = data["issued_at"]

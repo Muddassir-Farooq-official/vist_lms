@@ -1,5 +1,28 @@
 [
   {
+    "version": "1.29.0",
+    "date": "2026-11-16",
+    "title": "Re-sit the failed part, promotion list, result documents",
+    "summary": "Supplementary re-sits only the failed part (or both papers), a class result and promotion list, and award lists, result cards and the gazette with the affiliating body.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "Supplementary: a student who failed only the practical re-sits only the practical paper; theory only, the final; both, two papers. The table's re-sit cap applies."
+      },
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "Results → Class results & promotion: pick program, semester (year) and term to see GPA (or total, % and division for annual programs), status (Promoted, on probation, Not promoted, Result pending) and position holders. Tick and Promote; a promotion can be undone."
+      },
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "Documents with the affiliating body: award list per subject (button in each result sheet), semester / year result cards (one page per student) and the result gazette (roll order, position holders, signature lines). The transcript now names the affiliating body too."
+      }
+    ]
+  },
+  {
     "version": "1.28.0",
     "date": "2026-11-15",
     "title": "Grading tables for each university and board",

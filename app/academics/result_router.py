@@ -229,6 +229,91 @@ async def set_mark_split(payload: SplitIn, current_user: CurrentUser = Depends(a
     return {"split": await GradingSchemeService(db).set_split(program_id=payload.program_id, course_id=payload.course_id, values=values, actor_id=current_user.id)}
 
 
+# ============================================================ award list, class result cards, gazette, promotion
+def _pdf_response(content: bytes, filename: str) -> Response:
+    return Response(content=content, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"', "X-Content-Type-Options": "nosniff"})
+
+
+@router.get("/sheets/{offering_id}/award-list.pdf", summary="Award list of one subject (the subject's teacher or the exam office)")
+async def award_list_pdf(offering_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> Response:
+    from app.academics.grading_schemes import rules_for_program
+    from app.academics.models import CourseOffering
+    from app.academics.result_documents_pdf import render_award_list
+    from app.programs.models import Program
+
+    offering = await db.get(CourseOffering, offering_id)
+    if offering is None:
+        raise ResourceNotFoundError("Course offering not found.")
+    if not await _can_manage_marks_for_offering(db, offering, current_user):
+        raise AuthorizationError("Only the subject's teacher or the exam office can print its award list.")
+    sheet = await ResultSheetService(db).review(offering_id)
+    from collections import Counter
+
+    from sqlalchemy import select as _select
+
+    from app.academics.models import Enrollment
+    from app.students.models import Student
+
+    ids = (await db.execute(_select(Student.program_id).join(Enrollment, Enrollment.student_id == Student.id)
+                            .where(Enrollment.course_offering_id == offering_id, Student.program_id.is_not(None)))).scalars().all()
+    common = Counter(ids).most_common(1)          # the class's program (by its students)
+    program = await db.get(Program, common[0][0]) if common else None
+    rules = await rules_for_program(db, program.id if program else None)
+    grading = {"name": rules.name, "body": rules.body}
+    pdf = await run_in_threadpool(render_award_list, sheet, grading=grading, program_label=f"{program.name} ({program.code})" if program else None)
+    return _pdf_response(pdf, f"award-list-{sheet['course_code']}.pdf")
+
+
+class PromoteIn(BaseModel):
+    program_id: uuid.UUID
+    semester: int = Field(ge=1, le=20)
+    student_ids: list[uuid.UUID] = Field(min_length=1, max_length=2000)
+
+
+class UndoIn(BaseModel):
+    batch: str = Field(min_length=10, max_length=60)
+
+
+@router.get("/class", summary="A class's results for a term: GPA (or total/%/division), status and position (approver)")
+async def class_results(program_id: uuid.UUID, semester: int, term_label: str, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
+    from app.academics.promotion import ClassResultService
+
+    return await ClassResultService(db).build(program_id=program_id, semester=semester, term_label=term_label)
+
+
+@router.get("/class/result-cards.pdf", summary="Semester (year) result cards, one page per student (approver)")
+async def class_result_cards(program_id: uuid.UUID, semester: int, term_label: str, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> Response:
+    from app.academics.promotion import ClassResultService
+    from app.academics.result_documents_pdf import render_result_cards
+
+    data = await ClassResultService(db).build(program_id=program_id, semester=semester, term_label=term_label)
+    return _pdf_response(await run_in_threadpool(render_result_cards, data), f"result-cards-{data['program']['code']}-{semester}.pdf")
+
+
+@router.get("/class/gazette.pdf", summary="Result gazette / notification for a program, semester and term (approver)")
+async def class_gazette(program_id: uuid.UUID, semester: int, term_label: str, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> Response:
+    from app.academics.promotion import ClassResultService
+    from app.academics.result_documents_pdf import render_gazette
+
+    data = await ClassResultService(db).build(program_id=program_id, semester=semester, term_label=term_label)
+    return _pdf_response(await run_in_threadpool(render_gazette, data), f"gazette-{data['program']['code']}-{semester}.pdf")
+
+
+@router.post("/class/promote", summary="Move the chosen students to the next semester (year) (approver; can be undone)")
+async def promote(payload: PromoteIn, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
+    from app.academics.promotion import ClassResultService
+
+    return await ClassResultService(db).promote(program_id=payload.program_id, semester=payload.semester, student_ids=payload.student_ids, actor_id=current_user.id)
+
+
+@router.post("/class/promote/undo", summary="Undo a promotion (students who have not moved again go back) (approver)")
+async def undo_promotion(payload: UndoIn, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
+    from app.academics.promotion import ClassResultService
+
+    return await ClassResultService(db).undo(batch=payload.batch, actor_id=current_user.id)
+
+
 # ============================================================ the result card (transcript)
 async def _own_student_id(db, user: CurrentUser):
     student = await StudentRepository(db).get_by_user_id(user.id)

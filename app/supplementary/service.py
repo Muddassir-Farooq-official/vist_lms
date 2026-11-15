@@ -72,7 +72,22 @@ class SupplementaryService:
         return {"enrollment_id": e.id, "student_id": e.student_id, "roll_number": st.roll_number if st else None,
                 "student_name": f"{st.first_name} {st.last_name}" if st else None, "course_offering_id": o.id,
                 "course_code": c.code, "course_title": c.title, "term_label": o.term_label,
-                "percentage": float(r.percentage), "letter_grade": r.letter_grade}
+                "percentage": float(r.percentage), "letter_grade": r.letter_grade, "failed_part": r.failed_part}
+
+    async def _papers_for(self, offering_id: uuid.UUID, failed_part: str | None) -> list[OfferingAssessment]:
+        """The paper(s) to re-sit: only the failed part (theory -> the final; practical -> the practical), both when both
+        were failed; otherwise (no mark split) the final exam as before."""
+        rows = (await self.session.execute(select(OfferingAssessment, AssessmentType)
+                                           .join(AssessmentType, AssessmentType.id == OfferingAssessment.assessment_type_id)
+                                           .where(OfferingAssessment.course_offering_id == offering_id))).all()
+        parts = (failed_part or "").split("+")
+        out = []
+        for part, comp in (("THEORY", "FINAL"), ("PRACTICAL", "PRACTICAL")):
+            if part in parts:
+                match = [x for x in rows if x[1].component == comp]
+                if match:
+                    out.append(max(match, key=lambda x: float(x[1].max_marks))[0])
+        return out or [await self._default_component(offering_id)]
 
     async def _default_component(self, offering_id: uuid.UUID) -> OfferingAssessment:
         """The final paper: the biggest component whose type is in the 'Exam' category (else the biggest of all)."""
@@ -102,10 +117,14 @@ class SupplementaryService:
                 raise BusinessRuleViolationError("Failed for low attendance: the course must be repeated, not taken as a supplementary.")
             if (await self.session.execute(select(SupplementaryAttempt).where(SupplementaryAttempt.enrollment_id == eid))).scalar_one_or_none():
                 raise BusinessRuleViolationError("This result already has a supplementary attempt.")
-            comp = await self.session.get(OfferingAssessment, offering_assessment_id) if offering_assessment_id else await self._default_component(e.course_offering_id)
-            if comp is None or comp.course_offering_id != e.course_offering_id:
+            if offering_assessment_id:
+                papers = [await self.session.get(OfferingAssessment, offering_assessment_id)]
+            else:
+                papers = await self._papers_for(e.course_offering_id, r.failed_part)
+            if any(p is None or p.course_offering_id != e.course_offering_id for p in papers):
                 raise ValidationAppError("That component does not belong to this course.")
-            a = SupplementaryAttempt(enrollment_id=eid, offering_assessment_id=comp.id, original_result=_result_dict(r), registered_by=actor_id)
+            a = SupplementaryAttempt(enrollment_id=eid, offering_assessment_id=papers[0].id, original_result=_result_dict(r), registered_by=actor_id,
+                                     second_assessment_id=papers[1].id if len(papers) > 1 else None)
             self.session.add(a)
             out.append(a)
         await self.session.flush()
@@ -128,11 +147,12 @@ class SupplementaryService:
         return a
 
     # ---------------------------------------------------------------- marks
-    async def _component_max(self, a: SupplementaryAttempt) -> float:
-        comp = await self.session.get(OfferingAssessment, a.offering_assessment_id)
+    async def _component_max(self, a: SupplementaryAttempt, oa_id: uuid.UUID | None = None) -> float:
+        comp = await self.session.get(OfferingAssessment, oa_id or a.offering_assessment_id)
         return float((await self.session.get(AssessmentType, comp.assessment_type_id)).max_marks)
 
-    async def enter_mark(self, attempt_id: uuid.UUID, *, obtained: float | None, absent: bool, actor_id: uuid.UUID) -> SupplementaryAttempt:
+    async def enter_mark(self, attempt_id: uuid.UUID, *, obtained: float | None, absent: bool, actor_id: uuid.UUID,
+                         second_obtained: float | None = None) -> SupplementaryAttempt:
         a = await self._get(attempt_id)
         if a.status == SupplementaryStatus.PUBLISHED:
             raise BusinessRuleViolationError("This supplementary result is already published.")
@@ -145,6 +165,15 @@ class SupplementaryService:
             if not 0 <= obtained <= top:
                 raise ValidationAppError(f"Marks must be between 0 and {top:g}.")
             a.obtained_marks, a.absent = obtained, False
+            if a.second_assessment_id is not None:
+                if second_obtained is None:
+                    raise ValidationAppError("This re-sit has two papers: enter the practical paper's marks too.")
+                top2 = await self._component_max(a, a.second_assessment_id)
+                if not 0 <= second_obtained <= top2:
+                    raise ValidationAppError(f"Practical marks must be between 0 and {top2:g}.")
+                a.second_obtained_marks = second_obtained
+        if absent:
+            a.second_obtained_marks = None
         a.status, a.marked_by = SupplementaryStatus.MARKED, actor_id
         await self.session.flush()
         return a
@@ -159,7 +188,10 @@ class SupplementaryService:
             return {**a.original_result, "absent": True, "changed": False}
         orig = a.original_result
         enrollment = await self.session.get(Enrollment, a.enrollment_id)
-        ev = await GradingService(self.session).evaluate(enrollment, override={a.offering_assessment_id: float(a.obtained_marks)})
+        override = {a.offering_assessment_id: float(a.obtained_marks)}
+        if a.second_assessment_id is not None and a.second_obtained_marks is not None:
+            override[a.second_assessment_id] = float(a.second_obtained_marks)
+        ev = await GradingService(self.session).evaluate(enrollment, override=override)
         if ev is None:                 # marks missing (should not happen for a published result): plain arithmetic as a fallback
             mark = (await self.session.execute(select(StudentMark).where(StudentMark.enrollment_id == a.enrollment_id,
                                                                         StudentMark.offering_assessment_id == a.offering_assessment_id))).scalar_one_or_none()
@@ -181,7 +213,9 @@ class SupplementaryService:
             if allowed:
                 letter, points, capped = allowed[0].letter, float(allowed[0].points), True
         return {"percentage": pct, "total_obtained": round(total, 2), "total_max": total_max, "letter_grade": letter,
-                "grade_points": points, "outcome": "PASSED" if passed else "FAILED", "capped": capped, "absent": False, "changed": passed}
+                "grade_points": points, "outcome": "PASSED" if passed else "FAILED", "capped": capped, "absent": False, "changed": passed,
+                "theory_percent": ev.get("theory_percent") if ev else None, "practical_percent": ev.get("practical_percent") if ev else None,
+                "failed_parts": ev.get("failed_parts") if ev else []}
 
     async def publish(self, attempt_ids: list[uuid.UUID], *, actor_id: uuid.UUID) -> dict:
         from app.audit.service import AuditService
@@ -202,6 +236,7 @@ class SupplementaryService:
                 row.percentage, row.total_obtained = res["percentage"], res["total_obtained"]
                 row.letter_grade, row.grade_points, row.outcome = res["letter_grade"], res["grade_points"], "PASSED"
                 row.supplementary = True
+                row.theory_percent, row.practical_percent, row.failed_part = res.get("theory_percent"), res.get("practical_percent"), None
                 row.computed_at = datetime.now(timezone.utc)
                 e.outcome = EnrollmentOutcome.PASSED
                 passed += 1
@@ -240,7 +275,13 @@ class SupplementaryService:
             row = await self._row(e, r, o, c)
             comp = await self.session.get(OfferingAssessment, a.offering_assessment_id)
             t = await self.session.get(AssessmentType, comp.assessment_type_id)
-            row.update({"id": a.id, "status": a.status.value, "component": t.name, "component_max": float(t.max_marks),
+            second = None
+            if a.second_assessment_id is not None:
+                comp2 = await self.session.get(OfferingAssessment, a.second_assessment_id)
+                t2 = await self.session.get(AssessmentType, comp2.assessment_type_id)
+                second = {"component": t2.name, "component_max": float(t2.max_marks),
+                          "obtained_marks": float(a.second_obtained_marks) if a.second_obtained_marks is not None and not student_id else None}
+            row.update({"id": a.id, "status": a.status.value, "component": t.name, "component_max": float(t.max_marks), "second": second,
                         "obtained_marks": float(a.obtained_marks) if a.obtained_marks is not None else None, "absent": a.absent,
                         "original": a.original_result, "result": a.new_result if a.status == SupplementaryStatus.PUBLISHED else None})
             if student_id and a.status != SupplementaryStatus.PUBLISHED:
