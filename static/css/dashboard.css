@@ -4054,3 +4054,14 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 .gt-card-actions { white-space: nowrap; }
 #gt-bands .text-input { min-width: 60px; padding: 4px 6px; }
 .check-inline { display: flex; gap: 8px; align-items: center; margin: 6px 0; font-size: 14px; }
+
+/* Help & manual */
+.help-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+.help-bar .text-input { flex: 1 1 260px; }
+.help-layout { display: grid; grid-template-columns: 230px 1fr; gap: 24px; }
+.help-toc { position: sticky; top: 12px; align-self: start; font-size: 14px; }
+.help-toc ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.help-chapter { border-bottom: 1px solid var(--border, #e3e6ee); padding-bottom: 18px; margin-bottom: 18px; line-height: 1.6; }
+.help-chapter h2 { margin-top: 0; }
+.help-chapter li.sub { margin-left: 18px; }
+@media (max-width: 800px) { .help-layout { grid-template-columns: 1fr; } .help-toc { position: static; } }

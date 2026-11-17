@@ -1,0 +1,30 @@
+{% extends base_template %}
+{% block allowed_roles %}{{ allowed_roles|default("ADMIN") }}{% endblock %}
+{% block title %}Help &amp; manual{% endblock %}
+{% block page_title %}Help &amp; manual{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">How to use the portal, chapter by chapter. Manual version {{ manual_version }}; updated with every new version.</div>{% endblock %}
+
+{% block content %}
+<section class="sh-card help-shell">
+  <div class="help-bar">
+    <input id="help-q" class="text-input" type="search" placeholder="Search the manual&hellip;" aria-label="Search the manual" autocomplete="off" />
+    <a class="role-btn secondary-btn" href="/api/v1/help/manual.pdf?portal={{ portal }}" data-download="user-manual.pdf" data-label="file">Download as PDF</a>
+    {% if portal == "admin" %}<span class="cc-meta">The administrator's PDF is the complete manual, every role's chapter included.</span>{% endif %}
+  </div>
+  <div class="help-layout">
+    <nav class="help-toc" aria-label="Chapters">
+      <ol>{% for c in chapters %}<li><a href="#ch-{{ c.slug }}">{{ c.title }}</a></li>{% endfor %}</ol>
+    </nav>
+    <div class="help-body" id="help-body">
+      {% for c in chapters %}
+      <article class="help-chapter" id="ch-{{ c.slug }}">{{ c.html|safe }}</article>
+      {% endfor %}
+      <p class="empty-state" id="help-none" hidden>Nothing in the manual matches that.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/help.js"></script>
+{% endblock %}
