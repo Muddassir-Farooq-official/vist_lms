@@ -1265,10 +1265,39 @@ async def set_assessment_component(
 )
 async def delete_assessment_type(
     assessment_type_id: uuid.UUID,
+    force: bool = False,
+    confirm_name: str | None = None,
     current_user: CurrentUser = Depends(require_any_permission(Permissions.ENROLLMENT_MANAGE, Permissions.RESULT_APPROVE)),
     db=Depends(get_db),
 ) -> None:
+    """force=true (administrator only) also deletes every student's marks for it; confirm_name must be the type's name."""
+    if force:
+        if "ADMIN" not in current_user.roles:
+            raise AuthorizationError("Only an administrator can force-delete an exam type that subjects use.")
+        await AssessmentTypeService(db).force_delete(assessment_type_id, confirm_name=confirm_name or "", actor_id=current_user.id)
+        return
     await AssessmentTypeService(db).delete(assessment_type_id, actor_id=current_user.id)
+
+
+@router.get("/assessment-types/{assessment_type_id}/usage", summary="What deleting this exam type would remove (subjects, students, marks)")
+async def assessment_type_usage(
+    assessment_type_id: uuid.UUID,
+    current_user: CurrentUser = Depends(require_any_permission(Permissions.ENROLLMENT_MANAGE, Permissions.RESULT_APPROVE)),
+    db=Depends(get_db),
+) -> dict:
+    return await AssessmentTypeService(db).usage(assessment_type_id)
+
+
+@router.get("/assessment-types/{assessment_type_id}/marks.csv", summary="Backup: every mark given under this exam type, as CSV")
+async def assessment_type_marks_csv(
+    assessment_type_id: uuid.UUID,
+    current_user: CurrentUser = Depends(require_any_permission(Permissions.ENROLLMENT_MANAGE, Permissions.RESULT_APPROVE)),
+    db=Depends(get_db),
+):
+    from fastapi.responses import Response
+
+    body = await AssessmentTypeService(db).marks_backup_csv(assessment_type_id)
+    return Response(content=body, media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="marks-backup-{assessment_type_id}.csv"'})
 
 
 async def _to_offering_assessment_out(db, offering_assessment) -> OfferingAssessmentOut:

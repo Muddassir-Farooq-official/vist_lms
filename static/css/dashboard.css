@@ -4065,3 +4065,8 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 .help-chapter h2 { margin-top: 0; }
 .help-chapter li.sub { margin-left: 18px; }
 @media (max-width: 800px) { .help-layout { grid-template-columns: 1fr; } .help-toc { position: static; } }
+
+/* Self-assessments */
+.sa-items { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 14px; }
+.sa-course { margin-bottom: 18px; }
+.sa-course h3 { font-size: 15px; margin: 0 0 6px; }

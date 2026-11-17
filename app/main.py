@@ -29,6 +29,7 @@ from app.parents.router import router as parents_router
 from app.academics.router import router as academics_router
 from app.academics.class_requests import router as class_requests_router
 from app.academics.rooms import router as rooms_router
+from app.selfassess.router import router as self_assess_router
 import app.fees.move_payment  # noqa: F401,E402  (registers the PAYMENT_MOVE approval)
 import app.academics.grading_schemes  # noqa: F401,E402  (grading tables: programs.grading_scheme_id points at them)
 from app.attendance.router import router as attendance_router
@@ -333,6 +334,7 @@ PARENT_NAV_ITEMS = [
     _nav("children", "My children", "students", "/dashboard/parent", mobile=True, short="Children"),
     _nav("fees", "Fees", "fees", "/dashboard/parent/fees", mobile=True, short="Fees"),
     _nav("marks", "Marks", "exams", "/dashboard/parent/marks", mobile=True, short="Marks"),
+    _nav("self-assessments", "Self-assessments", "exams", "/dashboard/parent/self-assessments"),
     _nav("timetable", "Timetable & exams", "clock", "/dashboard/parent/timetable"),
     _nav("diary", "Diary & attendance", "attendance", "/dashboard/parent/diary"),     # School mode only
     _nav("meetings", "Parent-teacher meetings", "students", "/dashboard/parent/meetings"),   # School mode only
@@ -437,6 +439,7 @@ STUDENT_NAV_ITEMS = [
     _nav("home", "Home", "dashboard", "/dashboard/student", mobile=True),
     _nav("announcements", "Announcements", "megaphone", "/dashboard/student/announcements"),
     _nav("assignments", "Assignments", "exams", "/dashboard/student/assignments", group="Study"),
+    _nav("self-assessments", "Self-assessments", "exams", "/dashboard/student/self-assessments", group="Study"),
     _nav("courses", "My Courses", "graduation-cap", "/dashboard/student/courses", group="Study"),
     _nav("timetable", "My Timetable", "clock", "/dashboard/student/timetable", group="Study", mobile=True, short="Timetable"),
     _nav("attendance", "My Attendance", "attendance", "/dashboard/student/attendance", group="Study", mobile=True, short="Attendance"),
@@ -464,6 +467,7 @@ FACULTY_NAV_ITEMS = [
     _nav("announcements", "Announcements", "megaphone", "/dashboard/faculty/announcements"),
     _nav("my-announcements", "Post an announcement", "megaphone", "/dashboard/faculty/my-announcements"),
     _nav("assignments", "Assignments", "exams", "/dashboard/faculty/assignments", group="Teaching"),
+    _nav("self-assessments", "Self-assessments", "exams", "/dashboard/faculty/self-assessments", group="Teaching"),
     _nav("courses", "My Courses", "graduation-cap", "/dashboard/faculty/courses", group="Teaching", mobile=True, short="Courses"),
     _nav("attendance", "Attendance", "attendance", "/dashboard/faculty/attendance", group="Teaching", mobile=True),
     _nav("my-class", "My class", "students", "/dashboard/faculty/my-class", group="Teaching", short="My class"),   # School mode only
@@ -736,6 +740,7 @@ app.include_router(parents_router, prefix=settings.api_v1_prefix)
 app.include_router(audit_router, prefix=settings.api_v1_prefix)
 app.include_router(class_requests_router, prefix=settings.api_v1_prefix)
 app.include_router(rooms_router, prefix=settings.api_v1_prefix)
+app.include_router(self_assess_router, prefix=settings.api_v1_prefix)
 app.include_router(academics_router, prefix=settings.api_v1_prefix)
 app.include_router(attendance_router, prefix=settings.api_v1_prefix)
 app.include_router(complaints_router, prefix=settings.api_v1_prefix)
@@ -1363,6 +1368,24 @@ async def student_assignments_page(request: Request):
 @app.get("/dashboard/faculty/assignments", include_in_schema=False)
 async def faculty_assignments_page(request: Request):
     return templates.TemplateResponse(request, "faculty/assignments.html", {"nav_items": FACULTY_NAV_ITEMS, "active_nav": "assignments"})
+
+
+@app.get("/dashboard/student/self-assessments", include_in_schema=False)
+async def student_self_assessments_page(request: Request):
+    return templates.TemplateResponse(request, "shared/self_assessments.html", {"base_template": "student/_base.html", "nav_items": STUDENT_NAV_ITEMS,
+                                                                                "active_nav": "self-assessments", "allowed_roles": "STUDENT", "mode": "student"})
+
+
+@app.get("/dashboard/faculty/self-assessments", include_in_schema=False)
+async def faculty_self_assessments_page(request: Request):
+    return templates.TemplateResponse(request, "shared/self_assessments.html", {"base_template": "faculty/_base.html", "nav_items": FACULTY_NAV_ITEMS,
+                                                                                "active_nav": "self-assessments", "allowed_roles": "FACULTY", "mode": "teacher"})
+
+
+@app.get("/dashboard/parent/self-assessments", include_in_schema=False)
+async def parent_self_assessments_page(request: Request):
+    return templates.TemplateResponse(request, "shared/self_assessments.html", {"base_template": "parent/_base.html", "nav_items": PARENT_NAV_ITEMS,
+                                                                                "active_nav": "self-assessments", "allowed_roles": "PARENT", "mode": "parent"})
 
 
 @app.get("/dashboard/student/applications", include_in_schema=False)

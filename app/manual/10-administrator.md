@@ -36,7 +36,7 @@ From a student's or employee's record (or many at once from the list) print **ID
 - **Teacher Progress**: how far each teacher actually is through their course versus where they should be, from topics marked complete.
 - **Course feedback**: students' anonymous feedback on each course and teacher.
 - **Institute Overview**: how the institute is doing right now. Read-only.
-- **Result Types**: the institute-wide catalogue of assessments (Quiz 1, Mid Term, Final, Practical ...), each with fixed total marks and the part of the mark split it counts in.
+- **Result Types**: the institute-wide catalogue of assessments (Quiz 1, Mid Term, Final, Practical ...), each with fixed total marks and the part of the mark split it counts in. A type no subject uses is simply deleted. A type subjects already use can be **force-deleted** by an administrator: a warning shows how many subjects, students and marks it would remove, you type its name to confirm, and a CSV backup of every mark downloads first. Results already published stay exactly as they are; subjects waiting for approval go back to their teachers. A type used by a supplementary re-sit cannot be deleted.
 - **Result Approval**: approve and publish results, print award lists, result cards and the gazette, promote classes, and set grading tables (see the Exam department chapter).
 - **Datesheets**: plan exam papers, put teachers on duty, fix clashes, publish and print admit cards.
 - **Supplementary Exams**: re-sit papers for students who failed on marks.

@@ -7,6 +7,7 @@
 - **My Courses**: enroll in your current semester's courses, or retake one you have taken before. Open a course for its topics, slides and notes.
 - **My Timetable**: your week at a glance, with PDF download. Make-up and extra classes appear here once approved, and you get a notification.
 - **My Attendance**: your attendance in every course. Below the minimum you are barred from the final exam.
+- **Self-assessments**: your marks in practice quizzes and class tests done on paper, with the class average. They never count in your results.
 - **Assignments**: work set by your teachers. Hand in a Google Drive link before the deadline.
 - **My Exams**: published datesheets, whether you may sit each paper, and your admit card.
 - **My Results**: marks and outcome for every subject once published, and your result card (transcript) with GPA and CGPA.
