@@ -7,7 +7,7 @@
   const API = "/api/v1/teaching/covers/me";
   if (!$("cv-list")) return;
 
-  function hm(t) { return t ? String(t).slice(0, 5) : ""; }
+  function hm(t) { return window.VistAdmin.formatTimeShort(t); }
   function msg(body, fallback) { return (body && body.error && body.error.message) || fallback; }
   const LABEL = { UPCOMING: "Not started", OPEN: "Take attendance now", ON_TIME: "Attendance taken", LATE: "Taken late", MISSED: "Waiting for the office" };
 

@@ -42,6 +42,21 @@ From a student's or employee's record (or many at once from the list) print **ID
 - **Supplementary Exams**: re-sit papers for students who failed on marks.
 - **Calendar**: holidays, exams, events and deadlines.
 
+### Daily periods, breaks and changing times
+
+Timetable → **Daily periods** lists the periods of the day. Each has a type:
+
+- **Class period**: ordinary teaching period.
+- **Zero period / Assembly**: before the day starts; a class may be placed in it, the auto-scheduler never uses it.
+- **Break / Prayer / Lunch**: no class can be placed; it shows on every timetable and PDF with its name (e.g. *Lunch*, *Jumu'ah*).
+- **Library / Self-study**: no class and no teacher, but students are not "free" (it does not count as a free period).
+
+Tick days to make a period apply to some days only, e.g. a shorter Friday *Period 3* plus a Monday–Thursday *Period 3*. The same number cannot be used twice on one day, and periods on the same day cannot overlap.
+
+To make a period longer or shorter after the timetable is built, press **Change…** on it, set the new times and the date from which classes move, then **Preview**. You see every period that moves (with **Move the later periods by the same minutes** ticked, the periods after it shift too, so breaks keep their length) and how many classes move. Nothing changes until **Save this change**. Classes before that date, and any class whose attendance is already taken, keep their recorded times. Make-up or extra classes that would now overlap are listed as warnings. Deleting a period never moves classes, so use Change… to give a period new times.
+
+All times are shown on the 12-hour clock (8:00 AM, 1:30 PM).
+
 ### Several batches at once (one term per batch)
 
 When programs such as BS Dental, BS Anesthesia and BS MLT study semester 4 at the same time and share some subjects, give each batch its own term (e.g. *AHS BS Dental 4th*, *AHS BS Anesthesia 4th*) with the same start and end dates, and offer each subject in the term of every batch that studies it.

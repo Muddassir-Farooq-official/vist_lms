@@ -25,6 +25,7 @@ from app.academics.models import (
     EnrollmentOutcome,
     EnrollmentStatus,
     LectureResourceType,
+    PERIOD_KINDS,
     Period,
     TimetableSlot,
 )
@@ -1011,10 +1012,43 @@ def _times_overlap(start1: time, end1: time, start2: time, end2: time) -> bool:
     return start1 < end2 and start2 < end1
 
 
+WEEKDAY_VALUES = [d.value for d in DayOfWeek]
+
+
+def _norm_days(days) -> str | None:
+    """["FRIDAY", "monday"] -> "MONDAY,FRIDAY" (week order); empty / every day -> None."""
+    if not days:
+        return None
+    wanted = {str(d).strip().upper() for d in days if str(d).strip()}
+    bad = wanted - set(WEEKDAY_VALUES)
+    if bad:
+        raise BusinessRuleViolationError(f"Unknown day: {', '.join(sorted(bad))}.")
+    if len(wanted) == len(WEEKDAY_VALUES):
+        return None
+    return ",".join(d for d in WEEKDAY_VALUES if d in wanted) or None
+
+
+def _share_day(days_a: str | None, days_b: str | None) -> bool:
+    if not days_a or not days_b:
+        return True
+    return bool(set(days_a.split(",")) & set(days_b.split(",")))
+
+
+def _shift(t: time, minutes: int) -> time:
+    total = t.hour * 60 + t.minute + minutes
+    if total < 0 or total >= 24 * 60:
+        raise BusinessRuleViolationError("That would move a period past midnight. Shorten the change or the day.")
+    return time(total // 60, total % 60, t.second)
+
+
+def _minutes(t: time) -> int:
+    return t.hour * 60 + t.minute
+
+
 class PeriodService:
-    """Institute-wide daily periods — admin-defined once, the same
-    times every day. Both manual slot creation and TimetableService's
-    auto-assigner pick a Period instead of typing arbitrary times."""
+    """Institute-wide daily periods: the same times every day unless a period is limited to some weekdays (e.g. a
+    shorter Friday). A period is a class period, a zero period / assembly, a break, or a library / self-study period.
+    Both manual slot creation and the auto-schedulers pick a Period instead of typing arbitrary times."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -1024,23 +1058,155 @@ class PeriodService:
     async def list_all(self) -> list[Period]:
         return await self.repo.list_all()
 
-    async def create(self, *, period_number: int, start_time: time, end_time: time, actor_id: uuid.UUID) -> Period:
+    @staticmethod
+    def _check_kind(kind: str) -> str:
+        kind = (kind or "CLASS").upper()
+        if kind not in PERIOD_KINDS:
+            raise BusinessRuleViolationError("Period type must be one of: " + ", ".join(PERIOD_KINDS.values()) + ".")
+        return kind
+
+    @staticmethod
+    def _clashes(layout: dict, periods: list[Period]) -> str | None:
+        """layout: {period_id: (start, end, days)}. The first two periods that share a day and overlap, if any."""
+        items = [(p, *layout[p.id]) for p in periods]
+        for i, (a, sa, ea, da) in enumerate(items):
+            for b, sb, eb, db in items[i + 1:]:
+                if _share_day(da, db) and _times_overlap(sa, ea, sb, eb):
+                    return (f"Period {a.period_number} ({_hhmm(sa)}\u2013{_hhmm(ea)}) and Period {b.period_number} "
+                            f"({_hhmm(sb)}\u2013{_hhmm(eb)}) would overlap.")
+                if a.period_number == b.period_number and _share_day(da, db):
+                    return f"There are two Period {a.period_number}s on the same day. Give one another number or other days."
+        return None
+
+    async def create(self, *, period_number: int, start_time: time, end_time: time, actor_id: uuid.UUID,
+                     kind: str = "CLASS", label: str | None = None, days=None) -> Period:
         if start_time >= end_time:
             raise BusinessRuleViolationError("start_time must be before end_time.")
-        if await self.repo.get_by_number(period_number) is not None:
-            raise DuplicateResourceError(f"Period {period_number} already exists.")
+        kind, days_s = self._check_kind(kind), _norm_days(days)
+        label = (label or "").strip() or None
         for other in await self.repo.list_all():
+            if not _share_day(days_s, other.days):
+                continue
+            if other.period_number == period_number:
+                raise DuplicateResourceError(f"Period {period_number} already exists on those days.")
             if _times_overlap(start_time, end_time, other.start_time, other.end_time):
                 raise BusinessRuleViolationError(
                     f"This overlaps with Period {other.period_number} ({other.start_time}\u2013{other.end_time})."
                 )
 
-        period = await self.repo.create(Period(period_number=period_number, start_time=start_time, end_time=end_time))
+        period = await self.repo.create(Period(period_number=period_number, start_time=start_time, end_time=end_time,
+                                               kind=kind, label=label, days=days_s))
         await self.audit.log(
             actor_user_id=actor_id, action="period.created", entity_type="period", entity_id=period.id,
-            after={"period_number": period_number, "start_time": str(start_time), "end_time": str(end_time)},
+            after={"period_number": period_number, "start_time": str(start_time), "end_time": str(end_time),
+                   "kind": kind, "label": label, "days": days_s},
         )
         return period
+
+    async def change(
+        self, period_id: uuid.UUID, *, start_time: time, end_time: time, kind: str | None = None, label: str | None = None,
+        days=None, from_date: date | None = None, shift_later: bool = True, apply: bool = False, actor_id: uuid.UUID | None = None,
+    ) -> dict:
+        """Change a period's times, type, name or days. preview (apply=False) changes nothing and says what would happen.
+
+        Classes already on the timetable at this period move with it from `from_date` (default today): every weekly
+        slot of the period, and every class of those slots from that date on whose attendance is not taken yet.
+        Classes before that date, and classes whose attendance is taken, stay exactly as recorded.
+        shift_later: the periods after this one (on the same days) move by the same number of minutes as its end,
+        with their classes, so the day keeps its shape and breaks keep their length."""
+        target = await self.repo.get_by_id(period_id)
+        if target is None:
+            raise ResourceNotFoundError("Period not found.")
+        if start_time >= end_time:
+            raise BusinessRuleViolationError("The period must start before it ends.")
+        kind = self._check_kind(kind or target.kind)
+        days_s = _norm_days(days) if days is not None else target.days
+        label = (label or "").strip() or None if label is not None else target.label
+        from_date = from_date or institute_today()
+
+        periods = await self.repo.list_all()
+        slots_of = {p.id: list((await self.session.execute(select(TimetableSlot).where(TimetableSlot.period_id == p.id))).scalars())
+                    for p in periods}
+        mine = slots_of[target.id]
+        if mine and kind not in ("CLASS", "ZERO"):
+            raise BusinessRuleViolationError(
+                f"{len(mine)} class(es) are timetabled in this period. Move or remove them before making it a {PERIOD_KINDS[kind].lower()}.")
+        if mine and days_s:
+            off = sorted({sl.day_of_week.value.title() for sl in mine if sl.day_of_week.value not in days_s.split(",")})
+            if off:
+                raise BusinessRuleViolationError(f"Classes are timetabled in this period on {', '.join(off)}. Keep those days or move the classes first.")
+
+        delta = _minutes(end_time) - _minutes(target.end_time)
+        layout = {p.id: (p.start_time, p.end_time, p.days) for p in periods}
+        layout[target.id] = (start_time, end_time, days_s)
+        moved = {target.id}
+        if shift_later and delta:
+            for p in periods:
+                if p.id != target.id and _share_day(days_s, p.days) and p.start_time >= target.end_time:
+                    layout[p.id] = (_shift(p.start_time, delta), _shift(p.end_time, delta), p.days)
+                    moved.add(p.id)
+        problem = self._clashes(layout, periods)
+        if problem:
+            hint = "" if shift_later else " Tick 'move the later periods too', or change the next period first."
+            raise BusinessRuleViolationError(problem + hint)
+
+        # what moves
+        changes, slot_count, session_count, kept = [], 0, 0, 0
+        to_move_sessions = []
+        for p in sorted(periods, key=lambda x: layout[x.id][0]):
+            ns, ne, _d = layout[p.id]
+            if p.id not in moved or (ns, ne) == (p.start_time, p.end_time):
+                continue
+            slot_ids = [sl.id for sl in slots_of[p.id]]
+            sessions = []
+            if slot_ids:
+                sessions = list((await self.session.execute(select(ClassSession).where(
+                    ClassSession.timetable_slot_id.in_(slot_ids), ClassSession.session_date >= from_date))).scalars())
+            movable = [x for x in sessions if x.attendance_taken_at is None]
+            kept += len(sessions) - len(movable)
+            slot_count += len(slot_ids)
+            session_count += len(movable)
+            to_move_sessions.append((p, ns, ne, movable))
+            changes.append({"period_number": p.period_number, "label": p.label, "kind": p.kind,
+                            "from": f"{_hhmm(p.start_time)}\u2013{_hhmm(p.end_time)}", "to": f"{_hhmm(ns)}\u2013{_hhmm(ne)}",
+                            "slots": len(slot_ids), "classes": len(movable)})
+
+        # one-off classes (make-up / extra) from that date that would now overlap a moved period: a warning, not a block
+        warnings = []
+        oneoffs = list((await self.session.execute(select(ClassSession).where(
+            ClassSession.timetable_slot_id.is_(None), ClassSession.session_date >= from_date,
+            ClassSession.status == ClassSessionStatus.SCHEDULED))).scalars())
+        for x in oneoffs:
+            day = DAY_OF_WEEK_BY_PYTHON_WEEKDAY[x.session_date.weekday()].value
+            for p, ns, ne, _m in to_move_sessions:
+                if _share_day(p.days if p.id != target.id else days_s, day) and _times_overlap(ns, ne, x.start_time, x.end_time) \
+                        and not _times_overlap(p.start_time, p.end_time, x.start_time, x.end_time):
+                    warnings.append(f"A make-up/extra class on {x.session_date:%d %b} at {_hhmm(x.start_time)} now overlaps Period {p.period_number}.")
+                    break
+        day_end = max((layout[p.id][1] for p in periods), default=None)
+        report = {"applied": False, "changes": changes, "slots": slot_count, "classes": session_count, "kept_with_attendance": kept,
+                  "from_date": from_date, "warnings": warnings[:20], "day_ends": _hhmm(day_end) if day_end else None}
+        if not apply:
+            return report
+
+        before = {"start_time": str(target.start_time), "end_time": str(target.end_time), "kind": target.kind, "label": target.label, "days": target.days}
+        for p, ns, ne, movable in to_move_sessions:
+            for sl in slots_of[p.id]:
+                sl.start_time, sl.end_time = ns, ne
+            for x in movable:
+                x.start_time, x.end_time = ns, ne
+        for p in periods:
+            if p.id in moved:
+                p.start_time, p.end_time = layout[p.id][0], layout[p.id][1]
+        target.kind, target.label, target.days = kind, label, days_s
+        await self.session.flush()
+        await self.audit.log(
+            actor_user_id=actor_id, action="period.changed", entity_type="period", entity_id=target.id, before=before,
+            after={"start_time": str(start_time), "end_time": str(end_time), "kind": kind, "label": label, "days": days_s,
+                   "from_date": str(from_date), "periods_moved": len(changes), "slots_moved": slot_count, "classes_moved": session_count},
+        )
+        report["applied"] = True
+        return report
 
     async def delete(self, period_id: uuid.UUID, *, actor_id: uuid.UUID) -> None:
         period = await self.repo.get_by_id(period_id)
@@ -1048,6 +1214,12 @@ class PeriodService:
             raise ResourceNotFoundError("Period not found.")
         await self.repo.delete(period)
         await self.audit.log(actor_user_id=actor_id, action="period.deleted", entity_type="period", entity_id=period_id)
+
+
+def _hhmm(t: time) -> str:
+    from app.core.timefmt import hm12
+
+    return hm12(t)
 
 
 class TimetableService:
@@ -1451,6 +1623,10 @@ class TimetableService:
         period = await self.period_repo.get_by_id(period_id)
         if period is None:
             raise ResourceNotFoundError("Period not found.")
+        if not period.holds_class:
+            raise BusinessRuleViolationError(f"Period {period.period_number} is a {PERIOD_KINDS[period.kind].lower()}; no class can be placed in it.")
+        if not period.applies_on(day_of_week):
+            raise BusinessRuleViolationError(f"Period {period.period_number} is not used on {day_of_week.value.title()}.")
         start_time, end_time = period.start_time, period.end_time
 
         await self._check_conflicts(
@@ -1514,9 +1690,11 @@ class TimetableService:
         teacher_busy_days: set[DayOfWeek] = set()
         if offering.assigned_teacher_id is not None:
             teacher_busy_days = {sl.day_of_week for sl in await self.slot_repo.list_for_teacher(offering.assigned_teacher_id)}
-        for period in periods:
+        for period in [p for p in periods if p.kind == "CLASS"]:      # never into a break, study or zero period
             usable: dict[DayOfWeek, list[str]] = {}
             for day in weekdays:
+                if not period.applies_on(day):
+                    continue
                 neighbours = await self._live_neighbours(offering, day, period.start_time, period.end_time)
                 when = f"{day.value} {{}}\u2013{{}}"
                 if await self._people_conflict(offering, neighbours, when) is not None:

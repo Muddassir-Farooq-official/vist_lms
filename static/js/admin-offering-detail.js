@@ -210,7 +210,7 @@
     result.body.forEach(function (period) {
       const opt = document.createElement("option");
       opt.value = period.id;
-      opt.textContent = "Period " + period.period_number + " (" + period.start_time.slice(0, 5) + "\u2013" + period.end_time.slice(0, 5) + ")";
+      opt.textContent = "Period " + period.period_number + " (" + window.VistAdmin.formatTimeShort(period.start_time) + "\u2013" + window.VistAdmin.formatTimeShort(period.end_time) + ")";
       tsPeriodSelect.appendChild(opt);
     });
   }
@@ -239,7 +239,7 @@
       const tr = document.createElement("tr");
       tr.innerHTML =
         "<td>" + VA.escapeHtml(dayLabel(slot.day_of_week)) + "</td>" +
-        "<td>" + slot.start_time.slice(0, 5) + "\u2013" + slot.end_time.slice(0, 5) + "</td>" +
+        "<td>" + window.VistAdmin.formatTimeShort(slot.start_time) + "\u2013" + window.VistAdmin.formatTimeShort(slot.end_time) + "</td>" +
         "<td>" + VA.escapeHtml(slot.room) + "</td>" +
         '<td><button type="button" class="role-btn small-btn slot-change" data-id="' + slot.id + '">Change</button> ' +
         '<button type="button" class="danger-btn small-btn slot-delete" data-id="' + slot.id + '">Delete</button></td>';
@@ -300,7 +300,7 @@
   let scSlot = null, scTimer = null;
   function scPeriodOptions(selected) {
     document.getElementById("sc-period").innerHTML = periodsCache.map(function (p) {
-      return '<option value="' + p.id + '"' + (p.id === selected ? " selected" : "") + ">Period " + p.period_number + " (" + p.start_time.slice(0, 5) + "\u2013" + p.end_time.slice(0, 5) + ")</option>";
+      return '<option value="' + p.id + '"' + (p.id === selected ? " selected" : "") + ">Period " + p.period_number + " (" + window.VistAdmin.formatTimeShort(p.start_time) + "\u2013" + window.VistAdmin.formatTimeShort(p.end_time) + ")</option>";
     }).join("");
   }
   async function scPreview() {
@@ -314,7 +314,7 @@
   }
   function openSlotChange(slot) {
     scSlot = slot;
-    document.getElementById("sc-current").textContent = "Now: every " + dayLabel(slot.day_of_week) + ", " + slot.start_time.slice(0, 5) + "\u2013" + slot.end_time.slice(0, 5) + ", room " + slot.room + ".";
+    document.getElementById("sc-current").textContent = "Now: every " + dayLabel(slot.day_of_week) + ", " + window.VistAdmin.formatTimeShort(slot.start_time) + "\u2013" + window.VistAdmin.formatTimeShort(slot.end_time) + ", room " + slot.room + ".";
     const from = document.getElementById("sc-from");
     from.min = isoToday(); if (termDates.end) from.max = termDates.end;
     from.value = isoToday();

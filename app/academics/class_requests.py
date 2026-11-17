@@ -13,6 +13,8 @@ No new tables: a request is an approval_requests row whose payload says what to 
 """
 from __future__ import annotations
 
+from app.core.timefmt import hm12
+
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
@@ -184,6 +186,8 @@ class ClassRequestService:
             if DAY_NAMES[d.weekday()] in working and d not in holidays:
                 busy = await self._busy_on(d)
                 for p in periods:
+                    if not p.holds_class or not p.applies_on(DAY_NAMES[d.weekday()]):     # breaks / study periods / other days' periods
+                        continue
                     if d == today and p.start_time <= now:
                         continue
                     if await self._problem(offering, d, p.start_time, p.end_time, busy):
@@ -252,7 +256,7 @@ class ClassRequestService:
         course = await self.session.get(Course, offering.course_id)
         label = f"{course.code if course else ''} {offering.section_label or ''}".strip()
         what = "Make-up" if kind == "MAKEUP" else "Extra"
-        summary = (f"{what} class: {label} on {session_date:%a %d %b %Y} {period.start_time:%H:%M}–{period.end_time:%H:%M}, room {room}"
+        summary = (f"{what} class: {label} on {session_date:%a %d %b %Y} {hm12(period.start_time)}–{hm12(period.end_time)}, room {room}"
                    + (f" (for the class of {replaced.session_date:%d %b})" if replaced else ""))
         payload = {"course_offering_id": str(offering.id), "kind": kind, "session_date": session_date.isoformat(),
                    "start_time": period.start_time.isoformat(), "end_time": period.end_time.isoformat(), "period_id": str(period.id),

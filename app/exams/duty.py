@@ -52,6 +52,12 @@ def _hm(t) -> str:
     return t.strftime("%H:%M")
 
 
+def _hm12(t) -> str:
+    from app.core.timefmt import hm12
+
+    return hm12(t)
+
+
 def _norm(name: str | None) -> str:
     return re.sub(r"[^a-z0-9]", "", (name or "").lower())
 
@@ -132,7 +138,7 @@ class ExamDutyService:
             .join(CourseOffering, CourseOffering.id == ExamPaper.course_offering_id).join(Course, Course.id == CourseOffering.course_id)
             .where(ExamPaper.exam_date == day, ExamPaper.id != paper.id, ExamPaper.start_time < end, ExamPaper.end_time > start))).all()
         for emp_id, p, code in rows:
-            out[emp_id] = f"On duty: {code} paper {_hm(p.start_time)}–{_hm(p.end_time)}"
+            out[emp_id] = f"On duty: {code} paper {_hm12(p.start_time)}–{_hm12(p.end_time)}"
         # that day's class sessions
         sessions = (await self.session.execute(
             select(ClassSession, CourseOffering.assigned_teacher_id, Course.code).join(CourseOffering, CourseOffering.id == ClassSession.course_offering_id)
@@ -140,7 +146,7 @@ class ExamDutyService:
         has_sessions = {s.course_offering_id for s, _t, _c in sessions}
         for s, teacher, code in sessions:
             if teacher and s.status != ClassSessionStatus.CANCELLED and s.start_time < end and s.end_time > start:
-                out.setdefault(teacher, f"Teaching {code} {_hm(s.start_time)}–{_hm(s.end_time)}")
+                out.setdefault(teacher, f"Teaching {code} {_hm12(s.start_time)}–{_hm12(s.end_time)}")
         # the weekly timetable, for courses whose sessions for that day are not made yet
         weekday = DAY_OF_WEEK_BY_PYTHON_WEEKDAY[day.weekday()]
         slots = (await self.session.execute(
@@ -153,7 +159,7 @@ class ExamDutyService:
                 continue
             if (off.term_start_date and day < off.term_start_date) or (off.term_end_date and day > off.term_end_date):
                 continue
-            out.setdefault(off.assigned_teacher_id, f"Teaching {code} {_hm(slot.start_time)}–{_hm(slot.end_time)}")
+            out.setdefault(off.assigned_teacher_id, f"Teaching {code} {_hm12(slot.start_time)}–{_hm12(slot.end_time)}")
         return out
 
     async def _load(self, schedule_id: uuid.UUID) -> dict[uuid.UUID, int]:

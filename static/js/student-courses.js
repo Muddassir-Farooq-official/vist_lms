@@ -265,7 +265,7 @@
         }).join("");
       }
       block.innerHTML =
-        "<strong>" + session.session_date + " \u00b7 " + session.start_time.slice(0, 5) + "\u2013" + session.end_time.slice(0, 5) +
+        "<strong>" + session.session_date + " \u00b7 " + window.VistAdmin.formatTimeShort(session.start_time) + "\u2013" + window.VistAdmin.formatTimeShort(session.end_time) +
         " \u00b7 " + VA.escapeHtml(session.room) +
         (cancelled ? ' <span class="status-pill cancelled">CANCELLED</span>' : "") +
         (session.topic_completed && !cancelled ? ' <span class="badge-covered">\u2713 Covered</span>' : "") +

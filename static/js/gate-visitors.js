@@ -107,7 +107,7 @@
       const cellOf = function (inner) { return '<td><span class="vl-c">' + inner + "</span></td>"; };
       tr.innerHTML =
         cellOf("<strong>" + esc(v.visitor_name) + "</strong><small>" + esc([v.reference, v.coming_from].filter(Boolean).join(" · ")) + "</small>") +
-        cellOf("<strong>" + esc(String(v.entry_time).slice(0, 5)) + " \u2192 " + (v.exit_time ? esc(String(v.exit_time).slice(0, 5)) : '<span class="status-pill pending">inside</span>') + "</strong><small>" + esc(day) + "</small>") +
+        cellOf("<strong>" + esc(String(window.VistAdmin.formatTimeShort(v.entry_time))) + " \u2192 " + (v.exit_time ? esc(String(window.VistAdmin.formatTimeShort(v.exit_time))) : '<span class="status-pill pending">inside</span>') + "</strong><small>" + esc(day) + "</small>") +
         cellOf(esc(v.cnic || "—") + "<small>" + esc(v.phone || "") + "</small>") +
         cellOf(esc(v.purpose) + "<small>" + esc(v.person_to_meet || "") + "</small>") +
         cellOf(esc([v.vehicle_no, v.people_count > 1 ? v.people_count + " people" : null, v.card_no ? "card " + v.card_no : null].filter(Boolean).join(" · ") || "—")) +

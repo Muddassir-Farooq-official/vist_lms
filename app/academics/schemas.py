@@ -175,6 +175,20 @@ class PeriodCreateRequest(BaseModel):
     period_number: int = Field(gt=0, le=50)
     start_time: time
     end_time: time
+    kind: str = "CLASS"                 # CLASS, ZERO (zero period / assembly), BREAK, STUDY (library / self-study)
+    label: str | None = Field(default=None, max_length=40)
+    days: list[str] | None = None       # weekdays it applies to; empty = every day
+
+
+class PeriodChangeRequest(BaseModel):
+    start_time: time
+    end_time: time
+    kind: str | None = None
+    label: str | None = Field(default=None, max_length=40)
+    days: list[str] | None = None
+    from_date: date | None = None       # classes from this date move; earlier ones stay as they were (default today)
+    shift_later: bool = True            # move the later periods by the same minutes
+    apply: bool = False                 # False = preview only
 
 
 class PeriodOut(BaseModel):
@@ -184,6 +198,9 @@ class PeriodOut(BaseModel):
     period_number: int
     start_time: time
     end_time: time
+    kind: str = "CLASS"
+    label: str | None = None
+    days: list[str] = Field(default_factory=list, validation_alias="day_list")
 
 
 class TimetableSlotCreateRequest(BaseModel):
@@ -329,6 +346,7 @@ class WeeklyRowOut(BaseModel):
     start_time: time
     end_time: time
     period_number: int | None
+    breaks: dict[str, str] = {}          # weekday -> "Lunch" / "Break" / "Library / self-study" in that row
 
 
 class WeeklyCellOut(BaseModel):

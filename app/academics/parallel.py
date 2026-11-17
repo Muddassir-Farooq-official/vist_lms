@@ -27,6 +27,7 @@ from app.academics.combined import members, same_group
 from app.academics.models import Course, CourseOffering, DayOfWeek, Period, TimetableSlot
 from app.academics.rooms import Room, room_key
 from app.audit.service import AuditService
+from app.core.timefmt import hm12, range12
 from app.auth.permissions import Permissions
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser, require_permission
@@ -133,17 +134,19 @@ class ParallelTimetableService:
                 "combined_with": [t for t in d["group_terms"].get(o.combined_group_id, []) if t != o.term_label],
             })
         out = []
-        total = len(d["days"]) * len(periods)
+        # only ordinary class periods on the days they apply can be "free"; breaks, study and zero periods never are
+        class_cells = {f"{day.value}|{p.id}" for day in d["days"] for p in periods if p.kind == "CLASS" and p.applies_on(day)}
+        total = len(class_cells)
         for key in sorted(tracks, key=lambda k: (k[0], k[1])):
             t = tracks[key]
-            busy = len(t["cells"])
+            busy = len(class_cells & set(t["cells"]))
             missing = sum(x["missing"] for x in t["offerings"])
             out.append({"term": t["term"], "section": t["section"], "cells": dict(t["cells"]), "offerings": t["offerings"],
                         "periods_in_week": total, "busy": busy, "free": total - busy, "missing_classes": missing,
                         "clashes": sorted(k for k, v in t["cells"].items() if len({x["offering_id"] for x in v}) > 1)})
         return {"terms": d["labels"], "days": [x.value for x in d["days"]],
-                "periods": [{"id": p.id, "number": p.period_number, "start": p.start_time.strftime("%H:%M"),
-                             "end": p.end_time.strftime("%H:%M")} for p in periods],
+                "periods": [{"id": p.id, "number": p.period_number, "start": hm12(p.start_time), "end": hm12(p.end_time),
+                             "kind": p.kind, "label": p.label, "days": p.day_list} for p in periods],
                 "tracks": out}
 
     # ------------------------------------------------------------------ auto-fill
@@ -209,7 +212,7 @@ class ParallelTimetableService:
             last_reason = "Every free period of these students clashes with the teacher, a room or other classes."
             for _ in range(u["missing"]):
                 used = unit_days[u["key"]]
-                cells = sorted(((day, p) for day in d["days"] for p in periods),
+                cells = sorted(((day, p) for day in d["days"] for p in periods if p.kind == "CLASS" and p.applies_on(day)),
                                key=lambda c: (used[c[0]], c[1].period_number, day_index[c[0]]))
                 best = None
                 for day, p in cells:
@@ -255,7 +258,7 @@ class ParallelTimetableService:
                 planned.append({"offering_id": u["lead"].id, "code": code, "title": u["course"].title if u["course"] else "",
                                 "terms": sorted({m.term_label for m in u["group"]}), "section": u["lead"].section_label,
                                 "day": day.value, "period_id": p.id, "period": p.period_number,
-                                "time": f"{p.start_time.strftime('%H:%M')}–{p.end_time.strftime('%H:%M')}", "room": room,
+                                "time": range12(p.start_time, p.end_time), "room": room,
                                 "teacher": d["teachers"].get(u["teacher"])})
             if placed_here < u["missing"]:
                 unplaced.append({"code": code, "terms": sorted({m.term_label for m in u["group"]}), "section": u["lead"].section_label,
