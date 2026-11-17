@@ -1,5 +1,6 @@
-"""Combined classes: sections of the SAME course in the same term that one teacher teaches together, at the
-same time, e.g. AHS201 for BS Anesthesia (section A) and BS Dental (section B).
+"""Combined classes: sections of the SAME course that one teacher teaches together, at the same time, e.g. AHS201
+for BS Anesthesia (section A) and BS Dental (section B). The sections may be in the same term, or in different batch
+terms that run at the same time of year ("AHS BS Dental 4th" and "AHS BS Anesthesia 4th", see concurrent()).
 
 Each section stays its own record (its students, attendance, marks and result sheet), and they are linked by
 CourseOffering.combined_group_id. Linking them means:
@@ -39,6 +40,16 @@ async def member_ids(session: AsyncSession, offering_id: uuid.UUID) -> list[uuid
     return [o.id for o in await members(session, offering_id)]
 
 
+def concurrent(a: CourseOffering, b: CourseOffering) -> bool:
+    """Two sections can be one class when they run at the same time of year: the same term, or (one term per batch,
+    e.g. "BS Dental 4th" and "BS Anesthesia 4th") terms whose dates overlap. Sections without dates count as concurrent."""
+    if (a.term_label or "").lower() == (b.term_label or "").lower():
+        return True
+    if None in (a.term_start_date, a.term_end_date, b.term_start_date, b.term_end_date):
+        return True
+    return a.term_start_date <= b.term_end_date and b.term_start_date <= a.term_end_date
+
+
 def same_group(a: CourseOffering, b: CourseOffering) -> bool:
     return a.combined_group_id is not None and a.combined_group_id == b.combined_group_id
 
@@ -76,9 +87,10 @@ class CombinedClassService:
         if off is None:
             raise ResourceNotFoundError("Course offering not found.")
         group = await members(self.session, off)
-        others = list((await self.session.execute(select(CourseOffering).where(
-            CourseOffering.course_id == off.course_id, func.lower(CourseOffering.term_label) == off.term_label.lower(),
-            CourseOffering.id.not_in([g.id for g in group])).order_by(CourseOffering.section_label))).scalars())
+        # sections of the same course in this term, or in another batch's term running at the same time (one term per batch)
+        others = [o for o in (await self.session.execute(select(CourseOffering).where(
+            CourseOffering.course_id == off.course_id, CourseOffering.id.not_in([g.id for g in group]))
+            .order_by(CourseOffering.term_label, CourseOffering.section_label))).scalars() if concurrent(o, off)]
         progs = await programs_of(self.session, [o.id for o in group + others])
         counts = dict((await self.session.execute(select(Enrollment.course_offering_id, func.count()).where(
             Enrollment.course_offering_id.in_([o.id for o in group + others]), Enrollment.status == EnrollmentStatus.ENROLLED)
@@ -87,7 +99,7 @@ class CombinedClassService:
             Employee.id.in_({o.assigned_teacher_id for o in group + others if o.assigned_teacher_id})))).scalars()}
 
         def row(o):
-            return {"id": o.id, "section_label": o.section_label, "programs": progs.get(o.id, []), "students": counts.get(o.id, 0),
+            return {"id": o.id, "section_label": o.section_label, "term_label": o.term_label, "programs": progs.get(o.id, []), "students": counts.get(o.id, 0),
                     "teacher_id": o.assigned_teacher_id, "teacher": teachers.get(o.assigned_teacher_id)}
         return {"combined": off.combined_group_id is not None, "members": [row(o) for o in group], "can_join": [row(o) for o in others],
                 "students": sum(counts.get(o.id, 0) for o in group)}
@@ -104,8 +116,10 @@ class CombinedClassService:
             o = await self.session.get(CourseOffering, oid)
             if o is None or o.id == lead.id:
                 raise ValidationAppError("Choose other sections to combine with.")
-            if o.course_id != lead.course_id or o.term_label.lower() != lead.term_label.lower():
-                raise BusinessRuleViolationError("Only sections of the same course in the same term can be combined.")
+            if o.course_id != lead.course_id:
+                raise BusinessRuleViolationError("Only sections of the same course can be combined.")
+            if not concurrent(o, lead):
+                raise BusinessRuleViolationError(f"{o.term_label} and {lead.term_label} do not run at the same time of year, so they cannot be one class.")
             others.append(o)
         if not others:
             raise ValidationAppError("Choose at least one other section.")

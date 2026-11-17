@@ -31,7 +31,7 @@ From a student's or employee's record (or many at once from the list) print **ID
 
 - **Programs**: each program with its students and curriculum. (A school has **Classes & sections** here instead: classes, sections, class teachers and who teaches which subject.)
 - **Courses**: the course catalogue, curriculum placement, term offerings and materials. Academic terms are on the Academic terms tab.
-- **Timetable**: the weekly timetable for any class, semester, section or teacher, with PDF download. Tabs: weekly view, slots, **Daily periods** and **Rooms**. Once rooms are listed, the timetable only accepts listed rooms big enough for the class.
+- **Timetable**: the weekly timetable for any class, semester, section or teacher, with PDF download. Tabs: weekly view, slots, **Daily periods**, **Rooms** and **Batches side by side**. Once rooms are listed, the timetable only accepts listed rooms big enough for the class.
 - **Attendance**: classes nobody marked, teachers' correction requests, marking a register yourself, locking a course at the end of term, and holidays or approved leave. Students below the attendance minimum are barred from the final exam.
 - **Teacher Progress**: how far each teacher actually is through their course versus where they should be, from topics marked complete.
 - **Course feedback**: students' anonymous feedback on each course and teacher.
@@ -41,6 +41,16 @@ From a student's or employee's record (or many at once from the list) print **ID
 - **Datesheets**: plan exam papers, put teachers on duty, fix clashes, publish and print admit cards.
 - **Supplementary Exams**: re-sit papers for students who failed on marks.
 - **Calendar**: holidays, exams, events and deadlines.
+
+### Several batches at once (one term per batch)
+
+When programs such as BS Dental, BS Anesthesia and BS MLT study semester 4 at the same time and share some subjects, give each batch its own term (e.g. *AHS BS Dental 4th*, *AHS BS Anesthesia 4th*) with the same start and end dates, and offer each subject in the term of every batch that studies it.
+
+1. **Shared subject, one teacher, one room**: open the subject in one batch's term, choose **Combined class**, and tick the same subject in the other batches' terms. It becomes one class: its timetable is the same in every batch, and the teacher is not "already booked" by his own combined class. Sections can only be combined when their terms run at the same time of year.
+2. **Batches side by side** (Timetable): tick the batch terms and press **Show side by side**. Each column is one group of students; a red cell is a free period for them. The chips above show how many free periods each batch has and how many weekly classes are still to place (a course needs as many classes a week as its credit hours, at most 5).
+3. **Fill free periods…** proposes classes for the free periods: combined classes first (one class fills a period in every batch), each at a time that suits the teacher, the students and a room big enough for them. Nothing is added until you press **Add these classes**; existing classes are never moved. Anything that could not be placed is listed with the reason.
+
+If free periods remain after that, those students have fewer weekly class hours than the week has periods. Add a tutorial, lab or library period, or shorten the day. Two batches in different terms are treated as different students (so their own subjects may run at the same time) when the system can tell the batches apart: set the program and semester on each batch term in Academic terms, or offer at least one program-only subject in each. Students actually enrolled in both are always checked.
 
 ### Make-up and extra classes
 

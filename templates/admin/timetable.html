@@ -10,6 +10,7 @@
   <button class="portal-tab" data-tab="slots" role="tab" aria-selected="false"><span>All slots</span></button>
   <button class="portal-tab" data-tab="periods" role="tab" aria-selected="false"><span>Daily periods</span></button>
   <button class="portal-tab" data-tab="rooms" role="tab" aria-selected="false"><span>Rooms</span></button>
+  <button class="portal-tab" data-tab="parallel" role="tab" aria-selected="false"><span>Batches side by side</span></button>
 </div>
 
 <div class="portal-tab-panel" data-tab-panel="weekly">
@@ -62,6 +63,25 @@
 </section>
 </div>
 
+<div class="portal-tab-panel" data-tab-panel="parallel" hidden>
+<section class="panel">
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("dashboard") }}</div><h2>Batches side by side</h2></div></div>
+  <p class="panel-hint">Pick the batch terms that run at the same time, e.g. <em>AHS BS Dental 4th</em>, <em>AHS BS Anesthesia 4th</em> and <em>AHS BS MLT 4th</em>.
+    Each column is one group of students; a <strong>red cell is a free period</strong> for them. A shared subject taught to several batches together
+    (a combined class) fills a cell in every batch it covers. <strong>Fill free periods</strong> proposes classes for sections still short of their
+    weekly classes (credit hours, at most 5 a week); nothing is added until you confirm, and existing classes are never moved.</p>
+  <div class="pt-terms" id="pt-terms"><span class="sd-dim">Loading terms…</span></div>
+  <div class="att-go pt-actions">
+    <button type="button" class="role-btn" id="pt-show">Show side by side</button>
+    <button type="button" class="role-btn" id="pt-fill" disabled>Fill free periods…</button>
+  </div>
+  <p id="pt-error" class="dash-alert error" hidden></p>
+  <div id="pt-summary" class="pt-summary"></div>
+  <div id="pt-plan"></div>
+  <div class="pt-wrap"><table class="dash-table pt-grid" id="pt-grid" hidden></table></div>
+</section>
+</div>
+
 <div class="portal-tab-panel" data-tab-panel="slots" hidden>
 <section class="panel sd-panel">
   <div class="sd-toolbar">
@@ -91,4 +111,5 @@
 <script src="/static/js/weekly-timetable.js"></script>
 <script src="/static/js/admin-timetable.js"></script>
 <script src="/static/js/admin-rooms.js"></script>
+<script src="/static/js/parallel-timetable.js"></script>
 {% endblock %}

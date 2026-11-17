@@ -9,7 +9,7 @@
   function esc(s) { return VA.escapeHtml(s == null ? "" : String(s)); }
   function msg(r, f) { return (r.body && r.body.error && r.body.error.message) || f; }
   function who(m) {
-    return "Section " + esc(m.section_label) + (m.programs.length ? " · " + esc(m.programs.join(", ")) : "") + " · " + m.students + " student" + (m.students === 1 ? "" : "s");
+    return (m.term_label ? esc(m.term_label) + " \u00b7 " : "") + "Section " + esc(m.section_label) + (m.programs.length ? " · " + esc(m.programs.join(", ")) : "") + " · " + m.students + " student" + (m.students === 1 ? "" : "s");
   }
 
   async function load() {
@@ -34,7 +34,7 @@
       const teachers = {};
       d.members.concat(d.can_join).forEach(function (m) { if (m.teacher_id) teachers[m.teacher_id] = m.teacher; });
       const tIds = Object.keys(teachers);
-      html += '<div class="cb-join"><p><strong>' + (d.combined ? "Add sections" : "Combine with") + "</strong> (other sections of this course this term):</p>" +
+      html += '<div class="cb-join"><p><strong>' + (d.combined ? "Add sections" : "Combine with") + "</strong> (other sections of this course this term, or in another batch\'s term running at the same time):</p>" +
         d.can_join.map(function (m) {
           return '<label class="cb-opt"><input type="checkbox" value="' + esc(m.id) + '"> ' + who(m) + (m.teacher ? ' <small>' + esc(m.teacher) + "</small>" : "") + "</label>";
         }).join("") +
@@ -43,7 +43,7 @@
         '<p class="dash-alert error" id="cb-error" hidden></p><button type="button" class="role-btn small-btn" id="cb-go">Combine</button>' +
         '<p class="panel-hint">A section without a timetable gets this one’s; a section with a different timetable or marks scheme must be made the same first.</p></div>';
     } else if (!d.combined) {
-      html += '<p class="sd-dim">There is no other section of this course this term to combine with.</p>';
+      html += '<p class="sd-dim">There is no other section of this course to combine with (this term, or another batch\'s term running at the same time).</p>';
     }
     box.innerHTML = html;
     const sep = document.getElementById("cb-separate");

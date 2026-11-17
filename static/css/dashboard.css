@@ -4070,3 +4070,24 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 .sa-items { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 14px; }
 .sa-course { margin-bottom: 18px; }
 .sa-course h3 { font-size: 15px; margin: 0 0 6px; }
+/* Timetable -> Batches side by side */
+.pt-terms { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 8px 0 4px; }
+.pt-terms label { display: inline-flex; align-items: center; gap: 6px; font-size: .86rem; }
+.pt-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.pt-actions .role-btn, .pt-plan .att-go .role-btn { width: auto; flex: 0 0 auto; padding-left: 18px; padding-right: 18px; }
+.pt-summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.pt-chip { border: 1px solid var(--border, #e3e6ee); border-radius: 10px; padding: 8px 12px; font-size: .82rem; background: var(--surface, #fff); }
+.pt-chip strong { display: block; font-size: .86rem; }
+.pt-chip .pt-bad { color: #b42318; font-weight: 700; }
+.pt-chip .pt-good { color: #067647; font-weight: 700; }
+.pt-wrap { overflow-x: auto; }
+.pt-grid th, .pt-grid td { vertical-align: top; min-width: 150px; font-size: .8rem; }
+.pt-grid th.pt-when, .pt-grid td.pt-when { min-width: 90px; white-space: nowrap; }
+.pt-grid td.pt-free { background: #fdecec; color: #b42318; font-weight: 600; }
+.pt-grid td.pt-clash { background: #fff4e5; }
+.pt-grid tr.pt-day-start td, .pt-grid tr.pt-day-start th { border-top: 2px solid var(--border-strong, #c9cfdb); }
+.pt-cls { display: block; }
+.pt-cls small { display: block; color: var(--text-secondary, #475569); font-weight: 400; }
+.pt-comb { display: inline-block; font-size: .7rem; padding: 0 6px; border-radius: 8px; background: #e8f1ff; color: #1d4ed8; margin-left: 4px; }
+.pt-plan { margin: 10px 0; }
+.pt-plan table td, .pt-plan table th { font-size: .8rem; }
