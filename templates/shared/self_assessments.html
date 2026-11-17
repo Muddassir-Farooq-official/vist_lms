@@ -1,0 +1,54 @@
+{% extends base_template %}
+{% block allowed_roles %}{{ allowed_roles|default("ADMIN") }}{% endblock %}
+{% block title %}Self-assessments{% endblock %}
+{% block page_title %}Self-assessments{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">{% if mode == "teacher" %}Marks of practice quizzes, class tests and assignments done on paper. They never count in exams or results.{% else %}Marks of practice quizzes and class tests done on paper, with the class average. They never count in exams or results.{% endif %}</div>{% endblock %}
+
+{% block content %}
+<section class="sh-card" id="sa-root" data-mode="{{ mode }}">
+  {% if mode == "teacher" %}
+  <div class="cr-bar">
+    <label>Course<select id="sa-course" class="select-input"><option value="">Loading&hellip;</option></select></label>
+    <div class="att-go"><button type="button" class="role-btn" id="sa-new">+ New self-assessment</button></div>
+  </div>
+  <div id="sa-items" class="sa-items"></div>
+  <h3 class="tt-sub">Students</h3>
+  <div class="table-scroll"><table class="tk-table" id="sa-grid"><thead></thead><tbody></tbody></table></div>
+  {% elif mode == "parent" %}
+  <div class="cr-bar"><label>Child<select id="sa-child" class="select-input"></select></label></div>
+  <div id="sa-mine"></div>
+  {% else %}
+  <div id="sa-mine"><p class="cc-meta">Loading&hellip;</p></div>
+  {% endif %}
+</section>
+
+{% if mode == "teacher" %}
+<dialog id="sa-modal" class="modal" aria-labelledby="sa-title"><div class="modal-body">
+  <h2 id="sa-title">Self-assessment</h2>
+  <div class="form-grid two-col">
+    <div class="form-field"><label for="sa-f-title">Title</label><input id="sa-f-title" class="text-input" maxlength="120" placeholder="e.g. Quiz 1" /></div>
+    <div class="form-field"><label for="sa-f-kind">Kind</label><select id="sa-f-kind" class="select-input"><option value="QUIZ">Quiz</option><option value="TEST">Class test</option>
+      <option value="ASSIGNMENT">Assignment</option><option value="PRESENTATION">Presentation</option><option value="OTHER">Other</option></select></div>
+    <div class="form-field"><label for="sa-f-date">Held on</label><input id="sa-f-date" type="date" class="text-input" /></div>
+    <div class="form-field"><label for="sa-f-max">Total marks</label><input id="sa-f-max" type="number" min="1" max="1000" step="0.5" class="text-input" /></div>
+  </div>
+  <div class="form-field"><label for="sa-f-topic">Topic (optional)</label><input id="sa-f-topic" class="text-input" maxlength="2000" /></div>
+  <p id="sa-error" class="dash-alert error" hidden></p>
+  <div class="form-actions"><button type="button" class="role-btn" id="sa-save">Save</button></div>
+  <button id="sa-close" class="back-link modal-close-btn" type="button">Close</button></div></dialog>
+
+<dialog id="sa-marks-modal" class="modal modal-wide" aria-labelledby="sa-marks-title"><div class="modal-body">
+  <h2 id="sa-marks-title">Marks</h2>
+  <p class="panel-hint">Type each student's marks. Tick Absent for students who missed it. Leave a box empty for no mark. Or upload a CSV with
+    <code>roll_number,marks</code> (A = absent).</p>
+  <div class="form-actions"><label class="role-btn secondary-btn">Upload CSV<input type="file" id="sa-csv" accept=".csv,text/csv" hidden /></label></div>
+  <div class="table-scroll"><table class="tk-table"><thead><tr><th>Roll no.</th><th>Name</th><th>Marks</th><th>Absent</th><th>Remark</th></tr></thead><tbody id="sa-marks-body"></tbody></table></div>
+  <p id="sa-marks-error" class="dash-alert error" hidden></p>
+  <div class="form-actions"><button type="button" class="role-btn" id="sa-marks-save">Save marks</button></div>
+  <button id="sa-marks-close" class="back-link modal-close-btn" type="button">Close</button></div></dialog>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/self-assessments.js"></script>
+{% endblock %}

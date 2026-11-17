@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.academics.models import (
@@ -95,6 +95,93 @@ class AssessmentTypeService:
             entity_id=assessment_type.id, before={"name": assessment_type.name},
         )
         await self.session.delete(assessment_type)
+
+
+    async def usage(self, assessment_type_id: uuid.UUID) -> dict:
+        """What a forced delete would remove: subjects using the type, their published results, students and marks."""
+        from sqlalchemy import func
+
+        from app.academics.models import ResultSheet, ResultSheetStatus
+        from app.supplementary.models import SupplementaryAttempt
+
+        t = await self.session.get(AssessmentType, assessment_type_id)
+        if t is None:
+            raise ResourceNotFoundError("Assessment type not found.")
+        oas = list((await self.session.execute(select(OfferingAssessment).where(OfferingAssessment.assessment_type_id == t.id))).scalars())
+        oa_ids = [o.id for o in oas]
+        offering_ids = list({o.course_offering_id for o in oas})
+        marks = students = published = supp = 0
+        if oa_ids:
+            marks = (await self.session.execute(select(func.count()).select_from(StudentMark).where(StudentMark.offering_assessment_id.in_(oa_ids)))).scalar_one()
+            students = (await self.session.execute(select(func.count(func.distinct(StudentMark.enrollment_id)))
+                                                   .where(StudentMark.offering_assessment_id.in_(oa_ids)))).scalar_one()
+            published = (await self.session.execute(select(func.count()).select_from(ResultSheet).where(
+                ResultSheet.course_offering_id.in_(offering_ids), ResultSheet.status == ResultSheetStatus.PUBLISHED))).scalar_one()
+            supp = (await self.session.execute(select(func.count()).select_from(SupplementaryAttempt).where(
+                (SupplementaryAttempt.offering_assessment_id.in_(oa_ids)) | (SupplementaryAttempt.second_assessment_id.in_(oa_ids))))).scalar_one()
+        return {"id": t.id, "name": t.name, "subjects": len(offering_ids), "subjects_published": int(published), "students": int(students),
+                "marks": int(marks), "supplementary_attempts": int(supp)}
+
+    async def marks_backup_csv(self, assessment_type_id: uuid.UUID) -> str:
+        """Every mark given under this type, as CSV (taken before a forced delete)."""
+        import csv
+        import io
+
+        from app.academics.models import Course, CourseOffering, Enrollment
+
+        t = await self.session.get(AssessmentType, assessment_type_id)
+        if t is None:
+            raise ResourceNotFoundError("Assessment type not found.")
+        rows = (await self.session.execute(
+            select(Course.code, CourseOffering.section_label, CourseOffering.term_label, Student.roll_number, Student.first_name, Student.last_name,
+                   StudentMark.obtained_marks, StudentMark.updated_at)
+            .join(OfferingAssessment, OfferingAssessment.id == StudentMark.offering_assessment_id)
+            .join(CourseOffering, CourseOffering.id == OfferingAssessment.course_offering_id)
+            .join(Course, Course.id == CourseOffering.course_id)
+            .join(Enrollment, Enrollment.id == StudentMark.enrollment_id)
+            .join(Student, Student.id == Enrollment.student_id)
+            .where(OfferingAssessment.assessment_type_id == t.id)
+            .order_by(Course.code, CourseOffering.section_label, Student.roll_number))).all()
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["assessment", "max_marks", "course", "section", "term", "roll_number", "student", "obtained_marks", "last_changed"])
+        for code, sec, term, roll, fn, ln, obtained, changed in rows:
+            w.writerow([t.name, float(t.max_marks), code, sec or "", term or "", roll or "", f"{fn} {ln}", float(obtained), changed.isoformat() if changed else ""])
+        return buf.getvalue()
+
+    async def force_delete(self, assessment_type_id: uuid.UUID, *, confirm_name: str, actor_id: uuid.UUID) -> dict:
+        """Delete a type that subjects use, with every student's marks for it. Published results (stored separately) are
+        NOT changed. Subjects waiting for approval go back to their teacher to check. Refused while any supplementary
+        re-sit uses it (that would erase re-sit history)."""
+        from app.academics.models import ResultSheet, ResultSheetStatus
+
+        info = await self.usage(assessment_type_id)
+        if " ".join(confirm_name.split()).lower() != info["name"].strip().lower():
+            raise BusinessRuleViolationError(f"Type the exam type's name exactly ({info['name']}) to confirm.")
+        if info["supplementary_attempts"]:
+            raise BusinessRuleViolationError(f"{info['supplementary_attempts']} supplementary re-sit(s) use {info['name']}. "
+                                             "It cannot be deleted without erasing re-sit history.")
+        oas = list((await self.session.execute(select(OfferingAssessment).where(OfferingAssessment.assessment_type_id == assessment_type_id))).scalars())
+        offering_ids = {o.course_offering_id for o in oas}
+        returned = 0
+        if offering_ids:
+            sheets = (await self.session.execute(select(ResultSheet).where(ResultSheet.course_offering_id.in_(offering_ids),
+                                                                           ResultSheet.status.in_((ResultSheetStatus.SUBMITTED, ResultSheetStatus.APPROVED))))).scalars().all()
+            for sh in sheets:
+                sh.status = ResultSheetStatus.RETURNED
+                sh.returned_by, sh.returned_at = actor_id, datetime.now(timezone.utc)
+                sh.return_reason = f"The exam type {info['name']} was deleted with its marks. Check the result and submit again."
+                returned += 1
+            await self.session.execute(delete(StudentMark).where(StudentMark.offering_assessment_id.in_([o.id for o in oas])))
+            for o in oas:
+                await self.session.delete(o)
+        t = await self.session.get(AssessmentType, assessment_type_id)
+        await self.audit.log(actor_user_id=actor_id, action="assessment_type.force_deleted", entity_type="assessment_type", entity_id=t.id,
+                             before={"name": t.name, "max_marks": float(t.max_marks)},
+                             metadata={k: v for k, v in info.items() if k not in ("id", "name")} | {"sheets_returned": returned})
+        await self.session.delete(t)
+        await self.session.flush()
+        return {**{k: v for k, v in info.items() if k != "id"}, "sheets_returned": returned}
 
 
 class GradingService:

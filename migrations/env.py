@@ -65,6 +65,7 @@ from app.banners import models as banners_models  # noqa: F401
 from app.push import models as push_models  # noqa: F401
 from app.academics import rooms as rooms_models  # noqa: F401
 from app.academics import grading_schemes as grading_schemes_models  # noqa: F401
+from app.selfassess import service as selfassess_models  # noqa: F401
 
 config = context.config
 # ALEMBIC_DATABASE_URL lets CI/tests migrate a scratch database without touching .env

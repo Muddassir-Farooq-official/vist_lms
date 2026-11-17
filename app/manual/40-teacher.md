@@ -7,6 +7,7 @@
 - **My Courses**: the courses you teach. Add each class's topic, slides, notes and links; students see them straight away. Marking a topic complete feeds Teacher Progress.
 - **Attendance**: mark attendance within 15 minutes of a class's start time. Outside that window, ask the admin to mark it for you.
 - **Grading**: pick which result types apply to your course and enter marks. Marks stay a draft until you submit them for approval; students see them only after approval and publishing. You enter Sessional (quizzes, assignments) and Mid-term marks; Final and Practical marks are entered by the exam office. **Award list (PDF)** prints your subject's marks.
+- **Self-assessments**: marks of practice quizzes, class tests and assignments done on paper in class. Press **New self-assessment** (title, kind, date, total marks, topic), then **Marks** to type each student's marks (tick Absent, add a remark) or upload a CSV with `roll_number,marks` (A = absent). Students and parents see their marks with the class average; you see the class at a glance (average, highest, lowest, under half). Self-assessments never count in exams or results.
 - **Assignments**: set work, receive Google Drive links before the deadline, then accept or reject each one.
 - **Students to watch**: students in your courses who may need help.
 - **Student feedback**: what your students said about your courses. Anonymous, shown once a course's results are published.

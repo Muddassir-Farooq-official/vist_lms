@@ -1,19 +1,130 @@
 {
-  "version": "1.30.0",
+  "version": "1.31.0",
   "title": "VIST LMS user manual",
   "chapters": [
-    {"slug": "start", "title": "Getting started", "file": "00-getting-started.md", "portals": ["*"]},
-    {"slug": "common", "title": "Tools every staff member has", "file": "05-common-tools.md", "portals": ["admin", "accounts", "exam", "faculty", "library", "warden", "gate", "staff", "principal", "hod"]},
-    {"slug": "admin", "title": "Administrator", "file": "10-administrator.md", "portals": ["admin"]},
-    {"slug": "accounts", "title": "Accounts office", "file": "20-accounts.md", "portals": ["admin", "accounts"]},
-    {"slug": "exam", "title": "Exam department", "file": "30-exam.md", "portals": ["admin", "exam"]},
-    {"slug": "faculty", "title": "Teacher", "file": "40-teacher.md", "portals": ["admin", "faculty"]},
-    {"slug": "student", "title": "Student", "file": "50-student.md", "portals": ["admin", "student"]},
-    {"slug": "parent", "title": "Parent", "file": "55-parent.md", "portals": ["admin", "parent"]},
-    {"slug": "principal", "title": "Principal and head of department", "file": "60-principal-hod.md", "portals": ["admin", "principal", "hod"]},
-    {"slug": "library", "title": "Library", "file": "70-library.md", "portals": ["admin", "library"]},
-    {"slug": "warden", "title": "Hostel warden", "file": "75-warden.md", "portals": ["admin", "warden"]},
-    {"slug": "gate", "title": "Gate", "file": "80-gate.md", "portals": ["admin", "gate"]},
-    {"slug": "staff", "title": "General staff", "file": "85-staff.md", "portals": ["admin", "staff"]}
+    {
+      "slug": "start",
+      "title": "Getting started",
+      "file": "00-getting-started.md",
+      "portals": [
+        "*"
+      ]
+    },
+    {
+      "slug": "common",
+      "title": "Tools every staff member has",
+      "file": "05-common-tools.md",
+      "portals": [
+        "admin",
+        "accounts",
+        "exam",
+        "faculty",
+        "library",
+        "warden",
+        "gate",
+        "staff",
+        "principal",
+        "hod"
+      ]
+    },
+    {
+      "slug": "admin",
+      "title": "Administrator",
+      "file": "10-administrator.md",
+      "portals": [
+        "admin"
+      ]
+    },
+    {
+      "slug": "accounts",
+      "title": "Accounts office",
+      "file": "20-accounts.md",
+      "portals": [
+        "admin",
+        "accounts"
+      ]
+    },
+    {
+      "slug": "exam",
+      "title": "Exam department",
+      "file": "30-exam.md",
+      "portals": [
+        "admin",
+        "exam"
+      ]
+    },
+    {
+      "slug": "faculty",
+      "title": "Teacher",
+      "file": "40-teacher.md",
+      "portals": [
+        "admin",
+        "faculty"
+      ]
+    },
+    {
+      "slug": "student",
+      "title": "Student",
+      "file": "50-student.md",
+      "portals": [
+        "admin",
+        "student"
+      ]
+    },
+    {
+      "slug": "parent",
+      "title": "Parent",
+      "file": "55-parent.md",
+      "portals": [
+        "admin",
+        "parent"
+      ]
+    },
+    {
+      "slug": "principal",
+      "title": "Principal and head of department",
+      "file": "60-principal-hod.md",
+      "portals": [
+        "admin",
+        "principal",
+        "hod"
+      ]
+    },
+    {
+      "slug": "library",
+      "title": "Library",
+      "file": "70-library.md",
+      "portals": [
+        "admin",
+        "library"
+      ]
+    },
+    {
+      "slug": "warden",
+      "title": "Hostel warden",
+      "file": "75-warden.md",
+      "portals": [
+        "admin",
+        "warden"
+      ]
+    },
+    {
+      "slug": "gate",
+      "title": "Gate",
+      "file": "80-gate.md",
+      "portals": [
+        "admin",
+        "gate"
+      ]
+    },
+    {
+      "slug": "staff",
+      "title": "General staff",
+      "file": "85-staff.md",
+      "portals": [
+        "admin",
+        "staff"
+      ]
+    }
   ]
 }

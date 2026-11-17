@@ -1,5 +1,28 @@
 [
   {
+    "version": "1.31.0",
+    "date": "2026-11-17",
+    "title": "Self-assessments, force-delete exam types",
+    "summary": "Marks of paper quizzes and class tests in a separate Self-assessments module, and administrators can force-delete an exam type in use.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "Self-assessments: record marks of quizzes, class tests and assignments done on paper (type them in or upload a CSV). Students and parents see them with the class average. They never count in exams or results."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Result types: an exam type that subjects use can now be force-deleted after a warning with counts and typing its name; a CSV backup of its marks downloads first. Published results stay unchanged; subjects waiting for approval go back to their teachers."
+      },
+      {
+        "kind": "improved",
+        "for": "Exam office",
+        "text": "The manual's Exam department chapter has a step-by-step tutorial with a worked example (AUST table, BSN split, a practical fail, re-sit and promotion)."
+      }
+    ]
+  },
+  {
     "version": "1.30.0",
     "date": "2026-11-16",
     "title": "User manual",
