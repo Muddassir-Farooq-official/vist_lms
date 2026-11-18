@@ -5,6 +5,7 @@
   const API = "/api/v1/academics/timetable/parallel";
   const box = document.getElementById("pt-terms");
   if (!box) return;
+  const KIND = { BREAK: "Break", STUDY: "Library / self-study", ZERO: "Zero period" };
   const DAY = { MONDAY: "Mon", TUESDAY: "Tue", WEDNESDAY: "Wed", THURSDAY: "Thu", FRIDAY: "Fri", SATURDAY: "Sat", SUNDAY: "Sun" };
   const errBox = document.getElementById("pt-error");
   const fillBtn = document.getElementById("pt-fill");
@@ -36,10 +37,12 @@
     }).join("") + "</tr></thead><tbody>";
     d.days.forEach(function (day) {
       d.periods.forEach(function (p, i) {
-        html += '<tr class="' + (i === 0 ? "pt-day-start" : "") + '"><td class="pt-when"><strong>' + esc(DAY[day] || day) + "</strong> P" + esc(p.number) +
+        html += '<tr class="' + (i === 0 ? "pt-day-start" : "") + '"><td class="pt-when"><strong>' + esc(DAY[day] || day) + "</strong> " + (p.kind === "CLASS" ? "P" + esc(p.number) : esc(p.label || KIND[p.kind])) +
           '<br><span class="sd-dim">' + esc(p.start) + "–" + esc(p.end) + "</span></td>";
         d.tracks.forEach(function (t) {
           const items = t.cells[day + "|" + p.id] || [];
+          if (p.days && p.days.length && p.days.indexOf(day) < 0) { html += '<td class="pt-na">\u2014</td>'; return; }
+          if (!items.length && p.kind !== "CLASS") { html += '<td class="pt-break">' + esc(p.label || KIND[p.kind] || p.kind) + "</td>"; return; }
           if (!items.length) { html += '<td class="pt-free">Free</td>'; return; }
           const ids = new Set(items.map(function (x) { return x.offering_id; }));
           html += '<td class="' + (ids.size > 1 ? "pt-clash" : "") + '">' + items.map(function (x) {

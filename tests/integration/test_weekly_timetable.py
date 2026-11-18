@@ -66,7 +66,7 @@ async def _world(client, db):
 def _cell(data, day, row_label_start):
     for c in data["cells"]:
         row = next(r for r in data["rows"] if r["key"] == c["row_key"])
-        if c["day"] == day and row["label"].startswith(row_label_start):
+        if c["day"] == day and row["key"].startswith(row_label_start):          # the key stays 24-hour ("09:00-10:00")
             return c["entries"]
     return []
 
@@ -86,7 +86,7 @@ async def test_admin_grid_has_the_sheet_shape(app_client, admin_user, db_session
     data = await _weekly(app_client)
     assert data["scope"] == "admin" and data["term_label"] == "Fall 2026"          # the current term is picked automatically
     assert data["days"] == ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"]
-    assert [r["label"] for r in data["rows"]] == ["09:00\u201310:00", "10:00\u201311:00", "11:00\u201312:00"]   # unused period still listed
+    assert [r["label"] for r in data["rows"]] == ["9:00 AM\u201310:00 AM", "10:00 AM\u201311:00 AM", "11:00 AM\u201312:00 PM"]   # unused period still listed; 12-hour clock
     monday_9 = _cell(data, "MONDAY", "09:00")
     assert {e["course_code"] for e in monday_9} == {"WK-101", "WK-401"} and len(monday_9) == 3      # A + B section + BBA course
     entry = next(e for e in monday_9 if e["course_code"] == "WK-401")
@@ -172,7 +172,7 @@ async def test_pdf_download_matches_the_grid_and_is_scoped(app_client, admin_use
     text = _pdf_text(r.content)
     if text is not None:
         assert "WK-101" in text and "WK-102" in text and "WK-301" not in text and "WK-401" not in text
-        assert "MONDAY" in text and "09:00-10:00" in text
+        assert "MONDAY" in text and "9:00 AM" in text and "10:00 AM" in text      # 12-hour clock (may wrap in the time column)
 
     emp = await _employee(app_client, w["t1"])
     await _sign_in_teacher(app_client, emp["username"])

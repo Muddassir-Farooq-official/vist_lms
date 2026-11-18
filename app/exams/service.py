@@ -18,6 +18,8 @@ The exam office can still print any student's card; it shows the same status.
 """
 from __future__ import annotations
 
+from app.core.timefmt import hm12
+
 import uuid
 from collections import defaultdict
 from datetime import date, datetime, timezone
@@ -145,7 +147,7 @@ class ExamScheduleService:
                 for a in (await duty.duties([paper.id]))[paper.id]:
                     await duty.tell(a["employee_id"], f"Exam duty changed: {label}",
                                     f"The {sched.name} paper of {label} you are on duty for is now on {paper.exam_date:%a %d %b %Y}, "
-                                    f"{paper.start_time:%H:%M}–{paper.end_time:%H:%M}, room {paper.room}.")
+                                    f"{hm12(paper.start_time)}–{hm12(paper.end_time)}, room {paper.room}.")
         return paper
 
     async def delete_paper(self, paper_id: uuid.UUID) -> None:

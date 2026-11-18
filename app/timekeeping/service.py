@@ -1,6 +1,8 @@
 """Staff timekeeping: timings, marking in and out, corrections, holidays, CSV import and the monthly summary payroll uses."""
 from __future__ import annotations
 
+from app.core.timefmt import hm12
+
 import calendar
 import csv
 import io
@@ -188,7 +190,7 @@ class TimekeepingService:
         row = await self._row(emp.id, today)
         if action == "IN":
             if row is not None and row.check_in_at is not None:
-                raise BusinessRuleViolationError(f"Already marked in at {local(row.check_in_at):%H:%M}.")
+                raise BusinessRuleViolationError(f"Already marked in at {hm12(local(row.check_in_at))}.")
             if row is None:
                 row = await self._new_row(emp, today)
             row.check_in_at, row.in_marked_by = moment.astimezone(timezone.utc), actor_id
@@ -196,7 +198,7 @@ class TimekeepingService:
             if row is None or row.check_in_at is None:
                 raise BusinessRuleViolationError("Mark them in first (or ask the administration to enter the arrival time).")
             if row.check_out_at is not None:
-                raise BusinessRuleViolationError(f"Already marked out at {local(row.check_out_at):%H:%M}.")
+                raise BusinessRuleViolationError(f"Already marked out at {hm12(local(row.check_out_at))}.")
             row.check_out_at, row.out_marked_by = moment.astimezone(timezone.utc), actor_id
         else:
             raise BusinessRuleViolationError("Choose in or out.")

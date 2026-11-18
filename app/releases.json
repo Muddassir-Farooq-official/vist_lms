@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.33.0",
+    "date": "2026-11-18",
+    "title": "Breaks, day-specific periods and changing period times",
+    "summary": "Periods can be breaks, zero periods or library periods and apply to some days only; a period's times can be changed after the timetable is built; times show on the 12-hour clock.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Daily periods have a type: class period, zero period / assembly, break / prayer / lunch, or library / self-study. Breaks show on every timetable and PDF; no class can be put in them."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "A period can apply to some days only, e.g. a shorter Friday."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Change… a period's times after the timetable is built: preview first, classes move from the date you choose, later periods shift with it, and classes already held stay as recorded."
+      },
+      {
+        "kind": "improved",
+        "for": "Everyone",
+        "text": "Times are shown on the 12-hour clock (1:30 PM instead of 13:30)."
+      }
+    ]
+  },
+  {
     "version": "1.32.0",
     "date": "2026-11-17",
     "title": "Several batches side by side",

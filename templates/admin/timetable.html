@@ -25,17 +25,25 @@
       <h2>Daily Periods</h2>
     </div>
   </div>
-  <p class="panel-hint">Define the institute's fixed daily period structure once — e.g. Period 1: 08:00&ndash;08:50. Every timetable slot (manual or auto-assigned) picks from these instead of typing arbitrary times.</p>
+  <p class="panel-hint">The institute's daily periods, e.g. Period 1: 8:00 AM&ndash;8:50 AM. Every timetable slot picks from these. Add breaks (break, prayer, lunch),
+    a zero period or assembly, and library / self-study periods too, so they show on every timetable. A period can apply to some days only, e.g. a shorter Friday.
+    <strong>Change…</strong> moves a period (and the classes in it) to new times from a date you choose; you see what will move before anything changes.</p>
   <table class="dash-table tt-periods" id="periods-table">
-    <thead><tr><th>Period</th><th>Time</th><th>Length</th><th class="crs-actions"></th></tr></thead>
+    <thead><tr><th>Period</th><th>Type</th><th>Time</th><th>Length</th><th>Days</th><th class="crs-actions"></th></tr></thead>
     <tbody id="periods-tbody"></tbody>
   </table>
   <p class="empty-state" id="periods-empty" hidden>No periods defined yet.</p>
+  <div id="period-change" class="pc-box" hidden></div>
   <h3 class="tt-sub">Add a period</h3>
   <form id="add-period-form" class="ar-form">
     <label>Period number<input type="number" id="period-number" class="text-input" min="1" required /></label>
+    <label>Type<select id="period-kind" class="select-input">
+      <option value="CLASS">Class period</option><option value="ZERO">Zero period / Assembly</option>
+      <option value="BREAK">Break / Prayer / Lunch</option><option value="STUDY">Library / Self-study</option></select></label>
+    <label>Name (optional)<input type="text" id="period-label" class="text-input" maxlength="40" placeholder="e.g. Lunch, Jumu'ah, Assembly" /></label>
     <label>Starts<input type="time" id="period-start" class="text-input" required /></label>
     <label>Ends<input type="time" id="period-end" class="text-input" required /></label>
+    <div class="pc-days" id="period-days" aria-label="Days"><label><input type="checkbox" value="MONDAY" /> Mon</label><label><input type="checkbox" value="TUESDAY" /> Tue</label><label><input type="checkbox" value="WEDNESDAY" /> Wed</label><label><input type="checkbox" value="THURSDAY" /> Thu</label><label><input type="checkbox" value="FRIDAY" /> Fri</label><label><input type="checkbox" value="SATURDAY" /> Sat</label><label><input type="checkbox" value="SUNDAY" /> Sun</label><span class="sd-dim">None ticked = every day</span></div>
     <div class="att-go"><button type="submit" class="role-btn" id="add-period-submit">Add period</button></div>
   </form>
   <p id="add-period-error" class="dash-alert error" hidden></p>

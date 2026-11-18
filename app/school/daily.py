@@ -21,6 +21,8 @@ PTM
 """
 from __future__ import annotations
 
+from app.core.timefmt import hm12
+
 import uuid
 from datetime import date, datetime, time, timedelta, timezone
 
@@ -551,13 +553,13 @@ class PtmService:
             async with self.session.begin_nested():
                 for t in {s.employee_id for s in (await self.session.execute(select(PtmSlot).where(PtmSlot.ptm_day_id == ptm.id))).scalars()}:
                     await SchoolService(self.session)._tell_teacher(t, f"Parent-teacher meeting on {ptm.day:%d %b}",
-                                                                    f"Parents will book times with you on {ptm.day:%a %d %b}, {ptm.start_time:%H:%M}-"
-                                                                    f"{ptm.end_time:%H:%M}. See My class.")
+                                                                    f"Parents will book times with you on {ptm.day:%a %d %b}, {hm12(ptm.start_time)}-"
+                                                                    f"{hm12(ptm.end_time)}. See My class.")
                 secs = (await self.session.execute(select(SchoolSection).where(SchoolSection.term_id == term.id,
                                                                                SchoolSection.class_teacher_id.is_not(None)))).scalars().all()
                 pupils = [p for s in secs for p in await SchoolService(self.session)._pupils(s.program_id, s.label)]
                 fam = await family(self.session, {p.id for p in pupils})
-                text = (f"Parent-teacher meeting on {ptm.day:%a %d %b}, {ptm.start_time:%H:%M}-{ptm.end_time:%H:%M}. "
+                text = (f"Parent-teacher meeting on {ptm.day:%a %d %b}, {hm12(ptm.start_time)}-{hm12(ptm.end_time)}. "
                         "Please book a time with the class teacher in the parent portal (Meetings).")
                 from app.sms.service import SmsService
 

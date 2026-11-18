@@ -37,6 +37,9 @@ WEEK_ORDER = [
 CORE_DAYS = WEEK_ORDER[:5]
 
 
+from app.core.timefmt import range12  # noqa: E402
+
+
 def _hhmm(t: time) -> str:
     return t.strftime("%H:%M")
 
@@ -174,14 +177,21 @@ class WeeklyTimetableService:
         # Rows: the institute's defined periods (so the sheet keeps its familiar shape), plus
         # any time that slots still use after a period was deleted.
         periods = await self.period_repo.list_all()
+        days_all = WEEK_ORDER
         rows: dict[str, dict] = {}
+        kind_names = {"BREAK": "Break", "STUDY": "Library / self-study", "ZERO": "Zero period"}
         for p in periods:
-            rows[_row_key(p.start_time, p.end_time)] = {
-                "key": _row_key(p.start_time, p.end_time), "label": f"{_hhmm(p.start_time)}\u2013{_hhmm(p.end_time)}",
-                "start_time": p.start_time, "end_time": p.end_time, "period_number": p.period_number,
-            }
+            key = _row_key(p.start_time, p.end_time)
+            row = rows.setdefault(key, {"key": key, "label": range12(p.start_time, p.end_time), "start_time": p.start_time,
+                                        "end_time": p.end_time, "period_number": None, "breaks": {}})
+            if p.kind == "CLASS":
+                row["period_number"] = p.period_number
+            else:              # breaks, study and zero periods are printed in the days they apply to
+                for day in days_all:
+                    if p.applies_on(day):
+                        row["breaks"][day.value] = p.label or kind_names.get(p.kind, p.kind)
         for key, (st, et) in row_times.items():
-            rows.setdefault(key, {"key": key, "label": f"{_hhmm(st)}\u2013{_hhmm(et)}", "start_time": st, "end_time": et, "period_number": None})
+            rows.setdefault(key, {"key": key, "label": range12(st, et), "start_time": st, "end_time": et, "period_number": None, "breaks": {}})
         ordered_rows = sorted(rows.values(), key=lambda r: (r["start_time"], r["end_time"]))
 
         days = [d for d in WEEK_ORDER if d in CORE_DAYS or d in used_days]
@@ -368,10 +378,14 @@ def _render_pdf(data: dict, institute_name: str, density: int) -> bytes:
     table_data = [header]
     styles = []
     for r_i, row in enumerate(rows, start=1):
-        line_cells = [Paragraph(row["label"].replace("\u2013", "-"), time_style)]
+        line_cells = [Paragraph(escape(row["label"]).replace("\u2013", "-<br/>"), time_style)]      # "9:00 AM-" / "10:00 AM"
         for c_i, day in enumerate(days, start=1):
             entries = by_cell.get((day.value if hasattr(day, "value") else day, row["key"]), [])
             flow = []
+            brk = (row.get("breaks") or {}).get(day.value if hasattr(day, "value") else day)
+            if brk and not entries:
+                flow.append(Paragraph(f"<i>{escape(brk)}</i>", small))
+                styles.append(("BACKGROUND", (c_i, r_i), (c_i, r_i), colors.HexColor("#eef1f5")))
             if density == 0:
                 for e in entries:
                     flow.append(Paragraph(escape(e["course_code"]) + (f" ({escape(e['section_label'])})" if e["section_label"] not in ("", "A") else ""), code_style))

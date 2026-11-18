@@ -70,6 +70,7 @@ from app.academics.schemas import (
     LinkResourceCreateRequest,
     OfferingAssessmentOut,
     MyScheduleEntryOut,
+    PeriodChangeRequest,
     PeriodCreateRequest,
     PeriodOut,
     SetOutcomeRequest,
@@ -1718,9 +1719,23 @@ async def create_period(
 ) -> PeriodOut:
     period = await PeriodService(db).create(
         period_number=payload.period_number, start_time=payload.start_time, end_time=payload.end_time,
-        actor_id=current_user.id,
+        actor_id=current_user.id, kind=payload.kind, label=payload.label, days=payload.days,
     )
     return PeriodOut.model_validate(period)
+
+
+@router.post("/periods/{period_id}/change",
+             summary="Change a period's times, type, name or days -- apply=false previews; classes move with it from from_date -- admin only")
+async def change_period(
+    period_id: uuid.UUID,
+    payload: PeriodChangeRequest,
+    current_user: CurrentUser = Depends(require_permission(Permissions.ENROLLMENT_MANAGE)),
+    db=Depends(get_db),
+) -> dict:
+    return await PeriodService(db).change(
+        period_id, start_time=payload.start_time, end_time=payload.end_time, kind=payload.kind, label=payload.label,
+        days=payload.days, from_date=payload.from_date, shift_later=payload.shift_later, apply=payload.apply, actor_id=current_user.id,
+    )
 
 
 @router.delete("/periods/{period_id}", status_code=204, summary="Remove a period — admin only")

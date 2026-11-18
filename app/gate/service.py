@@ -1,6 +1,8 @@
 """Visitor log book: enter, leave, search, edit (administration) and export."""
 from __future__ import annotations
 
+from app.core.timefmt import hm12
+
 import csv
 import io
 import re
@@ -103,7 +105,7 @@ class GateService:
     async def leave(self, entry_id: uuid.UUID, *, actor_id: uuid.UUID) -> dict:
         v = await self._get(entry_id)
         if v.exit_at is not None:
-            raise BusinessRuleViolationError(f"Already marked out at {local(v.exit_at):%H:%M}.")
+            raise BusinessRuleViolationError(f"Already marked out at {hm12(local(v.exit_at))}.")
         v.exit_at, v.out_by = datetime.now(timezone.utc), actor_id
         await self.session.flush()
         await self.audit.log(actor_user_id=actor_id, action="gate.visitor_out", entity_type="visitor_entry", entity_id=v.id)

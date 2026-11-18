@@ -4091,3 +4091,17 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 .pt-comb { display: inline-block; font-size: .7rem; padding: 0 6px; border-radius: 8px; background: #e8f1ff; color: #1d4ed8; margin-left: 4px; }
 .pt-plan { margin: 10px 0; }
 .pt-plan table td, .pt-plan table th { font-size: .8rem; }
+.pt-grid td.pt-break { background: #f1f5f9; color: var(--text-secondary, #475569); font-style: italic; }
+.pt-grid td.pt-na { color: #cbd5e1; }
+
+/* Timetable -> Daily periods: types, days and changing a period */
+.pc-days { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; grid-column: 1 / -1; font-size: .85rem; }
+.pc-days label { display: inline-flex; align-items: center; gap: 4px; }
+.pc-box { border: 1px solid var(--border, #e3e6ee); border-radius: 12px; padding: 14px; margin: 12px 0; background: var(--surface, #fff); }
+.pc-box .ar-form { margin-top: 8px; }
+.pc-report { margin-top: 10px; font-size: .86rem; }
+.pc-report ul { margin: 6px 0 6px 18px; }
+.pc-kind { font-size: .75rem; padding: 1px 8px; border-radius: 8px; background: #eef1f5; color: var(--text-secondary, #475569); }
+.pc-kind.CLASS { background: #e8f1ff; color: #1d4ed8; }
+.tt-break-cell { background: #f1f5f9; color: var(--text-secondary, #475569); font-style: italic; font-size: .8rem; text-align: center; }
+.ar-form .pc-days label, .pc-box .pc-days label { display: inline-flex; flex-direction: row; align-items: center; gap: 4px; font-weight: 500; }

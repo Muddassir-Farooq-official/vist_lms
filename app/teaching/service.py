@@ -6,6 +6,8 @@ class_covers (plus notifications). Nothing here changes a student's attendance o
 """
 from __future__ import annotations
 
+from app.core.timefmt import hm12
+
 import uuid
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
@@ -118,7 +120,7 @@ class TeachingService:
             return {"presence": "NOT_IN", "presence_label": "Not checked in", "checked_in_at": None}
         t = to_local(row.check_in_at)
         left = to_local(row.check_out_at)
-        return {"presence": "IN", "presence_label": f"Checked in {t:%H:%M}" + (f", left {left:%H:%M}" if left else ""), "checked_in_at": t}
+        return {"presence": "IN", "presence_label": f"Checked in {hm12(t)}" + (f", left {hm12(left)}" if left else ""), "checked_in_at": t}
 
     async def _teacher_ids(self) -> set[uuid.UUID]:
         rows = (await self.session.execute(select(Employee.id).join(JobRole, JobRole.id == Employee.job_role_id)
@@ -266,7 +268,7 @@ class TeachingService:
             if link in told:
                 continue
             who = r["cover"]["substitute_name"] if r["cover"] else r["teacher_name"]
-            msg = (f"{who} checked in but did not take attendance for {r['course_code']} ({r['section']}) at {r['start_time']:%H:%M}, room {r['room']}. "
+            msg = (f"{who} checked in but did not take attendance for {r['course_code']} ({r['section']}) at {hm12(r['start_time'])}, room {r['room']}. "
                    f"The {window()}-minute marking window has closed.")
             for uid in set(admins):
                 self.session.add(Notification(user_id=uid, category=NotificationCategory.GENERAL, title=MISSED_TITLE, message=msg[:1000], link=link))
@@ -327,7 +329,7 @@ class TeachingService:
                 continue
             load[who] += 1
             if s.id != cs.id and s.start_time < cs.end_time and cs.start_time < s.end_time:
-                busy[who].append(f"{c.code} {s.start_time:%H:%M}")
+                busy[who].append(f"{c.code} {hm12(s.start_time)}")
         staff = (await self.session.execute(select(Employee, JobRole).join(JobRole, JobRole.id == Employee.job_role_id)
                                             .where(Employee.status == EmployeeStatus.ACTIVE, Employee.user_id.is_not(None)))).all()
         days = await self._days({e.id for e, _ in staff}, day, day)
@@ -407,7 +409,7 @@ class TeachingService:
         absent = await self.session.get(Employee, off.assigned_teacher_id) if off.assigned_teacher_id else None
         suggested, note = await self.suggested_amount(off.assigned_teacher_id, cs.session_date)
         final = q2(amount) if amount is not None else suggested
-        desc = f"{course.code} ({off.section_label}) on {cs.session_date:%d %b %Y} at {cs.start_time:%H:%M}" + (f", for {name(absent)}" if absent else "")
+        desc = f"{course.code} ({off.section_label}) on {cs.session_date:%d %b %Y} at {hm12(cs.start_time)}" + (f", for {name(absent)}" if absent else "")
         cover = ClassCover(class_session_id=cs.id, cover_date=cs.session_date, absent_employee_id=absent.id if absent else None,
                            substitute_employee_id=sub.id, description=desc[:200], amount=final,
                            amount_note=(note if amount is None or final == suggested else f"Set by the administration (suggested Rs. {float(suggested):,.0f})")[:200],

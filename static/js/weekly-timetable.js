@@ -183,8 +183,9 @@
         (row.period_number ? '<small>Period ' + row.period_number + "</small>" : "") + "</th>";
       data.days.forEach(function (d) {
         const entries = byCell[d + "|" + row.key] || [];
-        body += '<td data-day="' + d + '" class="' + (d === todayName ? "tt-today" : "") + '">' +
-          entries.map(function (e) { return entryHtml(e, data.scope); }).join("") + "</td>";
+        const brk = !entries.length && row.breaks && row.breaks[d];
+        body += '<td data-day="' + d + '" class="' + (d === todayName ? "tt-today" : "") + (brk ? " tt-break-cell" : "") + '">' +
+          (brk ? esc(brk) : entries.map(function (e) { return entryHtml(e, data.scope); }).join("")) + "</td>";
       });
       body += "</tr>";
     });

@@ -439,8 +439,12 @@ window.VistAdmin = (function () {
   }
 
   function formatTimeShort(timeStr) {
-    // "09:00:00" -> "09:00" -- the API always returns HH:MM:SS.
-    return timeStr ? timeStr.slice(0, 5) : "";
+    // "13:30:00" -> "1:30 PM" (12-hour clock, as people read it). The API always returns 24-hour HH:MM[:SS].
+    if (!timeStr) return "";
+    const m = /^(\d{1,2}):(\d{2})/.exec(String(timeStr));
+    if (!m) return String(timeStr);
+    const h = parseInt(m[1], 10);
+    return ((h + 11) % 12 + 1) + ":" + m[2] + " " + (h < 12 ? "AM" : "PM");
   }
 
   function showError(message) {

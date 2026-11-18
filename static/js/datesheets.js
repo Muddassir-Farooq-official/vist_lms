@@ -33,7 +33,7 @@
   function pill(status) {
     return status === "PUBLISHED" ? '<span class="status-pill active">Published</span>' : '<span class="status-pill pending">Draft</span>';
   }
-  function hm(t) { return String(t || "").slice(0, 5); }
+  function hm(t) { return window.VistAdmin.formatTimeShort(t); }
 
   async function loadOfferings(term) {
     const r = await VA.fetchJson("/api/v1/academics/offerings?term_label=" + encodeURIComponent(term));

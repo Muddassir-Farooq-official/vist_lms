@@ -216,11 +216,31 @@ class Period(UUIDPKMixin, TimestampMixin, Base):
     fixed, consistent daily structure instead of arbitrary times."""
 
     __tablename__ = "periods"
-    __table_args__ = (UniqueConstraint("period_number", name="uq_periods_period_number"),)
 
     period_number: Mapped[int] = mapped_column(Integer, nullable=False)
     start_time: Mapped[time] = mapped_column(Time(), nullable=False)
     end_time: Mapped[time] = mapped_column(Time(), nullable=False)
+    # CLASS: an ordinary period. ZERO: a zero period / assembly before the day (may hold a class).
+    # BREAK: break, prayer, lunch (no class). STUDY: library / self-study (no class, but students are not free).
+    kind: Mapped[str] = mapped_column(String(10), nullable=False, default="CLASS", server_default="CLASS")
+    label: Mapped[str | None] = mapped_column(String(40), nullable=True)            # "Lunch", "Jumu'ah", "Assembly"
+    # The weekdays it applies to, e.g. "FRIDAY" for a shorter Friday period; NULL = every day.
+    days: Mapped[str | None] = mapped_column(String(80), nullable=True)
+
+    @property
+    def day_list(self) -> list[str]:
+        return [d for d in (self.days or "").split(",") if d]
+
+    def applies_on(self, day) -> bool:
+        value = getattr(day, "value", day)
+        return not self.days or value in self.day_list
+
+    @property
+    def holds_class(self) -> bool:
+        return self.kind in ("CLASS", "ZERO")
+
+
+PERIOD_KINDS = {"CLASS": "Class period", "ZERO": "Zero period / Assembly", "BREAK": "Break", "STUDY": "Library / Self-study"}
 
 
 class TimetableSlot(UUIDPKMixin, TimestampMixin, Base):

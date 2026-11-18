@@ -10,7 +10,7 @@
   let loaded = false, current = null, picked = null;
 
   function iso(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
-  function hm(t) { return t ? String(t).slice(0, 5) : ""; }
+  function hm(t) { return window.VistAdmin.formatTimeShort(t); }
   function money(v) { return VA.formatMoney ? VA.formatMoney(v) : "Rs. " + Number(v || 0).toLocaleString(); }
   function msg(body, fallback) { return (body && body.error && body.error.message) || fallback; }
   function shortDate(s) { const d = new Date(s + "T00:00:00"); return d.toLocaleDateString(undefined, { day: "2-digit", month: "short" }); }
