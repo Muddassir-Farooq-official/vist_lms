@@ -1072,6 +1072,7 @@ class TimetableService:
         self._enrolled_memo: dict = {}
         self._day_memo: dict = {}
         self._offering_memo: dict = {}
+        self._batch_memo: dict = {}
         self.audit = AuditService(session)
 
     @staticmethod
@@ -1123,6 +1124,38 @@ class TimetableService:
             out.append((slot, other))
         return out
 
+    async def _term_batch(self, label: str):
+        """Which batch (program, semester) a term is for: the program/semester set on the registered term, else the
+        program-semesters that EVERY course offered in the term belongs to. None when that cannot be told."""
+        key = (label or "").strip().lower()
+        if key in self._batch_memo:
+            return self._batch_memo[key]
+        from sqlalchemy import func, select
+
+        from app.academics.terms import AcademicTerm
+
+        term = (await self.session.execute(select(AcademicTerm).where(func.lower(AcademicTerm.label) == key))).scalars().first()
+        found = None
+        if term is not None and term.program_id is not None:
+            found = {(term.program_id, term.semester)}
+        else:
+            common = None
+            for course_id in set((await self.session.execute(select(CourseOffering.course_id).where(
+                    func.lower(CourseOffering.term_label) == key))).scalars()):
+                links = await self._links_for(course_id)
+                common = set(links) if common is None else common & links
+            found = common or None
+        self._batch_memo[key] = found
+        return found
+
+    async def _different_batches(self, label_a: str, label_b: str) -> bool:
+        if (label_a or "").strip().lower() == (label_b or "").strip().lower():
+            return False
+        a, b = await self._term_batch(label_a), await self._term_batch(label_b)
+        if not a or not b:
+            return False
+        return not any(pa == pb and (sa is None or sb is None or sa == sb) for pa, sa in a for pb, sb in b)
+
     async def _people_conflict(self, offering: CourseOffering, neighbours: list, when: str) -> str | None:
         """Everything except the room: teacher, student cohort, actual enrolled students.
         Returns the reason it cannot be placed here, or None if it can."""
@@ -1143,6 +1176,11 @@ class TimetableService:
                 if other.id == offering.id or other.course_id == offering.course_id:
                     continue
                 if other.section_label.strip().lower() != offering.section_label.strip().lower():
+                    continue
+                # One term per batch ("AHS BS Dental 4th", "AHS BS Anesthesia 4th"): a shared course is linked to both
+                # programs, but a section in ANOTHER batch's term is another group of students. Skipped only when both
+                # terms are known to be different batches; real shared students are still caught by check 4 below.
+                if await self._different_batches(offering.term_label, other.term_label):
                     continue
                 if batch_keys & await self._links_for(other.course_id):
                     return (

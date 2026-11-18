@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.32.0",
+    "date": "2026-11-17",
+    "title": "Several batches side by side",
+    "summary": "One term per batch (e.g. BS Dental 4th, BS Anesthesia 4th): shared subjects become one combined class across terms, free periods show in red, and free periods can be filled automatically.",
+    "changes": [
+      {
+        "kind": "improved",
+        "for": "Administrators",
+        "text": "Combined classes: a subject can now be combined with the same subject in another batch's term that runs at the same time, so the shared teacher is no longer 'already booked'."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Timetable → Batches side by side: the timetables of several batch terms in one grid, with every free period in red and a count per batch."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Fill free periods: proposes the classes each batch is still missing in its free periods (teacher, students and room all free), shows the plan, and adds it only when you confirm. Existing classes are not moved."
+      },
+      {
+        "kind": "fixed",
+        "for": "Administrators",
+        "text": "A subject shared by two programs no longer makes one batch's term look like the other batch's students: the timetable no longer refuses a class because the other batch has a class at that time."
+      }
+    ]
+  },
+  {
     "version": "1.31.0",
     "date": "2026-11-17",
     "title": "Self-assessments, force-delete exam types",
