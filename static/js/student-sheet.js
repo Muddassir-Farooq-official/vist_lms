@@ -88,7 +88,7 @@
   function render(p) {
     const name = p.first_name + " " + p.last_name;
     $("ss-name").textContent = name;
-    $("ss-sub").textContent = [p.roll_number || "No roll number yet", p.program_name, p.current_semester ? "Semester " + p.current_semester : "",
+    $("ss-sub").textContent = [p.roll_number || "No roll number yet", p.reg_number ? "Reg No " + p.reg_number : "", p.program_name, p.current_semester ? "Semester " + p.current_semester : "",
       p.section_label ? "Section " + p.section_label : ""].filter(Boolean).join(" · ");
     $("ss-chips").innerHTML = pill(p.status) + [p.gender, p.admission_session, p.admission_category, p.blood_group ? "Blood " + p.blood_group : ""]
       .filter(Boolean).map(function (c) { return '<span class="ss-chip">' + esc(c) + "</span>"; }).join("");
@@ -106,7 +106,7 @@
       return '<div class="ss-kpi' + (k[2] ? " bad" : "") + '"><span>' + esc(k[0]) + "</span><strong>" + esc(k[1]) + "</strong><small>" + esc(k[3]) + "</small></div>";
     }).join("") + (FEE_LINK ? '<a class="role-btn small-btn ss-fee-link" href="' + esc(FEE_LINK) + "?student=" + encodeURIComponent(p.id) +
       '#accounts">Open the fee account \u2192</a>' : "");
-    $("ss-admission").innerHTML = dl([["Roll number", p.roll_number], ["Program", p.program_name], ["Semester", p.current_semester], ["Section / shift", p.section_label],
+    $("ss-admission").innerHTML = dl([["Roll number", p.roll_number], ["University Reg No", p.reg_number], ["Program", p.program_name], ["Semester", p.current_semester], ["Section / shift", p.section_label],
       ["Session", p.admission_session], ["Category", p.admission_category], ["Enrolled on", fmtDate(p.enrollment_date)],
       ["Admission fee", p.admission_fee_paid === null || p.admission_fee_paid === undefined ? "" : (p.admission_fee_paid ? "Paid" : "Not paid")]]);
     $("ss-personal").innerHTML = dl([["CNIC / B-form", p.cnic], ["Date of birth", fmtDate(p.date_of_birth)], ["Gender", p.gender], ["Marital status", p.marital_status],
@@ -121,7 +121,7 @@
         rows.filter(function (r) { return r; }).map(function (r) { return "<small>" + r + "</small>"; }).join("") + "</div></article>";
     }
     $("ss-guardians").innerHTML = (p.guardians || []).map(function (g) {
-      return card(g.name, [esc(g.relation || "Guardian"), "CNIC " + esc(g.cnic), g.contact_no ? '<a href="tel:' + esc(g.contact_no) + '">' + esc(g.contact_no) + "</a>" : ""]);
+      return card(g.name || "Guardian", [esc(g.relation || "Guardian"), g.cnic ? "CNIC " + esc(g.cnic) : "No CNIC on record", g.contact_no ? '<a href="tel:' + esc(g.contact_no) + '">' + esc(g.contact_no) + "</a>" : ""]);
     }).join("") || '<p class="ss-empty">No guardian on record.</p>';
     $("ss-emergency").innerHTML = (p.emergency_contacts || []).map(function (e) {
       return card(e.name || "Emergency contact", [esc(e.relation || ""), '<a href="tel:' + esc(e.contact_no) + '">' + esc(e.contact_no) + "</a>"]);

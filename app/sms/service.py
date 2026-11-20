@@ -97,7 +97,7 @@ class SmsService:
                 SmsMessage.student_id == student_id, SmsMessage.event == event, SmsMessage.created_at >= since))).scalar_one()
             if recent:
                 return 0
-        targets = [("STUDENT", student.contact_no, body)]
+        targets = [("STUDENT", student.contact_no, body)] if student.contact_no else []
         if int(settings.sms_to_guardian):
             g = (await self.session.execute(select(StudentGuardian).where(StudentGuardian.student_id == student_id)
                                             .order_by(StudentGuardian.is_primary.desc()))).scalars().first()

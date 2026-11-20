@@ -8,7 +8,7 @@
 {% from "_icons.html" import nav_icon %}
 <section class="panel sd-panel">
   <div class="sd-toolbar">
-    <label class="sd-search">{{ nav_icon("search") }}<input type="search" id="search-input" placeholder="Search name, roll number, CNIC or phone" aria-label="Search students" /></label>
+    <label class="sd-search">{{ nav_icon("search") }}<input type="search" id="search-input" placeholder="Search name, roll no, Reg No, CNIC or phone" aria-label="Search students" /></label>
     <select id="status-filter" class="select-input" aria-label="Status">
       <option value="">All statuses</option>
       <option value="ACTIVE">Active</option>
@@ -102,7 +102,7 @@
       <h3 class="form-section">Guardian &amp; emergency contact</h3>
       <div class="form-field"><label for="as-guardian-name">Guardian Name</label><input type="text" id="as-guardian-name" class="text-input" required maxlength="150" /></div>
       <div class="form-field"><label for="as-guardian-cnic">Guardian CNIC</label><input type="text" id="as-guardian-cnic" class="text-input" placeholder="12345-1234567-1" required /></div>
-      <div class="form-field"><label for="as-guardian-contact">Guardian Contact (optional)</label><input type="text" id="as-guardian-contact" class="text-input" placeholder="03XXXXXXXXX" /></div>
+      <div class="form-field"><label for="as-guardian-contact">Guardian Contact</label><input type="text" id="as-guardian-contact" class="text-input" placeholder="03XXXXXXXXX" /></div>
       <div class="form-field"><label for="as-relation">Relation with Guardian</label><input type="text" id="as-relation" class="text-input" required maxlength="50" value="Father" /></div>
       <div class="form-field"><label for="as-emergency">Emergency Contact No.</label><input type="text" id="as-emergency" class="text-input" placeholder="03XXXXXXXXX" required /></div>
 
@@ -114,7 +114,7 @@
 
       <h3 class="form-section">Admission</h3>
       <div class="form-field">
-        <label for="as-program">Program (optional)</label>
+        <label for="as-program">Program</label>
         <select id="as-program" class="select-input"><option value="">None</option></select>
       </div>
       <div class="form-field"><label for="as-section">Section / Shift</label><input type="text" id="as-section" class="text-input" maxlength="30" placeholder="A, B, Morning, Evening" /></div>
@@ -122,12 +122,15 @@
       <div class="form-field"><label for="as-enrollment-date">Enrollment Date</label><input type="date" id="as-enrollment-date" class="text-input" /></div>
       <div class="form-field"><label for="as-admission-session">Admission Session</label><input type="text" id="as-admission-session" class="text-input" maxlength="50" placeholder="e.g. Fall 2026" /></div>
       <div class="form-field"><label for="as-admission-category">Admission Category</label><input type="text" id="as-admission-category" class="text-input" maxlength="50" placeholder="e.g. Open Merit" /></div>
+      <div class="form-field"><label for="as-reg-number">University Reg No</label><input type="text" id="as-reg-number" class="text-input" maxlength="40" placeholder="e.g. KMU-2026-0123 (can be added later)" /></div>
       <h3 class="form-section">Optional</h3>
-      <div class="form-field"><label for="as-email">Email (optional)</label><input type="email" id="as-email" class="text-input" maxlength="255" /></div>
-      <div class="form-field"><label for="as-blood-group">Blood Group (optional)</label>
+      <div class="form-field"><label for="as-email">Email</label><input type="email" id="as-email" class="text-input" maxlength="255" /></div>
+      <div class="form-field"><label for="as-blood-group">Blood Group</label>
         <select id="as-blood-group" class="select-input"><option value="">Unknown</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select>
       </div>
-      <p class="panel-hint two-span">Roll number is generated automatically once the program is known (or assigned later if left blank now) and will also be this student's login username.</p>
+      <p class="panel-hint two-span">Fields marked <span class="req-star">*</span> are required. An administrator chooses which on
+        <a href="/dashboard/admin/imports#field-rules">Students &rarr; Import &rarr; Field rules</a>.
+        Roll number is generated automatically once the program is known (or assigned later if left blank now) and will also be this student's login username.</p>
 
       <div class="form-actions two-span">
         <button type="submit" class="role-btn" id="add-student-submit">Create Student</button>

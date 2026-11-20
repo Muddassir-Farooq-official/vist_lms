@@ -36,7 +36,10 @@ class ParentService:
         rows = (await self.session.execute(select(StudentGuardian).where(StudentGuardian.student_id == student_id))).scalars().all()
         if not rows:
             raise BusinessRuleViolationError("This student has no guardian on record. Add the guardian (name and CNIC) first.")
-        return next((g for g in rows if g.is_primary), rows[0])
+        g = next((g for g in rows if g.is_primary), rows[0])
+        if not g.cnic:     # the field rules let a student be added without the guardian's CNIC
+            raise BusinessRuleViolationError("The guardian's CNIC is not on record. Parents sign in with it: add it on the student's record first.")
+        return g
 
     async def access_for_student(self, student_id: uuid.UUID) -> dict:
         if await self.session.get(Student, student_id) is None:
@@ -123,7 +126,7 @@ class ParentService:
         out = []
         for s in sorted(rows, key=lambda x: x.roll_number or ""):
             prog = await self.session.get(Program, s.program_id) if s.program_id else None
-            out.append({"id": s.id, "name": f"{s.first_name} {s.last_name}", "roll_number": s.roll_number,
+            out.append({"id": s.id, "name": f"{s.first_name} {s.last_name}", "roll_number": s.roll_number, "reg_number": s.reg_number,
                         "program": prog.code if prog else None, "semester": s.current_semester, "status": s.status.value if hasattr(s.status, "value") else s.status})
         return out
 

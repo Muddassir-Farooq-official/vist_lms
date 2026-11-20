@@ -34,6 +34,17 @@ def _normalize_phone(value: str) -> str:
     return cleaned
 
 
+def _check_reg_number(v: str | None) -> str | None:
+    from app.imports.validators import _REG_NO_RE, normalize_reg_number
+
+    v = normalize_reg_number(v)
+    if v is None:
+        return None
+    if not _REG_NO_RE.match(v):
+        raise ValueError("Reg No may have letters, digits, spaces, '-', '/' and '.' (at most 40).")
+    return v
+
+
 class StudentListItem(BaseModel):
     """Compact row shape for list/search endpoints — deliberately excludes
     CNIC, guardian CNIC/phone, and address to minimize sensitive-data exposure
@@ -46,6 +57,7 @@ class StudentListItem(BaseModel):
     first_name: str
     last_name: str
     roll_number: str | None
+    reg_number: str | None = None
     program_id: uuid.UUID | None
     current_semester: int | None = None
     section_label: str | None = None
@@ -71,14 +83,15 @@ class StudentAdminDetail(BaseModel):
     id: uuid.UUID
     first_name: str
     last_name: str
-    date_of_birth: date
-    gender: str
-    cnic: str
-    contact_no: str
-    marital_status: str
-    religion: str
-    nationality: str
+    date_of_birth: date | None = None
+    gender: str | None = None
+    cnic: str | None = None
+    contact_no: str | None = None
+    marital_status: str | None = None
+    religion: str | None = None
+    nationality: str | None = None
     roll_number: str | None
+    reg_number: str | None = None
     program_id: uuid.UUID | None
     current_semester: int | None
     status: StudentStatus
@@ -113,14 +126,15 @@ class StudentSelfDetail(BaseModel):
     id: uuid.UUID
     first_name: str
     last_name: str
-    date_of_birth: date
-    gender: str
-    cnic: str
-    contact_no: str
-    marital_status: str
-    religion: str
-    nationality: str
+    date_of_birth: date | None = None
+    gender: str | None = None
+    cnic: str | None = None
+    contact_no: str | None = None
+    marital_status: str | None = None
+    religion: str | None = None
+    nationality: str | None = None
     roll_number: str | None
+    reg_number: str | None = None
     program_id: uuid.UUID | None
     current_semester: int | None
     status: StudentStatus
@@ -154,29 +168,40 @@ class StudentCreateRequest(BaseModel):
     row that would be accepted by bulk import is accepted here too, and
     vice versa — one set of rules, not two that can drift apart."""
 
-    # Personal
+    # Personal. Which of these are required is set by Students -> Field rules (app/students/field_rules.py) and
+    # checked in StudentService.create; empty text counts as "not given".
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
-    date_of_birth: date
-    gender: str
-    cnic: str
-    contact_no: str
-    marital_status: str
-    religion: str = Field(min_length=1, max_length=50)
-    nationality: str = Field(min_length=1, max_length=50)
+    date_of_birth: date | None = None
+    gender: str | None = None
+    cnic: str | None = None
+    contact_no: str | None = None
+    marital_status: str | None = None
+    religion: str | None = Field(default=None, max_length=50)
+    nationality: str | None = Field(default=None, max_length=50)
 
     # Guardian / emergency
-    guardian_name: str = Field(min_length=1, max_length=150)
-    guardian_cnic: str
+    guardian_name: str | None = Field(default=None, max_length=150)
+    guardian_cnic: str | None = None
     guardian_contact_no: str | None = None
-    relation_with_guardian: str = Field(min_length=1, max_length=50)
-    emergency_contact_no: str
+    relation_with_guardian: str | None = Field(default=None, max_length=50)
+    emergency_contact_no: str | None = None
 
     # Address
-    present_address: str = Field(min_length=1, max_length=255)
-    province: str = Field(min_length=1, max_length=100)
-    district: str = Field(min_length=1, max_length=100)
-    city: str = Field(min_length=1, max_length=100)
+    present_address: str | None = Field(default=None, max_length=255)
+    province: str | None = Field(default=None, max_length=100)
+    district: str | None = Field(default=None, max_length=100)
+    city: str | None = Field(default=None, max_length=100)
+
+    # The affiliating university's registration number (optional; unique)
+    reg_number: str | None = Field(default=None, max_length=40)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _blank_is_missing(cls, data):
+        if isinstance(data, dict):
+            data = {k: (None if isinstance(v, str) and not v.strip() else v) for k, v in data.items()}
+        return data
 
     # Academic (optional — a form-driven create picks a real program_id
     # from a dropdown rather than free-text code/name matching, which
@@ -233,7 +258,9 @@ class StudentCreateRequest(BaseModel):
 
     @field_validator("gender")
     @classmethod
-    def _validate_gender(cls, v: str) -> str:
+    def _validate_gender(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
         g = v.strip().capitalize()
         if g not in VALID_GENDERS:
             raise ValueError(f"Gender must be one of: {', '.join(sorted(VALID_GENDERS))}.")
@@ -241,7 +268,9 @@ class StudentCreateRequest(BaseModel):
 
     @field_validator("marital_status")
     @classmethod
-    def _validate_marital_status(cls, v: str) -> str:
+    def _validate_marital_status(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
         m = v.strip().capitalize()
         if m not in VALID_MARITAL_STATUS:
             raise ValueError(f"Marital status must be one of: {', '.join(sorted(VALID_MARITAL_STATUS))}.")
@@ -249,23 +278,28 @@ class StudentCreateRequest(BaseModel):
 
     @field_validator("cnic")
     @classmethod
-    def _validate_cnic_field(cls, v: str) -> str:
-        return _normalize_cnic(v)
+    def _validate_cnic_field(cls, v: str | None) -> str | None:
+        return None if v is None else _normalize_cnic(v)
 
     @field_validator("guardian_cnic")
     @classmethod
-    def _validate_guardian_cnic_field(cls, v: str) -> str:
-        return _normalize_cnic(v)
+    def _validate_guardian_cnic_field(cls, v: str | None) -> str | None:
+        return None if v is None else _normalize_cnic(v)
 
     @field_validator("contact_no")
     @classmethod
-    def _validate_contact_no_field(cls, v: str) -> str:
-        return _normalize_phone(v)
+    def _validate_contact_no_field(cls, v: str | None) -> str | None:
+        return None if v is None else _normalize_phone(v)
 
     @field_validator("emergency_contact_no")
     @classmethod
-    def _validate_emergency_contact_no_field(cls, v: str) -> str:
-        return _normalize_phone(v)
+    def _validate_emergency_contact_no_field(cls, v: str | None) -> str | None:
+        return None if v is None else _normalize_phone(v)
+
+    @field_validator("reg_number")
+    @classmethod
+    def _validate_reg_number_field(cls, v: str | None) -> str | None:
+        return _check_reg_number(v)
 
     @field_validator("guardian_contact_no")
     @classmethod
@@ -276,22 +310,25 @@ class StudentCreateRequest(BaseModel):
 
     @field_validator("religion")
     @classmethod
-    def _validate_religion_field(cls, v: str) -> str:
-        return validate_religion(v)
+    def _validate_religion_field(cls, v: str | None) -> str | None:
+        return None if v is None else validate_religion(v)
 
     @field_validator("province")
     @classmethod
-    def _validate_province_field(cls, v: str) -> str:
-        return validate_province(v)
+    def _validate_province_field(cls, v: str | None) -> str | None:
+        return None if v is None else validate_province(v)
 
     @field_validator("city")
     @classmethod
-    def _validate_city_field(cls, v: str) -> str:
-        return validate_city(v)
+    def _validate_city_field(cls, v: str | None) -> str | None:
+        return None if v is None else validate_city(v)
 
     @model_validator(mode="after")
     def _validate_district_against_province(self) -> "StudentCreateRequest":
-        self.district = validate_district(self.district, self.province)
+        if self.district is not None:
+            if self.province is None:
+                raise ValueError("Choose the province of the district.")
+            self.district = validate_district(self.district, self.province)
         return self
 
 
@@ -340,6 +377,14 @@ class StudentUpdateRequest(BaseModel):
     admission_session: str | None = None
     admission_category: str | None = None
     section_label: str | None = None
+    reg_number: str | None = Field(default=None, max_length=40)   # "" clears it
+
+    @field_validator("reg_number")
+    @classmethod
+    def _validate_reg_number_update(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return _check_reg_number(v) or ""
 
     # Address — updates the single PRESENT StudentAddress row. All
     # optional (partial update); if district is provided, province must
@@ -482,8 +527,8 @@ class AdvanceSemesterResponse(BaseModel):
 
 
 class GuardianInfo(BaseModel):
-    name: str
-    cnic: str
+    name: str | None
+    cnic: str | None
     contact_no: str | None
     relation: str | None
 
@@ -541,13 +586,14 @@ class StudentFullProfileResponse(BaseModel):
     first_name: str
     last_name: str
     roll_number: str | None
-    cnic: str
-    contact_no: str
-    date_of_birth: date
-    gender: str
-    marital_status: str
-    religion: str
-    nationality: str
+    reg_number: str | None = None
+    cnic: str | None
+    contact_no: str | None
+    date_of_birth: date | None
+    gender: str | None
+    marital_status: str | None
+    religion: str | None
+    nationality: str | None
     status: StudentStatus
     photo_original_name: str | None
     has_photo: bool

@@ -36,7 +36,7 @@ def render_transcript_pdf(data: dict, *, institute_name: str | None = None) -> b
     _ = h1
 
     s, summ = data["student"], data["summary"]
-    info = [["Name", s["name"], "Roll number", s["roll_number"] or "\u2014"],
+    info = [["Name", s["name"], "Roll number", (s["roll_number"] or "\u2014") + (f"  \u00b7  Reg No {s['reg_number']}" if s.get("reg_number") else "")],
             ["Father / guardian", s["guardian_name"] or "\u2014", "Program", f"{s['program_name'] or '\u2014'}" + (f" ({s['program_code']})" if s["program_code"] else "")],
             ["Admission session", s["admission_session"] or "\u2014", "Current semester", str(s["current_semester"] or "\u2014")]]
     t = Table(info, colWidths=[30 * mm, 55 * mm, 30 * mm, 55 * mm])

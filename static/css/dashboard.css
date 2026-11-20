@@ -4105,3 +4105,21 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 .pc-kind.CLASS { background: #e8f1ff; color: #1d4ed8; }
 .tt-break-cell { background: #f1f5f9; color: var(--text-secondary, #475569); font-style: italic; font-size: .8rem; text-align: center; }
 .ar-form .pc-days label, .pc-box .pc-days label { display: inline-flex; flex-direction: row; align-items: center; gap: 4px; font-weight: 500; }
+
+/* Add student: required fields follow Students -> Field rules */
+.form-field.is-required > label::after, .req-star { content: " *"; color: #b42318; font-weight: 700; }
+.req-star::after { content: ""; }
+.fr-box { border: 1px solid var(--border, #e3e6ee); border-radius: 10px; padding: 10px 14px; margin: 10px 0; background: var(--surface, #fff); }
+.fr-box summary { cursor: pointer; }
+.fr-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin: 8px 0; }
+.fr-group { border: 1px solid var(--border, #e3e6ee); border-radius: 8px; padding: 6px 10px; }
+.fr-group legend { font-weight: 700; font-size: .85rem; padding: 0 4px; }
+.fr-item { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: start; font-size: .86rem; padding: 3px 0; }
+.fr-item .fr-note { grid-column: 2; color: var(--text-secondary, #64748b); font-size: .75rem; }
+.fr-item.locked { opacity: .7; }
+.rn-input { max-width: 220px; }
+.rn-missing { display: inline-flex; align-items: center; gap: 6px; font-size: .86rem; }
+.rn-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.rn-actions .role-btn { width: auto; }
+.rn-ok.bad { color: #b42318; }
+.fr-box .att-go .role-btn { width: auto; padding-left: 18px; padding-right: 18px; }

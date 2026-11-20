@@ -37,8 +37,11 @@ def _worker_listening() -> bool:
 @router.get("/template", summary="Download the student CSV import template (plain .csv)")
 async def download_template(
     current_user: CurrentUser = Depends(require_permission(Permissions.STUDENT_IMPORT)),
+    db=Depends(get_db),
 ) -> Response:
-    csv_text = generate_template_csv()
+    from app.students.field_rules import required_set
+
+    csv_text = generate_template_csv(await required_set(db))
     return Response(
         content=csv_text,
         media_type="text/csv",
@@ -52,6 +55,7 @@ async def download_template(
 )
 async def download_template_xlsx(
     current_user: CurrentUser = Depends(require_permission(Permissions.STUDENT_IMPORT)),
+    db=Depends(get_db),
 ) -> Response:
     """The .csv template can only protect its own example row from Excel's
     leading-zero-stripping behavior — CSV carries no cell-formatting
@@ -62,7 +66,9 @@ async def download_template_xlsx(
     The admin still needs to 'Save As CSV' before uploading — the import
     endpoint only accepts .csv — but because the columns were already
     Text, that save preserves the literal digits including leading zeros."""
-    xlsx_bytes = generate_template_xlsx()
+    from app.students.field_rules import required_set
+
+    xlsx_bytes = generate_template_xlsx(await required_set(db))
     return Response(
         content=xlsx_bytes,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

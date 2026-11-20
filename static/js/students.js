@@ -270,6 +270,7 @@
     document.getElementById("es-gender").value = s.gender || "Male";
     document.getElementById("es-admission-session").value = s.admission_session || "";
     document.getElementById("es-admission-category").value = s.admission_category || "";
+    document.getElementById("es-reg-number").value = s.reg_number || "";
     document.getElementById("es-email").value = s.email || "";
     document.getElementById("es-blood-group").value = s.blood_group || "";
   });
@@ -300,6 +301,7 @@
       gender: document.getElementById("es-gender").value || null,
       admission_session: document.getElementById("es-admission-session").value.trim() || null,
       admission_category: document.getElementById("es-admission-category").value.trim() || null,
+      reg_number: document.getElementById("es-reg-number").value.trim(),            // "" clears it
       email: document.getElementById("es-email").value.trim() || null,
       blood_group: document.getElementById("es-blood-group").value || null,
     };
@@ -492,8 +494,31 @@
     await ensureProgramsLoaded();
     await ensureReferenceDataLoaded();
     populateDistrictOptions(asDistrictSelect, "", null);
+    await applyFieldRules();
     addStudentModal.showModal();
   });
+
+  // Students -> Field rules: which details are required (marked * and checked by the browser before sending)
+  const RULE_INPUTS = {
+    first_name: "as-first-name", last_name: "as-last-name", date_of_birth: "as-dob", gender: "as-gender", cnic: "as-cnic", contact_no: "as-contact",
+    marital_status: "as-marital", religion: "as-religion", nationality: "as-nationality", guardian_name: "as-guardian-name",
+    guardian_cnic: "as-guardian-cnic", guardian_contact_no: "as-guardian-contact", relation_with_guardian: "as-relation",
+    emergency_contact_no: "as-emergency", present_address: "as-address", province: "as-province", district: "as-district", city: "as-city",
+    program: "as-program", section: "as-section", current_semester: "as-semester", enrollment_date: "as-enrollment-date",
+    admission_session: "as-admission-session", admission_category: "as-admission-category", reg_number: "as-reg-number",
+    email: "as-email", blood_group: "as-blood-group",
+  };
+  async function applyFieldRules() {
+    const r = await VA.fetchJson("/api/v1/students/field-rules");
+    if (!r.ok) return;
+    r.body.forEach(function (f) {
+      const input = document.getElementById(RULE_INPUTS[f.key]);
+      if (!input) return;
+      input.required = !!f.required;
+      const field = input.closest(".form-field");
+      if (field) field.classList.toggle("is-required", !!f.required);
+    });
+  }
 
   openAdvanceSemesterBtn.addEventListener("click", async function () {
     advanceSemesterError.hidden = true;
@@ -642,6 +667,7 @@
       admission_category: val("as-admission-category") || null,
       email: val("as-email") || null,
       blood_group: val("as-blood-group") || null,
+      reg_number: val("as-reg-number") || null,
     };
 
     const result = await VA.fetchJson("/api/v1/students", {

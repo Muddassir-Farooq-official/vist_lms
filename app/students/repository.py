@@ -61,6 +61,7 @@ class StudentRepository:
                 Student.roll_number == query,
                 Student.cnic == query,
                 Student.contact_no == query,
+                func.upper(Student.reg_number) == " ".join(query.split()).upper(),     # university Reg No
             ]
             if guardians:
                 # The accounts office can also find a student by the father's (guardian's) name or CNIC: every word in

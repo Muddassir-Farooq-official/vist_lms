@@ -21,7 +21,7 @@
     $("cl-table").querySelector("tbody").innerHTML = data.rows.map(function (r) {
       const can = r.status === "PROMOTED" || r.status === "PROBATION";
       return '<tr><td><input type="checkbox" class="cl-pick" value="' + esc(r.student_id) + '"' + (can ? " checked" : "") + (r.status === "PENDING" || r.status === "NO_SUBJECTS" ? " disabled" : "") + ' /></td>' +
-        "<td>" + esc(r.roll_number) + "</td><td>" + esc(r.name) + (r.guardian_name ? '<div class="cc-meta">' + esc(r.guardian_name) + "</div>" : "") + "</td>" +
+        "<td>" + esc(r.roll_number) + (r.reg_number ? '<div class="cc-meta">Reg ' + esc(r.reg_number) + "</div>" : "") + "</td><td>" + esc(r.name) + (r.guardian_name ? '<div class="cc-meta">' + esc(r.guardian_name) + "</div>" : "") + "</td>" +
         (data.annual ? "<td>" + esc(r.total_obtained) + "/" + esc(r.total_max) + "</td><td>" + f2(r.percentage) + "</td><td>" + esc(r.division || "—") + "</td>" : "<td>" + f2(r.gpa) + "</td>") +
         '<td class="' + (r.status === "NOT_PROMOTED" ? "bad" : r.status === "PROBATION" ? "warn" : r.status === "PENDING" || r.status === "NO_SUBJECTS" ? "" : "ok") + '">' + esc(r.status_label) + "</td>" +
         "<td>" + esc(r.failed.join(", ") || "—") + "</td><td>" + (r.position ? esc(["", "1st", "2nd", "3rd"][r.position]) : "") + "</td></tr>";

@@ -1,5 +1,38 @@
 [
   {
+    "version": "1.34.0",
+    "date": "2026-11-20",
+    "title": "University Reg No and student field rules",
+    "summary": "Each student can have the affiliating university's registration number, and the institute chooses which student details are required when adding or importing students.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "University Reg No on the student record, the Add student form and the CSV import. It is unique, searchable, and printed on award lists, admit cards, result cards, the gazette and transcripts."
+      },
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "University Reg Nos page: fill in Reg Nos one by one or from a CSV, with a preview before saving."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Field rules (CSV Imports): choose which student details are required. The template and the Add student form follow them; first and last name are always required."
+      },
+      {
+        "kind": "new",
+        "for": "Students",
+        "text": "Your university Reg No is shown on your profile."
+      },
+      {
+        "kind": "new",
+        "for": "Parents",
+        "text": "Your child's university Reg No is shown beside the roll number."
+      }
+    ]
+  },
+  {
     "version": "1.33.0",
     "date": "2026-11-18",
     "title": "Breaks, day-specific periods and changing period times",

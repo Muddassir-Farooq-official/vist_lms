@@ -81,6 +81,7 @@ from app.profiles.router import router as profiles_router
 from app.programs.router import router as programs_router
 from app.reports.router import router as reports_router
 from app.students.router import router as students_router
+from app.students.regno_router import router as student_regno_router
 
 configure_logging()
 logger = get_logger(__name__)
@@ -222,6 +223,7 @@ def _nav(slug, label, icon, href, *, group=None, mobile=False, short=None):
 ADMIN_NAV_ITEMS = [
     _nav("dashboard", "Dashboard", "dashboard", "/dashboard/admin", mobile=True, short="Home"),
     _nav("students", "Students", "students", "/dashboard/admin/students", group="People", mobile=True),
+    _nav("reg-numbers", "University Reg Nos", "file", "/dashboard/admin/reg-numbers", group="People"),
     _nav("admissions", "Admissions", "imports", "/dashboard/admin/admissions", group="People"),
     _nav("employees", "Employees", "employees", "/dashboard/admin/employees", group="People"),
     _nav("hostel", "Hostel", "students", "/dashboard/admin/hostel", group="People"),
@@ -381,6 +383,7 @@ EXAM_NAV_ITEMS = [
     _nav("datesheets", "Datesheets & admit cards", "clock", "/dashboard/exam/datesheets"),
     _nav("supplementary", "Supplementary exams", "exams", "/dashboard/exam/supplementary"),
     _nav("students", "Student lookup", "students", "/dashboard/exam/students"),
+    _nav("reg-numbers", "University Reg Nos", "file", "/dashboard/exam/reg-numbers"),
     _nav("reports", "Reports", "exams", "/dashboard/exam/reports"),
     _nav("announcements", "Announcements", "megaphone", "/dashboard/exam/announcements", mobile=True, short="News"),
     _nav("my-announcements", "Post an announcement", "megaphone", "/dashboard/exam/my-announcements"),
@@ -756,6 +759,7 @@ app.include_router(purchasing_router, prefix=settings.api_v1_prefix)
 app.include_router(payroll_router, prefix=settings.api_v1_prefix)
 app.include_router(result_router, prefix=settings.api_v1_prefix)
 app.include_router(assignments_router, prefix=settings.api_v1_prefix)
+app.include_router(student_regno_router, prefix=settings.api_v1_prefix)   # before /students/{id}
 app.include_router(students_router, prefix=settings.api_v1_prefix)
 app.include_router(programs_router, prefix=settings.api_v1_prefix)
 app.include_router(profiles_router, prefix=settings.api_v1_prefix)
@@ -1772,6 +1776,16 @@ async def faculty_exams_page(request: Request):
 @app.get("/dashboard/student/exams", include_in_schema=False)
 async def student_exams_page(request: Request):
     return templates.TemplateResponse(request, "student/exams.html", {"nav_items": STUDENT_NAV_ITEMS, "active_nav": "exams"})
+
+
+@app.get("/dashboard/admin/reg-numbers", include_in_schema=False)
+async def admin_reg_numbers_page(request: Request):
+    return templates.TemplateResponse(request, "admin/reg_numbers.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "reg-numbers"})
+
+
+@app.get("/dashboard/exam/reg-numbers", include_in_schema=False)
+async def exam_reg_numbers_page(request: Request):
+    return templates.TemplateResponse(request, "admin/reg_numbers.html", {"nav_items": EXAM_NAV_ITEMS, "active_nav": "reg-numbers"})
 
 
 @app.get("/dashboard/exam/result-types", include_in_schema=False)

@@ -309,7 +309,7 @@ class SchoolFeeService:
         """1 = the eldest (pays in full), 2 = second child ... among active students in school classes with the same
         guardian CNIC. None when the student has no brother or sister in the school."""
         cnics = [g.cnic for g in (await self.session.execute(select(StudentGuardian).where(StudentGuardian.student_id == student.id)
-                                                             .order_by(StudentGuardian.is_primary.desc()))).scalars()]
+                                                             .order_by(StudentGuardian.is_primary.desc()))).scalars() if g.cnic]
         if not cnics:
             return None
         cnic = cnics[0]

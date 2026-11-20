@@ -511,7 +511,7 @@ class ResultsService:
 
         g = (await self.session.execute(select(StudentGuardian).where(StudentGuardian.student_id == student.id)
                                         .order_by(StudentGuardian.is_primary.desc()))).scalars().first()
-        guardian = f"{g.name} ({g.relation})" if g else None
+        guardian = (f"{g.name} ({g.relation})" if g.relation else g.name) if g and g.name else None
         out = {"exam": {"id": ex.id, "kind": ex.kind.value, "name": KIND_NAME[ex.kind]}, "session": term.label, "published": published,
                "student": {"id": student.id, "name": _name(student), "roll_number": student.roll_number, "guardian": guardian},
                "class": program.name, "section": sec.label if sec else student.section_label, "stage": program.school_stage, **result,

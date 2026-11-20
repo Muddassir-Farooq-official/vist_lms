@@ -25,7 +25,7 @@
   function header(st) {
     D.set("ch-avatar", initials(st.name));
     D.set("ch-name", st.name);
-    D.set("ch-meta", "Roll " + (st.roll_number || "—") + " · " + (st.program || "—") + (st.semester ? " · Semester " + st.semester : ""));
+    D.set("ch-meta", "Roll " + (st.roll_number || "—") + (st.reg_number ? " · Reg No " + st.reg_number : "") + " · " + (st.program || "—") + (st.semester ? " · Semester " + st.semester : ""));
     const s = $("ch-status");
     s.textContent = String(st.status || "").charAt(0) + String(st.status || "").slice(1).toLowerCase();
     s.className = "status-pill " + String(st.status || "").toLowerCase();

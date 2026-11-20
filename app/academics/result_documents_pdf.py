@@ -72,6 +72,16 @@ def _footer(stamp: str):
 
 
 # ---------------------------------------------------------------------- award list (one subject)
+def _roll(r: dict):
+    """Roll number, with the university Reg No under it when the student has one."""
+    roll = r.get("roll_number") or ""
+    if not r.get("reg_number"):
+        return roll
+    from xml.sax.saxutils import escape
+
+    return Paragraph(f"{escape(roll)}<br/><font size=6.5 color='#555555'>Reg {escape(r['reg_number'])}</font>", CELL)
+
+
 def render_award_list(sheet: dict, *, grading: dict, program_label: str | None) -> bytes:
     buf = io.BytesIO()
     size = landscape(A4)
@@ -95,7 +105,7 @@ def render_award_list(sheet: dict, *, grading: dict, program_label: str | None) 
         result = {"PASSED": "Pass", "FAILED": "Fail", "SHORT_ATTENDANCE": "Short attendance"}.get(r.get("outcome"), "—")
         if r.get("outcome") == "FAILED" and r.get("failed_parts"):
             result = "Fail (" + " & ".join(p.title() for p in r["failed_parts"]) + ")"
-        rows.append([str(i), r.get("roll_number") or "", Paragraph(r.get("student_name") or "", CELL)]
+        rows.append([str(i), _roll(r), Paragraph(r.get("student_name") or "", CELL)]
                     + [("—" if m is None else f"{m:g}") for m in r["marks"]]
                     + ([_f(r.get("theory_percent"), 1), _f(r.get("practical_percent"), 1)] if parts else [])
                     + [_f(r.get("percentage"), 1), r.get("grade") or "—", result])
@@ -125,7 +135,7 @@ def render_result_cards(data: dict) -> bytes:
         if n:
             story.append(PageBreak())
         story += _header(width, f"{word.upper()} RESULT CARD", data["grading"].get("body"))
-        info = [["Name", r["name"], "Roll no.", r["roll_number"] or "—"],
+        info = [["Name", r["name"], "Roll no.", (r["roll_number"] or "—") + (f"  ·  Reg No {r['reg_number']}" if r.get("reg_number") else "")],
                 [r.get("guardian_label") or "Father's name", r.get("guardian_name") or "—", "Program", f"{data['program']['name']} ({data['program']['code']})"],
                 [word, str(data["semester"]), "Term", data["term_label"]]]
         t = Table(info, colWidths=[30 * mm, width / 2 - 30 * mm, 22 * mm, width / 2 - 22 * mm])
@@ -174,12 +184,12 @@ def render_gazette(data: dict) -> bytes:
     holders = sorted([r for r in data["rows"] if r.get("position")], key=lambda r: r["position"])
     if holders:
         ph = [["Position", "Roll no.", "Name", "Percentage" if annual else "GPA"]] + [
-            [{1: "1st", 2: "2nd", 3: "3rd"}[r["position"]], r["roll_number"] or "", r["name"], _f(r["percentage"], 2) if annual else _f(r["gpa"])] for r in holders]
+            [{1: "1st", 2: "2nd", 3: "3rd"}[r["position"]], _roll(r), r["name"], _f(r["percentage"], 2) if annual else _f(r["gpa"])] for r in holders]
         story += [Paragraph("<b>Position holders</b>", CELL), Spacer(1, 2), _grid(ph, [24 * mm, 30 * mm, 80 * mm, 30 * mm]), Spacer(1, 8)]
     head = ["#", "Roll no.", "Name", "Father / guardian"] + (["Marks", "%", "Division"] if annual else ["GPA"]) + ["Status", "Subjects to clear"]
     rows, extra = [head], []
     for i, r in enumerate(data["rows"], start=1):
-        rows.append([str(i), r["roll_number"] or "", Paragraph(r["name"], CELL), Paragraph(r.get("guardian_name") or "—", CELL)]
+        rows.append([str(i), _roll(r), Paragraph(r["name"], CELL), Paragraph(r.get("guardian_name") or "—", CELL)]
                     + ([f"{r['total_obtained']:g}/{r['total_max']:g}", _f(r["percentage"], 2), r.get("division") or "—"] if annual else [_f(r["gpa"])])
                     + [r["status_label"], Paragraph(", ".join(r["failed"]) or "—", CELL)])
         if r["status"] in ("NOT_PROMOTED",):

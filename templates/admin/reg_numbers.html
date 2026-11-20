@@ -1,0 +1,41 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN,EXAM_CONTROLLER{% endblock %}
+{% block title %}University Reg Nos{% endblock %}
+{% block page_title %}University Reg Nos{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">The registration number the affiliating university (KMU, AUST …) gives each student. It is printed on award lists, admit cards, result cards and transcripts, and the university's result is matched to students by it.</div>{% endblock %}
+
+{% block content %}
+{% from "_icons.html" import nav_icon %}
+<section class="panel">
+  <div class="sd-toolbar">
+    <select id="rn-program" class="select-input" aria-label="Program"><option value="">All programs</option></select>
+    <select id="rn-semester" class="select-input" aria-label="Semester"><option value="">All semesters</option>
+      {% for n in range(1, 13) %}<option value="{{ n }}">Semester {{ n }}</option>{% endfor %}</select>
+    <input type="text" id="rn-section" class="text-input small-input" maxlength="30" placeholder="Section" aria-label="Section" style="max-width:110px" />
+    <label class="sd-search">{{ nav_icon("search") }}<input type="search" id="rn-q" placeholder="Name, roll no or Reg No" aria-label="Search" /></label>
+    <label class="rn-missing"><input type="checkbox" id="rn-missing" /> Only students without a Reg No</label>
+  </div>
+  <p class="panel-hint" id="rn-count" aria-live="polite"></p>
+  <div class="sd-table-wrap">
+    <table class="dash-table" id="rn-table">
+      <thead><tr><th>Roll no.</th><th>Student</th><th>Program</th><th>Reg No</th><th></th></tr></thead>
+      <tbody id="rn-tbody"></tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Fill many at once (CSV)</h2>
+  <p class="panel-hint">Download the list for the chosen program / semester, type each Reg No in the <code>reg_number</code> column (leave it empty to clear one),
+    save as CSV and upload. You see every change first; nothing is saved until you confirm, and a file with any error changes nothing.</p>
+  <div class="att-go rn-actions">
+    <a class="role-btn" id="rn-download" href="/api/v1/students/reg-numbers/template.csv" download>Download the list (.csv)</a>
+    <input type="file" id="rn-file" accept=".csv" aria-label="CSV file" />
+    <button type="button" class="role-btn" id="rn-check">Check the file</button>
+  </div>
+  <p id="rn-error" class="dash-alert error" hidden></p>
+  <div id="rn-result"></div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}<script src="/static/js/reg-numbers.js"></script>{% endblock %}

@@ -47,7 +47,11 @@ OPTIONAL_HEADERS: tuple[str, ...] = (
     "admission_session",
     "admission_category",
     "section",
+    "reg_number",
 )
+# What is required by default (no rule saved). Students -> Field rules (app/students/field_rules.py) can make any of these
+# optional, except first and last name, and make any optional column required.
+DEFAULT_REQUIRED: frozenset[str] = frozenset(REQUIRED_HEADERS)
 
 ALL_KNOWN_HEADERS = set(REQUIRED_HEADERS) | set(OPTIONAL_HEADERS)
 
@@ -122,11 +126,12 @@ def normalize_phone(value: str) -> str:
     return digits
 
 
-def validate_headers(headers: list[str]) -> list[FieldError]:
+def validate_headers(headers: list[str], required: set[str] | frozenset[str] | None = None) -> list[FieldError]:
+    """Every REQUIRED column (per the field rules) must be present; optional columns may be left out of the file."""
     errors: list[FieldError] = []
     header_set = set(headers)
 
-    missing = set(REQUIRED_HEADERS) - header_set
+    missing = set(DEFAULT_REQUIRED if required is None else required) - header_set
     for h in sorted(missing):
         errors.append(FieldError(field=h, error_type="MISSING_HEADER", message=f"Required column '{h}' is missing."))
 
@@ -139,18 +144,37 @@ def validate_headers(headers: list[str]) -> list[FieldError]:
     return errors
 
 
-def validate_and_normalize_row(row_number: int, raw_row: dict[str, str]) -> RowValidationResult:
+_DISPLAY = {
+    "first_name": "First name", "last_name": "Last name", "date_of_birth": "Date of birth", "gender": "Gender",
+    "cnic": "Student CNIC", "contact_no": "Student contact number", "marital_status": "Marital status", "religion": "Religion",
+    "nationality": "Nationality", "guardian_name": "Father/Guardian name", "guardian_cnic": "Father/Guardian CNIC",
+    "guardian_contact_no": "Guardian contact number", "relation_with_guardian": "Relation with guardian",
+    "emergency_contact_no": "Emergency contact number", "present_address": "Present address", "province": "Province",
+    "district": "District", "city": "City", "program": "Program", "current_semester": "Current semester", "section": "Section",
+    "enrollment_date": "Enrollment date", "admission_session": "Admission session", "admission_category": "Admission category",
+    "admission_fee_paid": "Admission fee paid", "reg_number": "University Reg No", "email": "Email", "blood_group": "Blood group",
+}
+_REG_NO_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ./-]{0,39}$")
+
+
+def normalize_reg_number(value: str | None) -> str | None:
+    v = " ".join((value or "").split())
+    return v or None
+
+
+def validate_and_normalize_row(
+    row_number: int, raw_row: dict[str, str], required: set[str] | frozenset[str] | None = None,
+) -> RowValidationResult:
+    """`required`: the columns that must be filled (Students -> Field rules); default = the original required columns.
+    An empty optional detail is stored as empty (None)."""
     result = RowValidationResult(row_number=row_number, raw=dict(raw_row))
     n = result.normalized
     errs = result.errors
+    required = DEFAULT_REQUIRED if required is None else required
 
     def require(field_name: str, display: str | None = None) -> str:
-        val = _norm_str(raw_row.get(field_name))
-        if not val:
-            errs.append(
-                FieldError(field=field_name, error_type="REQUIRED_FIELD_MISSING", message=f"{display or field_name} is required.")
-            )
-        return val
+        # emptiness of REQUIRED fields is reported once, at the end (whatever the column)
+        return _norm_str(raw_row.get(field_name))
 
     # --- Personal ---
     first_name = require("first_name", "First name")
@@ -369,6 +393,26 @@ def validate_and_normalize_row(row_number: int, raw_row: dict[str, str]) -> RowV
     else:
         n["enrollment_date"] = None
 
+    reg_raw = normalize_reg_number(raw_row.get("reg_number"))
+    n["reg_number"] = None
+    if reg_raw:
+        if not _REG_NO_RE.match(reg_raw):
+            errs.append(FieldError(field="reg_number", error_type="INVALID_FORMAT",
+                                   message="Reg No may have letters, digits, spaces, '-', '/' and '.' (at most 40)."))
+        else:
+            n["reg_number"] = reg_raw
+
+    # empty optional details are stored as empty, never as ""
+    for key in ("religion", "nationality", "guardian_name", "relation_with_guardian", "present_address", "province", "district", "city"):
+        n[key] = n.get(key) or None
+    for key in ("date_of_birth", "gender", "cnic", "contact_no", "marital_status", "guardian_cnic", "emergency_contact_no"):
+        n.setdefault(key, None)
+
+    # the field rules: every required column must be filled
+    for col in sorted(required, key=lambda c: list(_DISPLAY).index(c) if c in _DISPLAY else 99):
+        if not _norm_str(raw_row.get(col)) and not any(e.field == col for e in errs):
+            errs.append(FieldError(field=col, error_type="REQUIRED_FIELD_MISSING", message=f"{_DISPLAY.get(col, col)} is required."))
+
     return result
 
 
@@ -381,7 +425,7 @@ def _parse_date(value: str) -> date | None:
     return None
 
 
-def generate_template_csv() -> str:
+def generate_template_csv(required: set[str] | frozenset[str] | None = None) -> str:
     """Builds the downloadable CSV template directly from REQUIRED_HEADERS /
     OPTIONAL_HEADERS, so it can never silently drift out of sync with the
     actual validation rules above."""
@@ -426,6 +470,7 @@ def _template_example_row() -> dict[str, str]:
         "roll_number": "",  # no longer used — roll number is always system-generated now
         "admission_fee_paid": "Yes",
         "enrollment_date": "2026-08-01",
+        "reg_number": "",  # the university's registration number, if already known
     }
 
 
@@ -435,10 +480,10 @@ def _template_example_row() -> dict[str, str]:
 # long digit string as a number. roll_number stays listed here too even
 # though its value is now ignored, purely so an old template column
 # doesn't render as a mangled number if someone pastes stale data into it.
-_TEXT_FORCED_COLUMNS = {"cnic", "contact_no", "guardian_cnic", "guardian_contact_no", "emergency_contact_no", "roll_number"}
+_TEXT_FORCED_COLUMNS = {"cnic", "contact_no", "guardian_cnic", "guardian_contact_no", "emergency_contact_no", "roll_number", "reg_number"}
 
 
-def generate_template_xlsx() -> bytes:
+def generate_template_xlsx(required: set[str] | frozenset[str] | None = None) -> bytes:
     """Builds the downloadable XLSX template with phone/CNIC columns
     pre-formatted as Text (number_format '@') for a large row range —
     not just the demo row. This is what actually fixes Excel corrupting
@@ -460,9 +505,21 @@ def generate_template_xlsx() -> bytes:
     ws = wb.active
     ws.title = "Students"
 
+    req = DEFAULT_REQUIRED if required is None else required
     for col_idx, header in enumerate(headers, start=1):
         cell = ws.cell(row=1, column=col_idx, value=header)
-        cell.font = Font(bold=True)
+        cell.font = Font(bold=True, color="B42318" if header in req else "334155")   # required columns in red
+
+    rules = wb.create_sheet("Rules")
+    rules.append(["Column", "Required?", "What to enter"])
+    for c in rules[1]:
+        c.font = Font(bold=True)
+    for header in headers:
+        if header == "roll_number":
+            rules.append([header, "never", "Leave empty: the roll number is generated."])
+            continue
+        rules.append([header, "REQUIRED" if header in req else "optional", _DISPLAY.get(header, header)])
+    rules.column_dimensions["A"].width, rules.column_dimensions["B"].width, rules.column_dimensions["C"].width = 24, 12, 40
 
     for col_idx, header in enumerate(headers, start=1):
         ws.cell(row=2, column=col_idx, value=example_row.get(header, ""))

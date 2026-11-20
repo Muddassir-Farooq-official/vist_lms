@@ -208,7 +208,7 @@ async def export_students_csv(
     writer.writerow([
         "roll_number", "first_name", "last_name", "cnic", "gender", "date_of_birth", "contact_no", "email",
         "blood_group", "program", "current_semester", "section", "status", "enrollment_date", "admission_session",
-        "admission_category",
+        "admission_category", "reg_number",
     ])
     page_no = 1
     while page_no <= 100:  # hard ceiling: 20,000 rows
@@ -224,7 +224,7 @@ async def export_students_csv(
             writer.writerow([_csv_safe(v) for v in [
                 st.roll_number, st.first_name, st.last_name, st.cnic, st.gender, st.date_of_birth, st.contact_no,
                 st.email, st.blood_group, program_names.get(st.program_id, ""), st.current_semester, st.section_label,
-                st.status.value, st.enrollment_date, st.admission_session, st.admission_category,
+                st.status.value, st.enrollment_date, st.admission_session, st.admission_category, st.reg_number,
             ]])
         page_no += 1
     return Response(
@@ -283,7 +283,8 @@ th,td{{border:1px solid #444;padding:8px;text-align:left}}th{{width:35%;backgrou
 <table>
 <tr><th>Name</th><td>{e(student.first_name)} {e(student.last_name)}</td></tr>
 <tr><th>Roll number / Login username</th><td><b>{e(student.roll_number or '')}</b></td></tr>
-<tr><th>CNIC</th><td>{e(student.cnic)}</td></tr>
+<tr><th>CNIC</th><td>{e(student.cnic or '-')}</td></tr>
+{f"<tr><th>University Reg No</th><td>{e(student.reg_number)}</td></tr>" if student.reg_number else ""}
 <tr><th>Program</th><td>{e(program.name if program else '-')}</td></tr>
 <tr><th>Semester</th><td>{e(str(student.current_semester or '-'))}</td></tr>
 <tr><th>Section</th><td>{e(student.section_label or '-')}</td></tr>
@@ -669,7 +670,7 @@ async def get_student_full_profile(
 
     return StudentFullProfileResponse(
         id=student.id, first_name=student.first_name, last_name=student.last_name, roll_number=student.roll_number,
-        cnic=student.cnic, contact_no=student.contact_no, date_of_birth=student.date_of_birth, gender=student.gender,
+        reg_number=student.reg_number, cnic=student.cnic, contact_no=student.contact_no, date_of_birth=student.date_of_birth, gender=student.gender,
         marital_status=student.marital_status, religion=student.religion, nationality=student.nationality,
         status=student.status, photo_original_name=student.photo_original_name, has_photo=student.has_photo,
         certificate_original_name=student.certificate_original_name, has_certificate=student.has_certificate,

@@ -32,6 +32,7 @@ def render_admit_card_pdf(card: dict, institute: str | None = None) -> bytes:
 
     yy = y - 18 * mm
     for label, value in (("Name", st["name"]), ("Roll number", st["roll_number"] or "\u2014"),
+                         *((("University Reg No", st["reg_number"]),) if st.get("reg_number") else ()),
                          ("Program / Semester", f"{st.get('program') or '\u2014'} \u00b7 Semester {st.get('semester') or '\u2014'}")):
         c.setFont("Helvetica", 9.5)
         c.setFillColor(MUTED)

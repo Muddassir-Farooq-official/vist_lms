@@ -12,7 +12,7 @@ from app.audit.service import AuditService
 from app.auth.models import Role, User, UserRole
 from app.auth.repository import AuthRepository
 from app.core.security import new_temp_password
-from app.core.exceptions import BusinessRuleViolationError, DuplicateResourceError, ResourceNotFoundError
+from app.core.exceptions import BusinessRuleViolationError, DuplicateResourceError, ResourceNotFoundError, ValidationAppError
 from app.core.pagination import PageParams, RawPage
 from app.core.security import hash_password
 from app.core.sequences import generate_roll_number
@@ -180,6 +180,36 @@ class StudentService:
         if await self.repo.get_by_cnic(cnic):
             raise DuplicateResourceError(f"A student with CNIC '{cnic}' already exists.")
 
+    async def check_reg_number(self, reg_number: str, *, student_id: uuid.UUID | None = None) -> None:
+        """A university Reg No belongs to one student only (compared without regard to capitals)."""
+        from sqlalchemy import func, select
+
+        q = select(Student).where(func.upper(Student.reg_number) == reg_number.upper())
+        if student_id is not None:
+            q = q.where(Student.id != student_id)
+        other = (await self.session.execute(q)).scalars().first()
+        if other is not None:
+            raise DuplicateResourceError(f"Reg No {reg_number} already belongs to {other.first_name} {other.last_name} ({other.roll_number}).")
+
+    async def set_reg_number(self, student_id: uuid.UUID, reg_number: str | None, *, actor_id: uuid.UUID) -> Student:
+        from app.imports.validators import _REG_NO_RE, normalize_reg_number
+
+        student = await self.repo.get_by_id(student_id)
+        if student is None:
+            raise ResourceNotFoundError("Student not found.")
+        value = normalize_reg_number(reg_number)
+        if value and not _REG_NO_RE.match(value):
+            raise ValidationAppError("Reg No may have letters, digits, spaces, '-', '/' and '.' (at most 40).")
+        if value:
+            await self.check_reg_number(value, student_id=student.id)
+        if value != student.reg_number:
+            before = student.reg_number
+            student.reg_number = value
+            await self.session.flush()
+            await self.audit.log(actor_user_id=actor_id, action="student.reg_number_set", entity_type="student", entity_id=student.id,
+                                 before={"reg_number": before}, after={"reg_number": value})
+        return student
+
     async def correct_identity(self, student_id: uuid.UUID, data, *, actor_id: uuid.UUID) -> Student:
         """Fix a mistyped student or guardian CNIC / guardian details. Changing the guardian CNIC means a different person: the old
         guardian's parent-portal access to this student is cut, and the office gives the right guardian a login."""
@@ -276,6 +306,7 @@ class StudentService:
             "admission_session": student.admission_session,
             "admission_category": student.admission_category,
             "section_label": student.section_label,
+            "reg_number": student.reg_number,
             "contact_no": student.contact_no,
             "marital_status": student.marital_status,
             "religion": student.religion,
@@ -321,6 +352,13 @@ class StudentService:
             student.admission_category = data.admission_category.strip() or None
         if data.section_label is not None:
             student.section_label = data.section_label or None
+        if data.reg_number is not None:                      # "" clears it
+            from app.imports.validators import normalize_reg_number
+
+            value = normalize_reg_number(data.reg_number)
+            if value:
+                await self.check_reg_number(value, student_id=student.id)
+            student.reg_number = value
 
         # A program with no semester can never enroll in anything
         # (enrollment matches the student's current semester) — default to 1.
@@ -329,6 +367,9 @@ class StudentService:
 
         if data.present_address is not None or data.province is not None or data.district is not None or data.city is not None:
             address = await self.repo.get_present_address(student.id)
+            if address is None:          # added without an address (Students -> Field rules): the first edit creates it
+                address = StudentAddress(student_id=student.id, address_type="PRESENT", address_line="")
+                self.session.add(address)
             if address is not None:
                 if data.present_address is not None:
                     address.address_line = data.present_address.strip()
@@ -365,6 +406,7 @@ class StudentService:
                 "admission_session": student.admission_session,
                 "admission_category": student.admission_category,
                 "section_label": student.section_label,
+                "reg_number": student.reg_number,
                 "contact_no": student.contact_no,
                 "marital_status": student.marital_status,
                 "religion": student.religion,
@@ -391,8 +433,18 @@ class StudentService:
         and program existence, both of which need the database. The
         roll number (also the login username) is generated here, not
         supplied by the caller — see app/core/sequences.py."""
+        from app.students.field_rules import BY_KEY, get_rules
+
+        rules = await get_rules(self.session)                  # Students -> Field rules
+        given = {"program": data.program_id, "section": data.section_label, **data.model_dump()}
+        missing = [BY_KEY[k].label for k, req in rules.items() if req and given.get(k) in (None, "")]
+        if missing:
+            raise ValidationAppError("Required: " + ", ".join(missing) + ".")
         cnic = data.cnic
-        await self.check_duplicate(cnic=cnic)
+        if cnic:
+            await self.check_duplicate(cnic=cnic)
+        if data.reg_number:
+            await self.check_reg_number(data.reg_number)
 
         program = None
         if data.program_id is not None:
@@ -421,9 +473,10 @@ class StudentService:
             cnic=cnic,
             contact_no=data.contact_no,
             marital_status=data.marital_status,
-            religion=data.religion.strip(),
-            nationality=data.nationality.strip(),
+            religion=(data.religion or "").strip() or None,
+            nationality=(data.nationality or "").strip() or None,
             roll_number=roll_number,
+            reg_number=data.reg_number,
             admission_fee_paid=data.admission_fee_paid,
             enrollment_date=data.enrollment_date,
             program_id=data.program_id,
@@ -438,29 +491,31 @@ class StudentService:
         self.session.add(student)
         await self.session.flush()
 
-        self.session.add(
-            StudentGuardian(
-                student_id=student.id,
-                name=data.guardian_name.strip(),
-                cnic=data.guardian_cnic,
-                contact_no=data.guardian_contact_no,
-                relation=data.relation_with_guardian.strip(),
-                is_primary=True,
+        strip = lambda v: (v or "").strip() or None  # noqa: E731
+        if data.guardian_name or data.guardian_cnic or data.guardian_contact_no or data.relation_with_guardian:
+            self.session.add(
+                StudentGuardian(
+                    student_id=student.id,
+                    name=strip(data.guardian_name),
+                    cnic=data.guardian_cnic,
+                    contact_no=data.guardian_contact_no,
+                    relation=strip(data.relation_with_guardian),
+                    is_primary=True,
+                )
             )
-        )
-        self.session.add(
-            StudentEmergencyContact(student_id=student.id, contact_no=data.emergency_contact_no)
-        )
-        self.session.add(
-            StudentAddress(
-                student_id=student.id,
-                address_type="PRESENT",
-                address_line=data.present_address.strip(),
-                province=data.province.strip(),
-                district=data.district.strip(),
-                city=data.city.strip(),
+        if data.emergency_contact_no:
+            self.session.add(StudentEmergencyContact(student_id=student.id, contact_no=data.emergency_contact_no))
+        if data.present_address or data.province or data.district or data.city:
+            self.session.add(
+                StudentAddress(
+                    student_id=student.id,
+                    address_type="PRESENT",
+                    address_line=(data.present_address or "").strip(),
+                    province=strip(data.province),
+                    district=strip(data.district),
+                    city=strip(data.city),
+                )
             )
-        )
 
         # The roll number IS the login username now — one identifier,
         # not two, and it's already guaranteed unique by the generator.
