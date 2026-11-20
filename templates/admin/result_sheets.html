@@ -16,6 +16,7 @@
   <button class="portal-tab" data-tab="SCALE" role="tab" aria-selected="false"><span>Default scale</span></button>
   <button class="portal-tab" data-tab="CLASS" role="tab" aria-selected="false"><span>Class results &amp; promotion</span></button>
   <button class="portal-tab" data-tab="TABLES" role="tab" aria-selected="false"><span>Grading tables &amp; mark split</span></button>
+  <button class="portal-tab" data-tab="UNIVERSITY" role="tab" aria-selected="false"><span>University result</span></button>
 </div>
 
 <div class="portal-tab-panel" data-tab-panel="SUBMITTED"><section class="sh-card"><div id="rs-list-SUBMITTED" class="asg-list"></div><p class="empty-state" id="rs-empty-SUBMITTED" hidden>Nothing is waiting for approval.</p></section></div>
@@ -64,6 +65,24 @@
   <div class="table-scroll"><table class="tk-table" id="cl-table"><thead></thead><tbody></tbody></table></div>
 </section></div>
 
+<div class="portal-tab-panel" data-tab-panel="UNIVERSITY" hidden><section class="sh-card">
+  <div class="sh-card-head"><h2>University result (affiliated programs)</h2>
+    <a class="role-btn secondary-btn" href="/api/v1/results/university/template.csv" data-download="university-result-template.csv" data-label="file">Template (.csv)</a></div>
+  <p class="panel-hint">When the university (KMU, AUST …) announces the result, enter it here so transcripts, GPA/CGPA and promotion use it.
+    One row per student per subject: <code>reg_number</code> (or <code>roll_number</code>), <code>course_code</code>, the university's
+    <code>marks_obtained</code> and <code>marks_total</code> for the subject, and/or its <code>grade</code>; <code>result</code> (PASS / FAIL) is optional
+    (without it, pass/fail follows the grade or the program's pass mark). Every row is checked first, and nothing is saved while any row has a problem.
+    Importing again replaces the earlier university result (when the university revises it).</p>
+  <div class="ur-form">
+    <label>Program<select id="ur-program" class="select-input"><option value="">Affiliated programs…</option></select></label>
+    <label>Term<input id="ur-term" class="text-input" list="ur-terms" maxlength="50" placeholder="e.g. Fall 2026" /><datalist id="ur-terms"></datalist></label>
+    <label>File<input id="ur-file" type="file" accept=".csv" /></label>
+    <button type="button" class="role-btn" id="ur-check">Check the file</button>
+  </div>
+  <p id="ur-error" class="dash-alert error" hidden></p>
+  <div id="ur-result"></div>
+</section></div>
+
 <div class="portal-tab-panel" data-tab-panel="TABLES" hidden>
 <section class="sh-card">
   <div class="sh-card-head"><h2>Grading tables</h2>
@@ -75,9 +94,13 @@
 </section>
 <section class="sh-card">
   <div class="sh-card-head"><h2>Programs: table and mark split</h2></div>
+  <p class="panel-hint"><b>Exams conducted by</b>: <i>This institute</i> for a degree-awarding program; <i>Affiliating university</i> when the university
+    (KMU, AUST …) takes some parts: tick which. Those parts cannot be added to subjects, entered or put on the institute's datesheet; teachers enter internal
+    marks (quiz 1 … n, assignments, sessional), you print the internal award list with Reg Nos, and the university's result is imported on the
+    <b>University result</b> tab.</p>
   <p class="panel-hint">Pick each program's grading table, and how a subject's marks are split. Teachers' quizzes and assignments count in <b>Sessional</b>,
     scaled to its marks; <b>Final</b> and <b>Practical</b> marks are entered by the exam office. Leave the split empty to keep adding up the marks as they are.</p>
-  <div class="table-scroll"><table class="tk-table" id="gt-programs"><thead><tr><th>Program</th><th>Grading table</th><th>Sessional</th><th>Mid</th><th>Final</th><th>Practical</th><th></th></tr></thead><tbody></tbody></table></div>
+  <div class="table-scroll"><table class="tk-table" id="gt-programs"><thead><tr><th>Program</th><th>Grading table</th><th>Exams conducted by</th><th>Sessional</th><th>Mid</th><th>Final</th><th>Practical</th><th></th></tr></thead><tbody></tbody></table></div>
 </section>
 <section class="sh-card">
   <div class="sh-card-head"><h2>Subjects with their own split</h2><button type="button" class="role-btn secondary-btn" id="gt-add-course">+ Subject split</button></div>
@@ -145,4 +168,5 @@
 <script src="/static/js/result-sheets-admin.js"></script>
 <script src="/static/js/grading-tables.js"></script>
 <script src="/static/js/class-results.js"></script>
+<script src="/static/js/university-result.js"></script>
 {% endblock %}

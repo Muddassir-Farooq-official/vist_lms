@@ -107,6 +107,14 @@
     tr.querySelectorAll(".gs-part").forEach(function (i) { const n = i.value.trim() === "" ? 0 : Number(i.value); v[i.getAttribute("data-part")] = n; if (n > 0) any = true; });
     return any ? v : null;
   }
+  function examCell(p) {
+    const aff = p.exam_body === "AFFILIATED", parts = p.university_parts || [];
+    return '<td class="gp-exam"><select class="select-input gp-body"><option value="INSTITUTE">This institute</option><option value="AFFILIATED"' + (aff ? " selected" : "") +
+      ">Affiliating university</option></select>" + '<div class="gp-parts"' + (aff ? "" : " hidden") + ">" + ["MID", "FINAL", "PRACTICAL"].map(function (x) {
+        return '<label><input type="checkbox" class="gp-part" value="' + x + '"' + (parts.indexOf(x) >= 0 ? " checked" : "") + " /> " + x.charAt(0) + x.slice(1).toLowerCase() + "</label>";
+      }).join("") + '</div><button type="button" class="row-action gp-body-save">Save</button></td>';
+  }
+
   function drawPrograms() {
     const tbody = $("gt-programs").querySelector("tbody");
     const usable = tables.filter(function (t) { return !t.is_draft; });
@@ -116,8 +124,22 @@
       return '<tr data-id="' + esc(p.id) + '"><td><strong>' + esc(p.code) + '</strong><div class="cc-meta">' + esc(p.name) + "</div></td>" +
         '<td><select class="select-input gp-table"><option value="">Default scale</option>' + usable.map(function (t) {
           return '<option value="' + esc(t.id) + '"' + (current && current.id === t.id ? " selected" : "") + ">" + esc(t.name) + "</option>"; }).join("") + "</select></td>" +
-        splitCells(s) + '<td><button type="button" class="row-action gp-save">Save split</button>' + (s ? ' <button type="button" class="row-action gp-clear">Remove split</button>' : "") + "</td></tr>";
+        examCell(p) + splitCells(s) + '<td><button type="button" class="row-action gp-save">Save split</button>' + (s ? ' <button type="button" class="row-action gp-clear">Remove split</button>' : "") + "</td></tr>";
     }).join("");
+    tbody.querySelectorAll(".gp-body").forEach(function (sel) {
+      const box = sel.closest("td").querySelector(".gp-parts");
+      sel.addEventListener("change", function () { box.hidden = sel.value !== "AFFILIATED"; });
+    });
+    tbody.querySelectorAll(".gp-body-save").forEach(function (b) {
+      b.addEventListener("click", async function () {
+        const td = b.closest("td"), id = b.closest("tr").getAttribute("data-id");
+        const parts = Array.from(td.querySelectorAll(".gp-part:checked")).map(function (c) { return c.value; });
+        const r = await send(R + "/programs/" + id + "/exam-body", "PUT", { exam_body: td.querySelector(".gp-body").value, university_parts: parts });
+        if (!r.ok) return VA.toast(err(r.body, "Could not save."), "error");
+        VA.toast(r.body.exam_body === "AFFILIATED" ? "Saved: " + r.body.university_parts.join(", ").toLowerCase() + " by the university." : "Saved: the institute conducts every exam.");
+        load();
+      });
+    });
     tbody.querySelectorAll(".gp-table").forEach(function (sel) {
       sel.addEventListener("change", async function () {
         const id = sel.closest("tr").getAttribute("data-id");
@@ -190,7 +212,7 @@
   }
 
   async function load() {
-    const [t, p, s, c] = await Promise.all([VA.fetchJson(R + "/grading-tables"), VA.fetchJson("/api/v1/programs", { quiet: true }),
+    const [t, p, s, c] = await Promise.all([VA.fetchJson(R + "/grading-tables"), VA.fetchJson(R + "/programs-exam-mode", { quiet: true }),
       VA.fetchJson(R + "/mark-splits"), courses.length ? Promise.resolve({ ok: true, body: courses }) : VA.fetchJson("/api/v1/academics/courses", { quiet: true })]);
     tables = t.ok ? t.body : []; programs = p.ok ? p.body : []; splits = s.ok ? s.body : []; courses = c.ok ? c.body : [];
     drawTables(); drawPrograms(); drawCourses(); drawTypes();

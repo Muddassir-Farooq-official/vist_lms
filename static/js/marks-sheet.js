@@ -14,6 +14,8 @@
   let keepMessage = false;
   function sync() {
     link.href = select.value ? "/api/v1/academics/offerings/" + select.value + "/marks.csv" : "#";
+    const award = document.getElementById("internal-award-pdf");
+    if (award) award.href = select.value ? "/api/v1/results/sheets/" + select.value + "/internal-award-list.pdf" : "#";
     if (!keepMessage) say("");            // a different course: clear; our own refresh after uploading: keep the result visible
     keepMessage = false;
   }

@@ -216,6 +216,9 @@ class GradingService:
         assessment_type = await self.session.get(AssessmentType, assessment_type_id)
         if assessment_type is None:
             raise ResourceNotFoundError("Assessment type not found.")
+        from app.academics.affiliation import check_part_allowed
+
+        await check_part_allowed(self.session, course_offering_id, assessment_type.component, doing=f"add {assessment_type.name} to this subject")
 
         existing_stmt = select(OfferingAssessment).where(
             OfferingAssessment.course_offering_id == course_offering_id,
@@ -303,6 +306,9 @@ class GradingService:
             raise BusinessRuleViolationError(f"obtained_marks must be between 0 and {assessment_type.max_marks}.")
         from app.academics.grading_schemes import COMPONENT_LABELS, OFFICE_ONLY
 
+        from app.academics.affiliation import check_part_allowed
+
+        await check_part_allowed(self.session, enrollment.course_offering_id, assessment_type.component, doing=f"enter {assessment_type.name} marks")
         if assessment_type.component in OFFICE_ONLY and not is_admin:
             raise BusinessRuleViolationError(f"{assessment_type.name} is a {COMPONENT_LABELS[assessment_type.component].lower()} mark, "
                                              "entered by the exam office.")
@@ -426,6 +432,11 @@ class GradingService:
                 "scheme_name": rules.name, "rules": rules, "marks": {oa.id: marks[oa.id] for oa in offering_assessments}}
 
     async def _maybe_recompute_outcome(self, enrollment: Enrollment, *, actor_id: uuid.UUID, corrected: bool = False) -> None:
+        from app.academics.affiliation import is_affiliated, program_of_offering
+
+        offering = await self.offering_repo.get_by_id(enrollment.course_offering_id)
+        if offering is not None and is_affiliated(await program_of_offering(self.session, offering)):
+            return          # an affiliated program's result is the university's (imported), never computed from internal marks
         ev = await self.evaluate(enrollment)
         if ev is None:
             return

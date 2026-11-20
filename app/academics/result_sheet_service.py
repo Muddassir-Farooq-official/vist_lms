@@ -188,12 +188,21 @@ class ResultSheetService:
             await self.audit.log(actor_user_id=actor_id, action="result_sheet.published_before_attendance_lock",
                                  entity_type="result_sheet", entity_id=sheet.id, metadata={"reason": reason})
         sheet.status, sheet.published_by, sheet.published_at = ResultSheetStatus.PUBLISHED, actor_id, _now()
-        decided = await self.grading.publish_outcomes(offering_id, actor_id=actor_id)
+        from app.academics.affiliation import is_affiliated, program_of_offering
+
+        affiliated = is_affiliated(await program_of_offering(self.session, offering))
+        # An affiliated program's sheet holds the INTERNAL marks: students see them, but pass/fail is the university's
+        # result, imported later by Reg No (Results -> University result). Nothing is decided here.
+        decided = 0 if affiliated else await self.grading.publish_outcomes(offering_id, actor_id=actor_id)
         from app.sms.service import SmsService
 
         sms = SmsService(self.session)
         for sid in (await self.session.execute(select(Enrollment.student_id).where(Enrollment.course_offering_id == offering_id,
                                                                                   Enrollment.status != EnrollmentStatus.WITHDRAWN))).scalars():
+            if affiliated:
+                await sms.queue_for_student(sid, event="RESULTS", body=f"{settings.app_name}: internal marks for {course.code} {course.title[:40]} "
+                                                                       f"({offering.term_label}) are published. See My Results.")
+                continue
             await sms.queue_for_student(sid, event="RESULTS", attachment=f"RESULT:{sid}",
                                         body=f"{settings.app_name}: result for {course.code} {course.title[:40]} ({offering.term_label}) is published. See My Results.")
         await self.audit.log(actor_user_id=actor_id, action="result_sheet.published", entity_type="result_sheet", entity_id=sheet.id, metadata={"students": decided})
