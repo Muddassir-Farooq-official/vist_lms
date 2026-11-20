@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -115,6 +116,9 @@ if __name__ == "__main__":
     parser.add_argument("--with-admin", action="store_true")
     parser.add_argument("--admin-username", default=None)
     parser.add_argument("--admin-password", default=None)
+    # The password can also come from an environment variable, so it never appears on a command line (ps, shell history).
+    parser.add_argument("--admin-password-env", default=None, help="name of an environment variable holding the password")
     args = parser.parse_args()
+    password = args.admin_password or (os.environ.get(args.admin_password_env) if args.admin_password_env else None)
 
-    asyncio.run(seed(args.with_admin, args.admin_username, args.admin_password))
+    asyncio.run(seed(args.with_admin, args.admin_username, password))

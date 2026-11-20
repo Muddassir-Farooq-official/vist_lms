@@ -48,6 +48,9 @@ Keep this output in case you need help later.
 
 ## Step 2: Nightly backups to Google Drive
 
+> Running more than one institute on this server? Use `scripts/server/sites.sh backups-setup` instead ([multi-institute guide](multi-institute.md)): one backup account, an encrypted folder per institute, one nightly job for all.
+
+
 ### 2a. Install the Google Drive connection (once)
 
 The backup uses **rclone** (it runs in Docker, so nothing is installed).

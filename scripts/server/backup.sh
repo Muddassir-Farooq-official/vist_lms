@@ -10,8 +10,12 @@
 # Settings in .env (optional):
 #   BACKUP_REMOTE=vistbackup:        the rclone remote (default "vistbackup:"; use an encrypted "crypt" remote, see the guide)
 # The result is recorded in the database, so the admin dashboard shows "Off-server backup: N h ago" or "failed".
+#
+# Other institutes on this server (docs/multi-institute.md): LMS_SITE_DIR=/opt/lms-sites/<name> bash scripts/server/backup.sh
+# backs up THAT institute: its .env (own database), its files, its backups/ folder and its own BACKUP_REMOTE (an
+# encrypted folder of its own). scripts/server/sites.sh backup-all runs this for every institute each night.
 set -uo pipefail
-cd "$(dirname "$0")/../.." || exit 1
+cd "${LMS_SITE_DIR:-$(dirname "$0")/../..}" || exit 1
 
 ENV_FILE=".env"
 PG_IMAGE="postgres:18-alpine"            # same as scripts/deploy.sh; pg_dump 18 reads older servers too
