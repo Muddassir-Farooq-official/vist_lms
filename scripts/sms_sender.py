@@ -40,6 +40,9 @@ async def one_pass(with_reminders: bool) -> dict:
         from app.core.background import missed_class_round
 
         await missed_class_round(session)            # a teacher on campus who did not take a class -> the administration (once per class)
+        from app.backups.alerts import backup_alert_round
+
+        await backup_alert_round(session)            # backup failed / none for 26 hours / restore test failed -> administrators (once a day)
         result = await svc.send_pending(limit=200)
         from app.core.background import beat
         from app.notifications.email_service import send_pending as send_emails

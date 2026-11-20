@@ -53,7 +53,40 @@ record() {   # record() ok|failed "detail" -> service_heartbeats, shown on the a
   printf "INSERT INTO service_heartbeats (name, last_seen_at, detail) VALUES ('%s', now(), '%s') ON CONFLICT (name) DO UPDATE SET last_seen_at = now(), detail = EXCLUDED.detail;\n" \
     "$name" "${detail:0:480}" | psql_run >/dev/null 2>&1 || say "(could not record the result on the dashboard)"
 }
-fail() { say "FAILED: $*"; record failed "$*"; exit 1; }
+# run_row ok|failed "detail" [db-file]: one row in backup_runs for the admin panel's Backups page (what ran, sizes, what is
+# kept on the backup account). Best effort: never fails the script; skipped on a database without that table yet.
+KIND="${BACKUP_KIND:-NIGHTLY}"; STARTED="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+run_row() {
+  local ok="$1" detail="${2:-}" dbfile="${3:-}" listing="" dbb="" fb=""
+  [ -n "$dbfile" ] && [ -f "$dbfile" ] && dbb="$(stat -c %s "$dbfile" 2>/dev/null)"
+  [ -d var/storage ] && fb="$(du -sb --exclude=exports var/storage 2>/dev/null | cut -f1)"
+  [ "$ok" = true ] && listing="$(rclone lsjson -R --files-only "$REMOTE" 2>/dev/null || true)"
+  OK="$ok" DETAIL="$detail" DBB="$dbb" FB="$fb" LISTING="$listing" python3 - <<'PY' | psql_run >/dev/null 2>&1 || true
+import json, os
+def q(v):            # dollar-quoted literal; the text never contains the tag
+    return "NULL" if v in (None, "") else "$v$" + str(v).replace("$v$", "") + "$v$"
+copies, total, count = [], None, None
+try:
+    items = json.loads(os.environ["LISTING"]) if os.environ["LISTING"].strip() else None
+except ValueError:
+    items = None
+if items is not None:
+    total, count = sum(i.get("Size", 0) for i in items), len(items)
+    for i in items:
+        path = i.get("Path", "")
+        folder = path.split("/", 1)[0]
+        if folder in ("daily", "weekly") and path.endswith(".dump"):
+            copies.append({"folder": folder, "name": path.split("/")[-1], "bytes": i.get("Size"), "at": i.get("ModTime")})
+    copies.sort(key=lambda c: c["at"] or "", reverse=True)
+print("INSERT INTO backup_runs (id, created_at, updated_at, kind, ok, started_at, finished_at, detail, db_bytes, files_bytes, "
+      "remote_bytes, remote_objects, copies) VALUES (gen_random_uuid(), now(), now(), %s, %s, %s, now(), %s, %s, %s, %s, %s, %s);" % (
+      q(os.environ.get("KIND", "NIGHTLY")), os.environ["OK"], q(os.environ.get("STARTED")), q(os.environ["DETAIL"][:480]),
+      os.environ["DBB"] or "NULL", os.environ["FB"] or "NULL", "NULL" if total is None else total, "NULL" if count is None else count,
+      q(json.dumps(copies[:60])) + "::jsonb" if items is not None else "NULL"))
+PY
+}
+export KIND STARTED
+fail() { say "FAILED: $*"; record failed "$*"; run_row false "$*"; exit 1; }
 
 check_remote() {
   [ -s "$RCLONE_CONF_DIR/rclone.conf" ] || fail "rclone is not set up yet ($RCLONE_CONF_DIR/rclone.conf missing): see docs/server-safety.md, step 2"
@@ -84,9 +117,9 @@ run_backup() {
   # into files/changed/<date>/ on the remote (not lost), and those are kept for $KEEP_CHANGED_DAYS days.
   local files_note=""
   if [ -d var/storage ]; then
-    rclone sync /storage "${REMOTE}files/current" --backup-dir "${REMOTE}files/changed/$stamp" --transfers 4 --checkers 8 \
+    rclone sync /storage "${REMOTE}files/current" --backup-dir "${REMOTE}files/changed/$stamp" --exclude "/exports/**" --transfers 4 --checkers 8 \
       || fail "upload of the uploaded files failed"
-    files_note=" + files ($(du -sh var/storage 2>/dev/null | cut -f1))"
+    files_note=" + files ($(du -sh --exclude=exports var/storage 2>/dev/null | cut -f1))"
   fi
 
   rclone delete --min-age "${KEEP_DAILY_DAYS}d" "${REMOTE}daily/" >/dev/null 2>&1 || say "(could not tidy old daily copies)"
@@ -99,9 +132,11 @@ run_backup() {
   local size; size="$(du -h "$LOCAL_DIR/$db" | cut -f1)"
   say "Backup OK: database $size$files_note copied to $REMOTE"
   record ok "database $size$files_note to $REMOTE at $(date '+%d %b %H:%M')"
+  run_row true "database $size$files_note" "$LOCAL_DIR/$db"
 }
 
 verify() {
+  KIND=VERIFY; export KIND
   check_remote
   local newest
   newest="$(rclone lsf --files-only --include 'vist-db-*.dump' "${REMOTE}daily/" | sort | tail -1)"
@@ -114,11 +149,12 @@ verify() {
   rm -f "backups/verify/$newest"
   local files=""
   if [ -d var/storage ]; then
-    rclone check /storage "${REMOTE}files/current" --one-way --size-only >/dev/null 2>&1 \
+    rclone check /storage "${REMOTE}files/current" --one-way --size-only --exclude "/exports/**" >/dev/null 2>&1 \
       && files=" Uploaded files: the copy on the remote matches the server." \
       || files=" Uploaded files: the copy on the remote is behind the server (new files since the last backup are normal)."
   fi
   say "Verify OK: $newest downloaded from $REMOTE and readable ($tables tables with data).$files"
+  KIND=VERIFY run_row true "$newest restored fine: $tables tables with data.$files"
 }
 
 case "${1:-run}" in

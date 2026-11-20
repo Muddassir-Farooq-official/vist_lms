@@ -16,6 +16,9 @@
 #   bash /opt/vist-lms/scripts/server/sites.sh backups-switch             move every institute's backups to Backblaze B2 (same passwords)
 #   bash /opt/vist-lms/scripts/server/sites.sh backup <name|vertex>       back one institute up now;  verify <name|vertex>  test-restore it
 #   bash /opt/vist-lms/scripts/server/sites.sh backup-all                 every institute, one after another (the nightly job)
+#   bash /opt/vist-lms/scripts/server/sites.sh verify-all                 test-restore every institute's newest backup (monthly job)
+#   bash /opt/vist-lms/scripts/server/sites.sh jobs                       requests from the admin panel's Backups page (every minute)
+#   bash /opt/vist-lms/scripts/server/sites.sh schedule                   install / refresh those scheduled jobs (every deploy does it)
 #
 # Vertex is the institute in /opt/vist-lms (port 8000) and is never changed by "add". The others live in
 # /opt/lms-sites/<name>/: .env (secrets, mode 600), compose.env (port, files, workers), site.env (domain, name),
@@ -196,7 +199,10 @@ It does not stop or change Vertex or any other institute."
   V=production; setkey "$dir/.env" APP_ENV V
   V=false; setkey "$dir/.env" DEBUG V; setkey "$dir/.env" ENABLE_STUDENT_PAYMENT_SIMULATION V
   V=true; setkey "$dir/.env" COOKIE_SECURE V
-  V="\"$title\""; setkey "$dir/.env" APP_NAME V
+  # its own name everywhere (pages, receipts, the installed app): without INSTITUTE_NAME it would show the built-in
+  # default, Vertex's name. The administrator can change both later in Settings -> Institute.
+  V="\"$title\""; setkey "$dir/.env" INSTITUTE_NAME V
+  V="\"$(printf '%s' "$name" | tr '[:lower:]' '[:upper:]') LMS\""; setkey "$dir/.env" APP_NAME V
   V="https://$domain"; setkey "$dir/.env" PUBLIC_URL V; setkey "$dir/.env" CORS_ORIGINS V
   V="postgresql+asyncpg://$role:$dbpw@$host/$db"; setkey "$dir/.env" DATABASE_URL V
   V="postgresql+psycopg://$role:$dbpw@$host/$db"; setkey "$dir/.env" DATABASE_URL_SYNC V
@@ -489,13 +495,11 @@ backups_setup() {
     say "Backups for $name"
     site_backup_remote "$name" && backup_one "$name" && verify_one "$name" || warn "$name: backup set-up did not finish (see $(site_dir "$name")/backups/backup.log)"
   done
-  local line="30 21 * * * bash $CODE_DIR/scripts/server/sites.sh backup-all >/dev/null 2>&1"
   local tz; tz="$(timedatectl show -p Timezone --value 2>/dev/null || echo Etc/UTC)"
-  [ "$tz" = "Asia/Karachi" ] && line="30 2 * * * bash $CODE_DIR/scripts/server/sites.sh backup-all >/dev/null 2>&1"
   case "$tz" in Asia/Karachi|Etc/UTC|UTC) ;; *) warn "server time zone is $tz: check the time in 'crontab -l'";; esac
-  # one nightly job for every institute (it replaces the older Vertex-only line, so nothing runs twice)
-  ( crontab -l 2>/dev/null | grep -v "scripts/server/backup.sh" | grep -v "scripts/server/sites.sh backup-all"; echo "$line" ) | crontab - \
-    && ok "nightly backups of every institute at 2:30 AM Pakistan time"
+  # one nightly job for every institute (it replaces the older Vertex-only line, so nothing runs twice), plus the
+  # monthly restore test and the per-minute Backups-page requests
+  schedule && ok "nightly backups of every institute at 2:30 AM Pakistan time; restore test on the 1st of each month"
 }
 
 # Ask for a Backblaze B2 key and bucket and save them as rclone remote $1 (checked before anything else changes).
@@ -596,6 +600,118 @@ backup_all() {
   [ -z "$failed" ] || { echo "backup failed for:$failed" >&2; exit 1; }
 }
 
+# ------------------------------------------------------------------ requests from the admin panel (every minute)
+# The Backups page (app/backups) puts requests in each institute's server_jobs table: BACKUP_NOW, EXPORT_DB (a complete
+# database copy to download), EXPORT_FILES (a ZIP of the uploaded files). The web app cannot do these itself, on
+# purpose. "jobs" picks them up, writes the file into the institute's own storage (exports/, which only that
+# institute's app can serve, to the admin who asked, for one hour), and tidies expired files.
+site_psql() {   # SQL on stdin against one institute's database ($1 = folder with .env); prints rows (tab-separated)
+  local url; url="$(envget DATABASE_URL_SYNC "$1/.env" | sed 's#^postgresql+psycopg://#postgresql://#')"
+  [ -n "$url" ] || return 1
+  docker run --rm -i -e PGURL="$url" "$PG_IMAGE" sh -c 'psql "$PGURL" -v ON_ERROR_STOP=1 -qtA -F "|"'
+}
+job_done() {    # job_done DIR ID STATUS DETAIL [FILE BYTES]
+  local f="${5:-}" b="${6:-}"
+  printf "UPDATE server_jobs SET status = '%s', finished_at = now(), updated_at = now(), detail = \$d\$%s\$d\$%s WHERE id = '%s';\n" \
+    "$3" "${4//\$d\$/}" "${f:+, file_name = '$f', file_bytes = $b, expires_at = now() + interval '1 hour'}" "$2" | site_psql "$1" >/dev/null
+}
+jobs_one() {
+  local dir="$1" exports="$1/var/storage/exports" row id kind name url need free
+  # one database call a minute when there is nothing to do (each call is a short-lived container): tidy up, say
+  # "the helper is alive" for the Backups page, and count waiting requests. Fails quietly before the migration.
+  local tidy pending
+  tidy="$(site_psql "$dir" 2>/dev/null <<'SQL'
+UPDATE server_jobs SET status = 'EXPIRED', updated_at = now() WHERE status = 'DONE' AND expires_at < now() RETURNING 'X', file_name;
+UPDATE server_jobs SET status = 'FAILED', detail = 'took too long', updated_at = now() WHERE status = 'RUNNING' AND started_at < now() - interval '3 hours';
+INSERT INTO service_heartbeats (name, last_seen_at, detail) VALUES ('server-jobs', now(), 'sites.sh jobs') ON CONFLICT (name) DO UPDATE SET last_seen_at = now();
+SELECT 'P', count(*) FROM server_jobs WHERE status = 'PENDING';
+SQL
+)" || return 0
+  mkdir -p "$exports"; chown 1000:1000 "$exports"; chmod 750 "$exports"
+  printf '%s\n' "$tidy" | while IFS='|' read -r tag f; do [ "$tag" = X ] && [ -n "$f" ] && rm -f "$exports/$f"; done
+  find "$exports" -maxdepth 1 -type f -mmin +75 -delete 2>/dev/null           # a download is kept 1 hour; anything left over
+  pending="$(printf '%s\n' "$tidy" | sed -n 's/^P|//p')"
+  [ "${pending:-0}" -gt 0 ] 2>/dev/null || return 0
+  while :; do
+    row="$(echo "UPDATE server_jobs SET status = 'RUNNING', started_at = now(), updated_at = now() WHERE id = (SELECT id FROM server_jobs WHERE status = 'PENDING' ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED) RETURNING id, kind;" | site_psql "$dir" 2>/dev/null | head -1)"
+    [ -n "$row" ] || break
+    id="${row%%|*}"; kind="${row#*|}"
+    printf '%s  %s: %s %s\n' "$(date '+%F %T')" "$(basename "$dir")" "$kind" "$id"
+    case "$kind" in
+      BACKUP_NOW)
+        if BACKUP_KIND=MANUAL LMS_SITE_DIR="$dir" bash "$CODE_DIR/scripts/server/backup.sh" run >/dev/null 2>&1; then job_done "$dir" "$id" DONE "Backup finished."
+        else job_done "$dir" "$id" FAILED "The backup failed: see the backup history below."; fi ;;
+      EXPORT_DB)
+        name="database-$(date +%Y%m%d-%H%M)-${id:0:8}.dump"
+        url="$(envget DATABASE_URL_SYNC "$dir/.env" | sed 's#^postgresql+psycopg://#postgresql://#')"
+        if docker run --rm -e PGURL="$url" -v "$exports:/out" "$PG_IMAGE" sh -c 'pg_dump --format=custom --no-owner "$PGURL" -f /out/'"$name" \
+           && docker run --rm -v "$exports:/out" "$PG_IMAGE" sh -c 'pg_restore --list /out/'"$name"' >/dev/null'; then
+          chown 1000:1000 "$exports/$name"; chmod 640 "$exports/$name"
+          job_done "$dir" "$id" DONE "Ready." "$name" "$(stat -c %s "$exports/$name")"
+        else rm -f "$exports/$name"; job_done "$dir" "$id" FAILED "The database copy could not be made."; fi ;;
+      EXPORT_FILES)
+        name="files-$(date +%Y%m%d-%H%M)-${id:0:8}.zip"
+        need="$(du -sb --exclude=exports "$dir/var/storage" | cut -f1)"; free="$(df -B1 --output=avail "$exports" | tail -1)"
+        if [ "$free" -lt $((need + need / 5 + 1073741824)) ]; then job_done "$dir" "$id" FAILED "Not enough free disk space on the server for the ZIP."; continue; fi
+        if SRC="$dir/var/storage" OUT="$exports/$name" python3 - <<'PY'
+import os, zipfile
+src, out = os.environ["SRC"], os.environ["OUT"]
+packed = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".pdf", ".zip", ".gz", ".mp4", ".docx", ".xlsx", ".pptx"}
+with zipfile.ZipFile(out + ".part", "w", allowZip64=True) as z:
+    for root, dirs, files in os.walk(src):
+        rel = os.path.relpath(root, src)
+        if rel == "exports" or rel.startswith("exports" + os.sep):
+            continue
+        for f in files:
+            p = os.path.join(root, f)
+            z.write(p, os.path.relpath(p, src),
+                    compress_type=zipfile.ZIP_STORED if os.path.splitext(f)[1].lower() in packed else zipfile.ZIP_DEFLATED)
+os.rename(out + ".part", out)
+PY
+        then chown 1000:1000 "$exports/$name"; chmod 640 "$exports/$name"; job_done "$dir" "$id" DONE "Ready." "$name" "$(stat -c %s "$exports/$name")"
+        else rm -f "$exports/$name" "$exports/$name.part"; job_done "$dir" "$id" FAILED "The ZIP could not be made."; fi ;;
+      *) job_done "$dir" "$id" FAILED "Unknown request." ;;
+    esac
+  done
+}
+jobs_all() {
+  exec 7>"/tmp/lms-jobs.lock"; flock -n 7 || exit 0
+  local name
+  for name in $(all_names); do
+    [ "$name" != vertex ] && grep -qx 'ENABLED=0' "$SITES_DIR/$name/site.env" && continue
+    jobs_one "$(site_dir "$name")"
+  done
+}
+verify_all() {
+  local name
+  for name in $(all_names); do
+    [ "$name" != vertex ] && grep -qx 'ENABLED=0' "$SITES_DIR/$name/site.env" && continue
+    verify_one "$name" || true
+  done
+}
+
+# The server's scheduled jobs, installed or refreshed (safe to repeat; run by every deploy):
+#   every minute       requests from the admin panel (sites.sh jobs)
+#   2:30 AM PKT        nightly backup of every institute (only once a backup account is set up)
+#   3:15 AM PKT, 1st   monthly restore test of every institute's newest backup
+schedule() {
+  [ "$(id -u)" = "0" ] || return 0
+  local tz pk nightly jobs verify have_backups=0
+  tz="$(timedatectl show -p Timezone --value 2>/dev/null || echo Etc/UTC)"
+  if [ "$tz" = "Asia/Karachi" ]; then nightly="30 2 * * *"; verify="15 3 1 * *"; else nightly="30 21 * * *"; verify="15 22 1 * *"; fi
+  { [ -f "$STORE_CONF" ] || grep -qs '^\[vistbackup\]' "$RCLONE_DIR/rclone.conf"; } && have_backups=1
+  pk="bash $CODE_DIR/scripts/server/sites.sh"
+  jobs="* * * * * $pk jobs >> /var/log/lms-jobs.log 2>&1"
+  local cur; cur="$(crontab -l 2>/dev/null | grep -v "sites.sh jobs" | grep -v "sites.sh verify-all")"
+  if [ "$have_backups" = 1 ]; then
+    cur="$(printf '%s\n' "$cur" | grep -v "scripts/server/backup.sh" | grep -v "sites.sh backup-all")"
+    cur="$cur
+$nightly $pk backup-all >/dev/null 2>&1
+$verify $pk verify-all >/dev/null 2>&1"
+  fi
+  printf '%s\n%s\n' "$cur" "$jobs" | sed '/^$/d' | crontab -
+}
+
 case "${1:-}" in
   list) list ;;
   add) shift; add "$@" ;;
@@ -608,5 +724,8 @@ case "${1:-}" in
   backup) need_root; [ -n "${2:-}" ] || die "Use: sites.sh backup <name|vertex>"; [ -f "$STORE_CONF" ] || [ "${2:-}" = vertex ] || die "Run sites.sh backups-setup first."; backup_one "$2" ;;
   verify) need_root; verify_one "${2:-vertex}" ;;
   backup-all) need_root; backup_all ;;
+  verify-all) need_root; verify_all ;;
+  jobs) need_root; jobs_all ;;
+  schedule) need_root; schedule && ok "scheduled jobs are up to date (crontab -l)" ;;
   *) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

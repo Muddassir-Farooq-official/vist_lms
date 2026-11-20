@@ -232,7 +232,7 @@ async def status(session: AsyncSession) -> dict:
     }
 
 
-BACKUP_STALE = timedelta(hours=36)
+BACKUP_STALE = timedelta(hours=26)   # nightly at 2:30 AM, so a missed night shows by the next morning
 
 
 async def backup_status(session: AsyncSession) -> dict:
