@@ -109,6 +109,8 @@ Menu: **Fixed assets** (admin and accounts office; read-only for the principal).
   `asset.approve` (admin).
 
 ## Deploying
+
+**Several institutes on one server** (each with its own database, secrets, files, web address and encrypted backups; one approved push deploys Vertex first, then every institute): see [docs/multi-institute.md](docs/multi-institute.md) and `scripts/server/sites.sh`.
 1. Apply the finance-fixes changes first (migration `f1e2d3c4b5a6`); this builds on them.
 2. Back up the database. Deploy the code, run `alembic upgrade head` (additive: nine new tables, three new permissions).
 3. Make sure `PUBLIC_URL` is set (e.g. `https://lms.example.edu.pk`) so a phone can open a scanned label. Optional: set

@@ -152,7 +152,7 @@ jobs:
           echo "::notice::mypy: $(tail -n 1 mypy.txt)"
 
   deploy:
-    name: Deploy to VPS
+    name: Deploy to VPS (all institutes)
     needs: [migrations, test, lint, secrets]      # only runs if all 4 test groups, the migration checks, lint and the secrets check passed
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -192,9 +192,11 @@ jobs:
             --exclude '__pycache__/' --exclude '/.env' --exclude '/var/' --exclude '/backups/' \
             ./ "$VPS_USER@$VPS_HOST:$APP_DIR/"
 
-      - name: Run the deploy script on the VPS
+      # Every institute on the server (docs/multi-institute.md): Vertex first - if it fails nothing else is touched -
+      # then each institute in /opt/lms-sites, one at a time, each with its own backup, migrations and health check.
+      - name: Deploy every institute on the VPS (Vertex first)
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           ALLOW_DESTRUCTIVE: ${{ vars.ALLOW_DESTRUCTIVE_MIGRATIONS }}
-        run: ssh "$VPS_USER@$VPS_HOST" "cd $APP_DIR && ALLOW_DESTRUCTIVE_MIGRATIONS='$ALLOW_DESTRUCTIVE' bash scripts/deploy.sh"
+        run: ssh "$VPS_USER@$VPS_HOST" "cd $APP_DIR && ALLOW_DESTRUCTIVE_MIGRATIONS='$ALLOW_DESTRUCTIVE' bash scripts/deploy_all.sh"
