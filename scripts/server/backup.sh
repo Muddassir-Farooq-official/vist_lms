@@ -54,6 +54,8 @@ fail() { say "FAILED: $*"; record failed "$*"; exit 1; }
 
 check_remote() {
   [ -s "$RCLONE_CONF_DIR/rclone.conf" ] || fail "rclone is not set up yet ($RCLONE_CONF_DIR/rclone.conf missing): see docs/server-safety.md, step 2"
+  # A new institute's folder does not exist on the remote yet: create it first (does nothing when it exists).
+  rclone mkdir "$REMOTE" >/dev/null 2>&1 || true
   rclone lsd "$REMOTE" >/dev/null 2>&1 || fail "cannot reach the backup remote '$REMOTE' (Google Drive sign-in expired or the remote name is wrong)"
 }
 
