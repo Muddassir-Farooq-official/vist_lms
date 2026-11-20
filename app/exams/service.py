@@ -97,6 +97,12 @@ class ExamScheduleService:
         from app.academics.combined import member_ids
 
         sched = await self.get(schedule_id)
+        if sched.assessment_type_id:              # an affiliated program's mid / final is on the university's datesheet
+            from app.academics.affiliation import check_part_allowed
+            from app.academics.models import AssessmentType
+
+            at = await self.session.get(AssessmentType, sched.assessment_type_id)
+            await check_part_allowed(self.session, course_offering_id, at.component if at else None, doing="put it on the institute's datesheet")
         group = await member_ids(self.session, course_offering_id)
         exists = (await self.session.execute(select(ExamPaper).where(ExamPaper.schedule_id == schedule_id,
                                                                      ExamPaper.course_offering_id.in_(group)))).scalars().first()

@@ -509,6 +509,7 @@ class EnrollmentResult(UUIDPKMixin, TimestampMixin, Base):
     division: Mapped[str | None] = mapped_column(String(40), nullable=True)
     # True when this pass was earned in a supplementary (reappear) exam; shown as (S) on the result card.
     supplementary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    source: Mapped[str | None] = mapped_column(String(12), nullable=True)      # None = computed here; UNIVERSITY = imported
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 class CoursePrerequisite(UUIDPKMixin, Base):

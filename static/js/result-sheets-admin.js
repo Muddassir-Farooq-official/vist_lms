@@ -65,7 +65,10 @@
     $("rs-badges").innerHTML = '<span class="pill">' + esc(d.course_code) + "</span>" + pill(d.status);
     $("rs-title").textContent = d.course_title;
     $("rs-meta").textContent = "Section " + d.section_label + " \u00b7 " + d.term_label;
-    $("rs-note").innerHTML = d.status === "RETURNED" && d.return_reason ? '<div class="cc-note rejected"><strong>Sent back</strong><span>' + esc(d.return_reason) + "</span></div>" : d.status === "PUBLISHED" && d.correction_count ? '<div class="cc-note"><strong>' + d.correction_count + " correction" + (d.correction_count > 1 ? "s" : "") + " since publication</strong><span>Each one is recorded with who made it and why.</span></div>" : "";
+    const aff = d.affiliated;
+    $("rs-note").innerHTML = (aff ? '<div class="cc-note"><strong>Internal marks only (' + esc(aff.program) + " is affiliated)</strong><span>" +
+      esc(aff.university_parts.join(", ")) + " by the university. Publishing shows students these marks; the grade and pass/fail come from the university's result " +
+      "(University result tab). Send the university the internal award list.</span></div>" : "") + (d.status === "RETURNED" && d.return_reason ? '<div class="cc-note rejected"><strong>Sent back</strong><span>' + esc(d.return_reason) + "</span></div>" : d.status === "PUBLISHED" && d.correction_count ? '<div class="cc-note"><strong>' + d.correction_count + " correction" + (d.correction_count > 1 ? "s" : "") + " since publication</strong><span>Each one is recorded with who made it and why.</span></div>" : "");
     const st = d.stats;
     $("rs-stats").innerHTML = tile("Students", st.students, "") + tile("Average", st.average === null ? "\u2014" : st.average + "%", "") + tile("Highest", st.highest === null ? "\u2014" : st.highest + "%", "") +
       tile("Lowest", st.lowest === null ? "\u2014" : st.lowest + "%", "") + tile(d.status === "PUBLISHED" ? "Passed" : "Would pass", st.passed + " of " + st.students, st.pass_rate === null ? "" : st.pass_rate + "%", "good") +
@@ -106,6 +109,16 @@
     award.href = API + "/sheets/" + d.course_offering_id + "/award-list.pdf";
     award.setAttribute("data-download", "award-list-" + (d.course_code || "subject") + ".pdf"); award.setAttribute("data-label", "file");
     bar.appendChild(award);
+    if (aff) {
+      award.hidden = true;
+      ["pdf", "csv"].forEach(function (fmt) {
+        const a = document.createElement("a");
+        a.className = "role-btn small-btn secondary-btn"; a.textContent = "Internal award list (" + fmt.toUpperCase() + ")";
+        a.href = API + "/sheets/" + d.course_offering_id + "/internal-award-list." + fmt;
+        a.setAttribute("data-download", "internal-award-list-" + (d.course_code || "subject") + "." + fmt); a.setAttribute("data-label", "file");
+        bar.appendChild(a);
+      });
+    }
     showError("");
   }
 

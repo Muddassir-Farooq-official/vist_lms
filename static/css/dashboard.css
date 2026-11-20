@@ -4123,3 +4123,9 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 .rn-actions .role-btn { width: auto; }
 .rn-ok.bad { color: #b42318; }
 .fr-box .att-go .role-btn { width: auto; padding-left: 18px; padding-right: 18px; }
+.gp-exam { min-width: 170px; }
+.gp-parts { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0; font-size: .8rem; }
+.gp-parts label { display: inline-flex; align-items: center; gap: 3px; }
+.ur-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin: 8px 0; }
+.ur-form label { display: grid; gap: 4px; font-size: .82rem; font-weight: 600; }
+.ur-form .role-btn { width: auto; }

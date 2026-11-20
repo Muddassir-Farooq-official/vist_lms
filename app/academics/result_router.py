@@ -91,7 +91,15 @@ async def sheets_outstanding(current_user: CurrentUser = Depends(approver), db=D
 
 @router.get("/sheets/{offering_id}", summary="One subject's marks for the whole class, with each student's projected result (approver)")
 async def review(offering_id: uuid.UUID, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
-    return await ResultSheetService(db).review(offering_id)
+    from app.academics.affiliation import university_parts_for_offering
+    from app.academics.grading_schemes import COMPONENT_LABELS
+
+    out = await ResultSheetService(db).review(offering_id)
+    parts, program = await university_parts_for_offering(db, offering_id)
+    # an affiliated program's sheet is internal marks only: the projected grades are not the result
+    out["affiliated"] = ({"program": program.code, "university_parts": [COMPONENT_LABELS[p] for p in sorted(parts)]}
+                         if program is not None and program.exam_body == "AFFILIATED" else None)
+    return out
 
 
 @router.post("/sheets/{offering_id}/approve", summary="Approve a submitted sheet (approver)")
@@ -204,6 +212,84 @@ async def add_draft_tables(current_user: CurrentUser = Depends(approver), db=Dep
     from app.academics.grading_schemes import GradingSchemeService
 
     return {"added": await GradingSchemeService(db).add_ready_made_drafts(actor_id=current_user.id)}
+
+
+# ============================================================ affiliated programs: who conducts the exams
+class ExamBodyIn(BaseModel):
+    exam_body: str = Field(pattern="^(INSTITUTE|AFFILIATED)$")
+    university_parts: list[str] = Field(default_factory=list, max_length=3)
+
+
+@router.get("/programs-exam-mode", summary="Every program with its grading table and who conducts its exams (approver)")
+async def programs_exam_mode(current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> list[dict]:
+    from sqlalchemy import select as _select
+
+    from app.programs.models import Program
+
+    rows = (await db.execute(_select(Program).where(Program.is_active.is_(True)).order_by(Program.code))).scalars()
+    return [{"id": p.id, "code": p.code, "name": p.name, "grading_scheme_id": p.grading_scheme_id, "exam_body": p.exam_body or "INSTITUTE",
+             "university_parts": [x for x in (p.university_parts or "").split(",") if x]} for p in rows]
+
+
+@router.put("/programs/{program_id}/exam-body", summary="Set who conducts a program's exams: the institute, or the affiliating university for some parts (approver)")
+async def set_exam_body(program_id: uuid.UUID, payload: ExamBodyIn, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
+    from app.academics.affiliation import UNIVERSITY_CAN_TAKE
+    from app.audit.service import AuditService
+    from app.programs.models import Program
+
+    program = await db.get(Program, program_id)
+    if program is None:
+        raise ResourceNotFoundError("Program not found.")
+    parts = [p for p in UNIVERSITY_CAN_TAKE if p in {x.upper() for x in payload.university_parts}]
+    if payload.exam_body == "AFFILIATED" and not parts:
+        raise BusinessRuleViolationError("Tick at least one part the university conducts (mid, final or practical).")
+    before = {"exam_body": program.exam_body, "university_parts": program.university_parts}
+    program.exam_body = payload.exam_body
+    program.university_parts = ",".join(parts) if payload.exam_body == "AFFILIATED" else None
+    await db.flush()
+    await AuditService(db).log(actor_user_id=current_user.id, action="program.exam_body_set", entity_type="program", entity_id=program.id,
+                               before=before, after={"exam_body": program.exam_body, "university_parts": program.university_parts})
+    return {"id": program.id, "exam_body": program.exam_body, "university_parts": parts if payload.exam_body == "AFFILIATED" else []}
+
+
+@router.get("/sheets/{offering_id}/internal-award-list.{fmt}", summary="Internal award list for the university (PDF or CSV): internal marks with Reg No")
+async def internal_award_list(offering_id: uuid.UUID, fmt: str, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> Response:
+    from app.academics.affiliation import internal_award_list as build, internal_award_list_csv
+    from app.academics.models import CourseOffering
+
+    if fmt not in ("pdf", "csv"):
+        raise ResourceNotFoundError("Choose pdf or csv.")
+    offering = await db.get(CourseOffering, offering_id)
+    if offering is None:
+        raise ResourceNotFoundError("Course offering not found.")
+    if not await _can_manage_marks_for_offering(db, offering, current_user):
+        raise AuthorizationError("Only the subject's teacher or the exam office can print its award list.")
+    data = await build(db, offering_id)
+    name = f"internal-award-list-{data['course_code']}-{(offering.section_label or '').replace('/', '-')}"
+    if fmt == "csv":
+        return Response(content=internal_award_list_csv(data), media_type="text/csv; charset=utf-8",
+                        headers={"Content-Disposition": f'attachment; filename="{name}.csv"'})
+    from app.academics.result_documents_pdf import render_internal_award_list
+
+    pdf = await run_in_threadpool(render_internal_award_list, data)
+    return _pdf_response(pdf, f"{name}.pdf")
+
+
+@router.get("/university/template.csv", summary="CSV template for the university's result (Reg No, course code, marks and/or grade)")
+async def university_template(current_user: CurrentUser = Depends(approver)) -> Response:
+    from app.academics.affiliation import template_csv
+
+    return Response(content=template_csv(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="university-result-template.csv"'})
+
+
+@router.post("/university/import", summary="Import the university's result for a program and term (by Reg No). All-or-nothing; dry_run=true only checks.")
+async def university_import(file: UploadFile, program_id: uuid.UUID, term_label: str, dry_run: bool = True,
+                            current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
+    from app.academics.affiliation import UniversityResultImport
+
+    return await UniversityResultImport(db).run(await file.read(), program_id=program_id, term_label=term_label, dry_run=dry_run,
+                                                actor_id=current_user.id)
 
 
 @router.put("/programs/{program_id}/grading-table", summary="Choose the grading table a program's results use (approver); empty = institute default")

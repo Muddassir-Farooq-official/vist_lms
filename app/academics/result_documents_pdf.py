@@ -123,6 +123,49 @@ def render_award_list(sheet: dict, *, grading: dict, program_label: str | None) 
     return buf.getvalue()
 
 
+# ---------------------------------------------------------------------- internal award list (affiliated programs)
+def render_internal_award_list(data: dict) -> bytes:
+    """The internal marks the institute sends to the affiliating university: roll no., Reg No, each internal assessment and
+    the internal total (scaled to the program's internal marks when a mark split is set). No grade: the university decides."""
+    buf = io.BytesIO()
+    size = landscape(A4)
+    width = size[0] - 24 * mm
+    doc = _doc(buf, size, "Internal award list")
+    stamp = datetime.now().strftime("%d %b %Y")
+    story = _header(width, "INTERNAL ASSESSMENT AWARD LIST", data.get("body"))
+    prog = data.get("program") or {}
+    info = [["Subject", f"{data['course_code']} — {data['course_title']}", "Term", data.get("term_label") or "—"],
+            ["Section", data.get("section_label") or "—", "Program", f"{prog.get('name', '—')} ({prog.get('code', '')})" if prog else "—"],
+            ["Internal marks", f"out of {data['internal_max']:g}", "By the university", ", ".join(data.get("university_parts") or []) or "—"]]
+    t = Table(info, colWidths=[28 * mm, width / 2 - 28 * mm, 32 * mm, width / 2 - 32 * mm])
+    t.setStyle(TableStyle([("FONT", (0, 0), (-1, -1), "Helvetica", 8.5), ("FONT", (0, 0), (0, -1), "Helvetica-Bold", 8.5), ("FONT", (2, 0), (2, -1), "Helvetica-Bold", 8.5),
+                           ("TEXTCOLOR", (0, 0), (-1, -1), INK), ("BOX", (0, 0), (-1, -1), 0.5, LINE), ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f6f8fc"))]))
+    story += [t, Spacer(1, 6)]
+    a = data["assessments"]
+    head = ["#", "Roll no.", "Reg No", "Name"] + [f"{x['name']}\n/{x['max_marks']:g}" for x in a] + [f"Internal\n/{data['internal_max']:g}"]
+    rows, extra = [head], []
+    for i, r in enumerate(data["rows"], start=1):
+        rows.append([str(i), r["roll_number"] or "", r.get("reg_number") or "—", Paragraph(r["student_name"], CELL)]
+                    + [("—" if v is None else f"{v:g}") for v in r["marks"]] + [f"{r['internal_obtained']:g}"])
+        if not r.get("reg_number"):
+            extra.append(("TEXTCOLOR", (2, i), (2, i), RED))
+    fixed = 8 * mm + 22 * mm + 30 * mm + 50 * mm + 20 * mm
+    each = max(14 * mm, (width - fixed) / max(1, len(a)))
+    story.append(_grid(rows, [8 * mm, 22 * mm, 30 * mm, 50 * mm] + [each] * len(a) + [20 * mm], extra=extra))
+    notes = []
+    if data.get("scaled"):
+        notes.append(f"Internal total = each part's marks scaled to the program's mark split, out of {data['internal_max']:g}.")
+    if data.get("missing_parts"):
+        notes.append("No assessment yet for: " + ", ".join(data["missing_parts"]) + " (counted as 0).")
+    no_reg = sum(1 for r in data["rows"] if not r.get("reg_number"))
+    if no_reg:
+        notes.append(f"{no_reg} student(s) have no Reg No yet (in red).")
+    story += [Spacer(1, 5), Paragraph(" ".join(notes) or "&nbsp;", SMALL), Spacer(1, 12),
+              _signatures(width, ["Subject teacher", "Head of department", "Principal"])]
+    doc.build(story, onFirstPage=_footer(stamp), onLaterPages=_footer(stamp))
+    return buf.getvalue()
+
+
 # ---------------------------------------------------------------------- semester (year) result cards
 def render_result_cards(data: dict) -> bytes:
     buf = io.BytesIO()

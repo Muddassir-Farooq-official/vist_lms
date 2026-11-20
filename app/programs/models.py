@@ -25,6 +25,10 @@ class Program(UUIDPKMixin, TimestampMixin, Base):
     max_credit_hours_per_semester: Mapped[int] = mapped_column(Integer, nullable=False, default=18)
     # Which grading table (Results -> Grading tables) this program's results use. Empty = the institute's default scale.
     grading_scheme_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("grading_schemes.id", ondelete="SET NULL"), nullable=True)
+    # Who conducts the exams: INSTITUTE (degree-awarding, everything here) or AFFILIATED (the university takes the parts in
+    # university_parts, e.g. "MID,FINAL"; the institute keeps internal marks and imports the university's result).
+    exam_body: Mapped[str] = mapped_column(String(12), nullable=False, default="INSTITUTE", server_default="INSTITUTE")
+    university_parts: Mapped[str | None] = mapped_column(String(40), nullable=True)
 
     # School mode (app/school): a program can be a school CLASS, e.g. "Class 9 (Science)". Set only for classes;
     # all four stay empty for college / university programs.

@@ -1,5 +1,43 @@
 [
   {
+    "version": "1.35.0",
+    "date": "2026-11-20",
+    "title": "Affiliated programs: internal marks and the university's result",
+    "summary": "Each program says who conducts its exams. For a program affiliated with a university, the institute keeps internal marks, prints the internal award list with Reg Nos, and imports the university's result.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "Exams conducted by (Grading tables & mark split → Programs): this institute, or the affiliating university for the mid, final and/or practical."
+      },
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "For an affiliated program the university's parts cannot be added, entered or put on the institute's datesheet; publishing shows internal marks only."
+      },
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "Internal award list (PDF / CSV) with Reg Nos and the internal total scaled to the mark split."
+      },
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "University result tab: import the university's result by Reg No (marks and/or grade, optional pass/fail), with a preview. Transcripts, GPA and promotion use it."
+      },
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "Internal award list (PDF) on the Grading page."
+      },
+      {
+        "kind": "improved",
+        "for": "Exam office",
+        "text": "The exam office now sees every program on Grading tables & mark split."
+      }
+    ]
+  },
+  {
     "version": "1.34.0",
     "date": "2026-11-20",
     "title": "University Reg No and student field rules",
