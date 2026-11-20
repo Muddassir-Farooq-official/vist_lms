@@ -126,6 +126,7 @@ add() {
   [ -n "$name" ] && [ -n "$domain" ] && [ -n "$title" ] || die 'Use: sites.sh add <name> <domain> "<Full institute name>"   e.g. sites.sh add abc lms.abccollege.edu.pk "ABC College of Nursing"'
   valid_name "$name" || die "The short name must be 2-20 lower-case letters/digits, starting with a letter (e.g. abc, kcon2)."
   case " $RESERVED " in *" $name "*) die "'$name' is reserved; choose another short name.";; esac
+  printf '%s' "$title" | grep -Eq '^[A-Za-z0-9 .,&()/-]{3,120}$' || die "The institute name may use letters, digits, spaces and . , & ( ) / - only."
   printf '%s' "$domain" | grep -Eq '^([a-z0-9-]+\.)+[a-z]{2,}$' || die "That domain does not look right (e.g. lms.abccollege.edu.pk, lower-case, no https://)."
   local dir="$SITES_DIR/$name"
   [ -e "$dir" ] && die "$dir already exists. Choose another name (or see the guide to remove a half-made one)."
