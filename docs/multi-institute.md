@@ -43,7 +43,9 @@ Do this before adding anyone, so every institute is protected from its first day
 3. **Application Keys → Add a New Application Key**: name `vps`, *Allow access to bucket*: the bucket above,
    *Type of access*: Read and Write. Copy the **keyID** and **applicationKey** (the key is shown only once).
 
-**or Google Drive**: make a Google account used only for backups. On your Windows PC download rclone from
+**or Google Drive** (not recommended: rclone's built-in Google connection is shared by everyone and Google often
+refuses uploads with "Quota exceeded … RATE_LIMIT_EXCEEDED"; if that happens, switch with
+`sites.sh backups-switch`, see below): make a Google account used only for backups. On your Windows PC download rclone from
 <https://rclone.org/downloads/>, unzip it, open PowerShell in that folder and run `.\rclone.exe authorize "drive"`,
 sign in with that account, and copy the text between `--->` and `<---`.
 
@@ -61,7 +63,21 @@ bash /opt/vist-lms/scripts/server/sites.sh backups-setup
 - It schedules one nightly job at **2:30 AM (Pakistan time)** for every institute. (If Vertex already had its Google
   Drive backup from `harden.sh backups`, Vertex keeps it; the old Vertex-only nightly line is replaced, so nothing runs twice.)
 
+What a nightly backup sends: a **full copy of the database** (kept 14 days, plus 8 weekly copies), and the
+**uploaded files incrementally**: one up-to-date copy, and each night only new or changed files go up. A file that was
+changed or deleted on the server is kept on the backup for 30 days. So the first night uploads all files (it can take a
+while), later nights only a few MB.
+
 Each admin dashboard shows "Off-server backup: N h ago" (or "failed") for its own institute.
+
+**Moving from Google Drive to Backblaze B2** (create the B2 bucket and key as above, then):
+
+```bash
+bash /opt/vist-lms/scripts/server/sites.sh backups-switch
+```
+
+Every institute keeps its encrypted folder and its two backup passwords (nothing new to write down); only the place
+changes. It makes a fresh backup of every institute on B2 and checks it. The old copies on Google Drive stay there.
 
 ## Step 2: the new institute's domain
 

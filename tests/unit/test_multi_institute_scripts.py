@@ -87,6 +87,31 @@ printf 'account=NEW\\n' | rc_section lmsstore b2
     assert oct((tmp_path / "rclone.conf").stat().st_mode)[-3:] == "600"
 
 
+def test_rc_delete_removes_one_remote_and_keeps_the_rest(tmp_path):
+    text = (ROOT / "scripts" / "server" / "sites.sh").read_text()
+    f = _helpers(tmp_path)
+    rc_delete = text[text.index("rc_delete() {"):text.index("# Move every institute's backups to Backblaze B2.")]
+    f.write_text(f.read_text() + "\n" + rc_delete)
+    script = f'''
+set -u; source {f}
+printf 'scope=drive\\ntoken=x\\n' | rc_section lmsstore drive
+printf 'remote=lmsstore:LMS-backups/vertex\\npassword=p\\n' | rc_section lmsbk-vertex crypt
+rc_delete lmsstore
+'''
+    r = subprocess.run(["bash", "-c", script], env={**os.environ, "RCLONE_DIR": str(tmp_path)}, capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    conf = (tmp_path / "rclone.conf").read_text()
+    assert "[lmsstore]" not in conf and "[lmsbk-vertex]" in conf and "password = p" in conf
+
+
+def test_backup_uploads_only_changed_files_and_a_full_database_copy():
+    text = (ROOT / "scripts" / "server" / "backup.sh").read_text()
+    assert 'rclone sync /storage "${REMOTE}files/current" --backup-dir "${REMOTE}files/changed/$stamp"' in text
+    assert 'rclone copy "/backups/nightly/$db" "${REMOTE}daily/"' in text
+    assert "tar -czf" not in text                                          # no full archive of every file each night
+    assert 'rclone mkdir "$REMOTE"' in text                                # a new institute's folder is made first
+
+
 def test_sites_script_is_valid_bash_and_explains_itself():
     assert subprocess.run(["bash", "-n", str(ROOT / "scripts" / "server" / "sites.sh")]).returncode == 0
     r = subprocess.run(["bash", str(ROOT / "scripts" / "server" / "sites.sh")], capture_output=True, text=True)

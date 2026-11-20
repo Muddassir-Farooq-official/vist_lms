@@ -6,7 +6,9 @@
 #   bash scripts/server/backup.sh verify     download the newest database copy from the remote and check it can be restored
 #   bash scripts/server/backup.sh list       show what is on the remote
 #
-# Keeps: the last 3 copies on the VPS (backups/nightly), 14 daily + 8 weekly (Sunday) copies on the remote.
+# Keeps: the database - the last 3 copies on the VPS (backups/nightly), 14 daily + 8 weekly (Sunday) copies on the remote.
+#        uploaded files - one up-to-date copy on the remote (files/current); each night only new or changed files are
+#        uploaded, and a file that was changed or deleted is kept for 30 days in files/changed/<date>/.
 # Settings in .env (optional):
 #   BACKUP_REMOTE=vistbackup:        the rclone remote (default "vistbackup:"; use an encrypted "crypt" remote, see the guide)
 # The result is recorded in the database, so the admin dashboard shows "Off-server backup: N h ago" or "failed".
@@ -26,6 +28,7 @@ LOG="backups/backup.log"
 KEEP_LOCAL=3
 KEEP_DAILY_DAYS=15
 KEEP_WEEKLY_DAYS=57
+KEEP_CHANGED_DAYS=31
 
 mkdir -p "$LOCAL_DIR"
 chmod 700 backups 2>/dev/null || true
@@ -42,7 +45,7 @@ case "$REMOTE" in *:*) ;; *) REMOTE="$REMOTE:";; esac
 REMOTE="${REMOTE%/}"; case "$REMOTE" in *:) ;; *) REMOTE="$REMOTE/";; esac     # "name:" or "name:folder/"
 
 psql_run() { docker run --rm -i -e PGURL="$PG_URL" "$PG_IMAGE" sh -c 'psql "$PGURL" -v ON_ERROR_STOP=1 -qtA' ; }
-rclone() { docker run --rm -v "$RCLONE_CONF_DIR:/config/rclone" -v "$PWD/backups:/backups" "$RCLONE_IMAGE" "$@"; }
+rclone() { docker run --rm -v "$RCLONE_CONF_DIR:/config/rclone" -v "$PWD/backups:/backups" -v "$PWD/var/storage:/storage:ro" "$RCLONE_IMAGE" "$@"; }
 
 record() {   # record() ok|failed "detail" -> service_heartbeats, shown on the admin dashboard. Never fails the script.
   local name="backup"; [ "$1" = "failed" ] && name="backup-failed"
@@ -56,13 +59,13 @@ check_remote() {
   [ -s "$RCLONE_CONF_DIR/rclone.conf" ] || fail "rclone is not set up yet ($RCLONE_CONF_DIR/rclone.conf missing): see docs/server-safety.md, step 2"
   # A new institute's folder does not exist on the remote yet: create it first (does nothing when it exists).
   rclone mkdir "$REMOTE" >/dev/null 2>&1 || true
-  rclone lsd "$REMOTE" >/dev/null 2>&1 || fail "cannot reach the backup remote '$REMOTE' (Google Drive sign-in expired or the remote name is wrong)"
+  rclone lsd "$REMOTE" >/dev/null 2>&1 || fail "cannot reach the backup remote '$REMOTE' (the backup account's sign-in or key expired, or the remote name is wrong)"
 }
 
 run_backup() {
-  local stamp db files
+  local stamp db
   stamp="$(date +%Y%m%d-%H%M)"
-  db="vist-db-$stamp.dump"; files="vist-files-$stamp.tar.gz"
+  db="vist-db-$stamp.dump"
   say "Backup started (remote: $REMOTE)"
   check_remote
 
@@ -70,27 +73,32 @@ run_backup() {
     sh -c 'pg_dump --format=custom --no-owner "$PGURL" -f /out/'"$db" || fail "database dump failed"
   docker run --rm -v "$PWD/$LOCAL_DIR:/out" "$PG_IMAGE" sh -c 'pg_restore --list /out/'"$db"' >/dev/null' \
     || fail "the database dump is damaged (pg_restore cannot read it)"
-  if [ -d var/storage ]; then
-    tar -czf "$LOCAL_DIR/$files" -C var storage || fail "packing the uploaded files failed"
-  else
-    files=""
-  fi
   chmod 600 "$LOCAL_DIR"/* 2>/dev/null || true
 
   rclone copy "/backups/nightly/$db" "${REMOTE}daily/" || fail "upload of the database copy failed"
-  [ -n "$files" ] && { rclone copy "/backups/nightly/$files" "${REMOTE}daily/" || fail "upload of the files copy failed"; }
   if [ "$(date +%u)" = "7" ]; then                                   # Sunday: also keep it as a weekly copy
     rclone copy "/backups/nightly/$db" "${REMOTE}weekly/" || fail "weekly upload failed"
-    [ -n "$files" ] && { rclone copy "/backups/nightly/$files" "${REMOTE}weekly/" || fail "weekly upload failed"; }
   fi
+
+  # Uploaded files: only what is new or changed since last night goes up. A file changed or deleted here is moved
+  # into files/changed/<date>/ on the remote (not lost), and those are kept for $KEEP_CHANGED_DAYS days.
+  local files_note=""
+  if [ -d var/storage ]; then
+    rclone sync /storage "${REMOTE}files/current" --backup-dir "${REMOTE}files/changed/$stamp" --transfers 4 --checkers 8 \
+      || fail "upload of the uploaded files failed"
+    files_note=" + files ($(du -sh var/storage 2>/dev/null | cut -f1))"
+  fi
+
   rclone delete --min-age "${KEEP_DAILY_DAYS}d" "${REMOTE}daily/" >/dev/null 2>&1 || say "(could not tidy old daily copies)"
   rclone delete --min-age "${KEEP_WEEKLY_DAYS}d" "${REMOTE}weekly/" >/dev/null 2>&1 || say "(could not tidy old weekly copies)"
+  rclone delete --min-age "${KEEP_CHANGED_DAYS}d" "${REMOTE}files/changed/" >/dev/null 2>&1 || true
+  rclone rmdirs --leave-root "${REMOTE}files/changed/" >/dev/null 2>&1 || true
   ls -1t "$LOCAL_DIR"/vist-db-*.dump 2>/dev/null | tail -n +$((KEEP_LOCAL + 1)) | xargs -r rm -f
-  ls -1t "$LOCAL_DIR"/vist-files-*.tar.gz 2>/dev/null | tail -n +$((KEEP_LOCAL + 1)) | xargs -r rm -f
+  rm -f "$LOCAL_DIR"/vist-files-*.tar.gz 2>/dev/null       # the old way (a full archive every night) is no longer used
 
   local size; size="$(du -h "$LOCAL_DIR/$db" | cut -f1)"
-  say "Backup OK: database $size${files:+ + files} copied to $REMOTE"
-  record ok "database $size${files:+ + files} to $REMOTE at $(date '+%d %b %H:%M')"
+  say "Backup OK: database $size$files_note copied to $REMOTE"
+  record ok "database $size$files_note to $REMOTE at $(date '+%d %b %H:%M')"
 }
 
 verify() {
@@ -104,7 +112,13 @@ verify() {
   tables="$(docker run --rm -v "$PWD/backups/verify:/in" "$PG_IMAGE" sh -c 'pg_restore --list /in/'"$newest"' | grep -c " TABLE DATA "')" \
     || fail "$newest cannot be read by pg_restore"
   rm -f "backups/verify/$newest"
-  say "Verify OK: $newest downloaded from $REMOTE and readable ($tables tables with data)."
+  local files=""
+  if [ -d var/storage ]; then
+    rclone check /storage "${REMOTE}files/current" --one-way --size-only >/dev/null 2>&1 \
+      && files=" Uploaded files: the copy on the remote matches the server." \
+      || files=" Uploaded files: the copy on the remote is behind the server (new files since the last backup are normal)."
+  fi
+  say "Verify OK: $newest downloaded from $REMOTE and readable ($tables tables with data).$files"
 }
 
 case "${1:-run}" in
