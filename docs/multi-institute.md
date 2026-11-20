@@ -173,7 +173,8 @@ Merge to `main` → the checks pass → you approve "production" in GitHub → `
 2. Then **each institute in turn**, using the image just built: its own backup (kept in
    `/opt/lms-sites/<name>/backups`, last 10), its own migrations, restart, health check. If one fails it keeps its
    previous version and the next one still deploys.
-3. A summary at the end of the GitHub log: `OK: abc kcon` / `FAILED: …`. Any failure makes the run red.
+3. The server's scheduled jobs are refreshed (`sites.sh schedule`, see below).
+4. A summary at the end of the GitHub log: `OK: abc kcon` / `FAILED: …`. Any failure makes the run red.
 
 ## Day to day
 
@@ -185,7 +186,18 @@ bash /opt/vist-lms/scripts/server/sites.sh disable abc      # stop it (data, fil
 bash /opt/vist-lms/scripts/server/sites.sh enable abc       # start it again with the current version
 ```
 
-Do a `verify` of each institute once a month.
+Each institute's administrators see all of this in the admin panel, **System → Backups**: last backup, space used on the
+backup account, the copies kept, the monthly restore test, a **Back up now** button and complete downloads (database
+`.dump`, uploaded files ZIP). The web app never touches the backup account: it leaves requests in its own database and
+the server carries them out.
+
+Scheduled jobs (`crontab -l`; installed and refreshed by every deploy, or by `sites.sh schedule`):
+
+| When | Command | What |
+|---|---|---|
+| every minute | `sites.sh jobs` | requests from the Backups page (log: `/var/log/lms-jobs.log`); a download is written to `<institute>/var/storage/exports/` and deleted after 1 hour |
+| 2:30 AM PKT | `sites.sh backup-all` | nightly backup of every institute |
+| 1st of the month, 3:15 AM PKT | `sites.sh verify-all` | restore test of every institute's newest backup |
 
 ## Restoring one institute from its backup
 

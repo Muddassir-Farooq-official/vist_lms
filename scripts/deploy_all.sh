@@ -27,8 +27,15 @@ if [ -d "$SITES_DIR" ]; then
   done
 fi
 
+# the server's scheduled jobs (nightly backups, monthly restore test, Backups-page requests): installed / refreshed
+sched="skipped (deploy is not running as root: run 'sudo bash scripts/server/sites.sh schedule' once)"
+if [ "$(id -u)" = "0" ]; then
+  if bash scripts/server/sites.sh schedule >/dev/null 2>&1; then sched="up to date"; else sched="could not be updated (run: bash scripts/server/sites.sh schedule)"; fi
+fi
+
 printf '\n\033[1;34m==> Summary\033[0m\n'
 printf '  Vertex: OK\n'
+printf '  Scheduled jobs: %s\n' "$sched"
 [ ${#ok[@]} -gt 0 ] && printf '  OK: %s\n' "${ok[*]}"
 [ ${#skipped[@]} -gt 0 ] && printf '  Switched off (skipped): %s\n' "${skipped[*]}"
 if [ ${#failed[@]} -gt 0 ]; then

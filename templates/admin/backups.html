@@ -1,0 +1,74 @@
+{% extends "admin/_base.html" %}
+{% block title %}Backups{% endblock %}
+{% block page_title %}Backups{% endblock %}
+
+{% block content %}
+<p id="bk-alert" class="dash-alert error" role="alert" hidden></p>
+<p id="bk-helper" class="dash-alert" hidden></p>
+
+<section class="kpi-grid" aria-label="Backup summary">
+  <div class="kpi" id="k-last"><span class="kpi-label">Last backup</span><strong class="kpi-value" id="k-last-v">&mdash;</strong><span class="kpi-sub" id="k-last-s">&nbsp;</span></div>
+  <div class="kpi" id="k-stored"><span class="kpi-label">Stored on the backup account</span><strong class="kpi-value" id="k-stored-v">&mdash;</strong><span class="kpi-sub" id="k-stored-s">&nbsp;</span></div>
+  <div class="kpi"><span class="kpi-label">Database size</span><strong class="kpi-value" id="k-db-v">&mdash;</strong><span class="kpi-sub">one complete copy (.dump)</span></div>
+  <div class="kpi"><span class="kpi-label">Uploaded files</span><strong class="kpi-value" id="k-files-v">&mdash;</strong><span class="kpi-sub">photos, documents, receipts</span></div>
+  <div class="kpi" id="k-verify"><span class="kpi-label">Restore test</span><strong class="kpi-value" id="k-verify-v">&mdash;</strong><span class="kpi-sub" id="k-verify-s">&nbsp;</span></div>
+  <div class="kpi" id="k-month"><span class="kpi-label">Last 30 days</span><strong class="kpi-value" id="k-month-v">&mdash;</strong><span class="kpi-sub" id="k-month-s">&nbsp;</span></div>
+</section>
+
+<section class="panel">
+  <h2>Back up and download</h2>
+  <p class="panel-hint">Every night at 2:30 AM the server copies the database and the uploaded files, encrypted, to the backup account
+    (off this server). These buttons ask the server to do something now; it starts within a minute.</p>
+  <div class="bk-actions" style="display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0;">
+    <button type="button" class="role-btn" id="bk-now">Back up now</button>
+    <button type="button" class="role-btn secondary-btn" id="bk-db">Download the whole database (.dump)</button>
+    <button type="button" class="role-btn secondary-btn" id="bk-files">Download all uploaded files (ZIP)</button>
+  </div>
+  <p class="panel-hint">A download needs your password again, is ready within a few minutes, can be downloaded only by you, and is deleted from the
+    server after <strong>1 hour</strong>. The other administrators are told. Open a <strong>.dump</strong> in pgAdmin with <em>Restore</em>
+    (into a new, empty database), or with <code>pg_restore</code>. Keep downloaded copies somewhere safe: they hold everyone's data.</p>
+  <table class="dash-table" id="jobs-table">
+    <thead><tr><th>Request</th><th>By</th><th>Asked</th><th>Status</th><th class="num">Size</th><th></th></tr></thead>
+    <tbody id="jobs-tbody"></tbody>
+  </table>
+  <p class="empty-state" id="jobs-empty" hidden>Nothing asked for yet.</p>
+</section>
+
+<section class="panel">
+  <h2>Database copies kept on the backup account</h2>
+  <p class="panel-hint" id="copies-hint">A copy from each of the last 14 nights and from each of the last 8 weeks. The uploaded files are kept as one
+    up-to-date copy, plus the files changed or deleted in the last 31 days.</p>
+  <table class="dash-table" id="copies-table">
+    <thead><tr><th>Copy</th><th>Kind</th><th>Made</th><th class="num">Size</th></tr></thead>
+    <tbody id="copies-tbody"></tbody>
+  </table>
+  <p class="empty-state" id="copies-empty" hidden>No list yet: it appears after the next backup.</p>
+</section>
+
+<section class="panel">
+  <h2>History</h2>
+  <table class="dash-table" id="runs-table">
+    <thead><tr><th>When</th><th>What</th><th>Result</th><th class="num">Database</th><th>Details</th></tr></thead>
+    <tbody id="runs-tbody"></tbody>
+  </table>
+  <p class="empty-state" id="runs-empty" hidden>No backups recorded yet. They appear here after the next nightly backup (or press <strong>Back up now</strong>).</p>
+</section>
+
+<dialog id="bk-auth" class="modal" aria-labelledby="bk-auth-title">
+  <form class="modal-body" id="bk-auth-form" autocomplete="off">
+    <h2 id="bk-auth-title">Download</h2>
+    <p class="cc-meta" id="bk-auth-intro"></p>
+    <div class="form-field"><label for="bk-pass">Your password</label>
+      <input id="bk-pass" class="text-input" type="password" autocomplete="current-password" maxlength="200" required></div>
+    <div class="form-field" id="bk-code-row" hidden><label for="bk-code">6-digit code from your authenticator app</label>
+      <input id="bk-code" class="text-input" inputmode="numeric" autocomplete="one-time-code" maxlength="12"></div>
+    <p class="dash-alert error" id="bk-auth-err" role="alert" hidden></p>
+    <div class="form-actions"><button type="submit" class="role-btn" id="bk-auth-ok">Prepare the download</button></div>
+    <button type="button" class="back-link modal-close-btn" id="bk-auth-cancel">Cancel</button>
+  </form>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/backups.js"></script>
+{% endblock %}

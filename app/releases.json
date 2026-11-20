@@ -1,5 +1,38 @@
 [
   {
+    "version": "1.36.0",
+    "date": "2026-11-20",
+    "title": "Backups page: see every backup and download a complete copy",
+    "summary": "Administrators can see when the institute was last backed up, how much is kept on the backup account and whether the monthly restore test passed, start a backup, and download the whole database or all uploaded files.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "System → Backups: last backup, space used on the backup account, database and file sizes, the copies kept (14 nightly + 8 weekly), the monthly restore test and the full history."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Back up now: the server makes the same backup as the nightly one, within a minute."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Download the whole database (.dump, opens in pgAdmin) or all uploaded files (ZIP). Needs your password (and 2FA code); only you can download it, for 1 hour; other administrators are told; logged."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "A notification when a backup fails, when none has finished for 26 hours, or when the restore test fails (once a day until fixed)."
+      },
+      {
+        "kind": "improved",
+        "for": "Administrators",
+        "text": "The dashboard warns about a missed backup after 26 hours instead of 36."
+      }
+    ]
+  },
+  {
     "version": "1.35.0",
     "date": "2026-11-20",
     "title": "Affiliated programs: internal marks and the university's result",

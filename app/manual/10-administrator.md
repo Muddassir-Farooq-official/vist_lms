@@ -116,4 +116,23 @@ Open another office's portal with your administrator rights: **Accounts office**
 - **CSV Imports**: bring in students, employees, past results and more from spreadsheets. Each file is checked before anything is saved.
 - **SMS & WhatsApp**: messages to students and guardians. Turn each kind on or off in Settings → SMS messages.
 - **Activity log**: everything done in the system: who, what, when and from where.
+- **Backups**: see the backups and download a complete copy. See *Backups* below.
 - **Settings**: institute details, look, rules and your own account.
+
+### Backups
+
+Every night at 2:30 AM the server copies the database and all uploaded files, encrypted, to the backup account (off this server). On the 1st of each month it also restores the newest copy into a scratch database to prove the backup can really be opened. **Backups** shows:
+
+- **Last backup**, how much is **stored on the backup account**, the size of the database and of the uploaded files, the **restore test** result and how many backups worked in the last 30 days.
+- The **database copies kept**: one from each of the last 14 nights and one from each of the last 8 weeks. The uploaded files are kept as one up-to-date copy plus whatever was changed or deleted in the last 31 days.
+- The **history** of every backup and restore test, with the reason when one failed.
+
+If a backup fails, or none has finished for 26 hours, or the restore test fails, every administrator gets a notification (repeated once a day until it is fixed).
+
+The buttons ask the server to do something; it starts within a minute:
+
+- **Back up now**: the same backup as the nightly one, for example before a big change.
+- **Download the whole database (.dump)**: one file with everything in the database. Open it in pgAdmin with *Restore* (into a new, empty database) or with `pg_restore`.
+- **Download all uploaded files (ZIP)**: every photo, document and receipt. It can be large.
+
+A download needs your password again (and the 6-digit code if two-step sign-in is on). When it is ready a **Download** button appears; only you can use it, and the file is deleted from the server after **1 hour**. The other administrators are told when a download is asked for and when it is downloaded, and both are in the activity log. A downloaded copy holds everyone's data: keep it somewhere safe and delete it when you no longer need it.
