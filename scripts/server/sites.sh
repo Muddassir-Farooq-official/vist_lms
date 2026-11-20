@@ -385,6 +385,7 @@ site_backup_remote() {
   printf 'remote=%s/%s\nfilename_encryption=standard\ndirectory_name_encryption=true\npassword=%s\npassword2=%s\n' "$base" "$name" "$o1" "$o2" \
     | rc_section "${remote%%:*}" crypt || { warn "could not set up encryption for $name"; return 1; }
   if [ "$name" = vertex ]; then cp -p "$dir/.env" "$dir/backups/env-before-backup-remote-$(date +%Y%m%d-%H%M%S)" 2>/dev/null; fi
+  rclone_run mkdir "$remote" >/dev/null 2>&1 || true          # the institute's (empty) folder on the remote
   V="$remote"; setkey "$dir/.env" BACKUP_REMOTE V
   printf '\n\033[1;33m%s\033[0m\n' "WRITE DOWN the backup passwords of '$name' NOW and keep them OFF this server (password manager / office safe)."
   printf 'Without them its backups CANNOT be opened, not even by you. Shown only this once.\n\n    %s backup password 1:  %s\n    %s backup password 2:  %s\n\n' "$name" "$p1" "$name" "$p2"
