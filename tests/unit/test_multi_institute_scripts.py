@@ -112,10 +112,29 @@ def test_backup_uploads_only_changed_files_and_a_full_database_copy():
     assert 'rclone mkdir "$REMOTE"' in text                                # a new institute's folder is made first
 
 
+def test_temporary_address_and_nginx_site(tmp_path):
+    text = (ROOT / "scripts" / "server" / "sites.sh").read_text()
+    funcs = text[text.index("temp_suffix() {"):text.index("# ------------------------------------------------------------------ move to an official domain")]
+    f = tmp_path / "f.sh"
+    f.write_text(funcs)
+    fake = tmp_path / "bin"
+    fake.mkdir()
+    (fake / "curl").write_text("#!/bin/sh\necho 187.127.220.153\n")
+    (fake / "curl").chmod(0o755)
+    r = subprocess.run(["bash", "-c", f"source {f}; echo fims.$(temp_suffix); nginx_proxy_conf lms.fims.edu.pk 8003"],
+                       env={**os.environ, "PATH": f"{fake}:{os.environ['PATH']}"}, capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    lines = r.stdout.splitlines()
+    assert lines[0] == "fims.187-127-220-153.sslip.io"
+    conf = "\n".join(lines[1:])
+    assert "server_name lms.fims.edu.pk;" in conf and "proxy_pass http://127.0.0.1:8003;" in conf
+    assert "proxy_set_header X-Forwarded-For   $remote_addr;" in conf      # SEC-02: never the client's own header
+
+
 def test_sites_script_is_valid_bash_and_explains_itself():
     assert subprocess.run(["bash", "-n", str(ROOT / "scripts" / "server" / "sites.sh")]).returncode == 0
     r = subprocess.run(["bash", str(ROOT / "scripts" / "server" / "sites.sh")], capture_output=True, text=True)
-    assert r.returncode == 2 and "sites.sh add <name> <domain>" in r.stdout
+    assert r.returncode == 2 and "sites.sh add <name> <domain>" in r.stdout and "sites.sh domain <name|vertex> <new-domain>" in r.stdout
 
 
 @pytest.mark.skipif(shutil.which("docker") is None, reason="docker compose not installed")
