@@ -79,7 +79,17 @@ bash /opt/vist-lms/scripts/server/sites.sh backups-switch
 Every institute keeps its encrypted folder and its two backup passwords (nothing new to write down); only the place
 changes. It makes a fresh backup of every institute on B2 and checks it. The old copies on Google Drive stay there.
 
-## Step 2: the new institute's domain
+## Step 2: the new institute's address
+
+**No domain yet?** Use a free temporary address: leave the domain out and the institute gets
+`<name>.<server-ip>.sslip.io`, e.g. `https://fims.187-127-220-153.sslip.io`, with HTTPS, straight away (sslip.io sends
+every such name to this server; nothing to set up). Move it to its official domain later (below).
+
+```bash
+bash /opt/vist-lms/scripts/server/sites.sh add fims "FIMS College"
+```
+
+**With its own domain**: it needs one DNS record first:
 
 The institute (or you) adds one DNS record at the place where its domain is registered:
 
@@ -134,6 +144,25 @@ then `systemctl reload postgresql` and run the `add` command again.
 ```bash
 bash /opt/vist-lms/scripts/server/sites.sh https abc
 ```
+
+## Moving an institute to its official domain later
+
+When the institute has its domain (e.g. `lms.fims.edu.pk`), add the A record pointing to the VPS (as in Step 2), check
+it with `nslookup`, then:
+
+```bash
+bash /opt/vist-lms/scripts/server/sites.sh domain fims lms.fims.edu.pk
+bash /opt/vist-lms/scripts/server/sites.sh domain vertex lms.vist.edu.pk      # Vertex works the same way
+```
+
+1. Gets the HTTPS certificate for the new domain first; if that fails nothing changes.
+2. Sets the institute's address (`PUBLIC_URL`) to the new domain and restarts only that institute (about 20 seconds).
+   If it does not come back healthy, the old settings are put back.
+3. Turns the old sslip.io address into a permanent redirect, so old bookmarks and shared links keep working.
+
+The database, uploaded files and backups do not change. People sign in again once on the new address, and phones
+that had notifications on allow them again once. The old settings are kept in the institute's
+`backups/domain-change-<date>/` folder.
 
 ## Every deploy from now on
 

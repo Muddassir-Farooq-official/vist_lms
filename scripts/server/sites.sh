@@ -2,10 +2,14 @@
 # Several institutes on one server (docs/multi-institute.md). Run ON THE VPS as root, from anywhere:
 #
 #   bash /opt/vist-lms/scripts/server/sites.sh list                       every institute: address, port, health, memory, last backup
+#   bash /opt/vist-lms/scripts/server/sites.sh add <name> "<Full institute name>"
+#                                                                         same, on a free temporary address <name>.<server-ip>.sslip.io
 #   bash /opt/vist-lms/scripts/server/sites.sh add <name> <domain> "<Full institute name>"
 #                                                                         a new institute: own database + user, own secrets, own files,
 #                                                                         own port and Redis, nginx + HTTPS, first admin, backups
 #   bash /opt/vist-lms/scripts/server/sites.sh https <name>               (again) get the HTTPS certificate once the domain points here
+#   bash /opt/vist-lms/scripts/server/sites.sh domain <name|vertex> <new-domain>
+#                                                                         move to its official domain; the old address redirects there
 #   bash /opt/vist-lms/scripts/server/sites.sh disable <name>             stop it (data kept; deploys skip it); "enable" starts it again
 #   bash /opt/vist-lms/scripts/server/sites.sh backups-setup              one backup account (Backblaze B2 or Google Drive), an encrypted
 #                                                                         folder per institute with its own passwords, nightly at 2:30 AM PKT
@@ -124,7 +128,11 @@ list() {
 add() {
   need_root
   local name="${1:-}" domain="${2:-}" title="${3:-}"
-  [ -n "$name" ] && [ -n "$domain" ] && [ -n "$title" ] || die 'Use: sites.sh add <name> <domain> "<Full institute name>"   e.g. sites.sh add abc lms.abccollege.edu.pk "ABC College of Nursing"'
+  if [ -n "$name" ] && [ -n "$domain" ] && [ -z "$title" ]; then        # no domain given: a free temporary address
+    title="$domain"; domain="$name.$(temp_suffix)" || die "Could not work out this server's public IP address for the temporary address."
+  fi
+  [ -n "$name" ] && [ -n "$domain" ] && [ -n "$title" ] || die 'Use: sites.sh add <name> "<Full institute name>"   (temporary address <name>.<ip>.sslip.io)
+  or:  sites.sh add <name> <domain> "<Full institute name>"   e.g. sites.sh add abc lms.abccollege.edu.pk "ABC College of Nursing"'
   valid_name "$name" || die "The short name must be 2-20 lower-case letters/digits, starting with a letter (e.g. abc, kcon2)."
   case " $RESERVED " in *" $name "*) die "'$name' is reserved; choose another short name.";; esac
   printf '%s' "$title" | grep -Eq '^[A-Za-z0-9 .,&()/-]{3,120}$' || die "The institute name may use letters, digits, spaces and . , & ( ) / - only."
@@ -261,6 +269,124 @@ asyncio.run(m())" >/dev/null 2>&1 \
   printf 'They must choose a new password at first login. Then: Settings -> institute name, logo, fee and SMS settings.\n'
   unset LMS_ADMIN_PW
   printf 'From now on every approved deploy updates it too (after Vertex).\n'
+}
+
+# This server's public IPv4 as an sslip.io name: 187-127-220-153.sslip.io (any <x>.187-127-220-153.sslip.io reaches it).
+temp_suffix() {
+  local ip; ip="$(curl -fsS -m 5 https://api.ipify.org 2>/dev/null || true)"
+  printf '%s' "$ip" | grep -Eq '^[0-9]{1,3}(\.[0-9]{1,3}){3}$' \
+    || ip="$(hostname -I 2>/dev/null | tr ' ' '\n' | grep -Ev '^(10\.|127\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)' | grep -E '^[0-9.]+$' | head -1)"
+  [ -n "$ip" ] || return 1
+  printf '%s.sslip.io' "${ip//./-}"
+}
+
+nginx_proxy_conf() {
+  cat <<CONF
+# $1 -> port $2. Made by scripts/server/sites.sh; certbot adds the HTTPS part.
+server {
+    listen 80;
+    server_name $1;
+    client_max_body_size 20m;
+
+    location / {
+        proxy_pass http://127.0.0.1:$2;
+        proxy_set_header Host              \$host;
+        proxy_set_header X-Real-IP         \$remote_addr;
+        proxy_set_header X-Forwarded-For   \$remote_addr;   # not \$proxy_add_x_forwarded_for (audit SEC-02)
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 120s;
+    }
+}
+CONF
+}
+
+# ------------------------------------------------------------------ move to an official domain
+# domain <name|vertex> <new-domain>: HTTPS for the new domain first (nothing changes if that fails), then the
+# institute's address settings, then the old address becomes a permanent redirect to the new one. The database, files
+# and backups do not change. People sign in again once on the new address.
+domain() {
+  need_root
+  local name="${1:-}" new="${2:-}"
+  [ -n "$name" ] && [ -n "$new" ] || die "Use: sites.sh domain <name|vertex> <new-domain>   e.g. sites.sh domain fims lms.fims.edu.pk"
+  printf '%s' "$new" | grep -Eq '^([a-z0-9-]+\.)+[a-z]{2,}$' || die "That domain does not look right (e.g. lms.fims.edu.pk, lower-case, no https://)."
+  command -v nginx >/dev/null && command -v certbot >/dev/null || die "nginx and certbot are needed."
+  local dir port old conf stamp enabled=""
+  stamp="$(date +%Y%m%d-%H%M%S)"
+  if [ "$name" = vertex ]; then
+    dir="$CODE_DIR"; port=8000
+    enabled="$(grep -lE 'proxy_pass[[:space:]]+http://(127\.0\.0\.1|localhost):8000' /etc/nginx/sites-enabled/* /etc/nginx/conf.d/*.conf 2>/dev/null | grep -v '/lms-' | head -1)"
+    [ -n "$enabled" ] || die "Could not find Vertex's nginx site (the one passing to port 8000). Send me: ls -l /etc/nginx/sites-enabled"
+    old="$(awk '/server_name/ {for (i = 2; i <= NF; i++) {gsub(/;/, "", $i); if ($i != "_" && $i != "") {print $i; exit}}}' "$enabled")"
+  else
+    dir="$SITES_DIR/$name"; [ -f "$dir/site.env" ] || die "No institute called '$name'."
+    port="$(envget LMS_PORT "$dir/compose.env")"; old="$(envget DOMAIN "$dir/site.env")"
+    enabled="$(ls /etc/nginx/sites-enabled/lms-"$name".conf /etc/nginx/conf.d/lms-"$name".conf 2>/dev/null | head -1)"
+    [ -n "$enabled" ] || die "Could not find the nginx site of $name."
+  fi
+  [ -n "$old" ] && [ "$old" != "$new" ] || die "$name already uses $new (or its current address is unknown)."
+  local ip_dns ips; ip_dns="$(getent ahostsv4 "$new" | awk '{print $1; exit}')"; ips="$(hostname -I 2>/dev/null) $(curl -fsS -m 5 https://api.ipify.org 2>/dev/null || true)"
+  { [ -n "$ip_dns" ] && printf ' %s ' "$ips" | grep -q " $ip_dns "; } \
+    || die "$new does not point to this server yet (it points to ${ip_dns:-nothing}). Add the A record at the domain's registrar, wait, and try again. Nothing was changed."
+  confirm "Move '$name' from https://$old to https://$new:
+  - HTTPS certificate for $new first (if that fails, nothing changes)
+  - the institute's address becomes https://$new and https://$old redirects there (old links keep working)
+  - its database, files and backups do not change; people sign in again once on the new address"
+
+  local env="$dir/.env" saved="$dir/backups/domain-change-$stamp"
+  mkdir -p "$saved"; chmod 700 "$saved"
+  cp -p "$env" "$saved/env"; cp -pL "$enabled" "$saved/nginx-site.conf"
+  local avail="/etc/nginx/conf.d"; [ -d /etc/nginx/sites-available ] && avail="/etc/nginx/sites-available"
+  local newconf="$avail/lms-$name-$(printf '%s' "$new" | tr . -).conf" redir="$avail/lms-$name-old.conf"
+  link_conf() { [ -d /etc/nginx/sites-enabled ] && ln -sf "$1" "/etc/nginx/sites-enabled/$(basename "$1")"; return 0; }
+  unlink_conf() { rm -f "$1" "/etc/nginx/sites-enabled/$(basename "$1")"; }
+  reload() { nginx -t >/dev/null 2>&1 && systemctl reload nginx; }
+
+  say "1/3 HTTPS for $new (the old address keeps working meanwhile)"
+  nginx_proxy_conf "$new" "$port" > "$newconf"; link_conf "$newconf"
+  reload || { unlink_conf "$newconf"; reload; die "nginx did not accept the new address. Nothing was changed."; }
+  local email; email="$(envget VAPID_SUBJECT "$CODE_DIR/.env" | sed 's/^mailto://')"
+  [ -n "$email" ] || { printf 'E-mail for certificate expiry notices: '; read -r email; }
+  certbot --nginx -d "$new" --non-interactive --agree-tos -m "$email" --redirect >/dev/null 2>&1 \
+    || { unlink_conf "$newconf"; reload; die "certbot could not get a certificate for $new. Nothing was changed (see /var/log/letsencrypt/letsencrypt.log)."; }
+  ok "https://$new works (same institute)"
+
+  say "2/3 The institute's own address setting"
+  V="https://$new"; setkey "$env" PUBLIC_URL V; setkey "$env" CORS_ORIGINS V
+  local C; if [ "$name" = vertex ]; then C="docker compose -f $CODE_DIR/docker-compose.prod.yml"; else C="$(site_compose "$name")"; fi
+  ( cd "$CODE_DIR" && $C up -d --no-build --force-recreate app worker sms >/dev/null 2>&1 )
+  local i; for i in $(seq 1 45); do curl -fsS "http://127.0.0.1:$port/health/ready" >/dev/null 2>&1 && break; sleep 2; done
+  if ! curl -fsS "http://127.0.0.1:$port/health/ready" >/dev/null 2>&1; then
+    cp -p "$saved/env" "$env"; ( cd "$CODE_DIR" && $C up -d --no-build --force-recreate app worker sms >/dev/null 2>&1 )
+    unlink_conf "$newconf"; reload
+    die "The app did not come back with the new address, so the old settings were put back. Both addresses were left as before."
+  fi
+  if [ "$name" != vertex ]; then
+    V="$new"; setkey "$dir/site.env" DOMAIN V
+    V="$(envget OLD_DOMAINS "$dir/site.env") $old"; V="${V# }"; setkey "$dir/site.env" OLD_DOMAINS V
+  fi
+  ok "the institute now uses https://$new"
+
+  say "3/3 https://$old -> https://$new"
+  {
+    echo "# Old address of \"$name\": a permanent redirect to its official domain. Made by scripts/server/sites.sh domain."
+    echo "server { listen 80; server_name $old; return 301 https://$new\$request_uri; }"
+    if [ -f "/etc/letsencrypt/live/$old/fullchain.pem" ]; then
+      echo "server { listen 443 ssl; server_name $old; ssl_certificate /etc/letsencrypt/live/$old/fullchain.pem; ssl_certificate_key /etc/letsencrypt/live/$old/privkey.pem; return 301 https://$new\$request_uri; }"
+    fi
+  } > "$redir"
+  # the old site stops serving the old address (its copy is in $saved); the redirect takes over
+  if [ -L "$enabled" ] || [ "${enabled#/etc/nginx/sites-enabled/}" != "$enabled" ]; then mv "$enabled" "$saved/nginx-site-enabled-entry"
+  else mv "$enabled" "$saved/nginx-site-conf.d-file"; fi
+  link_conf "$redir"
+  if reload; then
+    ok "old links keep working: https://$old redirects to https://$new"
+  else
+    unlink_conf "$redir"
+    if [ -e "$saved/nginx-site-enabled-entry" ]; then mv "$saved/nginx-site-enabled-entry" "$enabled"; else mv "$saved/nginx-site-conf.d-file" "$enabled"; fi
+    reload
+    warn "the redirect could not be set up, so both addresses keep working as they are. Send me the output of: nginx -t"
+  fi
+  printf '\n\033[1;32m%s now lives at https://%s\033[0m (old settings kept in %s)\n' "$name" "$new" "$saved"
 }
 
 undo_add() {
@@ -467,6 +593,7 @@ case "${1:-}" in
   list) list ;;
   add) shift; add "$@" ;;
   https) need_root; https "${2:-}" || exit 1 ;;
+  domain) domain "${2:-}" "${3:-}" ;;
   disable) disable "${2:-}" ;;
   enable) enable "${2:-}" ;;
   backups-setup) backups_setup ;;
@@ -474,5 +601,5 @@ case "${1:-}" in
   backup) need_root; [ -n "${2:-}" ] || die "Use: sites.sh backup <name|vertex>"; [ -f "$STORE_CONF" ] || [ "${2:-}" = vertex ] || die "Run sites.sh backups-setup first."; backup_one "$2" ;;
   verify) need_root; verify_one "${2:-vertex}" ;;
   backup-all) need_root; backup_all ;;
-  *) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
