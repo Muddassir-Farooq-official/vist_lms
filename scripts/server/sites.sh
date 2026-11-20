@@ -9,6 +9,7 @@
 #   bash /opt/vist-lms/scripts/server/sites.sh disable <name>             stop it (data kept; deploys skip it); "enable" starts it again
 #   bash /opt/vist-lms/scripts/server/sites.sh backups-setup              one backup account (Backblaze B2 or Google Drive), an encrypted
 #                                                                         folder per institute with its own passwords, nightly at 2:30 AM PKT
+#   bash /opt/vist-lms/scripts/server/sites.sh backups-switch             move every institute's backups to Backblaze B2 (same passwords)
 #   bash /opt/vist-lms/scripts/server/sites.sh backup <name|vertex>       back one institute up now;  verify <name|vertex>  test-restore it
 #   bash /opt/vist-lms/scripts/server/sites.sh backup-all                 every institute, one after another (the nightly job)
 #
@@ -337,13 +338,8 @@ backups_setup() {
     printf '\nWhere should the backups go?\n  1) Backblaze B2 (recommended: reliable, about $6 per TB a month)\n  2) Google Drive (free 15 GB; use a Google account only for backups)\nChoose 1 or 2: '
     local c; read -r c
     case "$c" in
-      1) printf 'B2 keyID: '; local kid key bucket; read -r kid; printf 'B2 applicationKey (not shown): '; read -rs key; echo
-         printf 'Bucket name (it is created if missing, e.g. lms-backups-%s): ' "$(rnd 6 | tr 'A-Z' 'a-z')"; read -r bucket
-         printf 'account=%s\nkey=%s\nhard_delete=true\n' "$kid" "$key" | rc_section lmsstore b2 || die "Could not save the B2 connection."
-         unset key
-         rclone_run mkdir "lmsstore:$bucket" >/dev/null 2>&1 || true
-         rclone_run lsd "lmsstore:$bucket" >/dev/null 2>&1 || { rclone_run config delete lmsstore >/dev/null 2>&1; die "B2 did not accept the key or the bucket name. Nothing was kept."; }
-         printf 'PROVIDER=b2\nBASE=lmsstore:%s\n' "$bucket" > "$STORE_CONF" ;;
+      1) connect_b2 lmsstore
+         printf 'PROVIDER=b2\nBASE=lmsstore:%s\n' "$B2_BUCKET" > "$STORE_CONF" ;;
       2) printf '\nOn your Windows PC: download rclone from https://rclone.org/downloads/ , unzip, open PowerShell in that folder and run:\n    .\\rclone.exe authorize "drive"\nSign in with the BACKUP Google account and copy the text between ---> and <---.\nPaste it here (not shown): '
          local token; read -rs token; echo
          case "$token" in *access_token*refresh_token*) ;; *) die "That does not look like the token. Nothing was changed.";; esac
@@ -367,6 +363,67 @@ backups_setup() {
   # one nightly job for every institute (it replaces the older Vertex-only line, so nothing runs twice)
   ( crontab -l 2>/dev/null | grep -v "scripts/server/backup.sh" | grep -v "scripts/server/sites.sh backup-all"; echo "$line" ) | crontab - \
     && ok "nightly backups of every institute at 2:30 AM Pakistan time"
+}
+
+# Ask for a Backblaze B2 key and bucket and save them as rclone remote $1 (checked before anything else changes).
+connect_b2() {
+  local rname="$1" kid key
+  printf '\nFrom Backblaze (Application Keys): \nB2 keyID: '; read -r kid
+  printf 'B2 applicationKey (not shown while you paste): '; read -rs key; echo
+  printf 'Bucket name (exactly as created in Backblaze): '; read -r B2_BUCKET
+  printf '%s' "$B2_BUCKET" | grep -Eq '^[a-z0-9][a-z0-9-]{4,48}[a-z0-9]$' || die "That bucket name does not look right (lower-case letters, digits and -). Nothing was changed."
+  printf 'account=%s\nkey=%s\nhard_delete=true\n' "$kid" "$key" | rc_section "$rname" b2 || die "Could not save the B2 connection."
+  unset key
+  rclone_run mkdir "$rname:$B2_BUCKET" >/dev/null 2>&1 || true
+  if ! rclone_run lsd "$rname:$B2_BUCKET" >/dev/null 2>&1; then
+    rc_delete "$rname"
+    die "B2 did not accept the key or the bucket name (check the key has Read and Write access to that bucket). Nothing was kept."
+  fi
+  ok "Backblaze B2 bucket $B2_BUCKET connected"
+}
+rc_delete() {
+  NAME="$1" F="$RCLONE_DIR/rclone.conf" python3 -c '
+import configparser, os
+f = os.environ["F"]; c = configparser.RawConfigParser(); c.optionxform = str; c.read(f)
+if c.remove_section(os.environ["NAME"]):
+    with open(f, "w") as fh:
+        c.write(fh)
+'
+}
+
+# Move every institute's backups to Backblaze B2. Each institute keeps its encrypted folder and its two passwords:
+# only where the folder lives changes. The copies already on the old account stay there (delete them later by hand).
+backups_switch() {
+  need_root
+  [ -f "$STORE_CONF" ] || die "No backup account yet: run sites.sh backups-setup."
+  local old_base; old_base="$(envget BASE "$STORE_CONF")"
+  [ "$(envget PROVIDER "$STORE_CONF")" = b2 ] && die "Backups already go to Backblaze B2 ($old_base)."
+  confirm "Move the backups of every institute from $old_base to Backblaze B2.
+Encryption and the two backup passwords of each institute stay the same; nothing new to write down.
+The copies already on the old account are left there."
+  connect_b2 lmsb2
+  local new_base="lmsb2:$B2_BUCKET"
+  cp -p "$RCLONE_DIR/rclone.conf" "$RCLONE_DIR/rclone.conf.before-b2-$(date +%Y%m%d-%H%M%S)"
+  OLD="$old_base/" NEW="$new_base/" F="$RCLONE_DIR/rclone.conf" python3 -c '
+import configparser, os
+f, old, new = os.environ["F"], os.environ["OLD"], os.environ["NEW"]
+c = configparser.RawConfigParser(); c.optionxform = str; c.read(f)
+moved = []
+for s in c.sections():
+    if c.get(s, "type", fallback="") == "crypt" and c.get(s, "remote", fallback="").startswith(old):
+        c.set(s, "remote", new + c.get(s, "remote")[len(old):]); moved.append(s)
+with open(f, "w") as fh:
+    c.write(fh)
+print(" ".join(moved))
+' > /tmp/lms-moved
+  printf 'PROVIDER=b2\nBASE=%s\n' "$new_base" > "$STORE_CONF"; chmod 600 "$STORE_CONF"
+  ok "moved to B2: $(cat /tmp/lms-moved)"; rm -f /tmp/lms-moved
+  local name
+  for name in $(all_names); do
+    say "First backup of $name on B2"
+    backup_one "$name" && verify_one "$name" || warn "$name: see $(site_dir "$name")/backups/backup.log"
+  done
+  rc_delete "${old_base%%:*}" && ok "the old connection (${old_base%%:*}) was removed from this server"
 }
 
 # The encrypted folder for one institute: <backup account>/<name>, with its own two passwords (shown once).
@@ -413,8 +470,9 @@ case "${1:-}" in
   disable) disable "${2:-}" ;;
   enable) enable "${2:-}" ;;
   backups-setup) backups_setup ;;
+  backups-switch) backups_switch ;;
   backup) need_root; [ -n "${2:-}" ] || die "Use: sites.sh backup <name|vertex>"; [ -f "$STORE_CONF" ] || [ "${2:-}" = vertex ] || die "Run sites.sh backups-setup first."; backup_one "$2" ;;
   verify) need_root; verify_one "${2:-vertex}" ;;
   backup-all) need_root; backup_all ;;
-  *) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
