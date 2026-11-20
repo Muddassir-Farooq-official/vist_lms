@@ -19,7 +19,9 @@ def upgrade() -> None:
         op.execute("ALTER TYPE attendance_status ADD VALUE IF NOT EXISTS 'LATE'")
         op.execute("ALTER TYPE attendance_status ADD VALUE IF NOT EXISTS 'LEAVE'")
 
-    op.add_column("class_sessions", sa.Column("attendance_taken_at", sa.DateTime(timezone=True), nullable=True))
+    # IF NOT EXISTS: building a new institute's database once failed here with "already exists" (the statement right
+    # after the autocommit block above was sent twice through asyncpg). Same column; safe to repeat.
+    op.execute("ALTER TABLE class_sessions ADD COLUMN IF NOT EXISTS attendance_taken_at TIMESTAMP WITH TIME ZONE")
     # Sessions that already have attendance rows were, by definition, taken.
     op.execute(
         """

@@ -200,6 +200,9 @@ It does not stop or change Vertex or any other institute."
   V="https://$domain"; setkey "$dir/.env" PUBLIC_URL V; setkey "$dir/.env" CORS_ORIGINS V
   V="postgresql+asyncpg://$role:$dbpw@$host/$db"; setkey "$dir/.env" DATABASE_URL V
   V="postgresql+psycopg://$role:$dbpw@$host/$db"; setkey "$dir/.env" DATABASE_URL_SYNC V
+  # Migrations go through psycopg, not asyncpg: building a brand-new database runs ~130 migrations in one session, and
+  # through asyncpg one statement right after an enum change was sent twice on the server ("column already exists").
+  setkey "$dir/.env" MIGRATION_DATABASE_URL V
   setkey "$dir/.env" JWT_SECRET jwt
   V="lmsbk-$name:"; setkey "$dir/.env" BACKUP_REMOTE V
   V="$(envget VAPID_SUBJECT "$CODE_DIR/.env")"; [ -n "$V" ] && setkey "$dir/.env" VAPID_SUBJECT V
@@ -241,7 +244,11 @@ asyncio.run(m())" >/dev/null 2>&1 \
   ok "made"
 
   say "5/8 Tables (migrations), roles and the first administrator"
-  $C --profile tools run --rm migrate >/dev/null || die "Migrations failed on the new database."
+  local try; for try in 1 2 3; do       # each try continues from the last migration that finished
+    $C --profile tools run --rm migrate > "$dir/backups/migrate.log" 2>&1 && break
+    [ "$try" = 3 ] && { tail -n 25 "$dir/backups/migrate.log"; die "Migrations failed on the new database (log above)."; }
+    warn "migrations stopped (try $try of 3), continuing ..."
+  done
   LMS_ADMIN_PW="$(rnd 14)Aa1!"; export LMS_ADMIN_PW
   $C run --rm --no-deps -e LMS_ADMIN_PW app python scripts/seed_permissions.py --with-admin --admin-username admin --admin-password-env LMS_ADMIN_PW >/dev/null \
     || die "Could not create the roles and the first administrator."
