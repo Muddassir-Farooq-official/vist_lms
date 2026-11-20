@@ -145,8 +145,11 @@ class ImportService:
             await self._fail(job, "File encoding is invalid — expected UTF-8.")
             return job
 
+        from app.students.field_rules import required_set
+
+        required = await required_set(self.session)          # Students -> Field rules, as they are now
         try:
-            rows, header_errors = self._parse_csv(text)
+            rows, header_errors = self._parse_csv(text, required)
         except csv.Error as exc:
             await self._fail(job, f"Malformed CSV: {exc}")
             return job
@@ -159,7 +162,7 @@ class ImportService:
             await self._fail(job, "CSV headers do not match the expected template.")
             return job
 
-        results = [validate_and_normalize_row(i + 2, row) for i, row in enumerate(rows)]  # +2: header is row 1
+        results = [validate_and_normalize_row(i + 2, row, required) for i, row in enumerate(rows)]  # +2: header is row 1
 
         # Cross-row + DB validation (duplicates, program resolution) only
         # for rows that are otherwise clean — no point double-reporting.
@@ -210,13 +213,13 @@ class ImportService:
         return file_bytes.decode("utf-8-sig")  # tolerates a BOM from Excel exports
 
     @staticmethod
-    def _parse_csv(text: str) -> tuple[list[dict[str, str]], list[FieldError]]:
+    def _parse_csv(text: str, required=None) -> tuple[list[dict[str, str]], list[FieldError]]:
         reader = csv.DictReader(io.StringIO(text))
         if reader.fieldnames is None:
             return [], [FieldError(field="__file__", error_type="MALFORMED_CSV", message="CSV has no header row.")]
 
         headers = [h.strip() for h in reader.fieldnames]
-        header_errors = validate_headers(headers)
+        header_errors = validate_headers(headers, required)
 
         rows: list[dict[str, str]] = []
         for raw in reader:
@@ -230,6 +233,12 @@ class ImportService:
 
     async def _cross_validate(self, results: list[RowValidationResult]) -> None:
         seen_cnics: dict[str, int] = {}
+        seen_regs: dict[str, int] = {}
+        from sqlalchemy import func as _f
+
+        candidate_regs = {r.normalized["reg_number"].upper() for r in results if r.normalized.get("reg_number")}
+        existing_regs = set((await self.session.execute(select(_f.upper(Student.reg_number)).where(
+            _f.upper(Student.reg_number).in_(candidate_regs)))).scalars()) if candidate_regs else set()
 
         candidate_cnics = {r.normalized.get("cnic") for r in results if r.normalized.get("cnic")}
 
@@ -258,6 +267,16 @@ class ImportService:
                     )
                 else:
                     seen_cnics[cnic] = r.row_number
+
+            reg = r.normalized.get("reg_number")
+            if reg:
+                if reg.upper() in existing_regs:
+                    r.errors.append(FieldError("reg_number", "DUPLICATE_EXISTING", f"Reg No {reg} already belongs to another student."))
+                elif reg.upper() in seen_regs:
+                    r.errors.append(FieldError("reg_number", "DUPLICATE_IN_FILE",
+                                               f"Reg No duplicated within this file (first seen at row {seen_regs[reg.upper()]})."))
+                else:
+                    seen_regs[reg.upper()] = r.row_number
 
             program_value = r.normalized.get("program")
             if program_value:
@@ -303,13 +322,13 @@ class ImportService:
         student = Student(
             first_name=n["first_name"],
             last_name=n["last_name"],
-            date_of_birth=n["date_of_birth"],
-            gender=n["gender"],
-            cnic=n["cnic"],
-            contact_no=n["contact_no"],
-            marital_status=n["marital_status"],
-            religion=n["religion"],
-            nationality=n["nationality"],
+            date_of_birth=n.get("date_of_birth"),
+            gender=n.get("gender"),
+            cnic=n.get("cnic"),
+            contact_no=n.get("contact_no"),
+            marital_status=n.get("marital_status"),
+            religion=n.get("religion"),
+            nationality=n.get("nationality"),
             roll_number=roll_number,
             admission_fee_paid=n.get("admission_fee_paid"),
             enrollment_date=enrollment_date,
@@ -322,35 +341,38 @@ class ImportService:
             admission_session=n.get("admission_session"),
             admission_category=n.get("admission_category"),
             section_label=n.get("section_label"),
+            reg_number=n.get("reg_number"),
             status=StudentStatus.ACTIVE,
             source_import_job_id=job.id,
         )
         self.session.add(student)
         await self.session.flush()
 
-        self.session.add(
-            StudentGuardian(
-                student_id=student.id,
-                name=n["guardian_name"],
-                cnic=n["guardian_cnic"],
-                contact_no=n.get("guardian_contact_no"),
-                relation=n["relation_with_guardian"],
-                is_primary=True,
+        # Guardian, emergency contact and address only when the file gives them (the field rules may make them optional).
+        if n.get("guardian_name") or n.get("guardian_cnic") or n.get("guardian_contact_no") or n.get("relation_with_guardian"):
+            self.session.add(
+                StudentGuardian(
+                    student_id=student.id,
+                    name=n.get("guardian_name"),
+                    cnic=n.get("guardian_cnic"),
+                    contact_no=n.get("guardian_contact_no"),
+                    relation=n.get("relation_with_guardian"),
+                    is_primary=True,
+                )
             )
-        )
-        self.session.add(
-            StudentEmergencyContact(student_id=student.id, contact_no=n["emergency_contact_no"])
-        )
-        self.session.add(
-            StudentAddress(
-                student_id=student.id,
-                address_type="PRESENT",
-                address_line=n["present_address"],
-                province=n["province"],
-                district=n["district"],
-                city=n["city"],
+        if n.get("emergency_contact_no"):
+            self.session.add(StudentEmergencyContact(student_id=student.id, contact_no=n["emergency_contact_no"]))
+        if n.get("present_address") or n.get("province") or n.get("district") or n.get("city"):
+            self.session.add(
+                StudentAddress(
+                    student_id=student.id,
+                    address_type="PRESENT",
+                    address_line=n.get("present_address") or "",
+                    province=n.get("province"),
+                    district=n.get("district"),
+                    city=n.get("city"),
+                )
             )
-        )
 
         # Account creation: a random one-time password (shown on the admission slip), forced
         # change on first login. Username IS the roll number now — one

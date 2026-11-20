@@ -4,7 +4,7 @@ import enum
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Enum, ForeignKey, Index, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Enum, ForeignKey, Index, Integer, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base, TimestampMixin, UUIDPKMixin, utcnow
@@ -35,6 +35,7 @@ class Student(UUIDPKMixin, TimestampMixin, Base):
             "ix_students_last_name_trgm", "last_name", postgresql_using="gin", postgresql_ops={"last_name": "gin_trgm_ops"}
         ),
         CheckConstraint(r"cnic ~ '^[0-9]{5}-[0-9]{7}-[0-9]{1}$'", name="ck_students_cnic_format"),
+        Index("uq_students_reg_number_ci", text("upper(reg_number)"), unique=True),
         CheckConstraint("current_semester IS NULL OR current_semester >= 1", name="current_semester_positive"),
     )
 
@@ -48,19 +49,21 @@ class Student(UUIDPKMixin, TimestampMixin, Base):
 
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    date_of_birth: Mapped[date] = mapped_column(Date, nullable=False)
-    gender: Mapped[str] = mapped_column(String(20), nullable=False)
-    cnic: Mapped[str] = mapped_column(String(15), nullable=False)  # mandatory per approved decision
-    contact_no: Mapped[str] = mapped_column(String(20), nullable=False)
-    marital_status: Mapped[str] = mapped_column(String(20), nullable=False)
-    religion: Mapped[str] = mapped_column(String(50), nullable=False)
-    nationality: Mapped[str] = mapped_column(String(50), nullable=False)
+    date_of_birth: Mapped[date | None] = mapped_column(Date, nullable=True)
+    gender: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    cnic: Mapped[str | None] = mapped_column(String(15), nullable=True)  # required unless Students -> Field rules make it optional
+    contact_no: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    marital_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    religion: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    nationality: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # System-generated (BSN-2026-0001, ...), never admin-supplied — see
     # app/core/sequences.py. Doubles as the student's permanent login
     # username, so it's immutable once created (never editable via
     # StudentUpdateRequest).
     roll_number: Mapped[str] = mapped_column(String(30), nullable=False)
+    # The affiliating university's registration number (KMU / AUST ...), entered by the admin or the exam office.
+    reg_number: Mapped[str | None] = mapped_column(String(40), nullable=True)
     admission_fee_paid: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     enrollment_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 
@@ -130,10 +133,10 @@ class StudentGuardian(UUIDPKMixin, TimestampMixin, Base):
     )
 
     student_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
-    name: Mapped[str] = mapped_column(String(150), nullable=False)
-    cnic: Mapped[str] = mapped_column(String(15), nullable=False)
+    name: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    cnic: Mapped[str | None] = mapped_column(String(15), nullable=True)
     contact_no: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    relation: Mapped[str] = mapped_column(String(50), nullable=False)
+    relation: Mapped[str | None] = mapped_column(String(50), nullable=True)
     is_primary: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     student: Mapped[Student] = relationship(back_populates="guardians")
@@ -158,9 +161,9 @@ class StudentAddress(UUIDPKMixin, TimestampMixin, Base):
     student_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
     address_type: Mapped[str] = mapped_column(String(20), default="PRESENT", nullable=False)
     address_line: Mapped[str] = mapped_column(String(255), nullable=False)
-    province: Mapped[str] = mapped_column(String(100), nullable=False)
-    district: Mapped[str] = mapped_column(String(100), nullable=False)
-    city: Mapped[str] = mapped_column(String(100), nullable=False)
+    province: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    district: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     student: Mapped[Student] = relationship(back_populates="addresses")
 

@@ -288,7 +288,7 @@ class ResultSheetService:
                 outcome = "SHORT_ATTENDANCE" if short else ev["outcome"].value
             else:
                 letter, points, outcome = None, None, None
-            rows.append({"enrollment_id": e.id, "student_name": f"{st.first_name} {st.last_name}", "roll_number": st.roll_number, "grade": letter, "grade_points": points,
+            rows.append({"enrollment_id": e.id, "student_name": f"{st.first_name} {st.last_name}", "roll_number": st.roll_number, "reg_number": st.reg_number, "grade": letter, "grade_points": points,
                          "marks": [marks.get(a.id) for a in assessments],
                          "percentage": float(frozen[e.id].percentage) if published else (ev["percentage"] if ev else None), "attendance_percentage": ev["attendance_percentage"] if ev else None,
                          "attendance_eligible": ev["eligible"] if ev else None, "outcome": outcome, "is_projection": info["status"] != ResultSheetStatus.PUBLISHED,

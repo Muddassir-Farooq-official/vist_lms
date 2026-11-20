@@ -16,12 +16,21 @@ The administrator sets the institute up and oversees everything. Your menu is gr
 ## People
 
 - **Students**: every student on record. Open one to see their details, guardians and courses, change their photo or update the record.
+- **University Reg Nos**: the registration number the affiliating university (KMU, AUST …) gives each student. Type them in one by one, or download the class list as CSV, fill the `reg_number` column and upload it (you see every change before it is saved). The Reg No is printed on award lists, admit cards, result cards, the gazette and transcripts, students and parents see it on their profile, and you can search for a student by it. Two students can never share one.
 - **Admissions**: open a round per program and term, take applications (one by one or CSV), verify documents, publish merit lists and admit. Admitting creates the student record, roll number and login.
 - **Employees**: everyone on staff. Open a person to see their record, pay and access, and give them roles (teacher, accounts officer, exam controller and others).
 - **Hostel**: rooms and beds, who lives where, the monthly hostel charge (added to each resident's dues) and the history of stays.
 - **Profile changes**: students and staff ask to change their contact details and photo. Nothing changes until you approve.
 - **Certificate requests**: certificates students asked for. Approve with the fee (or waive it); the student downloads the certificate once it is paid.
 - **Warnings**: formal warnings to students and staff. A warning counts for 12 months; the 3rd one is final and you decide the action.
+
+### Which details are required (field rules)
+
+On **CSV Imports**, open **Field rules** (above the template download) and tick which details must be filled when a student is added. First and last name are always required; everything else can be required or optional, including the university Reg No. Save, then download the template: required columns are red and listed on the template's *Rules* sheet, and optional columns can be left empty or left out of the file. The **Add student** form follows the same rules (required fields have a red \*).
+
+- Without the guardian's CNIC the student has no parent portal and is not linked to brothers and sisters; the page warns you before you make it optional.
+- Without the student's CNIC the import cannot spot a student added twice.
+- Students already on record keep everything they have, and editing a student is never blocked by these rules.
 
 ### ID cards
 

@@ -406,5 +406,6 @@ class ExamScheduleService:
         withheld = await self.withheld(student_id)
         prog = await self.session.get(Program, student.program_id) if student.program_id else None
         return {"schedule": self.summary(sched), "student": {"id": student.id, "name": f"{student.first_name} {student.last_name}",
-                "roll_number": student.roll_number, "program": prog.code if prog else None, "semester": student.current_semester},
+                "roll_number": student.roll_number, "reg_number": student.reg_number, "program": prog.code if prog else None,
+                "semester": student.current_semester},
                 "papers": rows, "withheld": withheld, "issued_at": datetime.now(timezone.utc)}

@@ -80,7 +80,7 @@
     $("rs-tbody").innerHTML = "";
     d.rows.forEach(function (r) {
       const tr = document.createElement("tr");
-      tr.innerHTML = '<td><strong>' + esc(r.student_name) + "</strong><small>" + esc(r.roll_number || "") + "</small></td>";
+      tr.innerHTML = '<td><strong>' + esc(r.student_name) + "</strong><small>" + esc(r.roll_number || "") + (r.reg_number ? " \u00b7 Reg " + esc(r.reg_number) : "") + "</small></td>";
       r.marks.forEach(function (m, i) {
         const td = document.createElement("td");
         if (fixable) {
@@ -238,7 +238,7 @@
     if (!r.ok) return VA.toast(msg(r.body, "Could not open it."), "error");
     const t = r.body, s = t.student, sm = t.summary;
     $("rc-title").textContent = s.name;
-    $("rc-meta").textContent = [s.roll_number, s.program_name, s.admission_session ? "session " + s.admission_session : "", s.guardian_name ? "guardian: " + s.guardian_name : ""].filter(Boolean).join(" \u00b7 ");
+    $("rc-meta").textContent = [s.roll_number, s.reg_number ? "Reg No " + s.reg_number : "", s.program_name, s.admission_session ? "session " + s.admission_session : "", s.guardian_name ? "guardian: " + s.guardian_name : ""].filter(Boolean).join(" \u00b7 ");
     const tile = function (a, b, c, tone) { return '<div class="kpi ' + (tone || "") + '"><span class="kpi-label">' + a + '</span><strong class="kpi-value">' + b + '</strong><span class="kpi-sub">' + (c || "") + "</span></div>"; };
     $("rc-summary").innerHTML = tile("CGPA", fmt2(sm.cgpa), "out of 4.00", "good") + tile("Credits earned", sm.credits_earned, "of " + sm.credits_attempted + " attempted") + tile("Terms", sm.terms, "") + tile("To clear", sm.courses_to_clear, "", sm.courses_to_clear ? "bad" : "");
     $("rc-terms").innerHTML = t.terms.length ? t.terms.map(function (term) {

@@ -87,7 +87,7 @@ class ClassResultService:
             else:
                 status = self._semester_status(rules, term_gpa)
             g = fam.get(st.id) or {}
-            rows.append({"student_id": st.id, "roll_number": st.roll_number, "name": f"{st.first_name} {st.last_name}",
+            rows.append({"student_id": st.id, "roll_number": st.roll_number, "reg_number": st.reg_number, "name": f"{st.first_name} {st.last_name}",
                          "guardian_name": g.get("name"), "guardian_label": g.get("label"), "subjects": subjects, "gpa": term_gpa,
                          "total_obtained": round(obtained, 2), "total_max": round(maximum, 2), "percentage": pct, "division": division,
                          "failed": failed, "status": status, "status_label": STATUS_LABEL[status], "position": None})

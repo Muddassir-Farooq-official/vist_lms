@@ -44,7 +44,8 @@
         document.getElementById("ph-pills").innerHTML = SU.pill(p.status || "ACTIVE") +
           (p.employment_type ? '<span class="pill">' + VA.escapeHtml(String(p.employment_type).replace(/_/g, " ").toLowerCase().replace(/^./, function (m) { return m.toUpperCase(); })) + "</span>" : "");
       } else {
-        document.getElementById("ph-sub").textContent = "Roll number " + (p.roll_number || "\u2014") + (p.admission_session ? " \u00b7 " + p.admission_session + " intake" : "");
+        document.getElementById("ph-sub").textContent = "Roll number " + (p.roll_number || "\u2014") + (p.reg_number ? " \u00b7 University Reg No " + p.reg_number : "") +
+          (p.admission_session ? " \u00b7 " + p.admission_session + " intake" : "");
         document.getElementById("ph-pills").innerHTML = SU.pill(p.status || "ACTIVE") +
           (p.current_semester ? '<span class="pill">Semester ' + VA.escapeHtml(p.current_semester) + "</span>" : "") +
           (p.section_label ? '<span class="pill">Section ' + VA.escapeHtml(p.section_label) + "</span>" : "");
@@ -76,6 +77,7 @@
         ]
       : [
           fieldRow("Roll Number / Username", p.roll_number),
+          fieldRow("University Reg No", p.reg_number || "Not given yet"),
           fieldRow("CNIC", p.cnic),
           fieldRow("Contact No.", p.contact_no),
           fieldRow("Date of Birth", p.date_of_birth),

@@ -124,7 +124,7 @@ class TranscriptService:
         scale = [{"letter": b.letter, "min_percent": b.min_percent, "grade_points": b.points, "grade_points_low": b.points_low, "is_passing": b.is_passing,
                   "division": b.division} for b in sorted(rules.bands, key=lambda b: -b.min_percent)]
         return {
-            "student": {"id": student.id, "name": f"{student.first_name} {student.last_name}", "roll_number": student.roll_number, "program_name": program.name if program else None,
+            "student": {"id": student.id, "name": f"{student.first_name} {student.last_name}", "roll_number": student.roll_number, "reg_number": student.reg_number, "program_name": program.name if program else None,
                         "program_code": program.code if program else None, "admission_session": student.admission_session, "current_semester": student.current_semester, "guardian_name": guardian},
             "terms": out_terms,
             "summary": {"cgpa": gpa([(g, c) for g, c, _ in latest.values()]), "credits_attempted": sum(c for _, c, _ in latest.values()),
