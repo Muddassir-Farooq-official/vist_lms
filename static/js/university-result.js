@@ -26,7 +26,7 @@
     if (!$("ur-term").value.trim()) return say("Choose the term.");
     if (!f) return say("Choose the CSV file.");
     const fd = new FormData(); fd.append("file", f);
-    const q = new URLSearchParams({ program_id: $("ur-program").value, term_label: $("ur-term").value.trim(), dry_run: dry ? "true" : "false" });
+    const q = new URLSearchParams({ program_id: $("ur-program").value, term_label: $("ur-term").value.trim(), dry_run: dry ? "true" : "false", kind: $("ur-kind").value });
     const r = await VA.fetchJson("/api/v1/results/university/import?" + q.toString(), { method: "POST", body: fd });
     if (!r.ok) return say(err(r.body, "The file could not be read."));
     return r.body;
@@ -43,12 +43,13 @@
         "</tbody></table></div>";
       return;
     }
-    out.innerHTML = "<p><strong>" + d.result_count + " result(s)</strong> for " + esc(d.program) + ", " + esc(d.term_label) + ": " + d.passed + " pass, " + d.failed + " fail" +
+    out.innerHTML = (d.kind === "SUPPLEMENTARY" ? '<p class="dash-alert">Supplementary results: each becomes the result that counts (GPA, transcript with (S), promotion); the first attempt is kept on record.</p>' : "") +
+      "<p><strong>" + d.result_count + " result(s)</strong> for " + esc(d.program) + ", " + esc(d.term_label) + ": " + d.passed + " pass, " + d.failed + " fail" +
       (d.replacing ? ", <b>" + d.replacing + " replace an earlier result</b>" : "") + ". Grades from the " + esc(d.grading) + " table.</p>" +
-      '<div class="table-scroll"><table class="tk-table"><thead><tr><th>Roll no.</th><th>Reg No</th><th>Student</th><th>Course</th><th>%</th><th>Grade</th><th>Result</th><th>Replaces</th></tr></thead><tbody>' +
+      '<div class="table-scroll"><table class="tk-table"><thead><tr><th>Roll no.</th><th>Reg No</th><th>Student</th><th>Course</th><th>%</th><th>Grade</th><th>Result</th><th>Attempt</th><th>Replaces</th></tr></thead><tbody>' +
       d.results.map(function (x) {
         return "<tr><td>" + esc(x.roll_number) + "</td><td>" + esc(x.reg_number || "—") + "</td><td>" + esc(x.name) + "</td><td>" + esc(x.course_code) + "</td><td>" + esc(x.percent) +
-          "</td><td><b>" + esc(x.grade) + '</b></td><td class="' + (x.result === "PASS" ? "ok" : "bad") + '">' + esc(x.result) + "</td><td>" + esc(x.replaces || "") + "</td></tr>";
+          "</td><td><b>" + esc(x.grade) + '</b></td><td class="' + (x.result === "PASS" ? "ok" : "bad") + '">' + esc(x.result) + "</td><td>" + esc(x.attempt || "") + "</td><td>" + esc(x.replaces || "") + "</td></tr>";
       }).join("") + '</tbody></table></div><div class="form-actions"><button type="button" class="role-btn" id="ur-apply">Save ' + d.result_count + " result(s)</button></div>";
     $("ur-apply").addEventListener("click", async function () {
       if (!(await VA.confirm("Save these results? Students see them at once and are told; GPA, transcripts and promotion use them.", "Save results"))) return;

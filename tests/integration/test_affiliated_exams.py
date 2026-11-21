@@ -115,6 +115,38 @@ async def test_affiliated_program_internal_marks_award_list_and_university_resul
     again = (await app_client.post(f"{R}/university/import", params={**params, "dry_run": True}, files=files(good))).json()
     assert again["replacing"] == 2
 
+    # supplementary (re-sit): only for the subject the student failed; it counts from now on; the first attempt is kept
+    from app.academics.models import UniversityResultAttempt
+
+    supp = {**params, "kind": "SUPPLEMENTARY"}
+    passed_one = f"reg_number,roll_number,course_code,marks_obtained,marks_total,grade,result\nKMU-AF1-001,,{course_code},90,100,,\n"
+    refused = (await app_client.post(f"{R}/university/import", params={**supp, "dry_run": True}, files=files(passed_one))).json()
+    assert refused["error_count"] == 1 and "nothing to re-sit" in refused["errors"][0]["error"]
+    resit = f"reg_number,roll_number,course_code,marks_obtained,marks_total,grade,result\n,{s2_roll},{course_code},71,100,,\n"
+    dry = (await app_client.post(f"{R}/university/import", params={**supp, "dry_run": True}, files=files(resit))).json()
+    assert dry["error_count"] == 0 and dry["results"][0]["replaces"] == "C (first attempt)" and dry["results"][0]["attempt"] == "supplementary"
+    done = (await app_client.post(f"{R}/university/import", params={**supp, "dry_run": False}, files=files(resit))).json()
+    assert done["applied"] == 1
+    db_session.expire_all()
+    r2 = (await db_session.execute(select(EnrollmentResult).where(EnrollmentResult.enrollment_id == uuid.UUID(students[1][2])))).scalar_one()
+    assert (r2.outcome, r2.supplementary, float(r2.percentage)) == ("PASSED", True, 71.0)
+    tries = (await db_session.execute(select(UniversityResultAttempt).where(UniversityResultAttempt.enrollment_id == uuid.UUID(students[1][2]))
+                                      .order_by(UniversityResultAttempt.attempt_no))).scalars().all()
+    assert [(a.attempt_no, a.kind, a.letter_grade, a.outcome) for a in tries] == [(1, "REGULAR", "C", "FAILED"), (2, "SUPPLEMENTARY", r2.letter_grade, "PASSED")]
+    # a regular import can no longer overwrite it; a supplementary re-import revises the same attempt
+    overwrite = (await app_client.post(f"{R}/university/import", params={**params, "dry_run": True}, files=files(resit))).json()
+    assert overwrite["error_count"] == 1 and "already has a supplementary result" in overwrite["errors"][0]["error"]
+    revised = f"reg_number,roll_number,course_code,marks_obtained,marks_total,grade,result\n,{s2_roll},{course_code},75,100,,\n"
+    assert (await app_client.post(f"{R}/university/import", params={**supp, "dry_run": False}, files=files(revised))).json()["applied"] == 1
+    db_session.expire_all()
+    tries = (await db_session.execute(select(UniversityResultAttempt).where(UniversityResultAttempt.enrollment_id == uuid.UUID(students[1][2]))
+                                      .order_by(UniversityResultAttempt.attempt_no))).scalars().all()
+    assert len(tries) == 2 and float(tries[1].percentage) == 75.0 and tries[1].revised == 1
+    s2_id = (await db_session.get(Enrollment, uuid.UUID(students[1][2]))).student_id
+    tr = (await app_client.get(f"{R}/students/{s2_id}/transcript")).json()
+    row = next(c for t in tr["terms"] for c in t.get("courses", []) if c["course_code"] == course_code)
+    assert row["supplementary"] is True and row["outcome"] == "PASSED"
+
     # back to degree-awarding: everything is allowed again
     assert (await app_client.put(f"{R}/programs/{program_id}/exam-body", json={"exam_body": "INSTITUTE"})).json()["university_parts"] == []
     assert (await app_client.get(f"{R}/sheets/{offering}")).json()["affiliated"] is None

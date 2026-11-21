@@ -1,5 +1,23 @@
 [
   {
+    "version": "1.42.0",
+    "date": "2026-11-21",
+    "title": "Supplementary university results",
+    "summary": "Affiliated programs: import the university's supplementary (re-sit) result; it counts from then on and the first attempt is kept.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "University result: choose 'a supplementary (re-sit) exam' to import re-sit results. Only for subjects failed in the university's result; the latest attempt counts for GPA, transcript (S) and promotion."
+      },
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "Every university result is kept: the first attempt and each supplementary, with how many times the university revised it."
+      }
+    ]
+  },
+  {
     "version": "1.41.0",
     "date": "2026-11-21",
     "title": "Server health",

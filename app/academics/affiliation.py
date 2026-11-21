@@ -176,13 +176,19 @@ class UniversityResultImport:
     """One CSV row = one student's university result in one subject of the chosen program and term:
         reg_number (or roll_number), course_code, marks_obtained + marks_total (the university's figures for the whole
         subject), and/or grade, and optionally result (PASS / FAIL).
-    Every row is checked first; with any error nothing is saved. Importing again replaces the earlier university result
-    (the university revised it) and says so in the preview."""
+    Every row is checked first; with any error nothing is saved.
+
+    kind REGULAR (the first exam): importing again replaces that result (the university revised it).
+    kind SUPPLEMENTARY (a re-sit): only for a subject the student FAILED in the university's result; it becomes the
+    result that counts (latest attempt: GPA, transcript "(S)", promotion), and the earlier attempt is kept in
+    UniversityResultAttempt. Importing the supplementary again revises it. A subject that already has a supplementary
+    result cannot be overwritten by a REGULAR import."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def run(self, raw: bytes, *, program_id: uuid.UUID, term_label: str, dry_run: bool, actor_id: uuid.UUID) -> dict:
+    async def run(self, raw: bytes, *, program_id: uuid.UUID, term_label: str, dry_run: bool, actor_id: uuid.UUID,
+                  kind: str = "REGULAR") -> dict:
         from app.audit.service import AuditService
         from app.notifications.models import NotificationCategory
         from app.notifications.service import create_notification
@@ -197,6 +203,10 @@ class UniversityResultImport:
         term = " ".join((term_label or "").split())
         if not term:
             raise ValidationAppError("Choose the term.")
+        kind = (kind or "REGULAR").upper()
+        if kind not in ("REGULAR", "SUPPLEMENTARY"):
+            raise ValidationAppError("kind must be REGULAR or SUPPLEMENTARY.")
+        supp = kind == "SUPPLEMENTARY"
         if len(raw) > 5_000_000:
             raise ValidationAppError("The file is too big (at most 5 MB).")
         try:
@@ -287,24 +297,70 @@ class UniversityResultImport:
                 band = letters[grade]
                 letter, points, division = band.letter, float(band.points), band.division
             old = (await self.session.execute(select(EnrollmentResult).where(EnrollmentResult.enrollment_id == enrolment.id))).scalar_one_or_none()
+            from_university = old is not None and old.source == "UNIVERSITY"
+            if supp:
+                if not from_university:
+                    bad(f"{st.roll_number} has no university result in {course.code} yet: import the first (regular) result first.")
+                    continue
+                if not old.supplementary and old.outcome != EnrollmentOutcome.FAILED.value:
+                    bad(f"{st.roll_number} passed {course.code} in the first attempt: there is nothing to re-sit.")
+                    continue
+            elif from_university and old.supplementary:
+                bad(f"{st.roll_number} already has a supplementary result in {course.code}: choose Supplementary to revise it.")
+                continue
+            if old is None:
+                replaces = None
+            elif from_university:
+                replaces = f"{old.letter_grade} ({'supplementary' if old.supplementary else 'first attempt'})"
+            else:
+                replaces = f"{old.letter_grade} (institute)"
             plan.append({"enrollment": enrolment, "student": st, "course": course, "pct": pct, "got": got, "total": total, "letter": letter,
                          "points": points, "division": division, "passed": passed, "old": old,
                          "row": {"roll_number": st.roll_number, "reg_number": st.reg_number, "name": f"{st.first_name} {st.last_name}",
                                  "course_code": course.code, "percent": pct, "grade": letter, "result": "PASS" if passed else "FAIL",
-                                 "replaces": (f"{old.letter_grade} ({'university' if old.source == 'UNIVERSITY' else 'institute'})" if old else None)}})
+                                 "replaces": replaces,
+                                 "attempt": ("revises the supplementary" if (old is not None and old.supplementary and from_university) else "supplementary")
+                                 if supp else ("revises the first attempt" if from_university else "first attempt")}})
 
-        out = {"dry_run": dry_run or bool(errors), "program": program.code, "term_label": term, "rows": len(rows), "errors": errors[:300],
+        out = {"dry_run": dry_run or bool(errors), "kind": kind, "program": program.code, "term_label": term, "rows": len(rows), "errors": errors[:300],
                "error_count": len(errors), "results": [p["row"] for p in plan[:1000]], "result_count": len(plan),
                "passed": sum(1 for p in plan if p["passed"]), "failed": sum(1 for p in plan if not p["passed"]),
                "replacing": sum(1 for p in plan if p["old"] is not None), "grading": rules.name}
         if errors or dry_run:
             return out
 
+        from app.academics.models import UniversityResultAttempt
+
         now = datetime.now(timezone.utc)
         for p in plan:
             e, course = p["enrollment"], p["course"]
-            row = p["old"] or EnrollmentResult(enrollment_id=e.id)
-            if p["old"] is None:
+            # the attempt record, kept for good (the earlier attempt is never lost)
+            attempts = {a.attempt_no: a for a in (await self.session.execute(select(UniversityResultAttempt).where(
+                UniversityResultAttempt.enrollment_id == e.id))).scalars()}
+            old = p["old"]
+            if supp and old is not None and not old.supplementary and 1 not in attempts:
+                # a first result imported before attempts were kept: record it now, as it was
+                attempts[1] = UniversityResultAttempt(enrollment_id=e.id, attempt_no=1, kind="REGULAR", percentage=old.percentage,
+                                                      total_obtained=old.total_obtained, total_max=old.total_max, letter_grade=old.letter_grade,
+                                                      grade_points=old.grade_points, outcome=old.outcome, division=old.division)
+                self.session.add(attempts[1])
+            if supp:
+                latest = max(attempts) if attempts else 1
+                no = latest if (old is not None and old.supplementary and latest > 1) else latest + 1
+            else:
+                no = 1
+            a = attempts.get(no)
+            if a is None:
+                a = UniversityResultAttempt(enrollment_id=e.id, attempt_no=no, kind=kind)
+                self.session.add(a)
+            else:
+                a.revised = (a.revised or 0) + 1
+            a.percentage, a.total_obtained = p["pct"], p["got"] if p["got"] is not None else p["pct"]
+            a.total_max = p["total"] if p["total"] is not None else 100
+            a.letter_grade, a.grade_points, a.division, a.imported_by = p["letter"], p["points"], p["division"], actor_id
+            a.outcome = EnrollmentOutcome.PASSED.value if p["passed"] else EnrollmentOutcome.FAILED.value
+            row = old or EnrollmentResult(enrollment_id=e.id)
+            if old is None:
                 self.session.add(row)
             row.percentage = p["pct"]
             row.total_obtained = p["got"] if p["got"] is not None else p["pct"]
@@ -315,16 +371,17 @@ class UniversityResultImport:
             row.theory_percent = row.practical_percent = None
             row.failed_part = None
             row.scheme_name, row.division, row.source, row.computed_at = rules.name, p["division"], "UNIVERSITY", now
+            row.supplementary = supp                       # shown as (S); the latest attempt is the one that counts
             e.status = EnrollmentStatus.COMPLETED
             e.outcome = EnrollmentOutcome.PASSED if p["passed"] else EnrollmentOutcome.FAILED
             st = p["student"]
             if st.user_id:
                 await create_notification(self.session, user_id=st.user_id, category=NotificationCategory.RESULT,
-                                          title=f"University result for {course.code}: {'Pass' if p['passed'] else 'Fail'}",
+                                          title=f"{'Supplementary' if supp else 'University'} result for {course.code}: {'Pass' if p['passed'] else 'Fail'}",
                                           message=f"{rules.body or rules.name}: {p['pct']:g}% (grade {p['letter']}).", link="/dashboard/student/results")
         await self.session.flush()
         await AuditService(self.session).log(actor_user_id=actor_id, action="results.university_imported", entity_type="program", entity_id=program.id,
-                                             metadata={"term": term, "results": len(plan), "replaced": out["replacing"]})
+                                             metadata={"term": term, "kind": kind, "results": len(plan), "replaced": out["replacing"]})
         out["applied"] = len(plan)
         return out
 
