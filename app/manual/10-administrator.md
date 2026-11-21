@@ -87,6 +87,10 @@ When every batch has its own term (*BSN 6th Fall 2026*, *BSN 4th Fall 2026*, *ML
 
 **Start next session…** (on a session): give the new session's name (suggested, e.g. *Fall 2026* → *Spring 2027*) and dates, then **Preview**. For every batch it shows the next term (*BSN 6th Fall 2026* → *BSN 7th Spring 2027*; you can change the name), the courses of the next semester from the curriculum and the sections (the same as now), and how many students are already promoted to that semester and how many are not yet. A batch in its last semester, or a term with no batch, is skipped with the reason. Nothing is made until **Start the session**; then, in one step (all or nothing), the terms are created in the new session, their sections opened, and (if ticked) the promoted students enrolled in their own section. Students not yet promoted are not enrolled: promote them first (Result Approval), then enroll them from the course sections.
 
+**One datesheet for a whole session**: on Datesheets, choose *Whole session: Fall 2026* instead of one term. Papers can then come from any batch term of that session (the course list is grouped by batch term), and it is published once, with admit cards as usual. Datesheets made for one term work as before.
+
+**Session report** (a session's **Report** on Courses → Academic terms → Sessions): one row per batch term with its sections, courses and students, attendance (average, and students below the minimum in at least one course), results (published, approved, with the approver, not sent yet) and fees for that term (charged, paid, still owed, of which overdue), and the session's totals. **Download as CSV** for Excel.
+
 ### Smart timetable
 
 **Smart timetable** makes the timetable of one or more whole terms in one go. It never changes the live timetable by itself: you get a **draft**, and only **Publish** makes it live.

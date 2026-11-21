@@ -155,6 +155,8 @@ class AcademicTermService:
         out: dict[str, dict[str, int]] = {}
         for key, model in (("offerings", CourseOffering), ("fee_structures", FeeStructure), ("datesheets", ExamSchedule), ("admission_rounds", AdmissionRound)):
             stmt = select(model.term_label, func.count()).group_by(model.term_label)
+            if model is ExamSchedule:                       # a session's datesheet carries the session's name, not a term's
+                stmt = stmt.where(ExamSchedule.session_id.is_(None))
             if labels is not None:
                 stmt = stmt.where(model.term_label.in_(labels))
             for label, n in (await self.session.execute(stmt)).all():
@@ -180,7 +182,8 @@ class AcademicTermService:
 
         out: dict[str, int] = {}
         for key, model in (("offerings", CourseOffering), ("fee_structures", FeeStructure), ("datesheets", ExamSchedule), ("admission_rounds", AdmissionRound)):
-            result = await self.session.execute(update(model).where(model.term_label == old).values(term_label=new).execution_options(synchronize_session="fetch"))
+            cond = [model.term_label == old] + ([ExamSchedule.session_id.is_(None)] if model is ExamSchedule else [])
+            result = await self.session.execute(update(model).where(*cond).values(term_label=new).execution_options(synchronize_session="fetch"))
             out[key] = int(result.rowcount or 0)
         from app.fees.models import FeeAssignment
 
