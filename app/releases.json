@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.43.0",
+    "date": "2026-11-21",
+    "title": "University Reg No deadlines",
+    "summary": "Set the last day for each batch's university Reg Nos; everyone is reminded before it and admit cards are held after it.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "University Reg Nos → Deadlines: set the last day for one batch term or every batch of a session (affiliated programs), and see how many students still have no Reg No."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Reminders: the administration and exam office once a week, then daily in the last 7 days; each student without a Reg No gets a notification and an SMS (Settings → Rules → SMS can switch the SMS off)."
+      },
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "After the deadline a student's admit card is held until the Reg No is entered; exempt one student with a reason (and optionally a last day). Exemptions are kept on record."
+      },
+      {
+        "kind": "improved",
+        "for": "Teachers",
+        "text": "The internal award list warns which students have no Reg No yet, with the batch's deadline."
+      }
+    ]
+  },
+  {
     "version": "1.42.0",
     "date": "2026-11-21",
     "title": "Supplementary university results",

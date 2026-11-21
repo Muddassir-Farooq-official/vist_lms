@@ -6,6 +6,37 @@
 
 {% block content %}
 {% from "_icons.html" import nav_icon %}
+<section class="panel" id="rn-deadlines-panel">
+  <h2>Deadlines</h2>
+  <p class="panel-hint">The last day for a batch's Reg Nos (affiliated programs only). Before it, the administration, the exam office and each
+    student without a Reg No are reminded: once a week, then every day in the last 7 days (students also get an SMS). After it, that student's
+    admit card is held until the Reg No is entered or you exempt them below.</p>
+  <div class="sd-toolbar rn-actions">
+    <select id="rn-dl-scope" class="select-input" aria-label="Set for"><option value="term">One batch term</option><option value="session">A whole session</option></select>
+    <select id="rn-dl-term" class="select-input" aria-label="Batch term"></select>
+    <select id="rn-dl-session" class="select-input" aria-label="Session" hidden></select>
+    <input type="date" id="rn-dl-date" class="text-input" aria-label="Last day" />
+    <button type="button" class="role-btn" id="rn-dl-save">Set the deadline</button>
+    <button type="button" class="role-btn secondary-btn" id="rn-dl-clear">Remove it</button>
+  </div>
+  <p id="rn-dl-msg" class="panel-hint" aria-live="polite"></p>
+  <div class="sd-table-wrap">
+    <table class="dash-table"><thead><tr><th>Batch term</th><th>Session</th><th>Last day</th><th>Students</th><th>Without a Reg No</th></tr></thead>
+      <tbody id="rn-dl-tbody"></tbody></table>
+  </div>
+</section>
+
+<section class="panel" id="rn-ex-panel">
+  <h2>Admit card allowed without a Reg No</h2>
+  <p class="panel-hint">Students whose admit card is printed even though their Reg No is missing after the deadline. Use <b>Exempt…</b> on a
+    student in the list below (only those without a Reg No). Every exemption keeps its reason and who gave it; revoking keeps it on record.</p>
+  <label class="rn-missing"><input type="checkbox" id="rn-ex-old" /> Show revoked and expired ones too</label>
+  <div class="sd-table-wrap">
+    <table class="dash-table"><thead><tr><th>Student</th><th>Reason</th><th>Until</th><th>Given by</th><th></th></tr></thead>
+      <tbody id="rn-ex-tbody"></tbody></table>
+  </div>
+</section>
+
 <section class="panel">
   <div class="sd-toolbar">
     <select id="rn-program" class="select-input" aria-label="Program"><option value="">All programs</option></select>
@@ -23,6 +54,18 @@
     </table>
   </div>
 </section>
+
+<dialog id="rn-ex-modal" class="modal" aria-labelledby="rn-ex-title"><div class="modal-body">
+  <h2 id="rn-ex-title">Allow the admit card</h2>
+  <p class="cc-meta" id="rn-ex-who"></p>
+  <label class="field-label-sm" style="display:block" for="rn-ex-reason">Reason</label>
+  <input type="text" id="rn-ex-reason" class="text-input" maxlength="500" placeholder="e.g. the university has not issued Reg Nos for this batch yet" />
+  <label class="field-label-sm" style="display:block" for="rn-ex-until">Until (leave empty: until you revoke it)</label>
+  <input type="date" id="rn-ex-until" class="text-input" />
+  <p id="rn-ex-error" class="dash-alert error" hidden></p>
+  <div class="decision-bar"><button type="button" class="role-btn" id="rn-ex-save">Exempt</button>
+    <button type="button" class="role-btn secondary-btn" id="rn-ex-cancel">Cancel</button></div>
+</div></dialog>
 
 <section class="panel">
   <h2>Fill many at once (CSV)</h2>

@@ -11,11 +11,25 @@
   if (!select || !link) return;
 
   function say(t) { msg.textContent = t; msg.hidden = !t; }
+  async function regWarn(id) {         // students without a university Reg No (affiliated programs only)
+    const el = document.getElementById("award-reg-warn");
+    if (!el) return;
+    el.hidden = true;
+    if (!id) return;
+    const r = await VA.fetchJson("/api/v1/results/sheets/" + id + "/reg-check");
+    if (!r.ok || !r.body.affiliated || !r.body.missing || select.value !== id) return;
+    const d = r.body;
+    const names = d.students.slice(0, 8).map(function (s) { return s.roll_number || s.name; }).join(", ") + (d.missing > 8 ? " \u2026" : "");
+    const dl = d.reg_deadline ? " The last day to give it is " + new Date(d.reg_deadline + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) + "." : "";
+    el.textContent = d.missing + " student(s) have no university Reg No yet (" + names + "). They are in red on the internal award list; the university may not accept their marks." + dl;
+    el.hidden = false;
+  }
   let keepMessage = false;
   function sync() {
     link.href = select.value ? "/api/v1/academics/offerings/" + select.value + "/marks.csv" : "#";
     const award = document.getElementById("internal-award-pdf");
     if (award) award.href = select.value ? "/api/v1/results/sheets/" + select.value + "/internal-award-list.pdf" : "#";
+    regWarn(award ? select.value : "");
     if (!keepMessage) say("");            // a different course: clear; our own refresh after uploading: keep the result visible
     keepMessage = false;
   }

@@ -47,6 +47,8 @@ class AcademicTerm(Base):
     semester: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # The session it belongs to ("Fall 2026" groups every batch's term that runs then): app/academics/sessions.py.
     session_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("academic_sessions.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Last day for the university Reg Nos of this batch (affiliated programs): reminders before it, admit cards held after it.
+    reg_deadline: Mapped[date | None] = mapped_column(Date, nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
@@ -72,7 +74,8 @@ def _norm(label: str) -> str:
 
 def to_dict(t: AcademicTerm) -> dict:
     return {"id": t.id, "label": t.label, "start_date": t.start_date, "end_date": t.end_date, "status": t.status.value,
-            "program_id": t.program_id, "semester": t.semester, "session_id": t.session_id}
+            "program_id": t.program_id, "semester": t.semester, "session_id": t.session_id,
+            "reg_deadline": t.reg_deadline}
 
 
 class AcademicTermService:

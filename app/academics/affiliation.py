@@ -137,8 +137,11 @@ async def internal_award_list(session: AsyncSession, offering_id: uuid.UUID) -> 
                          "marks": cells, "missing": sum(1 for v in cells if v is None),
                          "internal_obtained": round(obtained, 2), "internal_max": round(internal_max, 2),
                          "internal_percent": round(obtained / internal_max * 100, 2) if internal_max else None})
+    from app.academics.terms import AcademicTerm
+
+    term = (await session.execute(select(AcademicTerm).where(func.lower(AcademicTerm.label) == (offering.term_label or "").lower()))).scalars().first()
     return {"course_code": course.code if course else "?", "course_title": course.title if course else "", "term_label": offering.term_label,
-            "section_label": offering.section_label, "program": {"code": program.code, "name": program.name} if program else None,
+            "reg_deadline": term.reg_deadline if term else None, "section_label": offering.section_label, "program": {"code": program.code, "name": program.name} if program else None,
             "body": await _body_name(session, program) if program else None,
             "university_parts": [COMPONENT_LABELS[p] for p in COMPONENTS if p in parts],
             "assessments": [{"name": at.name, "max_marks": float(at.max_marks), "part": COMPONENT_LABELS.get(at.component or "SESSIONAL")} for _oa, at in internal],

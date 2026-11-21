@@ -130,6 +130,7 @@ UI: dict[str, dict] = {
     "sms_on_fee_reminder": {"section": "SMS messages", "label": "Fee reminder before the due date", "control": "switch"},
     "sms_on_school_absence": {"section": "SMS messages", "label": "School: a child is absent or late (to the guardian)", "control": "switch"},
     "sms_on_homework": {"section": "SMS messages", "label": "School: the day's homework, in the evening (to the guardian)", "control": "switch"},
+    "sms_on_reg_no_reminder": {"section": "SMS messages", "label": "Reminder to give the university Reg No (to the student)", "control": "switch"},
     "sms_on_ptm": {"section": "SMS messages", "label": "School: a parent-teacher meeting day is set (to the guardian)", "control": "switch"},
     "school_weight_first_term": {"section": "Institute type", "label": "School year result: 1st Term counts", "control": "number", "after": "%"},
     "school_weight_mid_term": {"section": "Institute type", "label": "School year result: Mid-Term counts", "control": "number", "after": "%"},

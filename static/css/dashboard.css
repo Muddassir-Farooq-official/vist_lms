@@ -4182,3 +4182,4 @@ details.tg-session > summary.tg-head { cursor: pointer; }
 .ses-terms label, .ses-enroll { display: inline-flex; align-items: center; gap: 6px; font-size: .86rem; }
 .ses-enroll { margin: 10px 0; }
 #ses-report-table td.num, #ses-report-table th.num { white-space: nowrap; }
+#rn-ex-tbody td small { display: block; color: var(--text-secondary); font-weight: 500; }

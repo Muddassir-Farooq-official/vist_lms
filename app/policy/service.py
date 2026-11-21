@@ -93,6 +93,8 @@ POLICY: tuple[Policy, ...] = (
            "One message per child with every subject's homework of the day."),
     Policy("sms_on_ptm", "School: tell the guardian when a parent-teacher meeting day is set (1 = yes, 0 = no)", "SMS", int, 0, 1,
            "Parents then book a time in the parent portal."),
+    Policy("sms_on_reg_no_reminder", "SMS a student whose university Reg No is missing before the batch's deadline (1 = yes, 0 = no)", "SMS", int, 0, 1,
+           "Once a week, at most every 3 days in the last week. Affiliated programs only."),
     Policy("school_weight_first_term", "School: weight of the 1st Term exam in the year's result (%)", "Exams", float, 0, 100,
            "The three weights are shared out among the exams actually held, so they need not add up to 100."),
     Policy("school_weight_mid_term", "School: weight of the Mid-Term exam in the year's result (%)", "Exams", float, 0, 100, "See the 1st Term weight."),

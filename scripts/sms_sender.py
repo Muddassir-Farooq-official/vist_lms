@@ -46,6 +46,9 @@ async def one_pass(with_reminders: bool) -> dict:
         from app.serverhealth.service import health_alert_round
 
         await health_alert_round(session)            # disk / certificate / site down / memory or load -> administrators (once a day)
+        from app.students.regdeadline import regno_reminder_round
+
+        await regno_reminder_round(session)          # university Reg Nos missing before / after a batch's deadline (once a day from 10:00)
         result = await svc.send_pending(limit=200)
         from app.core.background import beat
         from app.notifications.email_service import send_pending as send_emails

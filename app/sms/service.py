@@ -48,7 +48,7 @@ EVENT_SWITCH = {"ATTENDANCE_FINE": "sms_on_attendance_fine", "ATTENDANCE_WARNING
                 "SECURITY": "sms_on_security_alert", "FEE_REMINDER": "sms_on_fee_reminder", "PARENT_WEEKLY": "sms_on_parent_weekly",
                 "FEE_PAID": "sms_on_fee_paid", "WARNING": "sms_on_warning", "CERTIFICATE_READY": "sms_on_certificate_ready",
                 "EXAM_DUTY": "sms_on_exam_duty", "SCHOOL_ABSENCE": "sms_on_school_absence", "SCHOOL_HOMEWORK": "sms_on_homework", "SCHOOL_FEE": "sms_on_school_fee",
-                "SCHOOL_PTM": "sms_on_ptm"}
+                "SCHOOL_PTM": "sms_on_ptm", "REG_NO": "sms_on_reg_no_reminder"}
 
 
 def normalize_pk_mobile(raw: str | None) -> str | None:
@@ -80,9 +80,10 @@ class SmsService:
 
     # ---------------------------------------------------------------- queueing
     async def queue_for_student(self, student_id: uuid.UUID, *, event: str, body: str, guardian_body: str | None = None,
-                                once_within_days: int | None = None, attachment: str | None = None) -> int:
+                                once_within_days: int | None = None, attachment: str | None = None, to_guardian: bool = True) -> int:
         """Queue to the student's mobile and (policy permitting) the primary guardian's. Returns how many were queued.
-        once_within_days: skip if this event already went to this student that recently (reminders)."""
+        once_within_days: skip if this event already went to this student that recently (reminders).
+        to_guardian=False: the student only (something only the student can do, such as giving their Reg No)."""
         switch = EVENT_SWITCH.get(event)
         if switch and not int(getattr(settings, switch, 1)):
             return 0
@@ -98,7 +99,7 @@ class SmsService:
             if recent:
                 return 0
         targets = [("STUDENT", student.contact_no, body)] if student.contact_no else []
-        if int(settings.sms_to_guardian):
+        if to_guardian and int(settings.sms_to_guardian):
             g = (await self.session.execute(select(StudentGuardian).where(StudentGuardian.student_id == student_id)
                                             .order_by(StudentGuardian.is_primary.desc()))).scalars().first()
             if g is not None and g.contact_no:
