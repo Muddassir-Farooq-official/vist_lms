@@ -166,7 +166,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Merging several pull requests quickly queues one deploy per merge. A queued deploy of an OLDER commit must
+      # not run after a newer one: it would copy older code over the newer code on the server and rebuild the image
+      # from it (its migrations then stop it, because the database is already newer). Only the newest commit on
+      # main is deployed; an older run says so and stops without touching the server.
+      - name: Deploy only the newest commit on main
+        id: newest
+        run: |
+          git fetch --no-tags --depth=1 origin main
+          latest="$(git rev-parse FETCH_HEAD)"
+          if [ "$latest" != "$GITHUB_SHA" ]; then
+            echo "::notice::Skipped: main has moved on to ${latest:0:7}; that commit's own run deploys it (this one is ${GITHUB_SHA:0:7})."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up SSH
+        if: steps.newest.outputs.skip != 'true'
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
@@ -177,12 +194,14 @@ jobs:
           ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
 
       - name: Record which version is being deployed
+        if: steps.newest.outputs.skip != 'true'
         # Read by the status page (/health) and the version line in the portals (app/core/releases.py).
         run: |
           printf '{"commit": "%s", "built_at": "%s", "run": %s}\n' "$GITHUB_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GITHUB_RUN_NUMBER" > app/build_info.json
           cat app/build_info.json
 
       - name: Copy code to the VPS
+        if: steps.newest.outputs.skip != 'true'
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -195,6 +214,7 @@ jobs:
       # Every institute on the server (docs/multi-institute.md): Vertex first - if it fails nothing else is touched -
       # then each institute in /opt/lms-sites, one at a time, each with its own backup, migrations and health check.
       - name: Deploy every institute on the VPS (Vertex first)
+        if: steps.newest.outputs.skip != 'true'
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
