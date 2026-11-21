@@ -532,3 +532,26 @@ class CoursePrerequisite(UUIDPKMixin, Base):
     requires_course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class UniversityResultAttempt(UUIDPKMixin, TimestampMixin, Base):
+    """Every university result imported for an enrollment (affiliated programs, app/academics/affiliation.py), kept for
+    good: attempt 1 is the first (regular) exam, 2, 3 ... are supplementary (re-sit) exams. EnrollmentResult holds the
+    one that counts (the latest attempt) for GPA, transcript and promotion; re-importing the same attempt (the
+    university revised it) updates that attempt."""
+
+    __tablename__ = "university_result_attempts"
+    __table_args__ = (UniqueConstraint("enrollment_id", "attempt_no", name="uq_university_result_attempts_attempt"),)
+
+    enrollment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("enrollments.id", ondelete="CASCADE"), nullable=False, index=True)
+    attempt_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    kind: Mapped[str] = mapped_column(String(14), nullable=False)               # REGULAR or SUPPLEMENTARY
+    percentage: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    total_obtained: Mapped[float] = mapped_column(Numeric(8, 2), nullable=False)
+    total_max: Mapped[float] = mapped_column(Numeric(8, 2), nullable=False)
+    letter_grade: Mapped[str] = mapped_column(String(4), nullable=False)
+    grade_points: Mapped[float] = mapped_column(Numeric(3, 2), nullable=False)
+    outcome: Mapped[str] = mapped_column(String(10), nullable=False)
+    division: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    imported_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    revised: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")    # times the university revised it

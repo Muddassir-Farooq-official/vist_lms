@@ -284,12 +284,14 @@ async def university_template(current_user: CurrentUser = Depends(approver)) -> 
 
 
 @router.post("/university/import", summary="Import the university's result for a program and term (by Reg No). All-or-nothing; dry_run=true only checks.")
-async def university_import(file: UploadFile, program_id: uuid.UUID, term_label: str, dry_run: bool = True,
+async def university_import(file: UploadFile, program_id: uuid.UUID, term_label: str, dry_run: bool = True, kind: str = "REGULAR",
                             current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
+    """kind=REGULAR: the first exam (re-import revises it). kind=SUPPLEMENTARY: a re-sit of a failed subject; it becomes
+    the result that counts and the first attempt is kept."""
     from app.academics.affiliation import UniversityResultImport
 
     return await UniversityResultImport(db).run(await file.read(), program_id=program_id, term_label=term_label, dry_run=dry_run,
-                                                actor_id=current_user.id)
+                                                actor_id=current_user.id, kind=kind)
 
 
 @router.put("/programs/{program_id}/grading-table", summary="Choose the grading table a program's results use (approver); empty = institute default")
