@@ -45,6 +45,23 @@ class AcademicTerm(Base):
     # Batches start and end at different times, so a term may belong to one batch: a program + the semester it is in.
     program_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("programs.id", ondelete="SET NULL"), nullable=True)
     semester: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # The session it belongs to ("Fall 2026" groups every batch's term that runs then): app/academics/sessions.py.
+    session_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("academic_sessions.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class AcademicSession(Base):
+    """A session ("Fall 2026", "2026-27"): the batch terms that run at the same time, so pages, datesheets and reports
+    can pick it once instead of every batch's term. Grouping only: no record refers to a session by name."""
+
+    __tablename__ = "academic_sessions"
+    __table_args__ = (UniqueConstraint("name", name="uq_academic_sessions_name"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(50), nullable=False)
+    start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
@@ -55,7 +72,7 @@ def _norm(label: str) -> str:
 
 def to_dict(t: AcademicTerm) -> dict:
     return {"id": t.id, "label": t.label, "start_date": t.start_date, "end_date": t.end_date, "status": t.status.value,
-            "program_id": t.program_id, "semester": t.semester}
+            "program_id": t.program_id, "semester": t.semester, "session_id": t.session_id}
 
 
 class AcademicTermService:
@@ -113,6 +130,12 @@ class AcademicTermService:
                 raise DuplicateResourceError(f'The term "{t.label}" already exists.')
         term = AcademicTerm(label=label, start_date=start_date, end_date=end_date, status=status, created_by=actor_id,
                             program_id=program_id, semester=semester)
+        # a new batch term joins its session when its name says which one ("BSN 6th Fall 2026" -> Fall 2026)
+        from app.academics.sessions import session_name_of
+
+        name = session_name_of(label)
+        if name:
+            term.session_id = (await self.session.execute(select(AcademicSession.id).where(func.lower(AcademicSession.name) == name.lower()))).scalar_one_or_none()
         self.session.add(term)
         await self.session.flush()
         from app.audit.service import AuditService
