@@ -24,7 +24,7 @@
     document.getElementById("ds-list").innerHTML = r.body.map(function (s) {
       return '<tr data-row="' + s.id + '"' + (current && current.id === s.id ? ' class="is-open"' : "") + "><td><strong>" + esc(s.name) + "</strong>" +
         (s.published_at ? '<small class="sd-dim ds-when">Published ' + esc(VA.formatDateLong(String(s.published_at).slice(0, 10))) + "</small>" : "") +
-        "</td><td>" + esc(s.term_label) + "</td><td>" + pill(s.status) +
+        "</td><td>" + esc(s.term_label) + (s.session_id ? ' <span class="pt-comb">whole session</span>' : "") + "</td><td>" + pill(s.status) +
         '</td><td class="crs-actions"><button type="button" class="sd-view" data-open="' + s.id + '">Open</button></td></tr>';
     }).join("") || '<tr><td colspan="4" class="sd-dim">No datesheets yet. Create one above.</td></tr>';
     document.querySelectorAll("[data-open]").forEach(function (b) { b.addEventListener("click", function () { open(b.dataset.open); }); });
@@ -35,12 +35,21 @@
   }
   function hm(t) { return window.VistAdmin.formatTimeShort(t); }
 
-  async function loadOfferings(term) {
-    const r = await VA.fetchJson("/api/v1/academics/offerings?term_label=" + encodeURIComponent(term));
-    const items = r.ok ? (Array.isArray(r.body) ? r.body : (r.body.items || [])) : [];
-    document.getElementById("pp-offering").innerHTML = '<option value="">Course\u2026</option>' + items.filter(function (o) { return o.term_label === term; }).map(function (o) {
+  // A session's datesheet takes papers from every batch term in it: one group of courses per term.
+  async function loadOfferings(terms) {
+    terms = Array.isArray(terms) ? terms : [terms];
+    const lists = await Promise.all(terms.map(function (term) {
+      return VA.fetchJson("/api/v1/academics/offerings?term_label=" + encodeURIComponent(term)).then(function (r) {
+        const items = r.ok ? (Array.isArray(r.body) ? r.body : (r.body.items || [])) : [];
+        return { term: term, items: items.filter(function (o) { return o.term_label === term; }) };
+      });
+    }));
+    const opt = function (o) {
       return '<option value="' + o.id + '">' + esc((o.course_code || "") + " " + (o.course_title || "") + (o.section_label && o.section_label !== "A" ? " (" + o.section_label + ")" : "")) + "</option>";
-    }).join("");
+    };
+    document.getElementById("pp-offering").innerHTML = '<option value="">Course\u2026</option>' + (terms.length > 1
+      ? lists.filter(function (l) { return l.items.length; }).map(function (l) { return '<optgroup label="' + esc(l.term) + '">' + l.items.map(opt).join("") + "</optgroup>"; }).join("")
+      : (lists[0] ? lists[0].items.map(opt).join("") : ""));
   }
 
   function render(d) {
@@ -197,15 +206,17 @@
     document.getElementById("er-box").hidden = true;
     const r = await VA.fetchJson(API + "/schedules/" + id);
     if (!r.ok) return err(r.body);
-    await loadOfferings(r.body.term_label);
+    await loadOfferings(r.body.terms || r.body.term_label);
     render(r.body);
   }
 
   document.getElementById("ds-create").addEventListener("click", async function () {
     clearErr();
-    const body = { term_label: document.getElementById("ds-term").value, name: document.getElementById("ds-name").value.trim(),
+    const pick = document.getElementById("ds-term").value;
+    const body = { term_label: pick, name: document.getElementById("ds-name").value.trim(),
                    assessment_type_id: document.getElementById("ds-assess").value || null };
-    if (!body.term_label || !body.name) return err(null, "Choose the term and give the datesheet a name.");
+    if (!body.term_label || !body.name) return err(null, "Choose the term (or a whole session) and give the datesheet a name.");
+    if (pick.indexOf("session:") === 0) { body.session_id = pick.slice(8); delete body.term_label; }
     const r = await VA.fetchJson(API + "/schedules", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     if (!r.ok) return err(r.body);
     document.getElementById("ds-name").value = "";
