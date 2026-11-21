@@ -4,7 +4,7 @@
   // Admin SMS log: /api/v1/sms
   const VA = window.VistAdmin;
   const esc = VA.escapeHtml;
-  const ABOUT = { ATTENDANCE_FINE: "Attendance fine", DATESHEET: "Datesheet", RESULTS: "Results", FEE_OVERDUE: "Overdue fee", TEST: "Test", BULK: "Group message", PASSWORD_RESET: "Password reset", ADMISSION: "Admission",
+  const ABOUT = { ATTENDANCE_FINE: "Attendance fine", DATESHEET: "Datesheet", RESULTS: "Results", FEE_OVERDUE: "Overdue fee", FEE_DEFAULTER: "Fee reminder (sent by the office)", REG_NO: "Reg No reminder", TEST: "Test", BULK: "Group message", PASSWORD_RESET: "Password reset", ADMISSION: "Admission",
     FEE_REMINDER: "Fee reminder", FEE_PAID: "Payment received", CERTIFICATE_READY: "Certificate ready", PARENT_WEEKLY: "Monday note to parents",
     ATTENDANCE_WARNING: "Attendance warning", SECURITY: "Security alert", EXAM_DUTY: "Exam duty", WARNING: "Warning",
     SCHOOL_ABSENCE: "Absent / late (school)", SCHOOL_HOMEWORK: "Homework (school)", SCHOOL_PTM: "Parent-teacher meeting" };

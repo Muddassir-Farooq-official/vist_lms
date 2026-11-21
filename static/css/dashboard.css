@@ -2284,7 +2284,7 @@ body[data-card-tables] .content-main > .sh-card, body[data-card-tables] .content
 .hr-person { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 3px 0; flex-wrap: wrap; }
 .hr-person + .hr-person { border-top: 1px dashed var(--border); }
 .hr-person small { color: var(--text-secondary); }
-#h-rooms td small, #h-hist td small, .records-dialog td small, #md-table td small, #df-table td small, #pa-table td small, #cal-table td small, #sl-table td small { display: block; color: var(--text-secondary); font-weight: 500; }
+#h-rooms td small, #h-hist td small, .records-dialog td small, #md-table td small, #df-table td small, #fd-table td small, #fd-pr-tbody td small, #fd-ex-tbody td small, #pa-table td small, #cal-table td small, #sl-table td small { display: block; color: var(--text-secondary); font-weight: 500; }
 dialog.modal.records-dialog { width: min(980px, calc(100vw - 24px)); max-width: none; }
 .records-dialog .form-actions { gap: 8px; flex-wrap: wrap; }
 /* Reports centre */

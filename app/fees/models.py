@@ -347,3 +347,18 @@ class Scholarship(UUIDPKMixin, TimestampMixin, Base):
     granted_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ended_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+class FeePromise(Base):
+    """A student (or their family) promised to pay overdue fees by a date. Until then no fee reminder SMS goes to them and
+    their admit card is not held for fees. Never deleted: cancelling keeps the row (app/fees/defaulters.py)."""
+    __tablename__ = "fee_promises"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    student_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True)
+    promised_date: Mapped[date] = mapped_column(Date, nullable=False)
+    amount: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    note: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("now()"))
+    cancelled_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

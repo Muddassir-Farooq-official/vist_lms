@@ -256,6 +256,7 @@ ADMIN_NAV_ITEMS = [
     _nav("reports", "Reports", "exams", "/dashboard/admin/reports", group="Reports"),
     _nav("monthly", "Monthly report", "exams", "/dashboard/admin/monthly", group="Reports"),
     _nav("finance-reports", "Finance reports", "exams", "/dashboard/admin/finance-reports", group="Finance"),
+    _nav("fee-defaulters", "Fee defaulters", "fees", "/dashboard/admin/fee-defaulters", group="Finance"),
     _nav("onebill", "1Bill payments", "fees", "/dashboard/admin/onebill", group="Finance"),
     _nav("payroll", "Payroll", "fees", "/dashboard/admin/payroll", group="Finance"),
     _nav("staff-attendance", "Staff attendance", "clock", "/dashboard/admin/staff-attendance", group="Finance"),
@@ -428,6 +429,7 @@ ACCOUNTS_NAV_ITEMS = [
     _nav("finance", "Accounts", "tasks", "/dashboard/accounts/finance", mobile=True),
     _nav("reports", "Reports", "exams", "/dashboard/accounts/reports", mobile=False),
     _nav("finance-reports", "Finance reports", "exams", "/dashboard/accounts/finance-reports"),
+    _nav("fee-defaulters", "Fee defaulters", "fees", "/dashboard/accounts/fee-defaulters"),
     _nav("refunds", "Refunds", "fees", "/dashboard/accounts/refunds"),
     _nav("onebill", "1Bill payments", "fees", "/dashboard/accounts/onebill"),
     _nav("inventory", "Inventory / Store", "tasks", "/dashboard/accounts/inventory"),
@@ -530,7 +532,7 @@ async def view_as_is_read_only(request: Request, call_next):
 # menu instead of the administration's. Pages only the administration has are left to the page's own role check.
 # Only where the portal copy is the SAME screen (same template) with the portal's own menu: e.g. a teacher's
 # /dashboard/faculty/attendance is a different screen from the administration's, so it is not a redirect target.
-_SAME_SCREEN = {"ACCOUNTS_OFFICER": ("accounts", {"fees", "fines", "refunds", "inventory", "assets", "payroll", "finance", "finance-reports",
+_SAME_SCREEN = {"ACCOUNTS_OFFICER": ("accounts", {"fees", "fines", "refunds", "inventory", "assets", "payroll", "finance", "finance-reports", "fee-defaulters",
                                                  "approvals", "staff-attendance"})}
 _page_routes: set[str] | None = None
 
@@ -716,6 +718,7 @@ app.include_router(exams_router, prefix=settings.api_v1_prefix)
 app.include_router(sms_router, prefix=settings.api_v1_prefix)
 app.include_router(sms_public_router)                          # /wa/d/<token>: the document sent with a WhatsApp message
 from app.reports.finance_router import router as finance_reports_router  # noqa: E402
+from app.fees.defaulters_router import router as fee_defaulters_router  # noqa: E402
 from app.reports.center_router import router as report_center_router  # noqa: E402
 from app.reports.monthly_router import router as monthly_report_router  # noqa: E402
 from app.discipline.router import router as discipline_router  # noqa: E402
@@ -725,6 +728,7 @@ app.include_router(monthly_report_router, prefix=settings.api_v1_prefix)
 app.include_router(discipline_router, prefix=settings.api_v1_prefix)
 
 app.include_router(finance_reports_router, prefix=settings.api_v1_prefix)
+app.include_router(fee_defaulters_router, prefix=settings.api_v1_prefix)
 from app.calendar.router import router as calendar_router  # noqa: E402
 
 app.include_router(calendar_router, prefix=settings.api_v1_prefix)
@@ -1525,6 +1529,16 @@ async def admin_result_sheets_page(request: Request):
 @app.get("/dashboard/student/fees", include_in_schema=False)
 async def student_fees_page(request: Request):
     return templates.TemplateResponse(request, "student/fees.html", {"nav_items": STUDENT_NAV_ITEMS, "active_nav": "fees"})
+
+
+@app.get("/dashboard/admin/fee-defaulters", include_in_schema=False)
+async def admin_fee_defaulters_page(request: Request):
+    return templates.TemplateResponse(request, "admin/fee_defaulters.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "fee-defaulters", "can_exempt": True})
+
+
+@app.get("/dashboard/accounts/fee-defaulters", include_in_schema=False)
+async def accounts_fee_defaulters_page(request: Request):
+    return templates.TemplateResponse(request, "admin/fee_defaulters.html", {"nav_items": ACCOUNTS_NAV_ITEMS, "active_nav": "fee-defaulters", "can_exempt": False})
 
 
 @app.get("/dashboard/admin/finance-reports", include_in_schema=False)

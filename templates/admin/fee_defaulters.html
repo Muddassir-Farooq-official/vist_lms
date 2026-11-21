@@ -1,0 +1,94 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN,ACCOUNTS_OFFICER{% endblock %}
+{% block title %}Fee defaulters{% endblock %}
+{% block page_title %}Fee defaulters{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Everyone with an overdue fee, by batch or session: download the list, send SMS reminders now, record a promise to pay, and (administrators) allow an admit card despite overdue fees.</div>{% endblock %}
+
+{% block content %}
+<section class="sh-card" id="fd-root" data-can-exempt="{{ 'yes' if can_exempt else 'no' }}">
+  <div class="toolbar">
+    <select id="fd-session" class="text-input" aria-label="Session"><option value="">All sessions</option></select>
+    <select id="fd-term" class="text-input" aria-label="Batch term"><option value="">All batch terms</option></select>
+    <select id="fd-program" class="text-input" aria-label="Program"><option value="">All programs</option></select>
+    <input id="fd-sem" class="text-input" type="number" min="1" max="12" placeholder="Semester" aria-label="Semester" style="max-width:110px" />
+    <input id="fd-days" class="text-input" type="number" min="0" step="1" placeholder="Overdue at least … days" aria-label="Overdue at least this many days" />
+    <input id="fd-min" class="text-input" type="number" min="0" step="1" placeholder="At least Rs." aria-label="Minimum overdue amount" />
+    <button type="button" class="role-btn" id="fd-load">Show</button>
+    <a class="role-btn secondary-btn" id="fd-csv" href="#" data-download="fee-defaulters.csv">Download CSV</a>
+  </div>
+  <div class="stat-grid" id="fd-kpis"></div>
+  <div class="toolbar">
+    <label class="rn-missing"><input type="checkbox" id="fd-all" /> Select all shown</label>
+    <button type="button" class="role-btn" id="fd-sms" disabled>Send SMS to the selected…</button>
+    <span class="panel-hint" id="fd-selected" aria-live="polite"></span>
+  </div>
+  <div class="table-scroll">
+    <table class="dash-table" id="fd-table">
+      <thead><tr><th></th><th>Student</th><th>Program</th><th class="num">Overdue</th><th>Since</th><th>Phones</th><th>Follow-up</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <p class="empty-state" id="fd-empty" hidden>No student matches: nobody with an overdue fee here.</p>
+</section>
+
+<section class="sh-card">
+  <h2 class="panel-title">Promises to pay</h2>
+  <p class="panel-hint">Until the promised date no fee reminder goes to the student or the family, and the admit card is not held for fees. After it, both apply again by themselves.</p>
+  <label class="rn-missing"><input type="checkbox" id="fd-pr-old" /> Show cancelled and past ones too</label>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Student</th><th>Pay by</th><th class="num">Amount</th><th>Note</th><th>Recorded by</th><th></th></tr></thead>
+    <tbody id="fd-pr-tbody"></tbody></table></div>
+</section>
+
+<section class="sh-card">
+  <h2 class="panel-title">Admit card allowed despite overdue fees</h2>
+  <p class="panel-hint">Given by an administrator with a reason, optionally until a date. Reminders still go. Revoking keeps the record.</p>
+  <label class="rn-missing"><input type="checkbox" id="fd-ex-old" /> Show revoked and expired ones too</label>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Student</th><th>Reason</th><th>Until</th><th>Given by</th><th></th></tr></thead>
+    <tbody id="fd-ex-tbody"></tbody></table></div>
+</section>
+
+<dialog id="fd-sms-modal" class="modal modal-wide" aria-labelledby="fd-sms-title"><div class="modal-body">
+  <h2 id="fd-sms-title">Send an SMS reminder</h2>
+  <p class="cc-meta" id="fd-sms-who"></p>
+  <label class="field-label-sm" style="display:block" for="fd-sms-to">Send to</label>
+  <select id="fd-sms-to" class="text-input"><option value="BOTH">Students and parents</option><option value="STUDENT">Students only</option><option value="PARENT">Parents only</option></select>
+  <label class="field-label-sm" style="display:block" for="fd-sms-text">Message</label>
+  <textarea id="fd-sms-text" class="text-input" style="width:100%" rows="4" maxlength="400"></textarea>
+  <p class="panel-hint" id="fd-sms-help"></p>
+  <div id="fd-sms-preview"></div>
+  <p id="fd-sms-error" class="dash-alert error" hidden></p>
+  <div class="decision-bar">
+    <button type="button" class="role-btn secondary-btn" id="fd-sms-check">Preview</button>
+    <button type="button" class="role-btn" id="fd-sms-send" disabled>Send</button>
+    <button type="button" class="role-btn secondary-btn" id="fd-sms-cancel">Close</button>
+  </div>
+</div></dialog>
+
+<dialog id="fd-pr-modal" class="modal" aria-labelledby="fd-pr-title"><div class="modal-body">
+  <h2 id="fd-pr-title">Promise to pay</h2>
+  <p class="cc-meta" id="fd-pr-who"></p>
+  <label class="field-label-sm" style="display:block" for="fd-pr-date">Will pay by</label>
+  <input type="date" id="fd-pr-date" class="text-input" />
+  <label class="field-label-sm" style="display:block" for="fd-pr-amount">Amount (optional)</label>
+  <input type="number" id="fd-pr-amount" class="text-input" min="1" step="1" />
+  <label class="field-label-sm" style="display:block" for="fd-pr-note">Note (optional)</label>
+  <input type="text" id="fd-pr-note" class="text-input" maxlength="300" placeholder="e.g. father called; salary on the 1st" />
+  <p id="fd-pr-error" class="dash-alert error" hidden></p>
+  <div class="decision-bar"><button type="button" class="role-btn" id="fd-pr-save">Save</button>
+    <button type="button" class="role-btn secondary-btn" id="fd-pr-cancel">Cancel</button></div>
+</div></dialog>
+
+<dialog id="fd-ex-modal" class="modal" aria-labelledby="fd-ex-title"><div class="modal-body">
+  <h2 id="fd-ex-title">Allow the admit card</h2>
+  <p class="cc-meta" id="fd-ex-who"></p>
+  <label class="field-label-sm" style="display:block" for="fd-ex-reason">Reason</label>
+  <input type="text" id="fd-ex-reason" class="text-input" maxlength="500" placeholder="e.g. scholarship approved, amount not posted yet" />
+  <label class="field-label-sm" style="display:block" for="fd-ex-until">Until (leave empty: until you revoke it)</label>
+  <input type="date" id="fd-ex-until" class="text-input" />
+  <p id="fd-ex-error" class="dash-alert error" hidden></p>
+  <div class="decision-bar"><button type="button" class="role-btn" id="fd-ex-save">Allow</button>
+    <button type="button" class="role-btn secondary-btn" id="fd-ex-cancel">Cancel</button></div>
+</div></dialog>
+{% endblock %}
+
+{% block extra_scripts %}<script src="/static/js/fee-defaulters.js"></script>{% endblock %}
