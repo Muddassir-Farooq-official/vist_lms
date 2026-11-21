@@ -42,14 +42,22 @@ class ExamScheduleService:
         self.session = session
 
     # ---------------------------------------------------------------- schedules
-    async def create(self, *, term_label: str, name: str, instructions: str | None, actor_id: uuid.UUID,
-                     assessment_type_id: uuid.UUID | None = None) -> ExamSchedule:
+    async def create(self, *, term_label: str | None, name: str, instructions: str | None, actor_id: uuid.UUID,
+                     assessment_type_id: uuid.UUID | None = None, session_id: uuid.UUID | None = None) -> ExamSchedule:
         name = " ".join(name.split())
         if not name:
             raise ValidationAppError("Give the datesheet a name, for example Midterm.")
-        from app.academics.terms import AcademicTermService
+        from app.academics.terms import AcademicSession, AcademicTermService
 
-        await AcademicTermService(self.session).require_usable(term_label)
+        if session_id is not None:                  # one datesheet for every batch term of a session
+            ses = await self.session.get(AcademicSession, session_id)
+            if ses is None:
+                raise ResourceNotFoundError("Session not found.")
+            term_label = ses.name
+        elif not term_label:
+            raise ValidationAppError("Choose the term or the session.")
+        else:
+            await AcademicTermService(self.session).require_usable(term_label)
         dup = (await self.session.execute(select(ExamSchedule).where(ExamSchedule.term_label == term_label, ExamSchedule.name == name))).scalar_one_or_none()
         if dup:
             raise DuplicateResourceError(f'A "{name}" datesheet for {term_label} already exists.')
@@ -58,7 +66,8 @@ class ExamScheduleService:
 
             if await self.session.get(AssessmentType, assessment_type_id) is None:
                 raise ResourceNotFoundError("Result type not found.")
-        sched = ExamSchedule(term_label=term_label, name=name, instructions=instructions, created_by=actor_id, assessment_type_id=assessment_type_id)
+        sched = ExamSchedule(term_label=term_label, name=name, instructions=instructions, created_by=actor_id, assessment_type_id=assessment_type_id,
+                             session_id=session_id)
         self.session.add(sched)
         await self.session.flush()
         return sched
@@ -81,7 +90,14 @@ class ExamScheduleService:
         offering = await self.session.get(CourseOffering, paper.course_offering_id)
         if offering is None:
             raise ResourceNotFoundError("Course offering not found.")
-        if offering.term_label != sched.term_label:
+        if sched.session_id is not None:
+            from app.academics.terms import AcademicTerm
+
+            ok = (await self.session.execute(select(AcademicTerm.id).where(AcademicTerm.label == offering.term_label,
+                                                                           AcademicTerm.session_id == sched.session_id))).first()
+            if ok is None:
+                raise BusinessRuleViolationError(f"That course is in {offering.term_label}, which is not in the {sched.term_label} session.")
+        elif offering.term_label != sched.term_label:
             raise BusinessRuleViolationError(f"That course is in {offering.term_label}, not {sched.term_label}.")
         if paper.end_time <= paper.start_time:
             raise ValidationAppError("The paper must end after it starts.")
@@ -290,13 +306,19 @@ class ExamScheduleService:
         sched = await self.get(schedule_id)
         from app.exams.duty import ExamDutyService
 
-        return {**self.summary(sched), "papers": await self._paper_rows(await self.papers(schedule_id), with_duty=True, sched=sched),
+        terms = [sched.term_label]
+        if sched.session_id is not None:
+            from app.academics.sessions import SessionService
+
+            terms = await SessionService(self.session).labels_of([sched.session_id])
+        return {**self.summary(sched), "terms": terms,
+                "papers": await self._paper_rows(await self.papers(schedule_id), with_duty=True, sched=sched),
                 "clashes": await self.clashes(schedule_id), "cases": await ExamDutyService(self.session).cases(schedule_id=schedule_id)}
 
     @staticmethod
     def summary(s: ExamSchedule) -> dict:
         return {"id": s.id, "term_label": s.term_label, "name": s.name, "status": s.status.value, "instructions": s.instructions,
-                "published_at": s.published_at, "assessment_type_id": s.assessment_type_id}
+                "published_at": s.published_at, "assessment_type_id": s.assessment_type_id, "session_id": s.session_id}
 
     async def _group(self, offering_id: uuid.UUID) -> list[uuid.UUID]:
         from app.academics.combined import member_ids

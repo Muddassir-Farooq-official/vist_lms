@@ -15,10 +15,14 @@
   let terms = [], editing = null, programs = [];
   window.VistTerms = { open: function () { return terms.filter(function (t) { return t.status === "OPEN"; }); } };
 
+  let sessions = [];                         // for selects marked data-sessions: "Whole session: Fall 2026" first
   function fillSelects() {
     document.querySelectorAll("select.term-select").forEach(function (sel) {
       const keep = sel.value;
       sel.innerHTML = '<option value="">Select a term…</option>' +
+        (sel.dataset.sessions ? sessions.filter(function (x) { return x.when !== "past" && x.terms.length; }).map(function (x) {
+          return '<option value="session:' + esc(x.id) + '">Whole session: ' + esc(x.name) + " (" + x.terms.length + " batch term" + (x.terms.length === 1 ? "" : "s") + ")</option>";
+        }).join("") : "") +
         (sel.dataset.allBatches ? '<option value="' + ALL_BATCHES + '">Each student\'s own term (several batches)</option>' : "") +
         window.VistTerms.open().map(function (t) {
         return '<option value="' + esc(t.label) + '">' + esc(t.label) + (t.start_date ? " (" + esc(t.start_date) + " – " + esc(t.end_date || "?") + ")" : "") + "</option>";
@@ -108,8 +112,11 @@
 
   async function load() {
     const needPrograms = !programs.length && document.querySelector("select.term-program");
-    const [r, p] = await Promise.all([VA.fetchJson(API), needPrograms ? VA.fetchJson("/api/v1/programs", { quiet: true }) : Promise.resolve(null)]);
+    const needSessions = !!document.querySelector("select.term-select[data-sessions]");
+    const [r, p, ss] = await Promise.all([VA.fetchJson(API), needPrograms ? VA.fetchJson("/api/v1/programs", { quiet: true }) : Promise.resolve(null),
+      needSessions ? VA.fetchJson("/api/v1/academics/sessions", { quiet: true }) : Promise.resolve(null)]);
     if (p && p.ok) { programs = p.body; fillBatchSelects(); }
+    if (ss && ss.ok) sessions = ss.body.sessions || [];
     if (!r.ok) return;
     terms = r.body;
     fillSelects();

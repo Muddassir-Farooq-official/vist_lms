@@ -27,7 +27,8 @@ manage = require_permission(Permissions.EXAM_SCHEDULE_MANAGE)
 
 
 class ScheduleIn(BaseModel):
-    term_label: str = Field(min_length=1, max_length=50)
+    term_label: str | None = Field(default=None, max_length=50)
+    session_id: uuid.UUID | None = None              # a datesheet for a whole session (all its batch terms) instead of one term
     name: str = Field(min_length=1, max_length=80)
     instructions: str | None = Field(default=None, max_length=1000)
     assessment_type_id: uuid.UUID | None = None      # the result type these papers' marks go into (optional)
@@ -89,7 +90,8 @@ async def list_schedules(current_user: CurrentUser = Depends(manage), db=Depends
 
 @router.post("/schedules", status_code=201, summary="Start a datesheet for a term (exam office)")
 async def create_schedule(payload: ScheduleIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
-    s = await ExamScheduleService(db).create(term_label=payload.term_label, name=payload.name, instructions=payload.instructions, actor_id=current_user.id,
+    s = await ExamScheduleService(db).create(term_label=payload.term_label, session_id=payload.session_id, name=payload.name,
+                                             instructions=payload.instructions, actor_id=current_user.id,
                                              assessment_type_id=payload.assessment_type_id)
     return ExamScheduleService.summary(s)
 

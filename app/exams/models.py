@@ -29,6 +29,9 @@ class ExamSchedule(Base):
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Which result type (e.g. "Mid Term") these papers' marks go into, so marks entry can show who was absent.
     assessment_type_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("assessment_types.id", ondelete="SET NULL"), nullable=True)
+    # A datesheet for a whole session ("Fall 2026": every batch term in it), app/academics/sessions.py. Then term_label
+    # holds the session's name (shown on admit cards) and papers may come from any of its batch terms.
+    session_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("academic_sessions.id", ondelete="RESTRICT"), nullable=True, index=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 

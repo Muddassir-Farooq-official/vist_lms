@@ -231,6 +231,12 @@ class SessionService:
         if start_date and end_date and end_date <= start_date:
             raise ValidationAppError("The session must end after it starts.")
         s.start_date, s.end_date = start_date, end_date
+        from sqlalchemy import update as _update
+
+        from app.exams.models import ExamSchedule
+
+        await self.session.execute(_update(ExamSchedule).where(ExamSchedule.session_id == s.id).values(term_label=s.name)
+                                   .execution_options(synchronize_session="fetch"))      # a session's datesheets show its name
         if term_ids is not None:
             for t in await self._terms():
                 if t.id in set(term_ids):
@@ -248,6 +254,11 @@ class SessionService:
         s = await self.session.get(AcademicSession, session_id)
         if s is None:
             raise ResourceNotFoundError("Session not found.")
+        from app.exams.models import ExamSchedule
+
+        n = (await self.session.execute(select(func.count()).select_from(ExamSchedule).where(ExamSchedule.session_id == s.id))).scalar_one()
+        if n:
+            raise BusinessRuleViolationError(f"{s.name} has {n} datesheet(s) of its own. It is kept so they stay complete.")
         for t in await self._terms():
             if t.session_id == s.id:
                 t.session_id = None
