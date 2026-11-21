@@ -93,3 +93,10 @@ async def start_next(session_id: uuid.UUID, payload: NextIn,
                      _m: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
     return await SessionService(db).start_next(session_id, new_name=payload.new_name, start_date=payload.start_date, end_date=payload.end_date,
                                                labels=payload.labels, enroll=payload.enroll, actor_id=current_user.id)
+
+
+@router.get("/{session_id}/report", summary="The session's report: per batch term, students, attendance, results and fees")
+async def report(session_id: uuid.UUID, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    from app.academics.session_report import session_report
+
+    return await session_report(db, session_id)

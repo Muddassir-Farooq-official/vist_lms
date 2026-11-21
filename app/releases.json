@@ -1,5 +1,23 @@
 [
   {
+    "version": "1.40.0",
+    "date": "2026-11-21",
+    "title": "One datesheet for a whole session, and the session report",
+    "summary": "A Mid or Final datesheet can cover every batch term of a session, and each session has a report of students, attendance, results and fees by batch.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "Datesheets: choose 'Whole session: Fall 2026' to put papers from every batch term of the session on one datesheet, published once with admit cards."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Sessions → Report: per batch term, sections, courses, students, attendance (average and below the minimum), results by stage and fees (charged, paid, owed, overdue); download as CSV."
+      }
+    ]
+  },
+  {
     "version": "1.39.0",
     "date": "2026-11-21",
     "title": "Sessions: group every batch's term (Fall 2026) and start the next one",

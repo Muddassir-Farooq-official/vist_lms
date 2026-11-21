@@ -35,7 +35,7 @@
       groups.sessions.map(function (s) {
         return '<tr data-id="' + esc(s.id) + '"><td><strong>' + esc(s.name) + "</strong> " + (WHEN[s.when] || "") + "</td><td>" + d(s.start_date) + " – " + d(s.end_date) +
           "</td><td>" + (s.terms.length ? s.terms.map(esc).join(", ") : '<span class="sd-dim">none</span>') + "</td>" +
-          '<td class="crs-actions"><button type="button" class="link-btn" data-act="next">Start next session…</button> ' +
+          '<td class="crs-actions"><button type="button" class="link-btn" data-act="report">Report</button> <button type="button" class="link-btn" data-act="next">Start next session…</button> ' +
           '<button type="button" class="link-btn" data-act="edit">Edit</button> <button type="button" class="link-btn" data-act="del">Remove</button></td></tr>';
       }).join("") + "</tbody></table>" +
       (groups.ungrouped.length ? '<p class="sd-dim">In no session: ' + groups.ungrouped.map(esc).join(", ") + "</p>" : "");
@@ -94,6 +94,44 @@
     $("ses-suggestions").innerHTML = "";
     load();
   });
+
+  // ------------------------------------------------------------------ the session's report
+  function money(n) { return VA.formatMoney ? VA.formatMoney(n) : "Rs. " + Number(n || 0).toLocaleString(); }
+  async function showReport(s) {
+    const r = await VA.fetchJson(API + "/" + s.id + "/report");
+    if (!r.ok) { err(msg(r, "Could not make the report.")); return; }
+    const d = r.body, t = d.totals;
+    const res = function (x) { return x.PUBLISHED + " published, " + x.APPROVED + " approved, " + (x.SUBMITTED + x.RETURNED) + " with the approver, " + x.DRAFT + " not sent"; };
+    const box = $("ses-report");
+    box.hidden = false;
+    box.innerHTML = '<h3 class="tt-sub">' + esc(d.session.name) + " report</h3>" +
+      '<div class="pt-summary"><div class="pt-chip">' + t.terms + " batch terms · " + t.courses + " course sections · " + t.students + " students</div>" +
+      '<div class="pt-chip">Attendance ' + (t.attendance_average == null ? "—" : t.attendance_average + "%") + " average · " + t.below_minimum + " below " + d.minimum_attendance + "%</div>" +
+      '<div class="pt-chip">Fees: ' + money(t.fees.charged) + " charged · " + money(t.fees.paid) + " paid · " + money(t.fees.remaining) + " owed (" + money(t.fees.overdue) + " overdue)</div></div>" +
+      '<div class="pt-wrap"><table class="dash-table no-stack" id="ses-report-table"><thead><tr><th>Batch term</th><th>Batch</th><th class="num">Sections</th><th class="num">Courses</th><th class="num">Students</th>' +
+      '<th class="num">Attendance</th><th class="num">Below ' + d.minimum_attendance + '%</th><th>Results</th><th class="num">Fees charged</th><th class="num">Paid</th><th class="num">Owed</th><th class="num">Overdue</th></tr></thead><tbody>' +
+      d.terms.map(function (x) {
+        return "<tr><td><strong>" + esc(x.term) + "</strong></td><td>" + esc(x.program ? x.program + " · sem " + x.semester : "—") + '</td><td class="num">' + x.sections + '</td><td class="num">' + x.courses +
+          '</td><td class="num">' + x.students + '</td><td class="num">' + (x.attendance.average == null ? "—" : x.attendance.average + "%") + '</td><td class="num">' + x.attendance.below_minimum +
+          "</td><td><small>" + esc(res(x.results)) + '</small></td><td class="num">' + money(x.fees.charged) + '</td><td class="num">' + money(x.fees.paid) +
+          '</td><td class="num">' + money(x.fees.remaining) + '</td><td class="num">' + money(x.fees.overdue) + "</td></tr>";
+      }).join("") + "</tbody></table></div>" +
+      '<div class="stt-actions"><button type="button" class="role-btn secondary-btn" id="ses-report-csv">Download as CSV</button></div>';
+    $("ses-report-csv").addEventListener("click", function () {
+      const head = ["Batch term", "Program", "Semester", "Sections", "Courses", "Students", "Attendance %", "Below minimum", "Results published", "Results approved",
+        "Results with approver", "Results not sent", "Fees charged", "Concessions", "Paid", "Owed", "Overdue"];
+      const lines = [head].concat(d.terms.map(function (x) {
+        return [x.term, x.program || "", x.semester || "", x.sections, x.courses, x.students, x.attendance.average == null ? "" : x.attendance.average, x.attendance.below_minimum,
+          x.results.PUBLISHED, x.results.APPROVED, x.results.SUBMITTED + x.results.RETURNED, x.results.DRAFT, x.fees.charged, x.fees.concession, x.fees.paid, x.fees.remaining, x.fees.overdue];
+      }));
+      const csv = lines.map(function (l) { return l.map(function (v) { v = String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(","); }).join("\r\n");
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv" }));
+      a.download = "session-" + d.session.name.replace(/[^A-Za-z0-9-]+/g, "-") + ".csv";
+      document.body.appendChild(a); a.click(); a.remove();
+    });
+    box.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   // ------------------------------------------------------------------ add / edit / remove
   $("ses-add").addEventListener("click", async function () {
@@ -203,6 +241,7 @@
     const b = e.target.closest("[data-act]");
     if (!b) return;
     const s = groups.sessions.find(function (x) { return x.id === b.closest("tr").dataset.id; });
+    if (b.dataset.act === "report") showReport(s);
     if (b.dataset.act === "next") openNext(s);
     if (b.dataset.act === "edit") edit(s);
     if (b.dataset.act === "del") {
