@@ -616,17 +616,30 @@ job_done() {    # job_done DIR ID STATUS DETAIL [FILE BYTES]
     "$3" "${4//\$d\$/}" "${f:+, file_name = '$f', file_bytes = $b, expires_at = now() + interval '1 hour'}" "$2" | site_psql "$1" >/dev/null
 }
 jobs_one() {
-  local dir="$1" exports="$1/var/storage/exports" row id kind name url need free
+  local dir="$1" health="${2:-}" exports="$1/var/storage/exports" row id kind name url need free
   # one database call a minute when there is nothing to do (each call is a short-lived container): tidy up, say
-  # "the helper is alive" for the Backups page, and count waiting requests. Fails quietly before the migration.
-  local tidy pending
-  tidy="$(site_psql "$dir" 2>/dev/null <<'SQL'
+  # "the helper is alive" for the Backups page, count waiting requests, and leave the server's health for the
+  # Server health page (never fails the call: before that table exists it is skipped). Fails quietly before the
+  # Backups migration.
+  local tidy pending sql
+  sql="$(cat <<'SQL'
 UPDATE server_jobs SET status = 'EXPIRED', updated_at = now() WHERE status = 'DONE' AND expires_at < now() RETURNING 'X', file_name;
 UPDATE server_jobs SET status = 'FAILED', detail = 'took too long', updated_at = now() WHERE status = 'RUNNING' AND started_at < now() - interval '3 hours';
 INSERT INTO service_heartbeats (name, last_seen_at, detail) VALUES ('server-jobs', now(), 'sites.sh jobs') ON CONFLICT (name) DO UPDATE SET last_seen_at = now();
 SELECT 'P', count(*) FROM server_jobs WHERE status = 'PENDING';
 SQL
-)" || return 0
+)"
+  if [ -n "$health" ]; then
+    sql="$sql
+DO \$do\$ BEGIN
+  IF to_regclass('public.server_health') IS NOT NULL THEN
+    INSERT INTO server_health (name, taken_at, data) VALUES ('latest', now(), \$hj\$${health}\$hj\$::jsonb)
+      ON CONFLICT (name) DO UPDATE SET taken_at = now(), data = EXCLUDED.data;
+  END IF;
+EXCEPTION WHEN others THEN NULL;
+END \$do\$;"
+  fi
+  tidy="$(printf '%s\n' "$sql" | site_psql "$dir" 2>/dev/null)" || return 0
   mkdir -p "$exports"; chown 1000:1000 "$exports"; chmod 750 "$exports"
   printf '%s\n' "$tidy" | while IFS='|' read -r tag f; do [ "$tag" = X ] && [ -n "$f" ] && rm -f "$exports/$f"; done
   find "$exports" -maxdepth 1 -type f -mmin +75 -delete 2>/dev/null           # a download is kept 1 hour; anything left over
@@ -674,12 +687,30 @@ PY
     esac
   done
 }
+# The server's health for every institute (scripts/server/health.py): each gets the shared server and its own site;
+# vertex (the owner) gets every institute. Printed as "<name><TAB><json>" lines.
+health_all() {
+  local name dir port domain enabled first=1 cfg
+  cfg='{"sites":['
+  for name in $(all_names); do
+    dir="$(site_dir "$name")"
+    if [ "$name" = vertex ]; then port=8000; domain="$(envget PUBLIC_URL "$dir/.env" | sed -E 's#^https?://##; s#/.*$##')"; enabled=true
+    else port="$(envget LMS_PORT "$dir/compose.env")"; domain="$(envget DOMAIN "$dir/site.env")"
+      enabled=true; grep -qx 'ENABLED=0' "$dir/site.env" && enabled=false; fi
+    [ "$first" = 1 ] || cfg="$cfg,"; first=0
+    cfg="$cfg{\"name\":\"$name\",\"dir\":\"$dir\",\"port\":${port:-0},\"domain\":\"$domain\",\"enabled\":$enabled}"
+  done
+  cfg="$cfg],\"state\":\"$SITES_DIR/.health-state.json\",\"cache\":\"$SITES_DIR/.health-cache.json\"}"
+  printf '%s' "$cfg" | timeout 100 python3 "$CODE_DIR/scripts/server/health.py" 2>/dev/null
+}
 jobs_all() {
   exec 7>"/tmp/lms-jobs.lock"; flock -n 7 || exit 0
-  local name
+  local name health
+  mkdir -p "$SITES_DIR"
+  health="$(health_all || true)"
   for name in $(all_names); do
     [ "$name" != vertex ] && grep -qx 'ENABLED=0' "$SITES_DIR/$name/site.env" && continue
-    jobs_one "$(site_dir "$name")"
+    jobs_one "$(site_dir "$name")" "$(printf '%s\n' "$health" | awk -F '\t' -v n="$name" '$1 == n { print $2; exit }')"
   done
 }
 verify_all() {

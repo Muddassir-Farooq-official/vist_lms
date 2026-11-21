@@ -1,0 +1,31 @@
+{% extends "admin/_base.html" %}
+{% block title %}Server health{% endblock %}
+{% block page_title %}Server health{% endblock %}
+
+{% block content %}
+<p id="sh-alert" class="dash-alert error" role="alert" hidden></p>
+<p id="sh-ok" class="dash-alert success" hidden>Everything looks fine.</p>
+<p id="sh-setup" class="dash-alert" hidden></p>
+
+<section class="kpi-grid" aria-label="The server">
+  <div class="kpi" id="k-disk"><span class="kpi-label">Disk</span><strong class="kpi-value" id="k-disk-v">&mdash;</strong><span class="kpi-sub" id="k-disk-s">&nbsp;</span></div>
+  <div class="kpi" id="k-mem"><span class="kpi-label">Memory</span><strong class="kpi-value" id="k-mem-v">&mdash;</strong><span class="kpi-sub" id="k-mem-s">&nbsp;</span></div>
+  <div class="kpi" id="k-load"><span class="kpi-label">Load (5 min)</span><strong class="kpi-value" id="k-load-v">&mdash;</strong><span class="kpi-sub" id="k-load-s">&nbsp;</span></div>
+  <div class="kpi"><span class="kpi-label">Running for</span><strong class="kpi-value" id="k-up-v">&mdash;</strong><span class="kpi-sub" id="k-up-s">&nbsp;</span></div>
+</section>
+
+<section class="panel">
+  <h2 id="sites-h">Institutes on this server</h2>
+  <p class="panel-hint">Checked by the server every minute (certificates and file sizes every 30 minutes). An institute's administrators see the
+    shared server and their own institute; the server's owner sees every institute.</p>
+  <div class="pt-wrap"><table class="dash-table no-stack" id="sh-sites">
+    <thead><tr><th>Institute</th><th>Status</th><th class="num">Answer</th><th>Version</th><th>HTTPS certificate</th><th class="num">Uploaded files</th><th>Last backup</th></tr></thead>
+    <tbody id="sh-tbody"></tbody>
+  </table></div>
+  <p class="sd-dim" id="sh-when"></p>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/server-health.js"></script>
+{% endblock %}

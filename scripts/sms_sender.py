@@ -43,6 +43,9 @@ async def one_pass(with_reminders: bool) -> dict:
         from app.backups.alerts import backup_alert_round
 
         await backup_alert_round(session)            # backup failed / none for 26 hours / restore test failed -> administrators (once a day)
+        from app.serverhealth.service import health_alert_round
+
+        await health_alert_round(session)            # disk / certificate / site down / memory or load -> administrators (once a day)
         result = await svc.send_pending(limit=200)
         from app.core.background import beat
         from app.notifications.email_service import send_pending as send_emails

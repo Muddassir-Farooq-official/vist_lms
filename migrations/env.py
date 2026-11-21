@@ -68,6 +68,7 @@ from app.academics import grading_schemes as grading_schemes_models  # noqa: F40
 from app.selfassess import service as selfassess_models  # noqa: F401
 from app.backups import models as backups_models  # noqa: F401
 from app.timetabling import models as timetabling_models  # noqa: F401
+from app.serverhealth import models as serverhealth_models  # noqa: F401
 
 config = context.config
 # ALEMBIC_DATABASE_URL lets CI/tests migrate a scratch database without touching .env
