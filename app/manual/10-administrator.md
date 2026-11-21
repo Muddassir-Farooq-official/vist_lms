@@ -1,6 +1,6 @@
 # Administrator
 
-The administrator sets the institute up and oversees everything. Your menu is grouped into People, Academics, Finance, Reports, Library, Panels, Support and System. The **Dashboard** shows everything happening today in one place: collections, attendance, approvals waiting and alerts.
+The administrator sets the institute up and oversees everything. Your menu is grouped by job: Students, Teaching & exams, Fees & accounts, HR & payroll, Store & assets, Reports, Communication, Other offices and System. Tap a group's name to open or close it (see *Finding your way in the menu* in Getting started). Setup pages you rarely need (CSV Imports, SMS & WhatsApp, Top bars, Activity log, Backups, Server health) are under **Settings → More tools**, and the menu's search finds them too. The **Dashboard** shows everything happening today in one place: collections, attendance, approvals waiting and alerts.
 
 ## First-time setup (in this order)
 
@@ -13,7 +13,7 @@ The administrator sets the institute up and oversees everything. Your menu is gr
 7. **Fees**: fee types and fee structures (see the Accounts office chapter).
 8. **Employees** and **Students** (or **Admissions** for new intakes, and **CSV Imports** for bulk records).
 
-## People
+## Students
 
 - **Students**: every student on record. Open one to see their details, guardians and courses, change their photo or update the record.
 - **University Reg Nos**: the registration number the affiliating university (KMU, AUST …) gives each student. Type them in one by one, or download the class list as CSV, fill the `reg_number` column and upload it (you see every change before it is saved). The Reg No is printed on award lists, admit cards, result cards, the gazette and transcripts, students and parents see it on their profile, and you can search for a student by it. Two students can never share one. **Deadlines** (same page, affiliated programs only): set the last day for one batch term or for every batch of a session. Before it, the administration, the exam office and each student without a Reg No are reminded (once a week, then every day in the last 7 days; students also get an SMS). After it, that student's admit card is held until the Reg No is entered. To let one student's admit card print anyway, press **Exempt…** on the student, write the reason and optionally the last day; revoking keeps the record.
@@ -36,7 +36,7 @@ On **CSV Imports**, open **Field rules** (above the template download) and tick 
 
 From a student's or employee's record (or many at once from the list) print **ID cards** with a front and back. A student card is valid from the start to the end of the student's own batch term. If a student's batch term is not set up yet, the card runs the number of months set in Settings and you get a warning naming those students. Anyone can scan the card's QR code to check it is genuine, still valid or not valid yet.
 
-## Academics
+## Teaching & exams
 
 - **Programs**: each program with its students and curriculum. (A school has **Classes & sections** here instead: classes, sections, class teachers and who teaches which subject.)
 - **Courses**: the course catalogue, curriculum placement, term offerings and materials. Academic terms are on the Academic terms tab.
@@ -126,7 +126,7 @@ Not used in School mode: a school's subjects are not counted in credit hours.
 
 Teachers book make-up classes (for a missed class) and extra classes (for a course that is behind) in free periods. Each request arrives in **Approvals**. Approving checks the slot again, adds the class to the timetable and attendance, marks the missed class "made up" and tells the students and the teacher. A booking is refused if the teacher is on approved leave that day.
 
-## Finance
+## Fees & accounts, HR, store
 
 - **Fees**, **Refunds**, **1Bill payments**, **Fines**, **Finance reports**, **Fee defaulters** and **Accounts**: see the Accounts office chapter. Only administrators can allow an admit card despite overdue fees (**Fee defaulters → Allow admit card…**).
 - **Inventory / Store**: what the institute keeps in stock, where every item went and who has it.
@@ -144,14 +144,13 @@ Teachers book make-up classes (for a missed class) and extra classes (for a cour
 
 **Library** opens the library portal (see the Library chapter).
 
-## Panels
+## Other offices
 
 Open another office's portal with your administrator rights: **Accounts office**, **Exam department**, **Principal**, **Gate**, **Hostel warden** and **General staff**. **View as a person** shows exactly what a teacher, student, parent or member of staff sees (read-only, and logged).
 
-## Support
+## Communication
 
 - **Announcements**: issue official notices to students, teachers and staff, with attachments.
-- **Top bars**: a notice across the top of every page for the people you choose.
 - **Gate visitors**: the visitor log book kept at the gate.
 - **Tasks**: assign work and see who delivers on time.
 - **Applications**: leave and other requests from students and employees. Review, ask questions, approve or reject.
@@ -159,12 +158,15 @@ Open another office's portal with your administrator rights: **Accounts office**
 
 ## System
 
+These are under **Settings → More tools** (and the menu's search), not in the menu list:
+
 - **CSV Imports**: bring in students, employees, past results and more from spreadsheets. Each file is checked before anything is saved.
 - **SMS & WhatsApp**: messages to students and guardians. Turn each kind on or off in Settings → SMS messages.
+- **Top bars**: a notice across the top of every page for the people you choose.
 - **Activity log**: everything done in the system: who, what, when and from where.
 - **Backups**: see the backups and download a complete copy. See *Backups* below.
 - **Server health**: the server's disk, memory and load, and whether the site, its database, its HTTPS certificate and its backups are fine. See *Server health* below.
-- **Settings**: institute details, look, rules and your own account.
+- **Settings** (in the menu): institute details, look, rules and your own account, and the **More tools** above.
 
 ### Backups
 

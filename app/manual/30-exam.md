@@ -1,6 +1,6 @@
 # Exam department
 
-The exam department (Controller of Examinations) checks and publishes results, runs exams and re-sits, and prints result documents. **Home** shows results waiting for you, who to chase and the exams coming up. Administrators find the same tools under Academics.
+The exam department (Controller of Examinations) checks and publishes results, runs exams and re-sits, and prints result documents. **Home** shows results waiting for you, who to chase and the exams coming up. Administrators find the same tools under Teaching & exams.
 
 ## Grading tables and mark split
 

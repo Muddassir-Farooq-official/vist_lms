@@ -13,6 +13,12 @@ Forgot your password? Press **Forgot password** on the sign-in page and follow t
 ## Finding your way
 
 - The **side menu** lists everything you can do. On a phone, the most used items sit in the bar at the bottom and **More** opens the full menu.
+
+### Finding your way in the menu
+
+- The menu is grouped by job. Tap a group's name to open or close it. The group of the page you are on is always open; the others stay the way you left them.
+- **Search the menu**: the box at the top of the menu. Type part of a page's name or another word for it (for example *challan*, *salary* or *KMU*) and press Enter to open the first match. On a computer, press **/** or **Ctrl+K** anywhere to jump to it.
+- A number beside a page is work waiting for you there: approvals, profile changes, certificate requests, new admission forms, result sheets to approve, applications, tasks and unread announcements. A closed group shows the total of its numbers.
 - The **bell** at the top shows notifications: results published, fees due, approvals waiting and more.
 - The **version** box in the menu shows which version you are using; **What's new** lists what changed in each version.
 - **Help & manual** (in the menu) opens this manual at your own chapter. You can download it as a PDF.

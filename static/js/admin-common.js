@@ -1114,6 +1114,143 @@ window.VistAdmin = (function () {
     backdrop.addEventListener("click", closeDrawer);
   }
 
+  // ------------------------------------------------------------------ the menu: open / closed groups, search, badges
+  // Each group heading opens and closes; the group of the open page is always open, the others stay as this person
+  // left them (remembered per portal in this browser). The search box filters every page, including setup pages kept
+  // off the list (Settings -> More tools); Enter opens the first match, "/" or Ctrl+K jumps to it.
+  function wireNavMenu() {
+    const nav = document.querySelector(".drawer .drawer-nav");
+    if (!nav) return;
+    const portal = (location.pathname.split("/")[2] || "home");
+    const KEY = "vist_nav_groups:" + portal;
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+    const sections = Array.prototype.slice.call(nav.querySelectorAll(".drawer-section"));
+    function setOpen(sec, open) {
+      const btn = sec.querySelector(".drawer-group"), list = sec.querySelector(".drawer-group-items");
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+      list.hidden = !open;
+      groupBadges();
+    }
+    function applySaved() {
+      sections.forEach(function (sec) {
+        const name = sec.getAttribute("data-group");
+        setOpen(sec, sec.classList.contains("has-active") || saved[name] === true);
+      });
+    }
+    sections.forEach(function (sec) {
+      sec.querySelector(".drawer-group").addEventListener("click", function () {
+        if (nav.classList.contains("searching")) return;
+        const open = this.getAttribute("aria-expanded") !== "true";
+        setOpen(sec, open);
+        saved[sec.getAttribute("data-group")] = open;
+        try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) { /* private mode: not remembered */ }
+      });
+    });
+    // A closed group shows the total of the waiting-work badges inside it.
+    function groupBadges() {
+      sections.forEach(function (sec) {
+        const b = sec.querySelector(".drawer-group-badge");
+        let n = 0;
+        sec.querySelectorAll(".drawer-group-items .nav-badge").forEach(function (x) { n += parseInt(x.textContent, 10) || 0; });
+        const closed = sec.querySelector(".drawer-group").getAttribute("aria-expanded") !== "true";
+        const text = n > 99 ? "99+" : String(n);
+        if (b.hidden !== !(closed && n > 0)) b.hidden = !(closed && n > 0);
+        if (b.textContent !== text) { b.textContent = text; b.setAttribute("aria-label", n + " waiting"); }
+      });
+    }
+    // only the links' own badges are watched (not the group badges this writes), so it cannot loop
+    const watch = new MutationObserver(groupBadges);
+    sections.forEach(function (sec) { watch.observe(sec.querySelector(".drawer-group-items"), { childList: true, subtree: true, characterData: true }); });
+
+    const input = document.getElementById("nav-search");
+    const none = document.getElementById("nav-noresult");
+    const links = Array.prototype.slice.call(nav.querySelectorAll("a.drawer-link[data-nav]"));
+    const norm = function (t) { return String(t || "").toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g, " ").trim(); };
+    links.forEach(function (a) {
+      const sec = a.closest(".drawer-section");
+      a._words = norm((a.textContent || "") + " " + (a.getAttribute("data-keywords") || "") + " " + (sec ? sec.getAttribute("data-group") : ""));
+      a._name = norm(a.textContent);
+    });
+    function filter() {
+      const q = norm(input.value);
+      if (!q) {
+        nav.classList.remove("searching");
+        links.forEach(function (a) { a.hidden = a.classList.contains("drawer-hub") && !a.classList.contains("active"); a.classList.remove("nav-first"); });
+        sections.forEach(function (sec) { sec.hidden = false; });
+        none.hidden = true;
+        applySaved();
+        return;
+      }
+      nav.classList.add("searching");
+      const words = q.split(" ");
+      let first = null, count = 0;
+      // pages whose name starts with what was typed come first for Enter
+      links.forEach(function (a) {
+        const hit = words.every(function (w) { return a._words.indexOf(w) !== -1; });
+        a.hidden = !hit;
+        a.classList.remove("nav-first");
+        if (hit) { count += 1; if (!first || (a._name.indexOf(q) === 0 && first._name.indexOf(q) !== 0)) first = a; }
+      });
+      if (first) first.classList.add("nav-first");
+      sections.forEach(function (sec) {
+        const any = sec.querySelector("a.drawer-link:not([hidden])");
+        sec.hidden = !any;
+        sec.querySelector(".drawer-group").setAttribute("aria-expanded", "true");
+        sec.querySelector(".drawer-group-items").hidden = false;
+      });
+      none.hidden = count > 0;
+    }
+    if (input) {
+      input.addEventListener("input", filter);
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          const a = nav.querySelector("a.nav-first") || nav.querySelector("a.drawer-link[data-nav]:not([hidden])");
+          if (a && input.value.trim()) { e.preventDefault(); window.location.href = a.href; }
+        } else if (e.key === "Escape" && input.value) {
+          e.stopPropagation(); input.value = ""; filter();
+        } else if (e.key === "ArrowDown") {
+          const a = nav.querySelector("a.drawer-link[data-nav]:not([hidden])");
+          if (a) { e.preventDefault(); a.focus(); }
+        }
+      });
+      document.addEventListener("keydown", function (e) {
+        const t = e.target, typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+        const slash = e.key === "/" && !typing && !e.ctrlKey && !e.metaKey && !e.altKey;
+        const ctrlK = (e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K");
+        if (!slash && !ctrlK) return;
+        if (document.querySelector("dialog[open]")) return;
+        e.preventDefault();
+        const drawer = document.getElementById("drawer"), openBtn = document.getElementById("drawer-open");
+        if (drawer && !drawer.classList.contains("drawer-open") && window.innerWidth < 900 && openBtn) openBtn.click();
+        input.focus(); input.select();
+      });
+    }
+    applySaved();
+    wireNavBadges();
+  }
+
+  // Waiting work beside menu links: approvals, profile changes, certificate requests, admissions, result sheets.
+  // Each count is only sent to people who can act on it (GET /api/v1/nav/badges).
+  function wireNavBadges() {
+    if (!document.querySelector("[data-badge]")) return;
+    const paint = function (counts) {
+      document.querySelectorAll("[data-badge]").forEach(function (link) {
+        const n = counts[link.getAttribute("data-badge")] || 0;
+        let b = link.querySelector(".nav-badge");
+        if (!n) { if (b) b.remove(); return; }
+        if (!b) { b = document.createElement("span"); b.className = "nav-badge"; link.appendChild(b); }
+        b.textContent = n > 99 ? "99+" : String(n);
+        b.setAttribute("aria-label", n + " waiting");
+      });
+    };
+    const load = function () {
+      fetchJson("/api/v1/nav/badges", { quiet: true }).then(function (r) { if (r.ok && r.body) paint(r.body); });
+    };
+    load();
+    setInterval(function () { if (document.visibilityState === "visible") load(); }, 180000);
+  }
+
   function wireLogout() {
     const logoutBtn = document.getElementById("logout-btn");
     if (!logoutBtn) return;
@@ -1288,6 +1425,7 @@ window.VistAdmin = (function () {
     loadIdentity(me).then(function (ident) { if (ident) paintWhoami(me, ident); });
 
     wireDrawer();
+    wireNavMenu();
     wireEmailLink();
     wireAppLinks(me);
     wireLogout();

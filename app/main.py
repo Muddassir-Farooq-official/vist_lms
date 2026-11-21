@@ -158,10 +158,11 @@ def ui_lang(request) -> str:
 
 templates.env.globals["ui_lang"] = ui_lang
 # School mode (Settings -> Institute type): school words in the menus, and `school_mode()` for pages.
-from app.school.nav import portal_nav  # noqa: E402
+from app.school.nav import nav_sections, portal_nav  # noqa: E402
 from app.school.service import school_mode  # noqa: E402
 
 templates.env.filters["portal_nav"] = portal_nav
+templates.env.filters["nav_sections"] = nav_sections
 templates.env.globals["school_mode"] = school_mode
 templates.env.globals["attendance_href"] = lambda portal: (("/dashboard/faculty/my-class" if portal == "faculty" else "/dashboard/student/diary")
                                                            if school_mode() else f"/dashboard/{portal}/attendance")
@@ -215,74 +216,77 @@ ROLE_CARDS_BY_SLUG = {r["slug"]: r for r in ROLE_CARDS}
 # rendered as inert (no href, no click) rather than a link to a page that
 # doesn't exist. Update this list is the single place to add a new admin
 # section as modules get built.
-def _nav(slug, label, icon, href, *, group=None, mobile=False, short=None):
-    """One menu entry. `group` puts it under a heading in the side menu;
-    `mobile=True` also shows it in the bottom bar on phones (keep it to 4
-    per portal -- a fifth "More" button opens the full menu)."""
+def _nav(slug, label, icon, href, *, group=None, mobile=False, short=None, badge=None, hub=False, keywords=""):
+    """One menu entry. `group` puts it under a heading in the side menu (each heading opens and closes);
+    `mobile=True` also shows it in the bottom bar on phones (keep it to 4 per portal -- a fifth "More" button opens
+    the full menu). `badge` names a count from /api/v1/nav/badges shown beside it. `hub=True`: a rarely used setup page,
+    kept off the menu list but found by the menu's search and listed on the Settings page. `keywords`: other words the
+    menu search should find it by."""
     return {"slug": slug, "label": label, "icon": icon, "href": href, "enabled": True,
-            "group": group, "mobile": mobile, "short": short}
+            "group": group, "mobile": mobile, "short": short, "badge": badge, "hub": hub, "keywords": keywords}
 
 
-# ---- Admin: grouped by what the person is doing, not by build order --------
+# ---- Admin: grouped by the job being done ------------------------------------
 ADMIN_NAV_ITEMS = [
     _nav("dashboard", "Dashboard", "dashboard", "/dashboard/admin", mobile=True, short="Home"),
-    _nav("students", "Students", "students", "/dashboard/admin/students", group="People", mobile=True),
-    _nav("reg-numbers", "University Reg Nos", "file", "/dashboard/admin/reg-numbers", group="People"),
-    _nav("admissions", "Admissions", "imports", "/dashboard/admin/admissions", group="People"),
-    _nav("employees", "Employees", "employees", "/dashboard/admin/employees", group="People"),
-    _nav("hostel", "Hostel", "students", "/dashboard/admin/hostel", group="People"),
-    _nav("profile-changes", "Profile changes", "user", "/dashboard/admin/profile-changes", group="People"),
-    _nav("certificates", "Certificate requests", "file", "/dashboard/admin/certificates", group="People"),
-    _nav("warnings", "Warnings", "alert", "/dashboard/admin/warnings", group="People"),
-    _nav("programs", "Programs", "programs", "/dashboard/admin/programs", group="Academics"),
-    _nav("courses", "Courses", "graduation-cap", "/dashboard/admin/courses", group="Academics", mobile=True),
-    _nav("timetable", "Timetable", "clock", "/dashboard/admin/timetable", group="Academics"),
-    _nav("smart-timetable", "Smart timetable", "grid", "/dashboard/admin/timetable/smart", group="Academics"),
-    _nav("attendance", "Attendance", "attendance", "/dashboard/admin/attendance", group="Academics", mobile=True),
-    _nav("progress", "Teacher Progress", "exams", "/dashboard/admin/progress", group="Academics"),
-    _nav("feedback", "Course feedback", "check-circle", "/dashboard/admin/feedback", group="Academics"),
-    _nav("overview", "Institute Overview", "dashboard", "/dashboard/admin/overview", group="Academics"),
-    _nav("results", "Result Types", "exams", "/dashboard/admin/results", group="Academics"),
-    _nav("result-sheets", "Result Approval", "tasks", "/dashboard/admin/result-sheets", group="Academics"),
-    _nav("datesheets", "Datesheets", "clock", "/dashboard/admin/datesheets", group="Academics"),
-    _nav("supplementary", "Supplementary Exams", "exams", "/dashboard/admin/supplementary", group="Academics"),
-    _nav("calendar", "Calendar", "clock", "/dashboard/admin/calendar", group="Academics"),
-    _nav("fees", "Fees", "fees", "/dashboard/admin/fees", group="Finance"),
-    _nav("refunds", "Refunds", "fees", "/dashboard/admin/refunds", group="Finance"),
-    _nav("inventory", "Inventory / Store", "tasks", "/dashboard/admin/inventory", group="Finance"),
-    _nav("assets", "Fixed assets", "tasks", "/dashboard/admin/assets", group="Finance"),
-    _nav("approvals", "Approvals", "tasks", "/dashboard/admin/approvals", group="Finance"),
-    _nav("finance", "Accounts", "tasks", "/dashboard/admin/finance", group="Finance"),
+    _nav("students", "Students", "students", "/dashboard/admin/students", group="Students", mobile=True, keywords="learners roll"),
+    _nav("admissions", "Admissions", "imports", "/dashboard/admin/admissions", group="Students", badge="admissions", keywords="applicants merit list new students"),
+    _nav("reg-numbers", "University Reg Nos", "file", "/dashboard/admin/reg-numbers", group="Students", keywords="registration KMU AUST affiliation"),
+    _nav("profile-changes", "Profile changes", "user", "/dashboard/admin/profile-changes", group="Students", badge="profile_changes"),
+    _nav("certificates", "Certificate requests", "file", "/dashboard/admin/certificates", group="Students", badge="certificates", keywords="bonafide character"),
+    _nav("warnings", "Warnings", "alert", "/dashboard/admin/warnings", group="Students", keywords="discipline"),
+    _nav("hostel", "Hostel", "hostel", "/dashboard/admin/hostel", group="Students", keywords="rooms boarders"),
+    _nav("programs", "Programs", "programs", "/dashboard/admin/programs", group="Teaching & exams", keywords="degrees"),
+    _nav("courses", "Courses", "graduation-cap", "/dashboard/admin/courses", group="Teaching & exams", mobile=True, keywords="subjects offerings sections terms sessions"),
+    _nav("timetable", "Timetable", "clock", "/dashboard/admin/timetable", group="Teaching & exams", keywords="periods rooms"),
+    _nav("smart-timetable", "Smart timetable", "grid", "/dashboard/admin/timetable/smart", group="Teaching & exams", keywords="workload free slots"),
+    _nav("attendance", "Attendance", "attendance", "/dashboard/admin/attendance", group="Teaching & exams", mobile=True, keywords="absent present"),
+    _nav("progress", "Teacher Progress", "exams", "/dashboard/admin/progress", group="Teaching & exams"),
+    _nav("feedback", "Course feedback", "check-circle", "/dashboard/admin/feedback", group="Teaching & exams"),
+    _nav("calendar", "Calendar", "clock", "/dashboard/admin/calendar", group="Teaching & exams", keywords="holidays events"),
+    _nav("results", "Result Types", "exams", "/dashboard/admin/results", group="Teaching & exams", keywords="assessment marks grading"),
+    _nav("result-sheets", "Result Approval", "tasks", "/dashboard/admin/result-sheets", group="Teaching & exams", badge="result_sheets", keywords="award list university result publish"),
+    _nav("datesheets", "Datesheets", "clock", "/dashboard/admin/datesheets", group="Teaching & exams", keywords="admit cards exam schedule"),
+    _nav("supplementary", "Supplementary Exams", "exams", "/dashboard/admin/supplementary", group="Teaching & exams", keywords="resit"),
+    _nav("fees", "Fees", "fees", "/dashboard/admin/fees", group="Fees & accounts", keywords="challan installments structures"),
+    _nav("fee-defaulters", "Fee defaulters", "fees", "/dashboard/admin/fee-defaulters", group="Fees & accounts", keywords="overdue reminders promise"),
+    _nav("fines", "Fines", "ban", "/dashboard/admin/fines", group="Fees & accounts"),
+    _nav("refunds", "Refunds", "fees", "/dashboard/admin/refunds", group="Fees & accounts"),
+    _nav("onebill", "1Bill payments", "fees", "/dashboard/admin/onebill", group="Fees & accounts", keywords="online bank"),
+    _nav("finance", "Accounts", "tasks", "/dashboard/admin/finance", group="Fees & accounts", keywords="expenses income day book"),
+    _nav("approvals", "Approvals", "check-circle", "/dashboard/admin/approvals", group="Fees & accounts", badge="approvals"),
+    _nav("employees", "Employees", "employees", "/dashboard/admin/employees", group="HR & payroll", keywords="staff teachers"),
+    _nav("payroll", "Payroll", "payroll", "/dashboard/admin/payroll", group="HR & payroll", keywords="salary payslips"),
+    _nav("staff-attendance", "Staff attendance", "clock", "/dashboard/admin/staff-attendance", group="HR & payroll", keywords="present absent staff"),
+    _nav("inventory", "Inventory / Store", "folder", "/dashboard/admin/inventory", group="Store & assets", keywords="stock purchases"),
+    _nav("assets", "Fixed assets", "folder", "/dashboard/admin/assets", group="Store & assets"),
+    _nav("overview", "Institute Overview", "dashboard", "/dashboard/admin/overview", group="Reports"),
     _nav("reports", "Reports", "exams", "/dashboard/admin/reports", group="Reports"),
     _nav("monthly", "Monthly report", "exams", "/dashboard/admin/monthly", group="Reports"),
-    _nav("finance-reports", "Finance reports", "exams", "/dashboard/admin/finance-reports", group="Finance"),
-    _nav("fee-defaulters", "Fee defaulters", "fees", "/dashboard/admin/fee-defaulters", group="Finance"),
-    _nav("onebill", "1Bill payments", "fees", "/dashboard/admin/onebill", group="Finance"),
-    _nav("payroll", "Payroll", "fees", "/dashboard/admin/payroll", group="Finance"),
-    _nav("staff-attendance", "Staff attendance", "clock", "/dashboard/admin/staff-attendance", group="Finance"),
-    _nav("fines", "Fines", "ban", "/dashboard/admin/fines", group="Finance"),
-    _nav("library", "Library", "library", "/dashboard/library", group="Library"),
+    _nav("finance-reports", "Finance reports", "exams", "/dashboard/admin/finance-reports", group="Reports", keywords="collection payables reconciliation"),
+    _nav("announcements", "Announcements", "megaphone", "/dashboard/admin/announcements", group="Communication", keywords="notices"),
+    _nav("applications", "Applications", "file", "/dashboard/admin/applications", group="Communication", keywords="requests letters"),
+    _nav("complaints", "Complaints", "ban", "/dashboard/admin/complaints", group="Communication", keywords="feedback"),
+    _nav("tasks", "Tasks", "tasks", "/dashboard/admin/tasks", group="Communication", keywords="to-do"),
+    _nav("gate", "Gate visitors", "shield", "/dashboard/admin/gate", group="Communication"),
+    _nav("library", "Library", "library", "/dashboard/library", group="Other offices", keywords="books"),
     # Every other office's panel, opened with the administrator's own login (like Library), and "view as" a person.
-    _nav("panel-accounts", "Accounts office", "fees", "/dashboard/accounts", group="Panels"),
-    _nav("panel-exam", "Exam department", "exams", "/dashboard/exam/home", group="Panels"),
-    _nav("panel-principal", "Principal", "dashboard", "/dashboard/principal", group="Panels"),
-    _nav("panel-gate", "Gate", "shield", "/dashboard/gate/home", group="Panels"),
-    _nav("panel-warden", "Hostel warden", "hostel", "/dashboard/warden/home", group="Panels"),
-    _nav("panel-staff", "General staff", "employees", "/dashboard/staff", group="Panels"),
-    _nav("view-as", "View as a person", "user", "/dashboard/admin/view-as", group="Panels"),
-    _nav("announcements", "Announcements", "megaphone", "/dashboard/admin/announcements", group="Support"),
-    _nav("top-bars", "Top bars", "megaphone", "/dashboard/admin/top-bars", group="Support"),
-    _nav("gate", "Gate visitors", "shield", "/dashboard/admin/gate", group="Support"),
-    _nav("tasks", "Tasks", "tasks", "/dashboard/admin/tasks", group="Support"),
-    _nav("applications", "Applications", "file", "/dashboard/admin/applications", group="Support"),
-    _nav("complaints", "Complaints", "ban", "/dashboard/admin/complaints", group="Support"),
-    _nav("imports", "CSV Imports", "imports", "/dashboard/admin/imports", group="System"),
-    _nav("sms", "SMS & WhatsApp", "megaphone", "/dashboard/admin/sms", group="System"),
-    _nav("activity", "Activity log", "clock", "/dashboard/admin/activity", group="System"),
-    _nav("backups", "Backups", "cloud-upload", "/dashboard/admin/backups", group="System"),
-    _nav("server-health", "Server health", "dashboard", "/dashboard/admin/server-health", group="System"),
-    _nav("settings", "Settings", "settings", "/dashboard/admin/settings", group="System"),
+    _nav("panel-accounts", "Accounts office", "fees", "/dashboard/accounts", group="Other offices"),
+    _nav("panel-exam", "Exam department", "exams", "/dashboard/exam/home", group="Other offices"),
+    _nav("panel-principal", "Principal", "dashboard", "/dashboard/principal", group="Other offices"),
+    _nav("panel-gate", "Gate", "shield", "/dashboard/gate/home", group="Other offices"),
+    _nav("panel-warden", "Hostel warden", "hostel", "/dashboard/warden/home", group="Other offices"),
+    _nav("panel-staff", "General staff", "employees", "/dashboard/staff", group="Other offices"),
+    _nav("view-as", "View as a person", "user", "/dashboard/admin/view-as", group="Other offices", keywords="impersonate"),
+    _nav("settings", "Settings", "settings", "/dashboard/admin/settings", group="System", keywords="rules policy institute profile"),
     _nav("help", "Help & manual", "file", "/dashboard/admin/help", group="System"),
+    # Rarely used setup pages: on the Settings page ("More tools") and in the menu's search, not in the list.
+    _nav("imports", "CSV Imports", "imports", "/dashboard/admin/imports", group="System", hub=True, keywords="upload excel bulk"),
+    _nav("sms", "SMS & WhatsApp", "megaphone", "/dashboard/admin/sms", group="System", hub=True, keywords="messages text"),
+    _nav("top-bars", "Top bars", "megaphone", "/dashboard/admin/top-bars", group="System", hub=True, keywords="banner notice"),
+    _nav("activity", "Activity log", "clock", "/dashboard/admin/activity", group="System", hub=True, keywords="audit who changed"),
+    _nav("backups", "Backups", "cloud-upload", "/dashboard/admin/backups", group="System", hub=True, keywords="restore"),
+    _nav("server-health", "Server health", "dashboard", "/dashboard/admin/server-health", group="System", hub=True, keywords="disk memory certificate"),
 ]
 
 # Library staff (ADMIN + LIBRARIAN). Student/teacher borrowing lives in their
@@ -313,16 +317,16 @@ GATE_NAV_ITEMS = [
     _nav("gate", "Visitors", "shield", "/dashboard/gate", mobile=True),
     _nav("log", "Visitor log book", "file", "/dashboard/gate/log", mobile=True, short="Log book"),
     _nav("staff", "Staff in / out", "clock", "/dashboard/gate/staff", mobile=True, short="Staff"),
-    _nav("announcements", "Announcements", "megaphone", "/dashboard/gate/announcements"),
-    _nav("my-announcements", "Post an announcement", "megaphone", "/dashboard/gate/my-announcements"),
-    _nav("tasks", "Tasks", "tasks", "/dashboard/gate/tasks"),
-    _nav("applications", "Applications", "file", "/dashboard/gate/applications"),
-    _nav("purchases", "Purchase requests", "tasks", "/dashboard/gate/purchases"),
-    _nav("payslips", "My pay & attendance", "file", "/dashboard/gate/payslips"),
-    _nav("calendar", "Calendar", "clock", "/dashboard/gate/calendar"),
-    _nav("profile", "My Profile", "user", "/dashboard/gate/profile"),
-    _nav("my-warnings", "My warnings", "alert", "/dashboard/gate/my-warnings"),
-    _nav("help", "Help & manual", "file", "/dashboard/gate/help"),
+    _nav("announcements", "Announcements", "megaphone", "/dashboard/gate/announcements", group="Me"),
+    _nav("my-announcements", "Post an announcement", "megaphone", "/dashboard/gate/my-announcements", group="Me"),
+    _nav("tasks", "Tasks", "tasks", "/dashboard/gate/tasks", group="Me"),
+    _nav("applications", "Applications", "file", "/dashboard/gate/applications", group="Me"),
+    _nav("purchases", "Purchase requests", "tasks", "/dashboard/gate/purchases", group="Me"),
+    _nav("payslips", "My pay & attendance", "file", "/dashboard/gate/payslips", group="Me"),
+    _nav("calendar", "Calendar", "clock", "/dashboard/gate/calendar", group="Me"),
+    _nav("profile", "My Profile", "user", "/dashboard/gate/profile", group="Me"),
+    _nav("my-warnings", "My warnings", "alert", "/dashboard/gate/my-warnings", group="Me"),
+    _nav("help", "Help & manual", "file", "/dashboard/gate/help", group="Me"),
 ]
 
 # General staff (office boy, IT, driver, cleaner...): only their own things.
@@ -386,64 +390,64 @@ HOD_NAV_ITEMS = [
 
 EXAM_NAV_ITEMS = [
     _nav("home", "Home", "dashboard", "/dashboard/exam/home", mobile=True, short="Home"),
-    _nav("results", "Result approval", "tasks", "/dashboard/exam", mobile=True, short="Results"),
-    _nav("result-types", "Result types", "exams", "/dashboard/exam/result-types"),
-    _nav("datesheets", "Datesheets & admit cards", "clock", "/dashboard/exam/datesheets"),
-    _nav("supplementary", "Supplementary exams", "exams", "/dashboard/exam/supplementary"),
-    _nav("students", "Student lookup", "students", "/dashboard/exam/students"),
-    _nav("reg-numbers", "University Reg Nos", "file", "/dashboard/exam/reg-numbers"),
-    _nav("reports", "Reports", "exams", "/dashboard/exam/reports"),
-    _nav("announcements", "Announcements", "megaphone", "/dashboard/exam/announcements", mobile=True, short="News"),
-    _nav("my-announcements", "Post an announcement", "megaphone", "/dashboard/exam/my-announcements"),
-    _nav("tasks", "Tasks", "tasks", "/dashboard/exam/tasks", mobile=True),
-    _nav("applications", "Applications", "file", "/dashboard/exam/applications"),
-    _nav("purchases", "Purchase requests", "tasks", "/dashboard/exam/purchases"),
-    _nav("payslips", "My pay & attendance", "file", "/dashboard/exam/payslips"),
-    _nav("calendar", "Calendar", "clock", "/dashboard/exam/calendar"),
-    _nav("profile", "My Profile", "user", "/dashboard/exam/profile"),
-    _nav("my-warnings", "My warnings", "alert", "/dashboard/exam/my-warnings"),
-    _nav("help", "Help & manual", "file", "/dashboard/exam/help"),
+    _nav("results", "Result approval", "tasks", "/dashboard/exam", mobile=True, short="Results", group="Exams", badge="result_sheets"),
+    _nav("result-types", "Result types", "exams", "/dashboard/exam/result-types", group="Exams"),
+    _nav("datesheets", "Datesheets & admit cards", "clock", "/dashboard/exam/datesheets", group="Exams"),
+    _nav("supplementary", "Supplementary exams", "exams", "/dashboard/exam/supplementary", group="Exams"),
+    _nav("students", "Student lookup", "students", "/dashboard/exam/students", group="Exams"),
+    _nav("reg-numbers", "University Reg Nos", "file", "/dashboard/exam/reg-numbers", group="Exams"),
+    _nav("reports", "Reports", "exams", "/dashboard/exam/reports", group="Exams"),
+    _nav("announcements", "Announcements", "megaphone", "/dashboard/exam/announcements", mobile=True, short="News", group="Me"),
+    _nav("my-announcements", "Post an announcement", "megaphone", "/dashboard/exam/my-announcements", group="Me"),
+    _nav("tasks", "Tasks", "tasks", "/dashboard/exam/tasks", mobile=True, group="Me"),
+    _nav("applications", "Applications", "file", "/dashboard/exam/applications", group="Me"),
+    _nav("purchases", "Purchase requests", "tasks", "/dashboard/exam/purchases", group="Me"),
+    _nav("payslips", "My pay & attendance", "file", "/dashboard/exam/payslips", group="Me"),
+    _nav("calendar", "Calendar", "clock", "/dashboard/exam/calendar", group="Me"),
+    _nav("profile", "My Profile", "user", "/dashboard/exam/profile", group="Me"),
+    _nav("my-warnings", "My warnings", "alert", "/dashboard/exam/my-warnings", group="Me"),
+    _nav("help", "Help & manual", "file", "/dashboard/exam/help", group="Me"),
 ]
 
 WARDEN_NAV_ITEMS = [
     _nav("home", "Home", "dashboard", "/dashboard/warden/home", mobile=True, short="Home"),
     _nav("hostel", "Hostel", "students", "/dashboard/warden/hostel", mobile=True),
     _nav("announcements", "Announcements", "megaphone", "/dashboard/warden", mobile=True, short="News"),
-    _nav("my-announcements", "Post an announcement", "megaphone", "/dashboard/warden/my-announcements"),
-    _nav("tasks", "Tasks", "tasks", "/dashboard/warden/tasks", mobile=True),
-    _nav("applications", "Applications", "file", "/dashboard/warden/applications"),
-    _nav("purchases", "Purchase requests", "tasks", "/dashboard/warden/purchases"),
-    _nav("payslips", "My pay & attendance", "file", "/dashboard/warden/payslips"),
-    _nav("calendar", "Calendar", "clock", "/dashboard/warden/calendar"),
-    _nav("profile", "My Profile", "user", "/dashboard/warden/profile"),
-    _nav("my-warnings", "My warnings", "alert", "/dashboard/warden/my-warnings"),
-    _nav("help", "Help & manual", "file", "/dashboard/warden/help"),
+    _nav("my-announcements", "Post an announcement", "megaphone", "/dashboard/warden/my-announcements", group="Me"),
+    _nav("tasks", "Tasks", "tasks", "/dashboard/warden/tasks", mobile=True, group="Me"),
+    _nav("applications", "Applications", "file", "/dashboard/warden/applications", group="Me"),
+    _nav("purchases", "Purchase requests", "tasks", "/dashboard/warden/purchases", group="Me"),
+    _nav("payslips", "My pay & attendance", "file", "/dashboard/warden/payslips", group="Me"),
+    _nav("calendar", "Calendar", "clock", "/dashboard/warden/calendar", group="Me"),
+    _nav("profile", "My Profile", "user", "/dashboard/warden/profile", group="Me"),
+    _nav("my-warnings", "My warnings", "alert", "/dashboard/warden/my-warnings", group="Me"),
+    _nav("help", "Help & manual", "file", "/dashboard/warden/help", group="Me"),
 ]
 
 ACCOUNTS_NAV_ITEMS = [
     _nav("home", "Home", "dashboard", "/dashboard/accounts", mobile=True, short="Home"),
-    _nav("announcements", "Announcements", "megaphone", "/dashboard/accounts/announcements"),
-    _nav("my-announcements", "Post an announcement", "megaphone", "/dashboard/accounts/my-announcements"),
-    _nav("fees", "Fees", "fees", "/dashboard/accounts/fees", mobile=True),
-    _nav("students", "Student lookup", "students", "/dashboard/accounts/students"),
-    _nav("finance", "Accounts", "tasks", "/dashboard/accounts/finance", mobile=True),
-    _nav("reports", "Reports", "exams", "/dashboard/accounts/reports", mobile=False),
-    _nav("finance-reports", "Finance reports", "exams", "/dashboard/accounts/finance-reports"),
-    _nav("fee-defaulters", "Fee defaulters", "fees", "/dashboard/accounts/fee-defaulters"),
-    _nav("refunds", "Refunds", "fees", "/dashboard/accounts/refunds"),
-    _nav("onebill", "1Bill payments", "fees", "/dashboard/accounts/onebill"),
-    _nav("inventory", "Inventory / Store", "tasks", "/dashboard/accounts/inventory"),
-    _nav("assets", "Fixed assets", "tasks", "/dashboard/accounts/assets"),
-    _nav("approvals", "My approval requests", "tasks", "/dashboard/accounts/approvals"),
-    _nav("payroll", "Payroll", "fees", "/dashboard/accounts/payroll"),
-    _nav("payslips", "My pay & attendance", "file", "/dashboard/accounts/payslips"),
-    _nav("fines", "Fines", "ban", "/dashboard/accounts/fines", mobile=True),
-    _nav("tasks", "Tasks", "tasks", "/dashboard/accounts/tasks"),
-    _nav("applications", "Applications", "file", "/dashboard/accounts/applications"),
-    _nav("calendar", "Calendar", "clock", "/dashboard/accounts/calendar"),
-    _nav("profile", "My Profile", "user", "/dashboard/accounts/profile"),
-    _nav("my-warnings", "My warnings", "alert", "/dashboard/accounts/my-warnings"),
-    _nav("help", "Help & manual", "file", "/dashboard/accounts/help"),
+    _nav("announcements", "Announcements", "megaphone", "/dashboard/accounts/announcements", group="Me"),
+    _nav("my-announcements", "Post an announcement", "megaphone", "/dashboard/accounts/my-announcements", group="Me"),
+    _nav("fees", "Fees", "fees", "/dashboard/accounts/fees", mobile=True, group="Fees"),
+    _nav("students", "Student lookup", "students", "/dashboard/accounts/students", group="Fees"),
+    _nav("finance", "Accounts", "tasks", "/dashboard/accounts/finance", mobile=True, group="Accounts & store"),
+    _nav("reports", "Reports", "exams", "/dashboard/accounts/reports", mobile=False, group="Reports"),
+    _nav("finance-reports", "Finance reports", "exams", "/dashboard/accounts/finance-reports", group="Reports"),
+    _nav("fee-defaulters", "Fee defaulters", "fees", "/dashboard/accounts/fee-defaulters", group="Fees"),
+    _nav("refunds", "Refunds", "fees", "/dashboard/accounts/refunds", group="Fees"),
+    _nav("onebill", "1Bill payments", "fees", "/dashboard/accounts/onebill", group="Fees"),
+    _nav("inventory", "Inventory / Store", "tasks", "/dashboard/accounts/inventory", group="Accounts & store"),
+    _nav("assets", "Fixed assets", "tasks", "/dashboard/accounts/assets", group="Accounts & store"),
+    _nav("approvals", "My approval requests", "tasks", "/dashboard/accounts/approvals", group="Accounts & store"),
+    _nav("payroll", "Payroll", "fees", "/dashboard/accounts/payroll", group="Accounts & store"),
+    _nav("payslips", "My pay & attendance", "file", "/dashboard/accounts/payslips", group="Me"),
+    _nav("fines", "Fines", "ban", "/dashboard/accounts/fines", mobile=True, group="Fees"),
+    _nav("tasks", "Tasks", "tasks", "/dashboard/accounts/tasks", group="Me"),
+    _nav("applications", "Applications", "file", "/dashboard/accounts/applications", group="Me"),
+    _nav("calendar", "Calendar", "clock", "/dashboard/accounts/calendar", group="Me"),
+    _nav("profile", "My Profile", "user", "/dashboard/accounts/profile", group="Me"),
+    _nav("my-warnings", "My warnings", "alert", "/dashboard/accounts/my-warnings", group="Me"),
+    _nav("help", "Help & manual", "file", "/dashboard/accounts/help", group="Me"),
 ]
 
 # Student self-service. Home is a real overview; Library is one service among
@@ -719,6 +723,7 @@ app.include_router(sms_router, prefix=settings.api_v1_prefix)
 app.include_router(sms_public_router)                          # /wa/d/<token>: the document sent with a WhatsApp message
 from app.reports.finance_router import router as finance_reports_router  # noqa: E402
 from app.fees.defaulters_router import router as fee_defaulters_router  # noqa: E402
+from app.core.nav_badges import router as nav_badges_router  # noqa: E402
 from app.reports.center_router import router as report_center_router  # noqa: E402
 from app.reports.monthly_router import router as monthly_report_router  # noqa: E402
 from app.discipline.router import router as discipline_router  # noqa: E402
@@ -729,6 +734,7 @@ app.include_router(discipline_router, prefix=settings.api_v1_prefix)
 
 app.include_router(finance_reports_router, prefix=settings.api_v1_prefix)
 app.include_router(fee_defaulters_router, prefix=settings.api_v1_prefix)
+app.include_router(nav_badges_router, prefix=settings.api_v1_prefix)
 from app.calendar.router import router as calendar_router  # noqa: E402
 
 app.include_router(calendar_router, prefix=settings.api_v1_prefix)

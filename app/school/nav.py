@@ -44,3 +44,17 @@ def portal_nav(items):
                 item["short"] = school_words(item["short"])
         out.append(item)
     return out
+
+
+def nav_sections(items) -> list[tuple[str | None, list[dict]]]:
+    """The menu as sections: items without a group first (Home ...), then each group in the order it first appears, with
+    its items together even when the list mixes them. Setup pages marked `hub` are kept (the menu's search finds them)."""
+    order: list[str | None] = [None]
+    by: dict[str | None, list[dict]] = {None: []}
+    for item in items:
+        g = item.get("group")
+        if g not in by:
+            by[g] = []
+            order.append(g)
+        by[g].append(item)
+    return [(g, by[g]) for g in order if by[g]]
