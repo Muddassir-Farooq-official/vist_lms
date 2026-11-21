@@ -125,6 +125,11 @@ class CourseOffering(UUIDPKMixin, TimestampMixin, Base):
     # teaches together, e.g. AHS201 for BS Anesthesia (A) and BS Dental (B). They share one timetable, one teacher,
     # one attendance list and one exam paper, while each section keeps its own students, attendance and marks.
     combined_group_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True, index=True)
+    # Smart timetable (app/timetabling): classes a week (NULL = the course's credit hours), a lab / practical taught
+    # as a double period (two back-to-back periods, in a lab room), and the room this section prefers.
+    classes_per_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    double_period: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    home_room: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # One combined syllabus document per offering (same "one supporting
     # PDF" pattern as the student/employee certificate upload) —

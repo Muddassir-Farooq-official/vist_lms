@@ -9,6 +9,16 @@
   <button class="portal-tab active" data-tab="weekly" role="tab" aria-selected="true"><span>Weekly timetable</span></button>
   <button class="portal-tab" data-tab="upcoming" role="tab" aria-selected="false"><span>Upcoming classes</span></button>
   <button class="portal-tab" data-tab="extra" role="tab" aria-selected="false"><span>Free slots &amp; extra classes</span></button>
+  <button class="portal-tab" data-tab="avail" role="tab" aria-selected="false"><span>My available times</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="avail" hidden>
+<section class="sh-card" aria-labelledby="av-h">
+  <div class="sh-card-head"><h2 id="av-h">My available times</h2></div>
+  <p class="panel-hint">When the administration makes the timetable with <em>Smart timetable</em>, you get no classes in the periods you mark here.
+    Changes count from the next time the timetable is made; your current timetable does not move.</p>
+  <div id="my-availability"><div class="skeleton-stack"><div class="skeleton-line"></div></div></div>
+</section>
 </div>
 
 <div class="portal-tab-panel" data-tab-panel="weekly">
@@ -52,4 +62,6 @@
 <script src="/static/js/weekly-timetable.js"></script>
 <script src="/static/js/faculty-timetable.js"></script>
 <script src="/static/js/class-requests.js"></script>
+<script src="/static/js/availability-grid.js"></script>
+<script src="/static/js/my-availability.js"></script>
 {% endblock %}

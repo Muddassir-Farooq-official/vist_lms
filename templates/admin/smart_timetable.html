@@ -1,0 +1,122 @@
+{% extends "admin/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block title %}Smart timetable{% endblock %}
+{% block page_title %}Smart timetable{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Make a whole term's timetable in one go: no clashes for students, teachers or rooms, teachers' unavailable times
+  and limits respected, classes spread over the week. You get a draft to check and adjust; the live timetable changes only when you press <strong>Publish</strong>.</div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="draft" role="tab" aria-selected="true"><span>Make &amp; publish</span></button>
+  <button class="portal-tab" data-tab="sections" role="tab" aria-selected="false"><span>Classes a week &amp; labs</span></button>
+  <button class="portal-tab" data-tab="teachers" role="tab" aria-selected="false"><span>Teachers' available times</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="draft">
+<section class="panel">
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("clock") }}</div><h2>1. Choose and generate</h2></div></div>
+  <p class="panel-hint">Tick the term(s) to plan together: one term like <em>Fall 2026</em>, or several batch terms that run at the same time.
+    Before the first run, check <strong>Daily periods</strong> and <strong>Rooms</strong> (Timetable page), each section's classes a week and labs (second tab),
+    and teachers' unavailable times (third tab).</p>
+  <div class="pt-terms" id="st-terms"><span class="sd-dim">Loading terms…</span></div>
+  <div class="stt-opts">
+    <div class="pc-days" id="st-days" aria-label="Days">
+      <label><input type="checkbox" value="MONDAY" checked /> Mon</label><label><input type="checkbox" value="TUESDAY" checked /> Tue</label>
+      <label><input type="checkbox" value="WEDNESDAY" checked /> Wed</label><label><input type="checkbox" value="THURSDAY" checked /> Thu</label>
+      <label><input type="checkbox" value="FRIDAY" checked /> Fri</label><label><input type="checkbox" value="SATURDAY" /> Sat</label>
+      <label><input type="checkbox" value="SUNDAY" /> Sun</label>
+    </div>
+    <label>Teacher: at most<input type="number" id="st-maxday" class="text-input stt-num" min="1" max="12" value="5" /> classes a day</label>
+    <label>and at most<input type="number" id="st-maxrow" class="text-input stt-num" min="1" max="12" value="3" /> periods in a row</label>
+  </div>
+  <div class="att-go stt-actions">
+    <button type="button" class="role-btn" id="st-generate">Generate draft</button>
+    <span class="sd-dim" id="st-gen-note">Takes up to about 20 seconds.</span>
+  </div>
+  <p id="st-error" class="dash-alert error" role="alert" hidden></p>
+</section>
+
+<section class="panel" id="st-draft" hidden>
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("clock") }}</div><h2 id="st-draft-title">2. Check the draft</h2></div></div>
+  <div id="st-summary" class="pt-summary"></div>
+  <div id="st-problems"></div>
+  <div class="stt-viewbar">
+    <label>Show<select id="st-view-kind" class="select-input"><option value="class">a class (students)</option><option value="teacher">a teacher</option><option value="room">a room</option></select></label>
+    <label><select id="st-view-of" class="select-input" aria-label="Which"></select></label>
+    <span class="sd-dim">Click a class to move it or take it out. A class you place or move yourself is <span class="stt-pin-key">pinned</span>: it stays when you generate again.</span>
+  </div>
+  <div class="pt-wrap"><table class="dash-table pt-grid stt-grid no-stack" id="stt-grid"></table></div>
+  <div class="att-go stt-actions" id="st-draft-actions">
+    <button type="button" class="role-btn" id="st-regenerate">Generate again (keep pinned)</button>
+    <button type="button" class="role-btn" id="st-publish">Publish…</button>
+    <button type="button" class="role-btn secondary-btn" id="st-discard">Discard draft</button>
+  </div>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="sections" hidden>
+<section class="panel">
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("dashboard") }}</div><h2>Classes a week &amp; labs</h2></div></div>
+  <p class="panel-hint">Classes a week start at the course's credit hours; change them where needed. Tick <strong>Lab (double)</strong> for a lab or practical:
+    each class is two back-to-back periods in a lab room. The <strong>home room</strong> is used when it is free. A combined class keeps the same settings in all its sections.
+    Changes are saved straight away.</p>
+  <div class="pt-terms" id="ss-terms"><span class="sd-dim">Loading terms…</span></div>
+  <div class="stt-actions"><button type="button" class="role-btn" id="ss-show">Show sections</button></div>
+  <p id="ss-error" class="dash-alert error" role="alert" hidden></p>
+  <table class="dash-table" id="ss-table" hidden>
+    <thead><tr><th>Course</th><th>Section</th><th>Term</th><th class="num">Credit hrs</th><th>Classes a week</th><th>Lab (double)</th><th>Home room</th><th></th></tr></thead>
+    <tbody id="ss-tbody"></tbody>
+  </table>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="teachers" hidden>
+<section class="panel">
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("employees") }}</div><h2>Teachers' available times</h2></div></div>
+  <p class="panel-hint">Mark the periods a teacher cannot teach (visiting faculty, other duties) and, if needed, their own limits. Teachers can also mark their
+    own times under <em>My Timetable</em>; tick <strong>Fixed by the administration</strong> to stop a teacher changing them.</p>
+  <table class="dash-table" id="tt-teachers">
+    <thead><tr><th>Teacher</th><th>Department</th><th class="num">Unavailable periods</th><th>Limits</th><th></th></tr></thead>
+    <tbody id="tt-teachers-tbody"></tbody>
+  </table>
+  <div id="tt-editor" class="stt-editor" hidden></div>
+</section>
+</div>
+
+<dialog id="st-move" class="modal" aria-labelledby="st-move-title">
+  <form class="modal-body" id="st-move-form">
+    <h2 id="st-move-title">Move class</h2>
+    <p class="cc-meta" id="st-move-what"></p>
+    <div class="form-field"><label for="st-move-day">Day</label><select id="st-move-day" class="select-input"></select></div>
+    <div class="form-field"><label for="st-move-period">Period</label><select id="st-move-period" class="select-input"></select></div>
+    <div class="form-field"><label for="st-move-room">Room</label><select id="st-move-room" class="select-input"></select></div>
+    <p class="dash-alert error" id="st-move-err" role="alert" hidden></p>
+    <div class="form-actions">
+      <button type="submit" class="role-btn" id="st-move-ok">Move</button>
+      <button type="button" class="role-btn secondary-btn" id="st-move-remove">Take out of the draft</button>
+    </div>
+    <button type="button" class="back-link modal-close-btn" id="st-move-cancel">Cancel</button>
+  </form>
+</dialog>
+
+<dialog id="st-pub" class="modal" aria-labelledby="st-pub-title">
+  <form class="modal-body" id="st-pub-form">
+    <h2 id="st-pub-title">Publish the timetable</h2>
+    <div class="form-field"><label for="st-pub-date">The new timetable starts on</label><input type="date" id="st-pub-date" class="text-input" required /></div>
+    <div id="st-pub-preview" class="cc-meta">Checking…</div>
+    <fieldset class="stt-notify"><legend>Tell</legend>
+      <label><input type="checkbox" value="teachers" checked /> Teachers</label>
+      <label><input type="checkbox" value="students" checked /> Students</label>
+      <label><input type="checkbox" value="parents" checked /> Parents</label>
+    </fieldset>
+    <p class="dash-alert error" id="st-pub-err" role="alert" hidden></p>
+    <div class="form-actions"><button type="submit" class="role-btn" id="st-pub-ok">Publish</button></div>
+    <button type="button" class="back-link modal-close-btn" id="st-pub-cancel">Cancel</button>
+  </form>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/availability-grid.js"></script>
+<script src="/static/js/smart-timetable.js"></script>
+{% endblock %}
