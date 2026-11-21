@@ -10,7 +10,7 @@ pytestmark = pytest.mark.asyncio
 
 async def test_the_admin_has_a_result_approval_page_with_four_lists(app_client):
     entry = next(i for i in ADMIN_NAV_ITEMS if i["slug"] == "result-sheets")
-    assert entry["href"] == "/dashboard/admin/result-sheets" and entry["group"] == "Academics"
+    assert entry["href"] == "/dashboard/admin/result-sheets" and entry["group"] == "Teaching & exams"
     html = (await app_client.get(entry["href"])).text
     for tab in ("SUBMITTED", "APPROVED", "PUBLISHED", "RETURNED"):
         assert f'data-tab="{tab}"' in html, tab
