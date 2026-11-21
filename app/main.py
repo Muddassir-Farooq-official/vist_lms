@@ -72,6 +72,7 @@ from app.fees.router import structures_router as fee_structures_router, types_ro
 from app.fines.router import router as fines_router
 from app.imports.router import router as imports_router
 from app.backups.router import router as backups_router
+from app.serverhealth.router import router as server_health_router
 from app.library.dashboard_router import router as library_dashboard_router
 from app.library.eresources_router import router as library_eresources_router
 from app.library.issue_router import router as library_issue_router
@@ -278,6 +279,7 @@ ADMIN_NAV_ITEMS = [
     _nav("sms", "SMS & WhatsApp", "megaphone", "/dashboard/admin/sms", group="System"),
     _nav("activity", "Activity log", "clock", "/dashboard/admin/activity", group="System"),
     _nav("backups", "Backups", "cloud-upload", "/dashboard/admin/backups", group="System"),
+    _nav("server-health", "Server health", "dashboard", "/dashboard/admin/server-health", group="System"),
     _nav("settings", "Settings", "settings", "/dashboard/admin/settings", group="System"),
     _nav("help", "Help & manual", "file", "/dashboard/admin/help", group="System"),
 ]
@@ -774,6 +776,7 @@ app.include_router(reference_data_router, prefix=settings.api_v1_prefix)
 app.include_router(notifications_router, prefix=settings.api_v1_prefix)
 app.include_router(imports_router, prefix=settings.api_v1_prefix)
 app.include_router(backups_router, prefix=settings.api_v1_prefix)
+app.include_router(server_health_router, prefix=settings.api_v1_prefix)
 app.include_router(reports_router, prefix=settings.api_v1_prefix)
 app.include_router(employees_router, prefix=settings.api_v1_prefix)
 app.include_router(job_roles_router, prefix=settings.api_v1_prefix)
@@ -1174,6 +1177,11 @@ async def admin_offering_detail_page(request: Request, offering_id: str):
         request, "admin/offering_detail.html",
         {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "courses", "offering_id": offering_id},
     )
+
+
+@app.get("/dashboard/admin/server-health", include_in_schema=False)
+async def admin_server_health_page(request: Request):
+    return templates.TemplateResponse(request, "admin/server_health.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "server-health"})
 
 
 @app.get("/dashboard/admin/backups", include_in_schema=False)

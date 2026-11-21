@@ -1,5 +1,23 @@
 [
   {
+    "version": "1.41.0",
+    "date": "2026-11-21",
+    "title": "Server health",
+    "summary": "See the server's disk, memory and load and each site's status, certificate, version and backups, and get warned before a problem becomes an outage.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "System → Server health: disk, memory, load, uptime; the site, its database, version and deploy time, HTTPS certificate expiry, uploaded files size and last backup (the owner institute sees every institute)."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "A Server problem notification when the disk is over 85%, a certificate expires within 14 days, a site or database is down, memory or load stays high for 10 minutes, or the server stops reporting."
+      }
+    ]
+  },
+  {
     "version": "1.40.0",
     "date": "2026-11-21",
     "title": "One datesheet for a whole session, and the session report",

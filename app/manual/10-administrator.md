@@ -163,6 +163,7 @@ Open another office's portal with your administrator rights: **Accounts office**
 - **SMS & WhatsApp**: messages to students and guardians. Turn each kind on or off in Settings → SMS messages.
 - **Activity log**: everything done in the system: who, what, when and from where.
 - **Backups**: see the backups and download a complete copy. See *Backups* below.
+- **Server health**: the server's disk, memory and load, and whether the site, its database, its HTTPS certificate and its backups are fine. See *Server health* below.
 - **Settings**: institute details, look, rules and your own account.
 
 ### Backups
@@ -182,3 +183,9 @@ The buttons ask the server to do something; it starts within a minute:
 - **Download all uploaded files (ZIP)**: every photo, document and receipt. It can be large.
 
 A download needs your password again (and the 6-digit code if two-step sign-in is on). When it is ready a **Download** button appears; only you can use it, and the file is deleted from the server after **1 hour**. The other administrators are told when a download is asked for and when it is downloaded, and both are in the activity log. A downloaded copy holds everyone's data: keep it somewhere safe and delete it when you no longer need it.
+
+### Server health
+
+**Server health** shows what the server reported in the last minute: how full its **disk** is, its **memory** and **load**, how long it has been running, and for the institute its site (up, database, how fast it answers), the **version** running and when it was deployed, when its **HTTPS certificate** expires, the size of its uploaded files and its **last backup**. Several institutes can share one server: each institute's administrators see the shared server and their own institute; the server's owner sees every institute.
+
+Every administrator gets a **Server problem** notification (once a day while it lasts, and straight away when it changes) when: the disk is more than 85% full; a certificate expires within 14 days; a site or its database does not answer; memory is above 90% or the server is overloaded for 10 minutes or more; or the server stops reporting for 10 minutes. Certificates renew by themselves; a warning means the renewal is not working and whoever looks after the server should check it.
