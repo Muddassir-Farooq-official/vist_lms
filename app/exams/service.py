@@ -385,7 +385,8 @@ class ExamScheduleService:
         return ok, reason, pct["percentage"]
 
     async def withheld(self, student_id: uuid.UUID) -> list[str]:
-        """Why the whole admit card is held: an unpaid attendance fine, or (by policy) overdue fees."""
+        """Why the whole admit card is held: an unpaid attendance fine, (by policy) overdue fees, or a missing university Reg No
+        after the batch's deadline (affiliated programs; the administration can exempt one student)."""
         from app.attendance.holds import unpaid_attendance_fines
         from app.fees.assignment_service import FeeStatusCalculator, late_pause, late_rate
         from app.fees.models import AssignmentStatus, FeeAssignment, FeeStructure, PayerType
@@ -409,6 +410,11 @@ class ExamScheduleService:
                         overdue += row["remaining"]
             if overdue > 0.005:
                 withheld.append(f"overdue fees of Rs. {overdue:,.0f}")
+        from app.students.regdeadline import regno_hold
+
+        reg = await regno_hold(self.session, student_id)
+        if reg:
+            withheld.append(reg)
         return withheld
 
     async def admit_card(self, schedule_id: uuid.UUID, student_id: uuid.UUID) -> dict:

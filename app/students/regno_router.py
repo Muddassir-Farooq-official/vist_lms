@@ -4,12 +4,15 @@
   * /students/reg-numbers            the class list with each student's Reg No, to fill in or correct (admin + exam office)
   * /students/reg-numbers/import     a CSV of roll_number, reg_number (all-or-nothing; dry_run only checks)
   * /students/{id}/reg-number        set or clear one student's Reg No
+  * /students/reg-numbers/deadlines  each batch term's last day for Reg Nos (app/students/regdeadline.py)
+  * /students/reg-numbers/exemptions students whose admit card may be printed although their Reg No is missing
 """
 from __future__ import annotations
 
 import csv
 import io
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends, UploadFile
 from fastapi.responses import Response
@@ -90,6 +93,56 @@ async def list_reg_numbers(
     programs = await _programs(db)
     return {"students": [_row(s, programs) for s in rows], "missing": sum(1 for s in rows if not s.reg_number), "truncated": len(rows) == 1000,
             "programs": [{"id": p.id, "code": p.code, "name": p.name} for p in sorted(programs.values(), key=lambda p: p.code)]}
+
+
+class DeadlineUpdate(BaseModel):
+    term_id: uuid.UUID | None = None
+    session_id: uuid.UUID | None = Field(default=None, description="every open term of an affiliated program in this session")
+    reg_deadline: date | None = Field(default=None, description="None clears it")
+
+
+class ExemptionCreate(BaseModel):
+    student_id: uuid.UUID
+    reason: str = Field(min_length=3, max_length=500)
+    until: date | None = Field(default=None, description="last day it applies; empty = until revoked")
+
+
+@router.get("/reg-numbers/deadlines", summary="Each open batch term's Reg No deadline and how many students still have none (admin, exam office)")
+async def reg_deadlines(current_user: CurrentUser = Depends(regno_access), db=Depends(get_db)) -> dict:
+    from app.students.regdeadline import overview
+
+    return await overview(db)
+
+
+@router.put("/reg-numbers/deadlines", summary="Set or clear the Reg No deadline of one batch term or of a whole session (admin, exam office)")
+async def put_reg_deadline(payload: DeadlineUpdate, current_user: CurrentUser = Depends(regno_access), db=Depends(get_db)) -> dict:
+    from app.students.regdeadline import set_deadline
+
+    return await set_deadline(db, term_id=payload.term_id, session_id=payload.session_id, deadline=payload.reg_deadline, actor_id=current_user.id)
+
+
+@router.get("/reg-numbers/exemptions", summary="Students whose admit card is printed although their Reg No is missing (admin, exam office)")
+async def reg_exemptions(include_old: bool = False, current_user: CurrentUser = Depends(regno_access), db=Depends(get_db)) -> list[dict]:
+    from app.students.regdeadline import list_exemptions
+
+    return await list_exemptions(db, "REG_NO", include_old=include_old)
+
+
+@router.post("/reg-numbers/exemptions", status_code=201, summary="Exempt one student from the Reg No admit-card hold, with a reason (admin, exam office)")
+async def add_reg_exemption(payload: ExemptionCreate, current_user: CurrentUser = Depends(regno_access), db=Depends(get_db)) -> dict:
+    from app.students.regdeadline import add_exemption, exemption_dict
+
+    row = await add_exemption(db, student_id=payload.student_id, kind="REG_NO", reason=payload.reason, until=payload.until, actor_id=current_user.id)
+    s = await db.get(Student, row.student_id)
+    return {**exemption_dict(row, s), "active": True}
+
+
+@router.post("/reg-numbers/exemptions/{exemption_id}/revoke", summary="Revoke a Reg No exemption: the hold applies again (kept on record)")
+async def revoke_reg_exemption(exemption_id: uuid.UUID, current_user: CurrentUser = Depends(regno_access), db=Depends(get_db)) -> dict:
+    from app.students.regdeadline import exemption_dict, revoke_exemption
+
+    row = await revoke_exemption(db, exemption_id, actor_id=current_user.id, kind="REG_NO")
+    return {**exemption_dict(row), "active": False}
 
 
 @router.put("/{student_id}/reg-number", summary="Set or clear one student's university Reg No (admin, exam office)")

@@ -2,6 +2,22 @@
   "use strict";
 
   const VA = window.VistAdmin;
+  function regWarn(id) {          // students without a university Reg No (affiliated programs)
+    const el = document.getElementById("rs-regwarn");
+    if (!el) return;
+    el.hidden = true;
+    if (!id) return;
+    VA.fetchJson("/api/v1/results/sheets/" + id + "/reg-check").then(function (r) {
+      if (!r.ok || !r.body.affiliated || !r.body.missing) return;
+      el.textContent = regText(r.body);
+      el.hidden = false;
+    });
+  }
+  function regText(d) {
+    const names = d.students.slice(0, 8).map(function (s) { return s.roll_number || s.name; }).join(", ") + (d.missing > 8 ? " \u2026" : "");
+    const dl = d.reg_deadline ? " The last day to give it is " + new Date(d.reg_deadline + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) + "." : "";
+    return d.missing + " student(s) have no university Reg No yet (" + names + "). The internal award list shows them in red; the university may not accept their marks." + dl;
+  }
   const esc = VA.escapeHtml;
   const API = "/api/v1/results";
   const $ = function (id) { return document.getElementById(id); };
@@ -119,6 +135,7 @@
         bar.appendChild(a);
       });
     }
+    regWarn(aff ? d.course_offering_id : null);
     showError("");
   }
 

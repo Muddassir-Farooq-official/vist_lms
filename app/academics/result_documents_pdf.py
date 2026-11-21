@@ -159,7 +159,9 @@ def render_internal_award_list(data: dict) -> bytes:
         notes.append("No assessment yet for: " + ", ".join(data["missing_parts"]) + " (counted as 0).")
     no_reg = sum(1 for r in data["rows"] if not r.get("reg_number"))
     if no_reg:
-        notes.append(f"{no_reg} student(s) have no Reg No yet (in red).")
+        dl = data.get("reg_deadline")
+        notes.append(f"{no_reg} student(s) have no Reg No yet (in red)" + (f"; the last day to give it is {dl:%d %b %Y}." if dl else ".")
+                     + " The university may not accept marks without a Reg No.")
     story += [Spacer(1, 5), Paragraph(" ".join(notes) or "&nbsp;", SMALL), Spacer(1, 12),
               _signatures(width, ["Subject teacher", "Head of department", "Principal"])]
     doc.build(story, onFirstPage=_footer(stamp), onLaterPages=_footer(stamp))

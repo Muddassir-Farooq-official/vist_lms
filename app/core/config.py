@@ -278,6 +278,7 @@ class Settings(BaseSettings):
     monthly_report_notice: int = 1          # the 1st of each month: tell the principal last month's report is ready
     sms_on_school_absence: int = 1           # School mode: a child marked absent or late in the morning roll call (to the guardian)
     sms_on_homework: int = 1                 # School mode: the evening homework message (to the guardian)
+    sms_on_reg_no_reminder: int = 1          # a student's university Reg No is missing before the batch's deadline (to the student)
     sms_on_ptm: int = 1                      # School mode: a parent-teacher meeting day is set (to the guardian)
     school_weight_first_term: float = 20         # School mode: share of the 1st Term exam in the year's result (%)
     school_weight_mid_term: float = 30           # ... of the Mid-Term

@@ -108,3 +108,20 @@ class ExamCase(Base):
     decision: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     decided_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AdmitCardExemption(Base):
+    """Lets one student's admit card be printed although a hold applies (REG_NO: no university Reg No after the deadline;
+    FEES: overdue fees). Given by the administration with a reason, optionally until a date. Never deleted: revoking keeps
+    the row, so who allowed what and when stays on record."""
+    __tablename__ = "admit_card_exemptions"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    student_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind: Mapped[str] = mapped_column(String(10), nullable=False)             # REG_NO | FEES
+    reason: Mapped[str] = mapped_column(String(500), nullable=False)
+    until: Mapped[date | None] = mapped_column(Date, nullable=True)            # last day it applies; None = until revoked
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    revoked_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

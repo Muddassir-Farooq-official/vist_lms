@@ -275,6 +275,19 @@ async def internal_award_list(offering_id: uuid.UUID, fmt: str, current_user: Cu
     return _pdf_response(pdf, f"{name}.pdf")
 
 
+@router.get("/sheets/{offering_id}/reg-check", summary="Students of this subject without a university Reg No (for the internal award list)")
+async def internal_award_reg_check(offering_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    from app.academics.models import CourseOffering
+    from app.students.regdeadline import reg_check
+
+    offering = await db.get(CourseOffering, offering_id)
+    if offering is None:
+        raise ResourceNotFoundError("Course offering not found.")
+    if not await _can_manage_marks_for_offering(db, offering, current_user):
+        raise AuthorizationError("Only the subject's teacher or the exam office can see this.")
+    return await reg_check(db, offering_id)
+
+
 @router.get("/university/template.csv", summary="CSV template for the university's result (Reg No, course code, marks and/or grade)")
 async def university_template(current_user: CurrentUser = Depends(approver)) -> Response:
     from app.academics.affiliation import template_csv
