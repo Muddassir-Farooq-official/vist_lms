@@ -205,6 +205,10 @@ POLICY: tuple[Policy, ...] = (
     Policy("amount_display", "Amounts on dashboard cards", "Display", int, 0, 2,
            "Full (Rs. 4,045,000), K / M (Rs. 4.05M) or lakh / crore (Rs. 40.45 lakh). Only the summary cards change; tables, receipts, "
            "challans, reports and downloads always show the full amount. Hover or tap a card to see the exact figure."),
+    Policy("teacher_load_min_credit_hours", "Teacher load: at least (credit hours a week)", "Teaching load", int, 0, 60,
+           "A teacher below this is shown as under-loaded on Smart timetable -> Teacher workload. Each teacher can have their own range."),
+    Policy("teacher_load_max_credit_hours", "Teacher load: at most (credit hours a week)", "Teaching load", int, 1, 60,
+           "Giving a teacher a section that takes them above this is refused, unless an administrator gives a reason (kept in the activity log)."),
     Policy("graduation_min_cgpa", "Lowest CGPA that can graduate", "Exams", float, 0, 4,
            "The degree audit asks for every curriculum course passed and at least this CGPA before a student is marked graduated."),
 )
@@ -255,6 +259,9 @@ def _check_consistency(values: dict) -> None:
     if not (drop < fine <= elig):
         raise ValidationAppError(
             f"Attendance thresholds must satisfy drop ({drop:g}%) < fine ({fine:g}%) <= minimum to pass ({elig:g}%).")
+    lo, hi = values.get("teacher_load_min_credit_hours", 0), values.get("teacher_load_max_credit_hours", 60)
+    if lo > hi:
+        raise ValidationAppError(f"Teacher load: the least ({lo:g}) cannot be more than the most ({hi:g}) credit hours.")
     b1, b2, b3 = values["attendance_band1_from"], values["attendance_band2_from"], values["attendance_band3_from"]
     if not (b3 < b2 < b1 < elig):
         raise ValidationAppError(

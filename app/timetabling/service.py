@@ -519,32 +519,33 @@ class SmartTimetableService:
                     .scalars())
         created = 0
         with quiet():                                         # one message per person at the end, not one per class
-            for s in live:
-                o = offerings.get(s.course_offering_id)
-                if o is not None and o in ending:
-                    continue
-                await self._retire(s, from_date)
-            await self.session.flush()
-            self.tt._day_memo.clear()
-            for r in sorted(rows, key=lambda x: (WEEK.index(x.day), periods[x.period_id].start_time if x.period_id in periods else 0)):
-                o = offerings.get(r.course_offering_id)
-                if o is None or o in ending:
-                    continue
-                day_list = per_day.get(r.day, [])
-                idx = next((n for n, p in enumerate(day_list) if p.id == r.period_id), None)
-                if idx is None or idx + r.span > len(day_list):
-                    raise BusinessRuleViolationError("A period used in the draft was changed or removed since. Generate the draft again. Nothing was changed.")
-                c = courses.get(o.course_id)
-                for p in day_list[idx: idx + r.span]:
-                    try:
-                        async with self.session.begin_nested():
-                            _slot, n = await self.tt.create_slot(course_offering_id=o.id, period_id=p.id, day_of_week=DayOfWeek(r.day), room=r.room,
-                                                                 actor_id=actor_id, starts_from=max(from_date, o.term_start_date or from_date), mirror=True)
-                    except BusinessRuleViolationError as e:
-                        raise BusinessRuleViolationError(
-                            f"{c.code if c else '?'} {o.section_label}, {r.day.title()} {hm12(p.start_time)}: {e.message} "
-                            "Something changed since the draft was made. Generate it again. Nothing was changed.") from None
-                    created += n
+            async with self.session.begin_nested():           # all or nothing, even inside a larger transaction
+                for s in live:
+                    o = offerings.get(s.course_offering_id)
+                    if o is not None and o in ending:
+                        continue
+                    await self._retire(s, from_date)
+                await self.session.flush()
+                self.tt._day_memo.clear()
+                for r in sorted(rows, key=lambda x: (WEEK.index(x.day), periods[x.period_id].start_time if x.period_id in periods else 0)):
+                    o = offerings.get(r.course_offering_id)
+                    if o is None or o in ending:
+                        continue
+                    day_list = per_day.get(r.day, [])
+                    idx = next((n for n, p in enumerate(day_list) if p.id == r.period_id), None)
+                    if idx is None or idx + r.span > len(day_list):
+                        raise BusinessRuleViolationError("A period used in the draft was changed or removed since. Generate the draft again. Nothing was changed.")
+                    c = courses.get(o.course_id)
+                    for p in day_list[idx: idx + r.span]:
+                        try:
+                            async with self.session.begin_nested():
+                                _slot, n = await self.tt.create_slot(course_offering_id=o.id, period_id=p.id, day_of_week=DayOfWeek(r.day), room=r.room,
+                                                                     actor_id=actor_id, starts_from=max(from_date, o.term_start_date or from_date), mirror=True)
+                        except BusinessRuleViolationError as e:
+                            raise BusinessRuleViolationError(
+                                f"{c.code if c else '?'} {o.section_label}, {r.day.title()} {hm12(p.start_time)}: {e.message} "
+                                "Something changed since the draft was made. Generate it again. Nothing was changed.") from None
+                        created += n
         draft.status = "PUBLISHED"
         draft.published_at = datetime.now(timezone.utc)
         draft.published_from = from_date

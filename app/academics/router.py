@@ -560,7 +560,7 @@ async def create_offering(
         assigned_teacher_id=payload.assigned_teacher_id,
         term_start_date=payload.term_start_date, term_end_date=payload.term_end_date,
         section_label=payload.section_label, capacity=payload.capacity,
-        actor_id=current_user.id,
+        actor_id=current_user.id, load_override_reason=payload.load_override_reason,
     )
     return await _to_offering_out(db, offering)
 
@@ -914,6 +914,8 @@ async def update_offering(
         kwargs["capacity"] = payload.capacity
     if payload.section_label is not None:
         kwargs["section_label"] = payload.section_label
+    if payload.load_override_reason:
+        kwargs["load_override_reason"] = payload.load_override_reason
     offering = await CourseOfferingService(db).update(offering_id, **kwargs)
     return await _to_offering_out(db, offering)
 
@@ -1115,6 +1117,7 @@ async def combined_view(offering_id: uuid.UUID, current_user: CurrentUser = Depe
 class CombineRequest(BaseModel):
     offering_ids: list[uuid.UUID] = Field(min_length=1, max_length=20)
     teacher_id: uuid.UUID | None = None
+    load_override_reason: str | None = Field(default=None, max_length=300)
 
 
 @router.post("/offerings/{offering_id}/combine", summary="Combine this section with other sections of the same course (one teacher, one time, one room)")
@@ -1122,7 +1125,8 @@ async def combine_sections(offering_id: uuid.UUID, payload: CombineRequest,
                            current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_OFFERING_MANAGE)), db=Depends(get_db)) -> dict:
     from app.academics.combined import CombinedClassService
 
-    return await CombinedClassService(db).combine(offering_id, payload.offering_ids, teacher_id=payload.teacher_id, actor_id=current_user.id)
+    return await CombinedClassService(db).combine(offering_id, payload.offering_ids, teacher_id=payload.teacher_id, actor_id=current_user.id,
+                                                  load_override_reason=payload.load_override_reason)
 
 
 @router.post("/offerings/{offering_id}/separate", summary="Take this section out of its combined class (it keeps its timetable)")

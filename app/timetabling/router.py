@@ -207,3 +207,63 @@ async def set_my_availability(payload: AvailabilityIn, current_user: CurrentUser
     me = await _me(db, current_user)
     return await AvailabilityService(db).set(me.id, blocked=payload.blocked, max_per_day=payload.max_per_day, max_in_row=payload.max_in_row,
                                              note=payload.note, actor_id=current_user.id, by_admin=False)
+
+
+# ------------------------------------------------------------------ teacher workload and free times (app/timetabling/workload.py)
+class RangeIn(BaseModel):
+    load_min: int | None = Field(default=None, ge=0, le=60)
+    load_max: int | None = Field(default=None, ge=0, le=60)
+
+
+class AssignItem(BaseModel):
+    offering_id: uuid.UUID
+    teacher_id: uuid.UUID
+
+
+class AssignIn(BaseModel):
+    items: list[AssignItem] = Field(min_length=1, max_length=300)
+
+
+@router.get("/workload", summary="Each teacher's load (credit hours a week) at the time of the chosen terms, against their range")
+async def workload(terms: str = Query(...), current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    from app.timetabling.workload import WorkloadService
+
+    return await WorkloadService(db).report(_terms(terms))
+
+
+@router.put("/workload/teachers/{employee_id}/range", summary="A teacher's own load range (empty = the institute's)")
+async def set_range(employee_id: uuid.UUID, payload: RangeIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    from app.timetabling.workload import WorkloadService
+
+    _no_view_as(current_user)
+    return await WorkloadService(db).set_range(employee_id, load_min=payload.load_min, load_max=payload.load_max, actor_id=current_user.id)
+
+
+@router.get("/workload/candidates/{offering_id}", summary="Teachers for a section, best first, with their load before and after")
+async def candidates(offering_id: uuid.UUID, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    from app.timetabling.workload import WorkloadService
+
+    return await WorkloadService(db).candidates(offering_id)
+
+
+@router.get("/workload/proposals", summary="Proposed teachers for every section without one, keeping everyone within their range")
+async def proposals(terms: str = Query(...), current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    from app.timetabling.workload import WorkloadService
+
+    return await WorkloadService(db).propose(_terms(terms))
+
+
+@router.post("/workload/assign", summary="Assign the chosen teachers (all or nothing, every normal check)")
+async def assign(payload: AssignIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    from app.timetabling.workload import WorkloadService
+
+    _no_view_as(current_user)
+    n = await WorkloadService(db).apply([(i.offering_id, i.teacher_id) for i in payload.items], actor_id=current_user.id)
+    return {"assigned": n}
+
+
+@router.get("/free", summary="What is free when: rooms and teachers per day and period, and each class's busy periods")
+async def free(terms: str = Query(...), days: str | None = Query(default=None), current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    from app.timetabling.workload import WorkloadService
+
+    return await WorkloadService(db).free_map(_terms(terms), [_day(d) for d in days.split(",")] if days else None)
