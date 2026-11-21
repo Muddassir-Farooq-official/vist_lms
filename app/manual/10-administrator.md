@@ -95,6 +95,19 @@ If free periods remain after that, those students have fewer weekly class hours 
 **Publish**
 Press **Publish…**, choose the date the new timetable starts (next Monday by default) and whom to tell: teachers, students and parents (untick to stay silent). You see what will happen before anything changes. From that date the draft replaces the timetable of its courses. Classes before that date, and every attendance mark, stay exactly as they are; upcoming classes that already have a topic or files are kept as cancelled, not deleted. Publishing is all or nothing: if something changed since the draft was made (e.g. a room was booked meanwhile), nothing changes and you are asked to generate again.
 
+### Teacher workload and what is free
+
+**Teacher workload** (a tab on Smart timetable): tick the term(s) and press **Show workload**. For every teacher you see the credit hours a week they teach while those terms run (every section whose term dates overlap counts, so batch terms running together add up; a combined class counts once), their periods a week on the timetable, and whether they are **Over**, **OK** or **Under** their range.
+
+- The range is 12 to 18 credit hours a week by default: change it under Settings → **Teaching load**. A teacher can have their own range (e.g. a head of department 6–9, a visiting teacher 3–6): type it in their row; leave it empty for the institute's.
+- Giving a teacher a section that takes them **above their most** is refused, both when you create the section and when you change its teacher. If it really must happen, type a reason and press **Allow and save**; the reason is kept in the activity log. Being under the least is only shown, never blocked.
+- When you choose a teacher for a section, the list shows the **suggested** teachers first: those who taught the course before or teach in its program, those under their least, then the least busy. Each shows their credit hours now → with this section, and their most. Teachers who would go over, or who are busy (or unavailable) at the section's times, are greyed.
+- **Propose teachers for them…** suggests a teacher for every section without one, keeping everyone within their most and free at the section's times. Untick any you don't want and press **Assign the ticked teachers** (all or nothing).
+
+**What is free** (a tab on Smart timetable): tick the term(s) and press **Show**. Each period shows how many rooms and teachers are free. Click it to see which rooms (with seats) and which teachers (least busy first; teachers who marked that period unavailable are left out) are free, e.g. to find a cover teacher or a room for an extra class. Choose **a class's free periods** to see one class's free periods in the week.
+
+Not used in School mode: a school's subjects are not counted in credit hours.
+
 ### Make-up and extra classes
 
 Teachers book make-up classes (for a missed class) and extra classes (for a course that is behind) in free periods. Each request arrives in **Approvals**. Approving checks the slot again, adds the class to the timetable and attendance, marks the missed class "made up" and tells the students and the teacher. A booking is refused if the teacher is on approved leave that day.

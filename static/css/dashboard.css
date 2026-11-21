@@ -4155,3 +4155,16 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 .av-day { display: inline-flex; gap: 4px; align-items: center; }
 .av-limits { margin-top: 12px; }
 .av-note input { min-width: 260px; }
+/* Teacher workload (teacher-workload.js, teacher-picker.js) */
+.wl-bar { position: relative; height: 8px; background: var(--surface-2, #eef1f7); border-radius: 4px; margin-top: 5px; min-width: 140px; }
+.wl-bar span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
+.wl-bar i { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text-secondary, #64748b); }
+.wl-ok { background: #16a34a; } .wl-under { background: #d97706; } .wl-over { background: #dc2626; }
+.wl-under-t { color: #b45309; font-weight: 600; }
+#wl-table td small { display: block; color: var(--text-secondary, #475569); }
+.tp-sugg { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 10px; max-height: 260px; overflow-y: auto; }
+.tp-sugg button { display: flex; justify-content: space-between; gap: 10px; text-align: left; border: 1px solid var(--border, #dde3ee); background: var(--surface, #fff);
+  border-radius: 8px; padding: 6px 9px; font: inherit; font-size: .84rem; cursor: pointer; color: inherit; }
+.tp-sugg button:hover { border-color: var(--primary, #2457c5); }
+.tp-sugg button.tp-bad { opacity: .65; }
+.tp-sugg small { color: var(--text-secondary, #475569); }

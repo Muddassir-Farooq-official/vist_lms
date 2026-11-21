@@ -10,6 +10,8 @@
   <button class="portal-tab active" data-tab="draft" role="tab" aria-selected="true"><span>Make &amp; publish</span></button>
   <button class="portal-tab" data-tab="sections" role="tab" aria-selected="false"><span>Classes a week &amp; labs</span></button>
   <button class="portal-tab" data-tab="teachers" role="tab" aria-selected="false"><span>Teachers' available times</span></button>
+  <button class="portal-tab" data-tab="workload" role="tab" aria-selected="false"><span>Teacher workload</span></button>
+  <button class="portal-tab" data-tab="free" role="tab" aria-selected="false"><span>What is free</span></button>
 </div>
 
 <div class="portal-tab-panel" data-tab-panel="draft">
@@ -83,6 +85,41 @@
 </section>
 </div>
 
+<div class="portal-tab-panel" data-tab-panel="workload" hidden>
+<section class="panel">
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("employees") }}</div><h2>Teacher workload</h2></div></div>
+  <p class="panel-hint">Credit hours a week each teacher teaches while the chosen term(s) run: every section whose term dates overlap counts,
+    and a combined class counts once. Each teacher should be between <strong id="wl-range">12 and 18</strong> (Settings &rarr; Teaching load), or their own range.
+    Giving a teacher a section that takes them above their most is refused unless you give a reason.</p>
+  <div class="pt-terms" id="wl-terms"><span class="sd-dim">Loading terms…</span></div>
+  <div class="stt-actions"><button type="button" class="role-btn" id="wl-show">Show workload</button></div>
+  <p id="wl-error" class="dash-alert error" role="alert" hidden></p>
+  <div id="wl-summary" class="pt-summary"></div>
+  <table class="dash-table" id="wl-table" hidden>
+    <thead><tr><th>Teacher</th><th>Load</th><th class="num">Periods a week</th><th>Range (credit hrs)</th><th>Sections</th></tr></thead>
+    <tbody id="wl-tbody"></tbody>
+  </table>
+  <div id="wl-unassigned"></div>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="free" hidden>
+<section class="panel">
+  <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("clock") }}</div><h2>What is free</h2></div></div>
+  <p class="panel-hint">From the live timetable of every section running while the chosen term(s) run. Click a period to see which rooms and teachers are free then
+    (least busy teachers first; teachers who marked that period unavailable are left out), or pick a class to see its free periods.</p>
+  <div class="pt-terms" id="fr-terms"><span class="sd-dim">Loading terms…</span></div>
+  <div class="stt-actions"><button type="button" class="role-btn" id="fr-show">Show</button></div>
+  <p id="fr-error" class="dash-alert error" role="alert" hidden></p>
+  <div class="stt-viewbar" id="fr-bar" hidden>
+    <label>Show<select id="fr-mode" class="select-input"><option value="map">free rooms &amp; teachers, every period</option><option value="class">a class's free periods</option></select></label>
+    <label id="fr-class-wrap" hidden><select id="fr-class" class="select-input" aria-label="Class"></select></label>
+  </div>
+  <div class="pt-wrap"><table class="dash-table pt-grid stt-grid no-stack" id="fr-grid" hidden></table></div>
+  <div id="fr-detail" class="stt-editor" hidden></div>
+</section>
+</div>
+
 <dialog id="st-move" class="modal" aria-labelledby="st-move-title">
   <form class="modal-body" id="st-move-form">
     <h2 id="st-move-title">Move class</h2>
@@ -119,4 +156,5 @@
 {% block extra_scripts %}
 <script src="/static/js/availability-grid.js"></script>
 <script src="/static/js/smart-timetable.js"></script>
+<script src="/static/js/teacher-workload.js"></script>
 {% endblock %}

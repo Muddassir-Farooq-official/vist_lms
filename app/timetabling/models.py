@@ -28,6 +28,9 @@ class TeacherAvailability(UUIDPKMixin, TimestampMixin, Base):
     max_in_row: Mapped[int | None] = mapped_column(Integer, nullable=True)
     note: Mapped[str | None] = mapped_column(String(300), nullable=True)
     locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    # this teacher's own teaching load range, credit hours a week (NULL = the institute's, Settings -> Teaching load)
+    load_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    load_max: Mapped[int | None] = mapped_column(Integer, nullable=True)
     updated_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
 

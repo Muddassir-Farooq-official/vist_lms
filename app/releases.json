@@ -1,5 +1,38 @@
 [
   {
+    "version": "1.38.0",
+    "date": "2026-11-21",
+    "title": "Teacher workload and what is free",
+    "summary": "See who is over- or under-loaded, keep every teacher within 12–18 credit hours a week (or their own range), get suggestions for the least busy teacher, and find free rooms and teachers for any period.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Smart timetable → Teacher workload: each teacher's credit hours a week while the chosen terms run (combined classes once), periods a week, and Over / OK / Under their range."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Settings → Teaching load: 12–18 credit hours a week by default; a teacher can have their own range. A section that takes a teacher above their most is refused unless you give a reason (activity log)."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Choosing a teacher for a section lists suggested teachers first (taught it before, under-loaded, least busy) with their load before and after."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Propose teachers for every section without one, within everyone's most; assign the ticked ones in one go."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Smart timetable → What is free: free rooms and teachers for every period, and any class's free periods."
+      }
+    ]
+  },
+  {
     "version": "1.37.0",
     "date": "2026-11-21",
     "title": "Smart timetable: a whole term's timetable in one go",

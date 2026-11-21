@@ -104,7 +104,8 @@ class CombinedClassService:
         return {"combined": off.combined_group_id is not None, "members": [row(o) for o in group], "can_join": [row(o) for o in others],
                 "students": sum(counts.get(o.id, 0) for o in group)}
 
-    async def combine(self, offering_id: uuid.UUID, other_ids: list[uuid.UUID], *, teacher_id: uuid.UUID | None, actor_id: uuid.UUID) -> dict:
+    async def combine(self, offering_id: uuid.UUID, other_ids: list[uuid.UUID], *, teacher_id: uuid.UUID | None, actor_id: uuid.UUID,
+                      load_override_reason: str | None = None) -> dict:
         from app.academics.grading_service import GradingService
         from app.academics.service import TimetableService
 
@@ -135,6 +136,11 @@ class CombinedClassService:
             if len(teachers) > 1:
                 raise BusinessRuleViolationError("These sections have different teachers. Choose the teacher of the combined class.")
             teacher_id = next(iter(teachers), None)
+        if teacher_id is not None:                     # the teacher's teaching load: the combined class counts once
+            from app.timetabling.workload import WorkloadService
+
+            await WorkloadService(self.session).check_assign(lead, teacher_id, override_reason=load_override_reason, actor_id=actor_id,
+                                                             together=[o for o in everyone if o.id != lead.id])
 
         # one timetable: sections without a timetable get the lead's; a section with a different one is refused
         slots = {o.id: list((await self.session.execute(select(TimetableSlot).where(TimetableSlot.course_offering_id == o.id))).scalars())

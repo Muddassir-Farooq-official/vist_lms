@@ -57,6 +57,7 @@ class CourseOfferingCreateRequest(BaseModel):
     term_end_date: date | None = None
     section_label: str = Field(default="A", min_length=1, max_length=30)
     capacity: int | None = Field(default=None, ge=1, le=2000)
+    load_override_reason: str | None = Field(default=None, max_length=300)   # allow a teacher above the most credit hours
 
 
 class CurriculumMoveRequest(BaseModel):
@@ -70,6 +71,7 @@ class CourseOfferingUpdateRequest(BaseModel):
     term_end_date: date | None = None
     section_label: str | None = Field(default=None, min_length=1, max_length=30)
     capacity: int | None = Field(default=None, ge=1, le=2000)
+    load_override_reason: str | None = Field(default=None, max_length=300)   # allow a teacher above the most credit hours
 
 
 class GenerateOfferingsRequest(BaseModel):

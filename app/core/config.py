@@ -321,6 +321,8 @@ class Settings(BaseSettings):
     payroll_advance_max_salary_multiple: float = 1.0   # an employee may owe at most this many months' basic salary in advances
     payroll_security_percent: float = 0.0           # % of basic held back each month as a security deposit, until it equals one basic salary
     graduation_min_cgpa: float = 2.0                # degree audit: the lowest CGPA that can graduate
+    teacher_load_min_credit_hours: int = 12         # a teacher below this (credit hours a week) shows as under-loaded
+    teacher_load_max_credit_hours: int = 18         # assigning a section that takes a teacher above this is refused (override with a reason)
     todo_reminder_hour: int = 15                    # staff with no to-do list today get a reminder from this hour (0 = off)
     amount_display: int = 0                         # amounts on dashboard cards: 0 full, 1 K / M, 2 lakh / crore (Settings -> Rules)
     certificate_signatory: str = "Principal"       # printed under the signature line on certificates

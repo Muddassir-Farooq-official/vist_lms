@@ -715,19 +715,24 @@
     addOfferingSubmit.disabled = true;
     addOfferingError.hidden = true;
 
-    const result = await VA.fetchJson("/api/v1/academics/offerings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        course_id: aoCourseSelect.value,
-        term_label: document.getElementById("ao-term").value.trim(),
-        assigned_teacher_id: teacherIdInput.value || null,
-        term_start_date: document.getElementById("ao-term-start").value || null,
-        term_end_date: document.getElementById("ao-term-end").value || null,
-        section_label: document.getElementById("ao-section").value.trim() || "A",
-        capacity: document.getElementById("ao-capacity").value ? parseInt(document.getElementById("ao-capacity").value, 10) : null,
-      }),
-    });
+    const offeringBody = {
+      course_id: aoCourseSelect.value,
+      term_label: document.getElementById("ao-term").value.trim(),
+      assigned_teacher_id: teacherIdInput.value || null,
+      term_start_date: document.getElementById("ao-term-start").value || null,
+      term_end_date: document.getElementById("ao-term-end").value || null,
+      section_label: document.getElementById("ao-section").value.trim() || "A",
+      capacity: document.getElementById("ao-capacity").value ? parseInt(document.getElementById("ao-capacity").value, 10) : null,
+    };
+    const post = function () {
+      return VA.fetchJson("/api/v1/academics/offerings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(offeringBody) });
+    };
+    let result = await post();
+    const err0 = result.body && result.body.error;
+    if (!result.ok && err0 && err0.details && err0.details.kind === "TEACHER_LOAD") {      // above the teacher's most credit hours
+      const reason = await VA.ask({ title: "Teacher above the most", intro: err0.message, label: "Reason to allow it anyway (kept in the activity log)", ok: "Allow" });
+      if (reason) { offeringBody.load_override_reason = reason; result = await post(); }
+    }
 
     addOfferingSubmit.disabled = false;
 

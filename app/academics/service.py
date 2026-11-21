@@ -224,7 +224,7 @@ class CourseOfferingService:
     async def create(
         self, *, course_id: uuid.UUID, term_label: str, assigned_teacher_id: uuid.UUID | None,
         term_start_date: date | None = None, term_end_date: date | None = None,
-        section_label: str = "A", capacity: int | None = None, actor_id: uuid.UUID,
+        section_label: str = "A", capacity: int | None = None, actor_id: uuid.UUID, load_override_reason: str | None = None,
     ) -> CourseOffering:
         course = await self.course_repo.get_by_id(course_id)
         if course is None:
@@ -247,6 +247,13 @@ class CourseOfferingService:
             assigned_teacher_id=assigned_teacher_id,
             term_start_date=term_start_date, term_end_date=term_end_date,
         )
+        if assigned_teacher_id is not None:               # the teacher's teaching load (app/timetabling/workload.py), before saving
+            from app.timetabling.workload import WorkloadService
+
+            offering.id = offering.id or uuid.uuid4()       # so an allowed override is logged against this section
+            offering.assigned_teacher_id = None
+            await WorkloadService(self.session).check_assign(offering, assigned_teacher_id, override_reason=load_override_reason, actor_id=actor_id)
+            offering.assigned_teacher_id = assigned_teacher_id
         await self.repo.create(offering)
         await self.audit.log(
             actor_user_id=actor_id, action="course_offering.created", entity_type="course_offering", entity_id=offering.id,
@@ -423,7 +430,7 @@ class CourseOfferingService:
     async def update(
         self, offering_id: uuid.UUID, *, assigned_teacher_id: uuid.UUID | None = ..., is_open_for_enrollment: bool | None = None,
         term_start_date: date | None = ..., term_end_date: date | None = ..., actor_id: uuid.UUID,
-        capacity: int | None = ..., section_label: str | None = None,
+        capacity: int | None = ..., section_label: str | None = None, load_override_reason: str | None = None,
     ) -> CourseOffering:
         offering = await self.get(offering_id)
         before = {"assigned_teacher_id": str(offering.assigned_teacher_id) if offering.assigned_teacher_id else None, "is_open_for_enrollment": offering.is_open_for_enrollment,
@@ -435,6 +442,10 @@ class CourseOfferingService:
                 # Re-assigning a teacher to an offering that ALREADY has timetable
                 # slots must not silently double-book that teacher.
                 await TimetableService(self.session).assert_teacher_free_for_offering(offering, assigned_teacher_id)
+                from app.timetabling.workload import WorkloadService       # the teacher's teaching load
+
+                await WorkloadService(self.session).check_assign(offering, assigned_teacher_id, override_reason=load_override_reason,
+                                                                 actor_id=actor_id)
             offering.assigned_teacher_id = assigned_teacher_id
             if offering.combined_group_id is not None:            # one teacher for every section of a combined class
                 from app.academics.combined import members
