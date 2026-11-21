@@ -21,6 +21,13 @@ pytestmark = pytest.mark.asyncio
 NOW = datetime.now(timezone.utc)
 
 
+@pytest.fixture(autouse=True)
+def _fresh_now():
+    """Each test's own "now": a module-level time goes stale when the full suite runs for many minutes before this file."""
+    global NOW
+    NOW = datetime.now(timezone.utc)
+
+
 def _row(server=None, sites=None, age=timedelta(seconds=30)):
     base = {"disk_used_pct": 40.0, "disk_free": 10, "disk_total": 20, "memory": {"used_pct": 50.0, "total": 8, "available": 4},
             "load": [0.1, 0.2, 0.3], "cpus": 2, "uptime_s": 100, "memory_high_since": None, "load_high_since": None}
