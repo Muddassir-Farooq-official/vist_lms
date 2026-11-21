@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.39.0",
+    "date": "2026-11-21",
+    "title": "Sessions: group every batch's term (Fall 2026) and start the next one",
+    "summary": "When each batch has its own term, a session such as Fall 2026 groups them: term lists are grouped by session everywhere, and the next session can be started for every batch in one step.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Courses → Academic terms → Sessions: suggested from the term names (and dates), batches guessed for terms without one; you check and save. Nothing recorded on a term changes."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Term dropdowns are grouped by session (current first, older ones folded), and term tick-lists have Tick all per session."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Start next session: for every batch, the next semester's term (e.g. BSN 6th Fall 2026 → BSN 7th Spring 2027), its sections from the curriculum, and the promoted students enrolled; preview first, then all in one step."
+      },
+      {
+        "kind": "improved",
+        "for": "Administrators",
+        "text": "A new term whose name contains a session (e.g. BSN 2nd Fall 2026) joins that session by itself."
+      }
+    ]
+  },
+  {
     "version": "1.38.0",
     "date": "2026-11-21",
     "title": "Teacher workload and what is free",

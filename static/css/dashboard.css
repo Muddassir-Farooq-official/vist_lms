@@ -4168,3 +4168,16 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 .tp-sugg button:hover { border-color: var(--primary, #2457c5); }
 .tp-sugg button.tp-bad { opacity: .65; }
 .tp-sugg small { color: var(--text-secondary, #475569); }
+/* Sessions: grouped term tick-lists (term-groups.js) and Courses > Academic terms > Sessions */
+.pt-terms.tg-boxes { display: block; }
+.tg-session { margin: 4px 0 8px; }
+.tg-head { display: flex; gap: 10px; align-items: baseline; font-size: .86rem; cursor: default; }
+details.tg-session > summary.tg-head { cursor: pointer; }
+.tg-items { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 4px 0 0 2px; }
+.tg-items label { display: inline-flex; align-items: center; gap: 6px; font-size: .86rem; }
+.ses-sugg { border: 1px solid var(--border, #dde3ee); border-radius: 10px; padding: 10px 12px; margin: 10px 0; }
+.ses-name { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 600; }
+.ses-name input { max-width: 260px; }
+.ses-terms { display: flex; flex-wrap: wrap; gap: 6px 16px; max-height: 300px; overflow-y: auto; }
+.ses-terms label, .ses-enroll { display: inline-flex; align-items: center; gap: 6px; font-size: .86rem; }
+.ses-enroll { margin: 10px 0; }
