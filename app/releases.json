@@ -1,5 +1,38 @@
 [
   {
+    "version": "1.37.0",
+    "date": "2026-11-21",
+    "title": "Smart timetable: a whole term's timetable in one go",
+    "summary": "Administrators can generate a clash-free timetable for whole terms as a draft, adjust it, and publish it from a chosen date. Teachers can mark the times they cannot teach.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Academics → Smart timetable: generate a draft for one or more terms. No clashes for students, teachers or rooms; teachers' unavailable times and limits respected; labs as double periods in a lab; combined classes together; classes spread over the week, same period each day, compact days."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Check the draft by class, teacher or room; move, add or take out classes (checked, and pinned so they stay when you generate again); a list of anything that could not be placed and why."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Publish from a date: earlier classes and all attendance stay as they are; all or nothing; optionally tells teachers, students and parents."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Per section: classes a week (default: credit hours), lab as a double period, home room. Per teacher: unavailable periods, classes a day and periods in a row, and 'fixed by the administration'."
+      },
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "My Timetable → My available times: mark the periods you cannot teach."
+      }
+    ]
+  },
+  {
     "version": "1.36.0",
     "date": "2026-11-20",
     "title": "Backups page: see every backup and download a complete copy",

@@ -20,6 +20,8 @@ School mode only: **My class** (morning roll call and parent-teacher meetings), 
 
 Your week at a glance; download it as a PDF.
 
+**My available times** (a tab on My Timetable): tick the periods you cannot teach, and if you like, at most how many classes a day and periods in a row. When the administration makes the timetable with Smart timetable, you get no classes then. Your current timetable does not move. If the administration has fixed your times, you can see them but not change them.
+
 **Free slots & extra classes** (a tab on My Timetable):
 
 1. Pick your course. You see the periods when you, its students and a room are all free (days on approved leave and holidays are left out).

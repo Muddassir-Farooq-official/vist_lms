@@ -4129,3 +4129,29 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 .ur-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin: 8px 0; }
 .ur-form label { display: grid; gap: 4px; font-size: .82rem; font-weight: 600; }
 .ur-form .role-btn { width: auto; }
+
+/* Smart timetable (admin/smart_timetable.html) and teachers' available times (availability-grid.js) */
+.stt-opts { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; margin: 10px 0; }
+.stt-opts label, .stt-viewbar label { display: inline-flex; align-items: center; gap: 6px; font-size: .88rem; }
+.text-input.stt-num { width: 4.6em; min-width: 0; flex-grow: 0; }
+.stt-actions .role-btn { width: auto; }
+.stt-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0 4px; }
+.stt-viewbar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin: 14px 0 8px; }
+.stt-grid td { min-width: 130px; }
+.stt-cls { display: block; width: 100%; text-align: left; background: var(--surface-2, #f4f6fb); border: 1px solid var(--border, #dde3ee);
+  border-radius: 8px; padding: 5px 7px; margin: 0 0 4px; font: inherit; font-size: .8rem; color: inherit; cursor: pointer; }
+.stt-cls:hover:not(:disabled) { border-color: var(--primary, #2457c5); }
+.stt-cls:disabled { cursor: default; }
+.stt-cls small { display: block; color: var(--text-secondary, #475569); }
+.stt-pinned, .stt-pin-key { border-left: 3px solid var(--primary, #2457c5); }
+.stt-pin-key { padding-left: 4px; font-weight: 600; }
+.stt-notify { border: 0; padding: 0; margin: 10px 0; display: flex; gap: 14px; flex-wrap: wrap; }
+.stt-notify legend { font-weight: 600; margin-bottom: 4px; }
+.stt-editor { margin-top: 18px; border-top: 1px solid var(--border, #dde3ee); padding-top: 8px; }
+.av-grid td, .av-grid th { min-width: 90px; text-align: center; }
+.av-grid td.pt-when { text-align: left; }
+.av-cell label { display: inline-flex; gap: 4px; align-items: center; font-size: .78rem; color: var(--text-secondary, #475569); }
+.av-cell input:checked + span { color: #b42318; font-weight: 600; }
+.av-day { display: inline-flex; gap: 4px; align-items: center; }
+.av-limits { margin-top: 12px; }
+.av-note input { min-width: 260px; }

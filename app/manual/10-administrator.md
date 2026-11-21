@@ -41,6 +41,7 @@ From a student's or employee's record (or many at once from the list) print **ID
 - **Programs**: each program with its students and curriculum. (A school has **Classes & sections** here instead: classes, sections, class teachers and who teaches which subject.)
 - **Courses**: the course catalogue, curriculum placement, term offerings and materials. Academic terms are on the Academic terms tab.
 - **Timetable**: the weekly timetable for any class, semester, section or teacher, with PDF download. Tabs: weekly view, slots, **Daily periods**, **Rooms** and **Batches side by side**. Once rooms are listed, the timetable only accepts listed rooms big enough for the class.
+- **Smart timetable**: makes a whole term's timetable in one go as a draft, which you check, adjust and publish. See *Smart timetable* below.
 - **Attendance**: classes nobody marked, teachers' correction requests, marking a register yourself, locking a course at the end of term, and holidays or approved leave. Students below the attendance minimum are barred from the final exam.
 - **Teacher Progress**: how far each teacher actually is through their course versus where they should be, from topics marked complete.
 - **Course feedback**: students' anonymous feedback on each course and teacher.
@@ -75,6 +76,24 @@ When programs such as BS Dental, BS Anesthesia and BS MLT study semester 4 at th
 3. **Fill free periods…** proposes classes for the free periods: combined classes first (one class fills a period in every batch), each at a time that suits the teacher, the students and a room big enough for them. Nothing is added until you press **Add these classes**; existing classes are never moved. Anything that could not be placed is listed with the reason.
 
 If free periods remain after that, those students have fewer weekly class hours than the week has periods. Add a tutorial, lab or library period, or shorten the day. Two batches in different terms are treated as different students (so their own subjects may run at the same time) when the system can tell the batches apart: set the program and semester on each batch term in Academic terms, or offer at least one program-only subject in each. Students actually enrolled in both are always checked.
+
+### Smart timetable
+
+**Smart timetable** makes the timetable of one or more whole terms in one go. It never changes the live timetable by itself: you get a **draft**, and only **Publish** makes it live.
+
+**Before the first run**
+1. Timetable → **Daily periods** and **Rooms**: the periods of the day, and every classroom, lab and hall with its seats. The smart timetable picks rooms from this list.
+2. Smart timetable → **Classes a week & labs**: each section gets as many classes a week as its credit hours; change that where needed. Tick **Lab (double)** for a lab or practical: each class is two back-to-back periods in a lab room. A **home room** is used whenever it is free. A combined class keeps the same settings in all its sections.
+3. Smart timetable → **Teachers' available times**: tick the periods a teacher cannot teach (visiting faculty, other duties) and, if needed, that teacher's own limits. Teachers can mark their own times under *My Timetable → My available times*. Tick **Fixed by the administration** to stop a teacher changing them.
+
+**Make the draft**
+1. On **Make & publish**, tick the term(s) to plan together and the teaching days (tick Saturday if you teach Saturdays). Set the teachers' limits: at most so many classes a day and so many periods in a row.
+2. Press **Generate draft** (up to about 20 seconds). These rules are never broken: no student group, teacher or room in two places at once; teachers' unavailable times and limits; one class of a course a day; labs as two back-to-back periods in a lab; rooms big enough; combined classes together in a room big enough for all their students; classes of other terms running at the same time stay where they are. As far as possible it also spreads a course over the week (e.g. Mon/Wed/Fri), keeps it in the same period each day, and keeps students' days compact.
+3. The chips show how many weekly classes were placed. **Needs your attention** lists anything that could not be placed and why (e.g. *Dr. Ali has 32 periods to teach but only 25 free periods a week*). Fix the cause and generate again, or press **Place by hand…**.
+4. **Show** a class, a teacher or a room to see their week. Click a class to move it (day, period, room) or take it out. Every change is checked against the same rules. A class you place or move yourself is **pinned**: **Generate again (keep pinned)** keeps it where you put it.
+
+**Publish**
+Press **Publish…**, choose the date the new timetable starts (next Monday by default) and whom to tell: teachers, students and parents (untick to stay silent). You see what will happen before anything changes. From that date the draft replaces the timetable of its courses. Classes before that date, and every attendance mark, stay exactly as they are; upcoming classes that already have a topic or files are kept as cancelled, not deleted. Publishing is all or nothing: if something changed since the draft was made (e.g. a room was booked meanwhile), nothing changes and you are asked to generate again.
 
 ### Make-up and extra classes
 

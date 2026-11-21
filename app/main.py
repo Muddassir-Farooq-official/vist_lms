@@ -31,6 +31,7 @@ from app.academics.class_requests import router as class_requests_router
 from app.academics.rooms import router as rooms_router
 from app.selfassess.router import router as self_assess_router
 from app.academics.parallel import router as parallel_timetable_router
+from app.timetabling.router import router as smart_timetable_router
 import app.fees.move_payment  # noqa: F401,E402  (registers the PAYMENT_MOVE approval)
 import app.academics.grading_schemes  # noqa: F401,E402  (grading tables: programs.grading_scheme_id points at them)
 from app.attendance.router import router as attendance_router
@@ -234,6 +235,7 @@ ADMIN_NAV_ITEMS = [
     _nav("programs", "Programs", "programs", "/dashboard/admin/programs", group="Academics"),
     _nav("courses", "Courses", "graduation-cap", "/dashboard/admin/courses", group="Academics", mobile=True),
     _nav("timetable", "Timetable", "clock", "/dashboard/admin/timetable", group="Academics"),
+    _nav("smart-timetable", "Smart timetable", "grid", "/dashboard/admin/timetable/smart", group="Academics"),
     _nav("attendance", "Attendance", "attendance", "/dashboard/admin/attendance", group="Academics", mobile=True),
     _nav("progress", "Teacher Progress", "exams", "/dashboard/admin/progress", group="Academics"),
     _nav("feedback", "Course feedback", "check-circle", "/dashboard/admin/feedback", group="Academics"),
@@ -748,6 +750,7 @@ app.include_router(class_requests_router, prefix=settings.api_v1_prefix)
 app.include_router(rooms_router, prefix=settings.api_v1_prefix)
 app.include_router(self_assess_router, prefix=settings.api_v1_prefix)
 app.include_router(parallel_timetable_router, prefix=settings.api_v1_prefix)
+app.include_router(smart_timetable_router, prefix=settings.api_v1_prefix)
 app.include_router(academics_router, prefix=settings.api_v1_prefix)
 app.include_router(attendance_router, prefix=settings.api_v1_prefix)
 app.include_router(complaints_router, prefix=settings.api_v1_prefix)
@@ -1123,6 +1126,11 @@ async def admin_courses_page(request: Request):
     return templates.TemplateResponse(
         request, "admin/courses.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "courses"}
     )
+
+
+@app.get("/dashboard/admin/timetable/smart", include_in_schema=False)
+async def admin_smart_timetable_page(request: Request):
+    return templates.TemplateResponse(request, "admin/smart_timetable.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "smart-timetable"})
 
 
 @app.get("/dashboard/admin/timetable", include_in_schema=False)
