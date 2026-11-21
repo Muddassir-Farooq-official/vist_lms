@@ -121,7 +121,41 @@
       </table>
     </div>
   </section>
+
+  <section class="panel sd-panel" id="sessions-panel" aria-labelledby="sessions-h">
+    <div class="jr-head">
+      <h2 id="sessions-h">Sessions</h2>
+      <p class="panel-hint">A session (e.g. <em>Fall 2026</em>) groups the batch terms that run at the same time (<em>BSN 6th Fall 2026</em>, <em>BSN 4th Fall 2026</em> &hellip;),
+        so term lists everywhere are grouped by session and you can tick a whole session at once. Grouping changes no record: fees, attendance and results keep their batch term.
+        <strong>Start next session&hellip;</strong> makes every batch's next-semester term, opens its sections from the curriculum and enrolls the students already promoted, after a preview.</p>
+    </div>
+    <div class="stt-actions">
+      <button type="button" class="role-btn" id="ses-suggest">Suggest sessions from the term names</button>
+      <button type="button" class="role-btn secondary-btn" id="ses-add">Add a session</button>
+    </div>
+    <p id="ses-error" class="dash-alert error crs-pad" role="alert" hidden></p>
+    <div id="ses-suggestions"></div>
+    <div id="ses-list"></div>
+  </section>
 </div>
+
+<dialog id="ses-next" class="modal modal-wide" aria-labelledby="ses-next-title">
+  <form class="modal-body" id="ses-next-form">
+    <h2 id="ses-next-title">Start next session</h2>
+    <p class="cc-meta" id="ses-next-from"></p>
+    <div class="ar-form">
+      <label>New session<input type="text" id="ses-next-name" class="text-input" maxlength="50" required /></label>
+      <label>Starts<input type="date" id="ses-next-start" class="text-input" required /></label>
+      <label>Ends<input type="date" id="ses-next-end" class="text-input" required /></label>
+    </div>
+    <div class="stt-actions"><button type="button" class="role-btn secondary-btn" id="ses-next-preview">Preview</button></div>
+    <div id="ses-next-plan"></div>
+    <label class="ses-enroll"><input type="checkbox" id="ses-next-enroll" checked /> Enroll the students already promoted to the next semester</label>
+    <p class="dash-alert error" id="ses-next-err" role="alert" hidden></p>
+    <div class="form-actions"><button type="submit" class="role-btn" id="ses-next-ok" disabled>Start the session</button></div>
+    <button type="button" class="back-link modal-close-btn" id="ses-next-cancel">Cancel</button>
+  </form>
+</dialog>
 
 <!-- ============ TEACHER PERFORMANCE ============ -->
 <div class="portal-tab-panel" data-tab-panel="performance" hidden>
@@ -325,4 +359,5 @@
 <script src="/static/js/teacher-picker.js"></script>
 <script src="/static/js/courses.js"></script>
 <script src="/static/js/academic-terms.js"></script>
+<script src="/static/js/academic-sessions.js"></script>
 {% endblock %}

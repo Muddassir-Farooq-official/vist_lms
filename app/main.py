@@ -32,6 +32,7 @@ from app.academics.rooms import router as rooms_router
 from app.selfassess.router import router as self_assess_router
 from app.academics.parallel import router as parallel_timetable_router
 from app.timetabling.router import router as smart_timetable_router
+from app.academics.session_router import router as academic_sessions_router
 import app.fees.move_payment  # noqa: F401,E402  (registers the PAYMENT_MOVE approval)
 import app.academics.grading_schemes  # noqa: F401,E402  (grading tables: programs.grading_scheme_id points at them)
 from app.attendance.router import router as attendance_router
@@ -751,6 +752,7 @@ app.include_router(rooms_router, prefix=settings.api_v1_prefix)
 app.include_router(self_assess_router, prefix=settings.api_v1_prefix)
 app.include_router(parallel_timetable_router, prefix=settings.api_v1_prefix)
 app.include_router(smart_timetable_router, prefix=settings.api_v1_prefix)
+app.include_router(academic_sessions_router, prefix=settings.api_v1_prefix)
 app.include_router(academics_router, prefix=settings.api_v1_prefix)
 app.include_router(attendance_router, prefix=settings.api_v1_prefix)
 app.include_router(complaints_router, prefix=settings.api_v1_prefix)

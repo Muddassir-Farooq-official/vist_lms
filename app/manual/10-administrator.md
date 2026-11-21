@@ -6,7 +6,7 @@ The administrator sets the institute up and oversees everything. Your menu is gr
 
 1. **Settings**: the institute's name, logo and details (they appear on every page, document and SMS), its look, and the rules the system applies (late fees, attendance minimum, pass marks, card validity and more).
 2. **Programs**: each program with its number of semesters (or years).
-3. **Courses → Academic terms**: register each term. Because batches start and end on their own dates, give each term its **batch** (program and semester), for example "Fall 2026 BSN 8TH" = BSN, semester 8.
+3. **Courses → Academic terms**: register each term. Because batches start and end on their own dates, give each term its **batch** (program and semester), for example "Fall 2026 BSN 8TH" = BSN, semester 8. Then group the batch terms into **sessions** (see *Sessions* below).
 4. **Courses**: the course catalogue, which program and semester each course belongs to, and the term offerings (who teaches which section).
 5. **Timetable**: list your **Rooms** (with seats) and the daily periods, then add each course's weekly slots from the course page.
 6. **Results → Grading tables & mark split**: give each program the grading table of its university or board and its mark split (see the Exam department chapter).
@@ -76,6 +76,16 @@ When programs such as BS Dental, BS Anesthesia and BS MLT study semester 4 at th
 3. **Fill free periods…** proposes classes for the free periods: combined classes first (one class fills a period in every batch), each at a time that suits the teacher, the students and a room big enough for them. Nothing is added until you press **Add these classes**; existing classes are never moved. Anything that could not be placed is listed with the reason.
 
 If free periods remain after that, those students have fewer weekly class hours than the week has periods. Add a tutorial, lab or library period, or shorten the day. Two batches in different terms are treated as different students (so their own subjects may run at the same time) when the system can tell the batches apart: set the program and semester on each batch term in Academic terms, or offer at least one program-only subject in each. Students actually enrolled in both are always checked.
+
+### Sessions (many batch terms at once)
+
+When every batch has its own term (*BSN 6th Fall 2026*, *BSN 4th Fall 2026*, *MLT 2nd Fall 2026* …), a **session** such as *Fall 2026* groups the ones that run at the same time. Grouping changes no record: fees, attendance, marks and results keep each batch's term exactly as before.
+
+1. Courses → **Academic terms** → **Sessions** → **Suggest sessions from the term names**. Sessions are read from the names (*… Fall 2026*, *… 2026-27*); a term whose name says no session but whose dates fall in one is offered there unticked (*by its dates*). For terms with no batch yet, the batch is guessed from the name (*BSN 6th* = BSN, semester 6). Check, untick or fix, then **Save these sessions**.
+2. A new term whose name contains a session's name (e.g. *BSN 2nd Fall 2026*) joins that session by itself. **Edit** a session to rename it, set its dates or choose its terms; **Remove** takes away only the grouping.
+3. Everywhere in the admin panel, term dropdowns are grouped by session (the current one first, older ones as *Older · …*), and term tick-lists show one block per session with **Tick all** (older sessions folded away).
+
+**Start next session…** (on a session): give the new session's name (suggested, e.g. *Fall 2026* → *Spring 2027*) and dates, then **Preview**. For every batch it shows the next term (*BSN 6th Fall 2026* → *BSN 7th Spring 2027*; you can change the name), the courses of the next semester from the curriculum and the sections (the same as now), and how many students are already promoted to that semester and how many are not yet. A batch in its last semester, or a term with no batch, is skipped with the reason. Nothing is made until **Start the session**; then, in one step (all or nothing), the terms are created in the new session, their sections opened, and (if ticked) the promoted students enrolled in their own section. Students not yet promoted are not enrolled: promote them first (Result Approval), then enroll them from the course sections.
 
 ### Smart timetable
 
