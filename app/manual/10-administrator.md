@@ -128,7 +128,7 @@ Teachers book make-up classes (for a missed class) and extra classes (for a cour
 
 ## Finance
 
-- **Fees**, **Refunds**, **1Bill payments**, **Fines**, **Finance reports** and **Accounts**: see the Accounts office chapter.
+- **Fees**, **Refunds**, **1Bill payments**, **Fines**, **Finance reports**, **Fee defaulters** and **Accounts**: see the Accounts office chapter. Only administrators can allow an admit card despite overdue fees (**Fee defaulters → Allow admit card…**).
 - **Inventory / Store**: what the institute keeps in stock, where every item went and who has it.
 - **Fixed assets**: furniture, computers, equipment, vehicles and buildings, with tag numbers, holders and depreciation.
 - **Approvals**: actions that need a second person: waiving or cancelling a fee, waiving a fine, writing off previous dues, moving a payment to the right fee, reopening closed books, new scholarships or discounts, and make-up or extra classes. Approving carries the action out exactly as asked; nobody can approve their own request.

@@ -1,5 +1,38 @@
 [
   {
+    "version": "1.44.0",
+    "date": "2026-11-21",
+    "title": "Fee defaulter follow-up",
+    "summary": "One page to follow up overdue fees: the list by batch or session, SMS reminders now, promises to pay, and admit-card exemptions.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Accounts office",
+        "text": "Fee defaulters: everyone overdue, by session, batch term, program, semester, days overdue and amount, with CSV."
+      },
+      {
+        "kind": "new",
+        "for": "Accounts office",
+        "text": "Send SMS reminders now to the selected students and/or parents: preview first; at most one fee SMS per student a day."
+      },
+      {
+        "kind": "new",
+        "for": "Accounts office",
+        "text": "Promise to pay: until the promised date no fee reminder goes and the admit card is not held for fees."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Allow one student's admit card despite overdue fees, with a reason and optionally a last day; kept on record when revoked."
+      },
+      {
+        "kind": "fixed",
+        "for": "Accounts office",
+        "text": "Finance reports: the phone numbers in the defaulters table are under the Phone heading again."
+      }
+    ]
+  },
+  {
     "version": "1.43.0",
     "date": "2026-11-21",
     "title": "University Reg No deadlines",

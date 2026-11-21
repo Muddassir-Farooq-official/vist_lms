@@ -38,9 +38,9 @@
     tb.innerHTML = r.body.students.map(function (s) {
       return "<tr><td><strong>" + esc(s.name) + "</strong><small>" + esc((s.father ? s.father + " · " : "") + (s.roll_number || "—") + " · overdue since " + day(s.oldest_due) + " (" + s.days_overdue + " days)") + "</small></td>" +
         "<td>" + esc((s.program || "—") + (s.semester ? " · Sem " + s.semester : "")) + "</td>" +
-        "<td>" + esc(s.phone || "") + (s.guardian_phone ? "<small>Guardian " + esc(s.guardian_phone) + "</small>" : "") + "</td>" +
         ["1-30", "31-60", "61-90", "90+"].map(function (b) { return '<td class="num">' + (s[b] ? money(s[b]) : "") + "</td>"; }).join("") +
-        '<td class="num"><b>' + money(s.overdue) + '</b></td><td class="num">' + (s.late_fee_accrued ? money(s.late_fee_accrued) : "") + '</td><td class="num">' + (s.fines_pending ? money(s.fines_pending) : "") + "</td></tr>";
+        '<td class="num"><b>' + money(s.overdue) + '</b></td><td class="num">' + (s.late_fee_accrued ? money(s.late_fee_accrued) : "") + '</td><td class="num">' + (s.fines_pending ? money(s.fines_pending) : "") + "</td>" +
+        "<td>" + esc(s.phone || "") + (s.guardian_phone ? "<small>Guardian " + esc(s.guardian_phone) + "</small>" : "") + "</td></tr>";
     }).join("");
   }
 

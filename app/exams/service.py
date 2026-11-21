@@ -385,8 +385,9 @@ class ExamScheduleService:
         return ok, reason, pct["percentage"]
 
     async def withheld(self, student_id: uuid.UUID) -> list[str]:
-        """Why the whole admit card is held: an unpaid attendance fine, (by policy) overdue fees, or a missing university Reg No
-        after the batch's deadline (affiliated programs; the administration can exempt one student)."""
+        """Why the whole admit card is held: an unpaid attendance fine, (by policy) overdue fees unless the student is exempted
+        or promised to pay by a date that has not passed, or a missing university Reg No after the batch's deadline
+        (affiliated programs; the administration can exempt one student)."""
         from app.attendance.holds import unpaid_attendance_fines
         from app.fees.assignment_service import FeeStatusCalculator, late_pause, late_rate
         from app.fees.models import AssignmentStatus, FeeAssignment, FeeStructure, PayerType
@@ -395,7 +396,12 @@ class ExamScheduleService:
         n_fines, fine_total = await unpaid_attendance_fines(self.session, student_id)
         if n_fines:
             withheld.append(f"unpaid attendance fine of Rs. {fine_total:,.0f}")
+        lifted = None
         if settings.admit_card_requires_fees_cleared:
+            from app.fees.defaulters import fee_hold_lifted
+
+            lifted = await fee_hold_lifted(self.session, student_id)       # exempted, or promised to pay by a date
+        if settings.admit_card_requires_fees_cleared and lifted is None:
             overdue = 0.0
             assignments = (await self.session.execute(select(FeeAssignment).where(
                 FeeAssignment.payer_type == PayerType.STUDENT, FeeAssignment.payer_id == student_id, FeeAssignment.status == AssignmentStatus.ACTIVE))).scalars().all()

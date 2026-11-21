@@ -352,7 +352,8 @@ class SmsService:
 
     # ---------------------------------------------------------------- reminders
     async def queue_fee_overdue_reminders(self) -> int:
-        """One reminder per student with any overdue instalment, at most once a week."""
+        """One reminder per student with any overdue instalment, at most once a week; none while a promise to pay runs
+        (app/fees/defaulters.py) or when the office already sent a fee SMS today."""
         from app.fees.assignment_service import FeeStatusCalculator
         from app.fees.models import AssignmentStatus, FeeAssignment, FeeLedgerEntry, FeeStructure, PayerType
 
@@ -364,6 +365,13 @@ class SmsService:
             amount = sum(r["remaining"] for r in FeeStatusCalculator.installments(entries, None) if r["status"] == "OVERDUE")
             if amount > 0.005:
                 overdue[a.payer_id] = overdue.get(a.payer_id, 0.0) + amount
+        if overdue:                                       # a promise to pay running, or a fee SMS sent by the office today: skip
+            from app.fees.defaulters import active_promises, day_start_utc
+
+            promised = set(await active_promises(self.session, list(overdue)))
+            today = set((await self.session.execute(select(SmsMessage.student_id).where(
+                SmsMessage.student_id.in_(list(overdue)), SmsMessage.event == "FEE_DEFAULTER", SmsMessage.created_at >= day_start_utc()))).scalars())
+            overdue = {k: v for k, v in overdue.items() if k not in promised and k not in today}
         n = 0
         for sid, amount in overdue.items():
             n += await self.queue_for_student(
