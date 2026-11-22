@@ -1,5 +1,23 @@
 [
   {
+    "version": "1.53.0",
+    "date": "2026-11-22",
+    "title": "Substitute teachers",
+    "summary": "Classes of a teacher on leave get a free teacher proposed; the office confirms.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Substitute teachers: approving leave proposes a free teacher for each class; confirm, change or cancel the class."
+      },
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "Substitute classes: the classes you cover, with attendance marking."
+      }
+    ]
+  },
+  {
     "version": "1.52.0",
     "date": "2026-11-22",
     "title": "Home cards for families",

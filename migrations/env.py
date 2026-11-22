@@ -73,6 +73,7 @@ from app.navigation import models as navigation_models  # noqa: F401
 from app.academics import rollover as rollover_models  # noqa: F401
 from app.exams import seating as seating_models  # noqa: F401
 from app.obe import models as obe_models  # noqa: F401
+from app.substitutes import models as substitutes_models  # noqa: F401
 
 config = context.config
 # ALEMBIC_DATABASE_URL lets CI/tests migrate a scratch database without touching .env
