@@ -34,6 +34,7 @@ class Roles:
     PARENT = "PARENT"   # a student's guardian: read-only view of their own children (attendance, results, fees)
     EXAM_CONTROLLER = "EXAM_CONTROLLER"    # the exam department: approves, publishes and corrects results, and keeps the grading scale
     STAFF = "STAFF"                        # general staff (office boy, IT, driver, cleaner...): only their own pay, attendance, tasks and requests
+    ALUMNUS = "ALUMNUS"                    # a graduate: their alumni details, degree and transcript, the alumni directory and surveys
     CLINICAL_SUPERVISOR = "CLINICAL_SUPERVISOR"   # a hospital's supervisor: only the clinical groups given to them (attendance, logbook sign-off)
 
     ALL = (ADMIN, TEACHER, STUDENT, ACCOUNTS_OFFICER, LIBRARIAN, HOSTEL_WARDEN, SECURITY_GUARD, EXAM_CONTROLLER, STAFF)
@@ -252,6 +253,12 @@ class Permissions:
     CLINICAL_SUPERVISE = "clinical.supervise"
     # Approve (or discard) a month's draft of hostel / mess / transport charges, adding them to students' dues (accounts office).
     CHARGES_APPROVE = "charges.approve"
+    # Graduation lists, alumni directory and surveys (administration).
+    ALUMNI_MANAGE = "alumni.manage"
+    # Track degrees and transcripts being prepared and handed over (administration, exam office).
+    DOCUMENT_ISSUE = "documents.issue"
+    # A graduate's own alumni portal.
+    ALUMNI_SELF = "alumni.self"
     # Transport routes, stops, riders, and preparing the monthly transport draft (administration).
     TRANSPORT_MANAGE = "transport.manage"
     # Parent portal: see one's OWN linked children only.
@@ -280,6 +287,8 @@ class Permissions:
 # seed script), not editing scattered `if` statements.
 ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
     Roles.ADMIN: (
+        Permissions.ALUMNI_MANAGE,
+        Permissions.DOCUMENT_ISSUE,
         Permissions.CHARGES_APPROVE,
         Permissions.TRANSPORT_MANAGE,
         Permissions.CLINICAL_MANAGE,
@@ -463,9 +472,10 @@ ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
     ),
     # Placeholder role — Hostel module not built yet.
     Roles.HOSTEL_WARDEN: (Permissions.HOSTEL_VIEW, Permissions.HOSTEL_MANAGE, Permissions.STUDENT_VIEW, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
-    Roles.EXAM_CONTROLLER: (Permissions.EXAM_SCHEDULE_MANAGE, Permissions.COURSE_VIEW, Permissions.RESULT_APPROVE, Permissions.MARKS_ENTER, Permissions.STUDENT_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
+    Roles.EXAM_CONTROLLER: (Permissions.DOCUMENT_ISSUE, Permissions.EXAM_SCHEDULE_MANAGE, Permissions.COURSE_VIEW, Permissions.RESULT_APPROVE, Permissions.MARKS_ENTER, Permissions.STUDENT_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
     Roles.PARENT: (Permissions.PARENT_VIEW,),
     Roles.CLINICAL_SUPERVISOR: (Permissions.CLINICAL_SUPERVISE,),
+    Roles.ALUMNUS: (Permissions.ALUMNI_SELF,),
     Roles.PRINCIPAL: (Permissions.INSTITUTE_OVERVIEW, Permissions.WARNING_DECIDE, Permissions.AUDIT_VIEW, Permissions.HOSTEL_VIEW, Permissions.INVENTORY_VIEW, Permissions.ASSET_VIEW, Permissions.STAFF_ATTENDANCE_VIEW, Permissions.ACADEMIC_OVERSIGHT, Permissions.ATTENDANCE_VIEW,
                       Permissions.COURSE_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.STUDENT_VIEW,
                       Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),

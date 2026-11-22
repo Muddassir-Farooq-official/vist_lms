@@ -27,6 +27,7 @@ PORTAL_BY_ROLE: tuple[tuple[str, str], ...] = (
     (Roles.SECURITY_GUARD, "/dashboard/gate/home"),
     (Roles.STAFF, "/dashboard/staff"),
     (Roles.CLINICAL_SUPERVISOR, "/dashboard/clinical"),
+    (Roles.ALUMNUS, "/dashboard/alumni"),
 )
 
 

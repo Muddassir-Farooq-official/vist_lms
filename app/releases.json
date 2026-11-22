@@ -1,5 +1,28 @@
 [
   {
+    "version": "1.57.0",
+    "date": "2026-11-22",
+    "title": "Graduation and alumni",
+    "summary": "Graduation lists, degree and transcript tracking, and an alumni portal with a directory and surveys.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Graduation lists: every student checked; graduate the cleared ones in one step; print the list."
+      },
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "Degrees & transcripts: track each one from request to hand-over."
+      },
+      {
+        "kind": "new",
+        "for": "Graduates",
+        "text": "An alumni login: degree and transcript status, your details, the alumni directory and surveys."
+      }
+    ]
+  },
+  {
     "version": "1.56.0",
     "date": "2026-11-22",
     "title": "Question bank",

@@ -1,0 +1,7 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN,EXAM_CONTROLLER{% endblock %}
+{% block title %}Degrees & transcripts{% endblock %}
+{% block page_title %}Degrees & transcripts{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Each degree and transcript from request to hand-over: being prepared, ready (with its serial number; the graduate is told), then collected or posted.</div>{% endblock %}
+{% block content %}{% include "shared/_degrees.html" %}{% endblock %}
+{% block extra_scripts %}<script src="/static/js/degrees.js"></script>{% endblock %}
