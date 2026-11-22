@@ -1227,7 +1227,75 @@ window.VistAdmin = (function () {
       });
     }
     applySaved();
+    wireShortcuts(nav, portal, links);
     wireNavBadges();
+  }
+
+  // My shortcuts: a star beside the page title adds the page to a "My shortcuts" group at the top of the menu.
+  // Kept per person and per portal on the server (GET/PUT /api/v1/nav/shortcuts), so it follows them to any device.
+  function wireShortcuts(nav, portal, links) {
+    const byslug = {};
+    links.forEach(function (a) { byslug[a.getAttribute("data-nav")] = a; });
+    const sec = document.createElement("div");
+    sec.className = "drawer-shortcuts";
+    sec.hidden = true;
+    sec.innerHTML = '<div class="drawer-shortcuts-h">My shortcuts</div><div class="drawer-group-items"></div>';
+    const anchor = document.getElementById("nav-noresult");
+    if (anchor) anchor.insertAdjacentElement("afterend", sec); else nav.insertBefore(sec, nav.firstChild);
+    const list = sec.querySelector(".drawer-group-items");
+    let slugs = [];
+    let max = 12;
+    function render() {
+      list.innerHTML = "";
+      slugs.forEach(function (slug) {
+        const a = byslug[slug];
+        if (!a) return;                                   // a page this person can no longer see: skipped
+        const c = a.cloneNode(true);
+        c.hidden = false;
+        c.removeAttribute("aria-current");
+        c.classList.add("drawer-shortcut");
+        list.appendChild(c);
+      });
+      sec.hidden = !list.children.length;
+      paintStar();
+    }
+    const active = nav.querySelector("a.drawer-link.active[data-nav]");
+    const title = document.querySelector(".content-title");
+    let star = null;
+    if (active && title) {
+      star = document.createElement("button");
+      star.type = "button";
+      star.className = "page-star";
+      title.appendChild(star);
+      star.addEventListener("click", async function () {
+        const slug = active.getAttribute("data-nav");
+        const on = slugs.indexOf(slug) !== -1;
+        if (!on && slugs.length >= max) { toast("You can keep " + max + " shortcuts. Remove one first.", "error"); return; }
+        const next = on ? slugs.filter(function (x) { return x !== slug; }) : slugs.concat([slug]);
+        star.disabled = true;
+        const r = await fetchJson("/api/v1/nav/shortcuts", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ portal: portal, slugs: next }) });
+        star.disabled = false;
+        if (!r.ok) { toast("Could not save your shortcut.", "error"); return; }
+        slugs = r.body.slugs;
+        render();
+        toast(on ? "Removed from My shortcuts." : "Added to My shortcuts (top of the menu).");
+      });
+    }
+    function paintStar() {
+      if (!star) return;
+      const on = slugs.indexOf(active.getAttribute("data-nav")) !== -1;
+      star.textContent = on ? "\u2605" : "\u2606";
+      star.setAttribute("aria-pressed", on ? "true" : "false");
+      star.setAttribute("aria-label", on ? "Remove this page from My shortcuts" : "Add this page to My shortcuts");
+      star.title = star.getAttribute("aria-label");
+    }
+    paintStar();
+    fetchJson("/api/v1/nav/shortcuts?portal=" + encodeURIComponent(portal), { quiet: true }).then(function (r) {
+      if (!r.ok || !r.body) return;
+      slugs = r.body.slugs || [];
+      max = r.body.max || max;
+      render();
+    });
   }
 
   // Waiting work beside menu links: approvals, profile changes, certificate requests, admissions, result sheets.

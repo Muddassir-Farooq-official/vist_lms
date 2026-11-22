@@ -4222,3 +4222,13 @@ details.tg-session > summary.tg-head { cursor: pointer; }
   color: var(--text-primary); font-weight: 600; font-size: 0.88rem; text-decoration: none; }
 .st-tool:hover { border-color: var(--blue-500); color: var(--blue-700); }
 .st-tool svg { width: 18px; height: 18px; flex: none; color: var(--blue-600, #2563eb); }
+
+/* ---------- My shortcuts (admin-common.js wireShortcuts) ---------- */
+.drawer-shortcuts { margin: 2px 0 6px; padding-bottom: 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.16); }
+.drawer-shortcuts[hidden], .drawer-nav.searching .drawer-shortcuts { display: none; }
+.drawer-shortcuts-h { margin: 6px 12px 4px; font-size: 0.7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.72); }
+.page-star { margin-left: 8px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; background: transparent; cursor: pointer;
+  color: var(--text-secondary); font-size: 1.05rem; line-height: 1.3; vertical-align: middle; }
+.page-star:hover, .page-star[aria-pressed="true"] { color: #d97706; border-color: #f59e0b; }
+.page-star:focus-visible { outline: 2px solid var(--blue-500); outline-offset: 2px; }
+.page-star:disabled { opacity: .6; cursor: progress; }

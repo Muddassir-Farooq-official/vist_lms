@@ -1,5 +1,18 @@
 [
   {
+    "version": "1.46.0",
+    "date": "2026-11-22",
+    "title": "My shortcuts",
+    "summary": "Star the pages you use most: they stay at the top of your menu on every device.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Everyone",
+        "text": "Press ☆ beside a page's title to add it to My shortcuts at the top of the menu (up to 12); ★ removes it. Kept for you on every device."
+      }
+    ]
+  },
+  {
     "version": "1.45.0",
     "date": "2026-11-21",
     "title": "An easier menu",

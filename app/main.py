@@ -724,6 +724,7 @@ app.include_router(sms_public_router)                          # /wa/d/<token>: 
 from app.reports.finance_router import router as finance_reports_router  # noqa: E402
 from app.fees.defaulters_router import router as fee_defaulters_router  # noqa: E402
 from app.core.nav_badges import router as nav_badges_router  # noqa: E402
+from app.navigation.router import router as nav_shortcuts_router  # noqa: E402
 from app.reports.center_router import router as report_center_router  # noqa: E402
 from app.reports.monthly_router import router as monthly_report_router  # noqa: E402
 from app.discipline.router import router as discipline_router  # noqa: E402
@@ -735,6 +736,7 @@ app.include_router(discipline_router, prefix=settings.api_v1_prefix)
 app.include_router(finance_reports_router, prefix=settings.api_v1_prefix)
 app.include_router(fee_defaulters_router, prefix=settings.api_v1_prefix)
 app.include_router(nav_badges_router, prefix=settings.api_v1_prefix)
+app.include_router(nav_shortcuts_router, prefix=settings.api_v1_prefix)
 from app.calendar.router import router as calendar_router  # noqa: E402
 
 app.include_router(calendar_router, prefix=settings.api_v1_prefix)
