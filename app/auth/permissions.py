@@ -253,6 +253,8 @@ class Permissions:
     CHARGES_APPROVE = "charges.approve"
     # Assign mentors to students and read every mentor's notes and referrals (administration).
     MENTORING_MANAGE = "mentoring.manage"
+    # Make committees and choose their members; read every committee's minutes (administration).
+    COMMITTEE_MANAGE = "committee.manage"
     # Graduation lists, alumni directory and surveys (administration).
     ALUMNI_MANAGE = "alumni.manage"
     # Track degrees and transcripts being prepared and handed over (administration, exam office).
@@ -287,6 +289,7 @@ class Permissions:
 # seed script), not editing scattered `if` statements.
 ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
     Roles.ADMIN: (
+        Permissions.COMMITTEE_MANAGE,
         Permissions.MENTORING_MANAGE,
         Permissions.ALUMNI_MANAGE,
         Permissions.DOCUMENT_ISSUE,

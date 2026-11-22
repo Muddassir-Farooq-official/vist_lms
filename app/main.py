@@ -249,6 +249,7 @@ ADMIN_NAV_ITEMS = [
     _nav("progress", "Teacher Progress", "exams", "/dashboard/admin/progress", group="Teaching & exams"),
     _nav("feedback", "Course feedback", "check-circle", "/dashboard/admin/feedback", group="Teaching & exams"),
     _nav("calendar", "Calendar", "clock", "/dashboard/admin/calendar", group="Teaching & exams", keywords="holidays events"),
+    _nav("committees", "Committees", "tasks", "/dashboard/admin/committees", group="Communication", keywords="meeting minutes agenda action items"),
     _nav("rollover", "Semester rollover", "grid", "/dashboard/admin/rollover", group="Teaching & exams", keywords="promote end semester next session close term"),
     _nav("results", "Result Types", "exams", "/dashboard/admin/results", group="Teaching & exams", keywords="assessment marks grading"),
     _nav("result-sheets", "Result Approval", "tasks", "/dashboard/admin/result-sheets", group="Teaching & exams", badge="result_sheets", keywords="award list university result publish"),
@@ -318,6 +319,7 @@ LIBRARY_NAV_ITEMS = [
     _nav("purchases", "Purchase requests", "tasks", "/dashboard/library/purchases", group="Services"),
     _nav("payslips", "My pay & attendance", "file", "/dashboard/library/payslips", group="Services"),
     _nav("calendar", "Calendar", "clock", "/dashboard/library/calendar", group="Services"),
+    _nav("committees", "Committees", "tasks", "/dashboard/library/committees", group="Services"),
     _nav("profile", "My Profile", "user", "/dashboard/library/profile", group="Services"),
     _nav("my-warnings", "My warnings", "alert", "/dashboard/library/my-warnings", group="Services"),
     _nav("help", "Help & manual", "file", "/dashboard/library/help"),
@@ -336,6 +338,7 @@ GATE_NAV_ITEMS = [
     _nav("purchases", "Purchase requests", "tasks", "/dashboard/gate/purchases", group="Me"),
     _nav("payslips", "My pay & attendance", "file", "/dashboard/gate/payslips", group="Me"),
     _nav("calendar", "Calendar", "clock", "/dashboard/gate/calendar", group="Me"),
+    _nav("committees", "Committees", "tasks", "/dashboard/gate/committees", group="Me"),
     _nav("profile", "My Profile", "user", "/dashboard/gate/profile", group="Me"),
     _nav("my-warnings", "My warnings", "alert", "/dashboard/gate/my-warnings", group="Me"),
     _nav("help", "Help & manual", "file", "/dashboard/gate/help", group="Me"),
@@ -352,6 +355,7 @@ STAFF_NAV_ITEMS = [
     _nav("purchases", "Purchase requests", "tasks", "/dashboard/staff/purchases", group="Requests"),
     _nav("complaints", "Feedback & Complaints", "ban", "/dashboard/staff/complaints", group="Requests"),
     _nav("calendar", "Calendar", "clock", "/dashboard/staff/calendar", group="Account"),
+    _nav("committees", "Committees", "tasks", "/dashboard/staff/committees", group="Account"),
     _nav("profile", "My Profile", "user", "/dashboard/staff/profile", group="Account"),
     _nav("my-warnings", "My warnings", "alert", "/dashboard/staff/my-warnings", group="Account"),
     _nav("help", "Help & manual", "file", "/dashboard/staff/help", group="Account"),
@@ -383,6 +387,7 @@ PRINCIPAL_NAV_ITEMS = [
     _nav("reports", "Reports", "exams", "/dashboard/principal/reports"),
     _nav("staff-attendance", "Staff attendance", "clock", "/dashboard/principal/staff-attendance"),
     _nav("calendar", "Calendar", "clock", "/dashboard/principal/calendar"),
+    _nav("committees", "Committees", "tasks", "/dashboard/principal/committees"),
     _nav("hostel", "Hostel", "students", "/dashboard/principal/hostel"),
     _nav("assets", "Fixed assets", "tasks", "/dashboard/principal/assets"),
     _nav("activity", "Activity log", "clock", "/dashboard/principal/activity"),
@@ -396,6 +401,7 @@ HOD_NAV_ITEMS = [
     _nav("students", "Student lookup", "students", "/dashboard/hod/students", mobile=True, short="Students"),
     _nav("reports", "Reports", "exams", "/dashboard/hod/reports"),
     _nav("calendar", "Calendar", "clock", "/dashboard/hod/calendar"),
+    _nav("committees", "Committees", "tasks", "/dashboard/hod/committees"),
     _nav("my-announcements", "Post an announcement", "megaphone", "/dashboard/hod/my-announcements"),
     _nav("help", "Help & manual", "file", "/dashboard/hod/help"),
 ]
@@ -420,6 +426,7 @@ EXAM_NAV_ITEMS = [
     _nav("purchases", "Purchase requests", "tasks", "/dashboard/exam/purchases", group="Me"),
     _nav("payslips", "My pay & attendance", "file", "/dashboard/exam/payslips", group="Me"),
     _nav("calendar", "Calendar", "clock", "/dashboard/exam/calendar", group="Me"),
+    _nav("committees", "Committees", "tasks", "/dashboard/exam/committees", group="Me"),
     _nav("profile", "My Profile", "user", "/dashboard/exam/profile", group="Me"),
     _nav("my-warnings", "My warnings", "alert", "/dashboard/exam/my-warnings", group="Me"),
     _nav("help", "Help & manual", "file", "/dashboard/exam/help", group="Me"),
@@ -435,6 +442,7 @@ WARDEN_NAV_ITEMS = [
     _nav("purchases", "Purchase requests", "tasks", "/dashboard/warden/purchases", group="Me"),
     _nav("payslips", "My pay & attendance", "file", "/dashboard/warden/payslips", group="Me"),
     _nav("calendar", "Calendar", "clock", "/dashboard/warden/calendar", group="Me"),
+    _nav("committees", "Committees", "tasks", "/dashboard/warden/committees", group="Me"),
     _nav("profile", "My Profile", "user", "/dashboard/warden/profile", group="Me"),
     _nav("my-warnings", "My warnings", "alert", "/dashboard/warden/my-warnings", group="Me"),
     _nav("help", "Help & manual", "file", "/dashboard/warden/help", group="Me"),
@@ -462,6 +470,7 @@ ACCOUNTS_NAV_ITEMS = [
     _nav("tasks", "Tasks", "tasks", "/dashboard/accounts/tasks", group="Me"),
     _nav("applications", "Applications", "file", "/dashboard/accounts/applications", group="Me"),
     _nav("calendar", "Calendar", "clock", "/dashboard/accounts/calendar", group="Me"),
+    _nav("committees", "Committees", "tasks", "/dashboard/accounts/committees", group="Me"),
     _nav("profile", "My Profile", "user", "/dashboard/accounts/profile", group="Me"),
     _nav("my-warnings", "My warnings", "alert", "/dashboard/accounts/my-warnings", group="Me"),
     _nav("help", "Help & manual", "file", "/dashboard/accounts/help", group="Me"),
@@ -540,6 +549,7 @@ FACULTY_NAV_ITEMS = [
     _nav("profile", "My Profile", "user", "/dashboard/faculty/profile", group="Account"),
     _nav("my-warnings", "My warnings", "alert", "/dashboard/faculty/my-warnings", group="Account"),
     _nav("calendar", "Calendar", "clock", "/dashboard/faculty/calendar", group="Services"),
+    _nav("committees", "Committees", "tasks", "/dashboard/faculty/committees", group="Services"),
     _nav("help", "Help & manual", "file", "/dashboard/faculty/help", group="Account"),
 ]
 
@@ -771,6 +781,7 @@ from app.clinical.router import router as clinical_router  # noqa: E402
 from app.paperfiles.router import router as paper_files_router  # noqa: E402
 from app.alumni.router import router as alumni_router  # noqa: E402
 from app.mentoring.router import router as mentoring_router  # noqa: E402
+from app.committees.router import router as committees_router  # noqa: E402
 from app.reports.center_router import router as report_center_router  # noqa: E402
 from app.reports.monthly_router import router as monthly_report_router  # noqa: E402
 from app.discipline.router import router as discipline_router  # noqa: E402
@@ -793,6 +804,7 @@ app.include_router(clinical_router, prefix=settings.api_v1_prefix)
 app.include_router(paper_files_router, prefix=settings.api_v1_prefix)
 app.include_router(alumni_router, prefix=settings.api_v1_prefix)
 app.include_router(mentoring_router, prefix=settings.api_v1_prefix)
+app.include_router(committees_router, prefix=settings.api_v1_prefix)
 from app.calendar.router import router as calendar_router  # noqa: E402
 
 app.include_router(calendar_router, prefix=settings.api_v1_prefix)
@@ -1017,6 +1029,32 @@ async def calendar_page(portal: str, request: Request):
     base, nav, roles = _CALENDAR_PAGES[portal]
     return templates.TemplateResponse(request, "shared/calendar.html", {"base_template": base, "nav_items": globals()[nav], "active_nav": "calendar",
                                                                        "allowed_roles": roles})
+
+
+_COMMITTEE_PORTALS = ("admin", "library", "gate", "staff", "principal", "hod", "exam", "warden", "accounts", "faculty")
+
+
+@app.get("/dashboard/{portal}/committees", include_in_schema=False)
+async def committees_page(portal: str, request: Request):
+    if portal not in _COMMITTEE_PORTALS:
+        raise HTTPException(status_code=404)
+    base, nav, roles = _CALENDAR_PAGES[portal]
+    return templates.TemplateResponse(request, "shared/committees.html", {"base_template": base, "nav_items": globals()[nav], "active_nav": "committees",
+                                                                         "allowed_roles": roles, "is_admin_page": portal == "admin"})
+
+
+@app.get("/dashboard/my-committees", include_in_schema=False)
+async def my_committees_redirect(request: Request):
+    """Sends anyone to the Committees page of their own portal (used by committee notifications)."""
+    from app.auth.redirects import home_for_roles
+
+    try:
+        roles = decode_access_token(request.cookies.get("access_token") or "").get("roles", [])
+    except Exception:
+        return RedirectResponse("/?reauth=1", status_code=302)
+    home = home_for_roles(roles) or ""
+    portal = home.split("/")[2] if home.count("/") >= 2 else ""
+    return RedirectResponse(f"/dashboard/{portal}/committees" if portal in _COMMITTEE_PORTALS else "/", status_code=302)
 
 
 @app.get("/dashboard/{portal}/help", include_in_schema=False)
