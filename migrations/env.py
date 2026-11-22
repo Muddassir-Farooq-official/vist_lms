@@ -42,7 +42,6 @@ from app.parents import models as parents_models  # noqa: F401
 from app.exams import models as exams_models  # noqa: F401
 from app.sms import models as sms_models  # noqa: F401
 from app.supplementary import models as supplementary_models  # noqa: F401
-from app.admissions import models as admissions_models  # noqa: F401
 from app.inventory import models as inventory_models  # noqa: F401
 from app.assets import models as assets_models  # noqa: F401
 from app.approvals import models as approvals_models  # noqa: F401

@@ -2204,7 +2204,7 @@ class AcademicTermPatch(BaseModel):
 
 @router.get("/academic-terms", summary="The institute's academic terms with dates and status")
 async def list_academic_terms(current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> list[dict]:
-    # Term names and dates are not sensitive, and several screens need them (fee structures, datesheets, admissions)
+    # Term names and dates are not sensitive, and several screens need them (fee structures, datesheets)
     # for people without course permissions, e.g. the accounts office.
     service = AcademicTermService(db)
     terms = await service.all()

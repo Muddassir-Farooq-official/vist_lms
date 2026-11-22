@@ -44,7 +44,6 @@ from app.exams import models as _exam_models  # noqa: F401
 from app.sms import models as _sms_models  # noqa: F401
 from app.supplementary import models as _supp_models  # noqa: F401
 from app.fees import refund_models as _refund_models  # noqa: F401
-from app.admissions import models as _admission_models  # noqa: F401
 from app.inventory import models as _inventory_models  # noqa: F401
 from app.assets import models as _assets_models  # noqa: F401
 from app.approvals import models as _approvals_models  # noqa: F401

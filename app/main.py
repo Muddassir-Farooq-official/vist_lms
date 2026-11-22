@@ -13,7 +13,6 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.templating import Jinja2Templates
 
-from app.admissions.router import router as admissions_router
 from app.fees.refund_router import router as refund_router
 from app.inventory.router import router as inventory_router
 from app.assets.router import router as assets_router
@@ -231,7 +230,6 @@ def _nav(slug, label, icon, href, *, group=None, mobile=False, short=None, badge
 ADMIN_NAV_ITEMS = [
     _nav("dashboard", "Dashboard", "dashboard", "/dashboard/admin", mobile=True, short="Home"),
     _nav("students", "Students", "students", "/dashboard/admin/students", group="Students", mobile=True, keywords="learners roll"),
-    _nav("admissions", "Admissions", "imports", "/dashboard/admin/admissions", group="Students", badge="admissions", keywords="applicants merit list new students"),
     _nav("reg-numbers", "University Reg Nos", "file", "/dashboard/admin/reg-numbers", group="Students", keywords="registration KMU AUST affiliation"),
     _nav("profile-changes", "Profile changes", "user", "/dashboard/admin/profile-changes", group="Students", badge="profile_changes"),
     _nav("certificates", "Certificate requests", "file", "/dashboard/admin/certificates", group="Students", badge="certificates", keywords="bonafide character"),
@@ -816,7 +814,6 @@ app.include_router(view_as_router, prefix=settings.api_v1_prefix)
 app.include_router(activity_router, prefix=settings.api_v1_prefix)
 app.include_router(profile_changes_router, prefix=settings.api_v1_prefix)
 app.include_router(performance_router, prefix=settings.api_v1_prefix)
-app.include_router(admissions_router, prefix=settings.api_v1_prefix)
 app.include_router(parents_router, prefix=settings.api_v1_prefix)
 app.include_router(audit_router, prefix=settings.api_v1_prefix)
 app.include_router(class_requests_router, prefix=settings.api_v1_prefix)
@@ -1280,11 +1277,6 @@ async def admin_settings_page(request: Request):
     return templates.TemplateResponse(
         request, "admin/settings.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "settings"}
     )
-
-
-@app.get("/dashboard/admin/admissions", include_in_schema=False)
-async def admin_admissions_page(request: Request):
-    return templates.TemplateResponse(request, "admin/admissions.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "admissions"})
 
 
 @app.get("/dashboard/admin/transport", include_in_schema=False)

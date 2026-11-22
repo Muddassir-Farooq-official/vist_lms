@@ -158,7 +158,6 @@ UI: dict[str, dict] = {
     "sms_on_attendance_warning": {"section": "SMS messages", "label": "Weekly attendance warning", "control": "switch"},
     "sms_on_results": {"section": "SMS messages", "label": "When results are published", "control": "switch"},
     "sms_on_datesheet": {"section": "SMS messages", "label": "When a datesheet is published", "control": "switch"},
-    "sms_on_admission": {"section": "SMS messages", "label": "Applicants selected in a merit list", "control": "switch"},
     "sms_on_security_alert": {"section": "SMS messages", "label": "Security alerts to administrators", "control": "switch"},
     "sms_to_guardian": {"section": "SMS messages", "label": "Also send each message to the guardian", "control": "switch"},
     # ---------------------------------------------------------------- other

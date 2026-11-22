@@ -55,7 +55,7 @@ async def test_other_portals_are_grouped_too(app_client, admin_user):
 async def test_badges_count_waiting_work_for_people_who_can_act(app_client, admin_user, db_session):
     await _login_admin(app_client)
     before = (await app_client.get("/api/v1/nav/badges")).json()
-    assert set(before) == {"approvals", "profile_changes", "certificates", "admissions", "result_sheets"}
+    assert set(before) == {"approvals", "profile_changes", "certificates", "result_sheets"}
     assert all(isinstance(v, int) for v in before.values())
     db_session.add(ApprovalRequest(kind="FINE_WAIVE", summary="Waive a test fine", payload={}, status="REQUESTED"))
     db_session.add(ApprovalRequest(kind="FINE_WAIVE", summary="Already decided", payload={}, status="APPROVED"))

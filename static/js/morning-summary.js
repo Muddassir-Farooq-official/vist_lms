@@ -9,7 +9,7 @@
     const inner = '<div class="kpi-label">' + esc(label) + '</div><div class="kpi-value">' + esc(value) + "</div>";
     return href ? '<a class="kpi" href="' + href + '">' + inner + "</a>" : '<div class="kpi">' + inner + "</div>";
   };
-  const LINKS = { approvals: ["approval", "approvals"], admissions: ["admission form", "admissions"], profile_changes: ["profile change", "profile-changes"],
+  const LINKS = { approvals: ["approval", "approvals"], profile_changes: ["profile change", "profile-changes"],
     certificates: ["certificate request", "certificates"], result_sheets: ["result sheet to approve", "result-sheets"], applications: ["application", "applications"],
     money_review: ["money change to review", "activity#money"] };
 

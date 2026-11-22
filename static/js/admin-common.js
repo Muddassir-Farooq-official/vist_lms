@@ -1298,7 +1298,7 @@ window.VistAdmin = (function () {
     });
   }
 
-  // Waiting work beside menu links: approvals, profile changes, certificate requests, admissions, result sheets.
+  // Waiting work beside menu links: approvals, profile changes, certificate requests, result sheets.
   // Each count is only sent to people who can act on it (GET /api/v1/nav/badges).
   function wireNavBadges() {
     if (!document.querySelector("[data-badge]")) return;
