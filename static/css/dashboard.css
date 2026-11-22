@@ -4266,3 +4266,16 @@ details.tg-session > summary.tg-head { cursor: pointer; }
 .ro-batch td small, #ro-c-body td small, #ro-n-body td small { display: block; color: var(--text-secondary); }
 .ro-hold-reason { width: 100%; min-width: 180px; }
 .ro-bad { color: #b91c1c; }
+
+/* ---------- Exam seating ---------- */
+.se-room-pick { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 10px; }
+.se-room { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin: 12px 0; }
+.se-room h3 { margin: 0 0 6px; font-size: 0.98rem; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.se-grid { display: grid; gap: 4px; overflow-x: auto; padding-bottom: 4px; }
+.se-seat { border: 1px solid var(--border); border-radius: 6px; padding: 3px 5px; font-size: 0.7rem; line-height: 1.25; min-width: 74px; background: var(--surface, #fff); }
+.se-seat b { display: block; font-size: 0.72rem; }
+.se-seat.empty { background: transparent; border-style: dashed; color: var(--text-secondary); }
+.se-seat[data-p="0"] { background: #eff6ff; } .se-seat[data-p="1"] { background: #fef3c7; } .se-seat[data-p="2"] { background: #ecfdf5; }
+.se-seat[data-p="3"] { background: #fce7f3; } .se-seat[data-p="4"] { background: #ede9fe; } .se-seat[data-p="5"] { background: #f1f5f9; }
+.se-inv-list { display: grid; gap: 4px; max-height: 320px; overflow: auto; margin: 6px 0 10px; }
+.se-inv-list .busy { color: var(--text-secondary); }

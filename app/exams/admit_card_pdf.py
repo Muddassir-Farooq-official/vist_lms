@@ -67,7 +67,7 @@ def render_admit_card_pdf(card: dict, institute: str | None = None) -> bytes:
         c.drawString(x0, yy, p["exam_date"].strftime("%a %d %b %Y") if hasattr(p["exam_date"], "strftime") else str(p["exam_date"]))
         c.drawString(x0 + 30 * mm, yy, f"{p['start_time']}\u2013{p['end_time']}")
         c.drawString(x0 + 58 * mm, yy, f"{p['course_code']} {p['course_title']}"[:42])
-        c.drawString(x0 + 128 * mm, yy, p["room"][:14])
+        c.drawString(x0 + 128 * mm, yy, (p["room"] or "")[:14])
         if p["eligible"]:
             c.drawString(x0 + 148 * mm, yy, "Eligible")
         else:

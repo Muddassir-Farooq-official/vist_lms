@@ -22,6 +22,7 @@ from app.branding.router import public_router as branding_public_router
 from app.branding.router import router as branding_router
 from app.supplementary.router import router as supplementary_router
 from app.sms.router import public_router as sms_public_router, router as sms_router
+from app.exams.seating_router import router as exam_seating_router
 from app.exams.router import router as exams_router
 from app.policy.router import router as policy_router
 from app.notifications.email_router import me_router as email_me_router, router as email_settings_router, status_router as system_status_router
@@ -248,6 +249,7 @@ ADMIN_NAV_ITEMS = [
     _nav("results", "Result Types", "exams", "/dashboard/admin/results", group="Teaching & exams", keywords="assessment marks grading"),
     _nav("result-sheets", "Result Approval", "tasks", "/dashboard/admin/result-sheets", group="Teaching & exams", badge="result_sheets", keywords="award list university result publish"),
     _nav("datesheets", "Datesheets", "clock", "/dashboard/admin/datesheets", group="Teaching & exams", keywords="admit cards exam schedule"),
+    _nav("seating", "Seating & invigilation", "grid", "/dashboard/admin/seating", group="Teaching & exams", keywords="exam rooms seats door list invigilators duty"),
     _nav("supplementary", "Supplementary Exams", "exams", "/dashboard/admin/supplementary", group="Teaching & exams", keywords="resit"),
     _nav("fees", "Fees", "fees", "/dashboard/admin/fees", group="Fees & accounts", keywords="challan installments structures"),
     _nav("fee-defaulters", "Fee defaulters", "fees", "/dashboard/admin/fee-defaulters", group="Fees & accounts", keywords="overdue reminders promise"),
@@ -396,6 +398,7 @@ EXAM_NAV_ITEMS = [
     _nav("results", "Result approval", "tasks", "/dashboard/exam", mobile=True, short="Results", group="Exams", badge="result_sheets"),
     _nav("result-types", "Result types", "exams", "/dashboard/exam/result-types", group="Exams"),
     _nav("datesheets", "Datesheets & admit cards", "clock", "/dashboard/exam/datesheets", group="Exams"),
+    _nav("seating", "Seating & invigilation", "grid", "/dashboard/exam/seating", group="Exams"),
     _nav("supplementary", "Supplementary exams", "exams", "/dashboard/exam/supplementary", group="Exams"),
     _nav("students", "Student lookup", "students", "/dashboard/exam/students", group="Exams"),
     _nav("reg-numbers", "University Reg Nos", "file", "/dashboard/exam/reg-numbers", group="Exams"),
@@ -721,6 +724,7 @@ from app.fees.onebill_router import report_router as onebill_report_router, rout
 
 app.include_router(onebill_router, prefix=settings.api_v1_prefix)
 app.include_router(onebill_report_router, prefix=settings.api_v1_prefix)
+app.include_router(exam_seating_router, prefix=settings.api_v1_prefix)
 app.include_router(exams_router, prefix=settings.api_v1_prefix)
 app.include_router(sms_router, prefix=settings.api_v1_prefix)
 app.include_router(sms_public_router)                          # /wa/d/<token>: the document sent with a WhatsApp message
@@ -1793,6 +1797,16 @@ async def exam_supplementary_page(request: Request):
 @app.get("/dashboard/admin/supplementary", include_in_schema=False)
 async def admin_supplementary_page(request: Request):
     return templates.TemplateResponse(request, "admin/supplementary.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "supplementary"})
+
+
+@app.get("/dashboard/admin/seating", include_in_schema=False)
+async def admin_seating_page(request: Request):
+    return templates.TemplateResponse(request, "admin/seating.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "seating"})
+
+
+@app.get("/dashboard/exam/seating", include_in_schema=False)
+async def exam_seating_page(request: Request):
+    return templates.TemplateResponse(request, "admin/seating.html", {"nav_items": EXAM_NAV_ITEMS, "active_nav": "seating"})
 
 
 @app.get("/dashboard/admin/datesheets", include_in_schema=False)

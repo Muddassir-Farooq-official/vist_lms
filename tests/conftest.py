@@ -72,6 +72,7 @@ from app.timetabling import models as _timetabling_models  # noqa: F401
 from app.serverhealth import models as _serverhealth_models  # noqa: F401
 from app.navigation import models as _navigation_models  # noqa: F401
 from app.academics import rollover as _rollover_models  # noqa: F401
+from app.exams import seating as _seating_models  # noqa: F401
 
 TEST_DATABASE_URL = settings.database_url.rsplit("/", 1)[0] + "/vist_lms_test"
 

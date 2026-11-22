@@ -444,6 +444,12 @@ class ExamScheduleService:
             r["eligible"] = ok
             r["reason"] = reason
         withheld = await self.withheld(student_id)
+        from app.exams.seating import SeatingService
+
+        seats = await SeatingService(self.session).seat_of(student_id, [r["id"] for r in rows])
+        for r in rows:                                       # the room and seat when the seating is made
+            if r["id"] in seats:
+                r["room"], r["seat"] = f"{seats[r['id']][0]} {seats[r['id']][1]}", seats[r["id"]][1]
         prog = await self.session.get(Program, student.program_id) if student.program_id else None
         return {"schedule": self.summary(sched), "student": {"id": student.id, "name": f"{student.first_name} {student.last_name}",
                 "roll_number": student.roll_number, "reg_number": student.reg_number, "program": prog.code if prog else None,
