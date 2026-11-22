@@ -1,6 +1,6 @@
 # Student
 
-**Home** shows today's classes, notices, fees due and anything waiting for you. Sign in with your roll number.
+**Home** shows today's classes, notices, fees due and anything waiting for you. Sign in with your roll number. The **Today** card at the top shows today's classes and whether you were marked present, what you have to pay with **Pay now** (the challan, and the number for 1Bill or your bank app), your next exam and your latest result. If you allow notifications on your phone, you are told when you are marked absent in a class and when a result is published.
 
 ## Study
 

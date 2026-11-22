@@ -1,5 +1,28 @@
 [
   {
+    "version": "1.52.0",
+    "date": "2026-11-22",
+    "title": "Home cards for families",
+    "summary": "Parents see a card per child, students a Today card; phones are told about absences and results.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Parents",
+        "text": "Your children today: a card per child with today's attendance, fees to pay with Pay now, the next exam and the latest result."
+      },
+      {
+        "kind": "new",
+        "for": "Students",
+        "text": "A Today card on the home page: today's classes and attendance, Pay now, next exam, latest result."
+      },
+      {
+        "kind": "new",
+        "for": "Parents",
+        "text": "Phone notifications when a child is marked absent in a class or a result is published (Settings → Rules → Reports can switch them off)."
+      }
+    ]
+  },
+  {
     "version": "1.51.0",
     "date": "2026-11-22",
     "title": "Outcome-based education (CLO/PLO)",
