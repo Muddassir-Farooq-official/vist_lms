@@ -1,0 +1,66 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN{% endblock %}
+{% block title %}Graduation & alumni{% endblock %}
+{% block page_title %}Graduation & alumni{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Draw up a program's graduation list, graduate the cleared students in one step, track degrees and transcripts, and keep in touch with alumni.</div>{% endblock %}
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="graduation" role="tab" aria-selected="true"><span>Graduation lists</span></button>
+  <button class="portal-tab" data-tab="degrees" role="tab" aria-selected="false"><span>Degrees &amp; transcripts</span></button>
+  <button class="portal-tab" data-tab="directory" role="tab" aria-selected="false"><span>Alumni directory</span></button>
+  <button class="portal-tab" data-tab="surveys" role="tab" aria-selected="false"><span>Surveys</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="graduation">
+<section class="sh-card">
+  <h2 class="panel-title">Draw up a graduation list</h2>
+  <p class="panel-hint">Every current student of the program is checked: every course passed and the CGPA needed (degree audit), and clearance (fees, fines, library, store, hostel). The clear ones are ticked.</p>
+  <form id="gl-form" class="form-grid">
+    <label>Program<select id="gl-program" class="text-input" required></select></label>
+    <label>Title<input id="gl-title" class="text-input" maxlength="120" required placeholder="Convocation 2026"></label>
+    <label>Graduation date<input id="gl-date" type="date" class="text-input" required></label>
+    <div class="decision-bar"><button type="submit" class="role-btn">Draw up</button></div>
+  </form>
+</section>
+<section class="sh-card">
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>List</th><th>Program</th><th>Date</th><th>Ticked</th><th>Status</th><th></th></tr></thead><tbody id="gl-list"></tbody></table></div>
+</section>
+<section class="sh-card" id="gl-detail" hidden>
+  <h2 class="panel-title" id="gl-d-title"></h2>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Graduates</th><th>Roll no.</th><th>Name</th><th>CGPA</th><th>Checks</th></tr></thead><tbody id="gl-entries"></tbody></table></div>
+  <div class="decision-bar"><a class="role-btn secondary-btn" id="gl-pdf" href="#">List (PDF)</a> <button type="button" class="role-btn secondary-btn" id="gl-refresh">Check again</button>
+    <button type="button" class="role-btn" id="gl-confirm">Graduate the ticked students</button> <button type="button" class="role-btn secondary-btn" id="gl-del">Delete list</button></div>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="degrees" hidden>{% include "shared/_degrees.html" %}</div>
+
+<div class="portal-tab-panel" data-tab-panel="directory" hidden>
+<section class="sh-card">
+  <div class="toolbar"><input id="ad-q" type="search" class="text-input" placeholder="Name, employer or city" aria-label="Search alumni">
+    <select id="ad-program" class="text-input" aria-label="Program"><option value="">All programs</option></select>
+    <a class="role-btn secondary-btn" id="ad-csv" href="/api/v1/alumni/directory/all.csv">Download (CSV)</a></div>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Graduate</th><th>Program</th><th>Work</th><th>City</th><th>Contact</th><th></th></tr></thead><tbody id="ad-list"></tbody></table></div>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="surveys" hidden>
+<section class="sh-card">
+  <h2 class="panel-title">Make a survey</h2>
+  <form id="sv-form" class="form-grid">
+    <label>Title<input id="sv-title" class="text-input" maxlength="150" required placeholder="Graduate survey 2026"></label>
+    <label class="cl-wide">Introduction<textarea id="sv-intro" class="text-input" rows="2" maxlength="2000"></textarea></label>
+    <label class="cl-wide">Questions, one per line. Start a line with <b>R:</b> for a 1-5 rating, <b>T:</b> for a written answer, or <b>C:</b> for a choice with options after a | (e.g. <i>C: Employed? | Yes | No | Studying</i>)
+      <textarea id="sv-qs" class="text-input" rows="6" required>R: How well did the program prepare you for work?
+C: What are you doing now? | Employed | Studying further | Looking for work | Other
+T: What should we teach better?</textarea></label>
+    <div class="decision-bar"><button type="submit" class="role-btn">Save survey</button></div>
+  </form>
+</section>
+<section class="sh-card">
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Survey</th><th>Answers</th><th>Status</th><th></th></tr></thead><tbody id="sv-list"></tbody></table></div>
+</section>
+<section class="sh-card" id="sv-results" hidden><h2 class="panel-title" id="sv-r-title"></h2><div id="sv-r-body"></div></section>
+</div>
+{% endblock %}
+{% block extra_scripts %}<script src="/static/js/degrees.js"></script><script src="/static/js/alumni-admin.js"></script>{% endblock %}

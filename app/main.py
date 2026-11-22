@@ -235,6 +235,7 @@ ADMIN_NAV_ITEMS = [
     _nav("reg-numbers", "University Reg Nos", "file", "/dashboard/admin/reg-numbers", group="Students", keywords="registration KMU AUST affiliation"),
     _nav("profile-changes", "Profile changes", "user", "/dashboard/admin/profile-changes", group="Students", badge="profile_changes"),
     _nav("certificates", "Certificate requests", "file", "/dashboard/admin/certificates", group="Students", badge="certificates", keywords="bonafide character"),
+    _nav("alumni", "Graduation & alumni", "graduation-cap", "/dashboard/admin/alumni", group="Students", keywords="graduates convocation degree transcript survey directory"),
     _nav("warnings", "Warnings", "alert", "/dashboard/admin/warnings", group="Students", keywords="discipline"),
     _nav("hostel", "Hostel", "hostel", "/dashboard/admin/hostel", group="Students", keywords="rooms boarders mess roll call"),
     _nav("transport", "Transport", "students", "/dashboard/admin/transport", group="Students", keywords="bus van route pick drop"),
@@ -407,6 +408,7 @@ EXAM_NAV_ITEMS = [
     _nav("datesheets", "Datesheets & admit cards", "clock", "/dashboard/exam/datesheets", group="Exams"),
     _nav("seating", "Seating & invigilation", "grid", "/dashboard/exam/seating", group="Exams"),
     _nav("question-papers", "Question papers", "exams", "/dashboard/exam/question-papers", group="Exams"),
+    _nav("degrees", "Degrees & transcripts", "graduation-cap", "/dashboard/exam/degrees", group="Exams"),
     _nav("obe", "Outcomes (OBE)", "check-circle", "/dashboard/exam/obe", group="Exams"),
     _nav("supplementary", "Supplementary exams", "exams", "/dashboard/exam/supplementary", group="Exams"),
     _nav("students", "Student lookup", "students", "/dashboard/exam/students", group="Exams"),
@@ -499,6 +501,12 @@ STUDENT_NAV_ITEMS = [
 CLINICAL_NAV_ITEMS = [
     _nav("home", "My rotations", "students", "/dashboard/clinical", mobile=True, short="Rotations"),
     _nav("help", "Help & manual", "file", "/dashboard/clinical/help"),
+]
+
+# Alumni portal: a graduate keeps their login (app/alumni).
+ALUMNI_NAV_ITEMS = [
+    _nav("home", "My alumni page", "graduation-cap", "/dashboard/alumni", mobile=True, short="Alumni"),
+    _nav("help", "Help & manual", "file", "/dashboard/alumni/help"),
 ]
 
 # Teacher self-service.
@@ -761,6 +769,7 @@ from app.family.router import router as family_router  # noqa: E402
 from app.substitutes.router import router as substitutes_router  # noqa: E402
 from app.clinical.router import router as clinical_router  # noqa: E402
 from app.qbank.router import router as qbank_router  # noqa: E402
+from app.alumni.router import router as alumni_router  # noqa: E402
 from app.reports.center_router import router as report_center_router  # noqa: E402
 from app.reports.monthly_router import router as monthly_report_router  # noqa: E402
 from app.discipline.router import router as discipline_router  # noqa: E402
@@ -781,6 +790,7 @@ app.include_router(family_router, prefix=settings.api_v1_prefix)
 app.include_router(substitutes_router, prefix=settings.api_v1_prefix)
 app.include_router(clinical_router, prefix=settings.api_v1_prefix)
 app.include_router(qbank_router, prefix=settings.api_v1_prefix)
+app.include_router(alumni_router, prefix=settings.api_v1_prefix)
 from app.calendar.router import router as calendar_router  # noqa: E402
 
 app.include_router(calendar_router, prefix=settings.api_v1_prefix)
@@ -993,6 +1003,7 @@ _CALENDAR_PAGES = {
     "parent": ("parent/_base.html", "PARENT_NAV_ITEMS", None), "principal": ("admin/_base.html", "PRINCIPAL_NAV_ITEMS", "ADMIN,PRINCIPAL"),
     "hod": ("admin/_base.html", "HOD_NAV_ITEMS", "ADMIN,HOD"), "staff": ("staff/_base.html", "STAFF_NAV_ITEMS", None),
     "clinical": ("clinical/_base.html", "CLINICAL_NAV_ITEMS", None),
+    "alumni": ("alumni/_base.html", "ALUMNI_NAV_ITEMS", None),
 }
 
 
@@ -1854,6 +1865,21 @@ async def admin_supplementary_page(request: Request):
 @app.get("/dashboard/admin/seating", include_in_schema=False)
 async def admin_seating_page(request: Request):
     return templates.TemplateResponse(request, "admin/seating.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "seating"})
+
+
+@app.get("/dashboard/admin/alumni", include_in_schema=False)
+async def admin_alumni_page(request: Request):
+    return templates.TemplateResponse(request, "admin/alumni.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "alumni"})
+
+
+@app.get("/dashboard/exam/degrees", include_in_schema=False)
+async def exam_degrees_page(request: Request):
+    return templates.TemplateResponse(request, "admin/degrees.html", {"nav_items": EXAM_NAV_ITEMS, "active_nav": "degrees"})
+
+
+@app.get("/dashboard/alumni", include_in_schema=False)
+async def alumni_home_page(request: Request):
+    return templates.TemplateResponse(request, "alumni/home.html", {"nav_items": ALUMNI_NAV_ITEMS, "active_nav": "home"})
 
 
 @app.get("/dashboard/admin/question-papers", include_in_schema=False)
