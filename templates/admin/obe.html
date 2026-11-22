@@ -1,0 +1,56 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN,EXAM_CONTROLLER{% endblock %}
+{% block title %}Outcomes (OBE){% endblock %}
+{% block page_title %}Outcomes (OBE){% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Program outcomes (PLOs) and pass levels, teachers' course files to check and lock, and PLO attainment for accreditation.</div>{% endblock %}
+
+{% block content %}
+<section class="sh-card">
+  <div class="dc-areas" role="tablist" aria-label="Part">
+    <button type="button" role="tab" data-tab="plo" aria-selected="true">Program outcomes</button>
+    <button type="button" role="tab" data-tab="files" aria-selected="false">Course files</button>
+    <button type="button" role="tab" data-tab="report" aria-selected="false">PLO attainment</button>
+  </div>
+</section>
+
+<div data-pane="plo">
+<section class="sh-card">
+  <div class="toolbar"><label class="field-label-sm" for="op-prog">Program</label><select id="op-prog" class="text-input" aria-label="Program"></select></div>
+  <div class="toolbar">
+    <label class="field-label-sm" for="op-st">A student reaches an outcome at</label><input type="number" id="op-st" class="text-input" min="1" max="100" style="max-width:90px" /> %
+    <label class="field-label-sm" for="op-bt">Attained when this % of students reach it</label><input type="number" id="op-bt" class="text-input" min="1" max="100" style="max-width:90px" /> %
+  </div>
+  <div id="op-plos"></div>
+  <div class="decision-bar"><button type="button" class="role-btn secondary-btn" id="op-add">Add a PLO</button><button type="button" class="role-btn" id="op-save">Save</button></div>
+  <p class="panel-hint" id="op-msg" aria-live="polite"></p>
+</section>
+</div>
+
+<div data-pane="files" hidden>
+<section class="sh-card">
+  <div class="toolbar"><label class="field-label-sm" for="of-status">Show</label>
+    <select id="of-status" class="text-input"><option value="SUBMITTED">Waiting to be checked</option><option value="">All classes</option><option value="LOCKED">Locked</option><option value="DRAFT">Still with the teacher</option></select></div>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Class</th><th>Term</th><th>CLOs</th><th>Status</th><th></th></tr></thead><tbody id="of-body"></tbody></table></div>
+</section>
+<section class="sh-card" id="of-detail" hidden>
+  <div class="toolbar"><strong id="of-title"></strong>
+    <button type="button" class="role-btn" id="of-lock">Lock</button>
+    <input id="of-note" class="text-input" maxlength="500" placeholder="What should the teacher change?" />
+    <button type="button" class="role-btn secondary-btn" id="of-return">Send back</button></div>
+  <select id="ob-class" hidden></select><span id="ob-status" hidden></span><p id="ob-note" hidden></p>
+</section>
+<div id="of-file" hidden>{% include "_obe_course_file.html" %}</div>
+</div>
+
+<div data-pane="report" hidden>
+<section class="sh-card">
+  <div class="toolbar"><label class="field-label-sm" for="or-prog">Program</label><select id="or-prog" class="text-input"></select>
+    <input id="or-term" class="text-input" placeholder="Only these terms (comma separated, optional)" style="min-width:260px" />
+    <button type="button" class="role-btn secondary-btn" id="or-run">Show</button></div>
+  <p class="panel-hint" id="or-hint"></p>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>PLO</th><th>Students assessed</th><th>Average</th><th>Reached the level</th><th>Attained</th></tr></thead><tbody id="or-body"></tbody></table></div>
+</section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}<script src="/static/js/obe-course-file.js"></script><script src="/static/js/obe-office.js"></script>{% endblock %}

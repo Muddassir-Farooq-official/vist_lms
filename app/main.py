@@ -251,6 +251,7 @@ ADMIN_NAV_ITEMS = [
     _nav("datesheets", "Datesheets", "clock", "/dashboard/admin/datesheets", group="Teaching & exams", keywords="admit cards exam schedule"),
     _nav("seating", "Seating & invigilation", "grid", "/dashboard/admin/seating", group="Teaching & exams", keywords="exam rooms seats door list invigilators duty"),
     _nav("supplementary", "Supplementary Exams", "exams", "/dashboard/admin/supplementary", group="Teaching & exams", keywords="resit"),
+    _nav("obe", "Outcomes (OBE)", "check-circle", "/dashboard/admin/obe", group="Teaching & exams", keywords="CLO PLO accreditation attainment course file"),
     _nav("fees", "Fees", "fees", "/dashboard/admin/fees", group="Fees & accounts", keywords="challan installments structures"),
     _nav("fee-defaulters", "Fee defaulters", "fees", "/dashboard/admin/fee-defaulters", group="Fees & accounts", keywords="overdue reminders promise"),
     _nav("fines", "Fines", "ban", "/dashboard/admin/fines", group="Fees & accounts"),
@@ -399,6 +400,7 @@ EXAM_NAV_ITEMS = [
     _nav("result-types", "Result types", "exams", "/dashboard/exam/result-types", group="Exams"),
     _nav("datesheets", "Datesheets & admit cards", "clock", "/dashboard/exam/datesheets", group="Exams"),
     _nav("seating", "Seating & invigilation", "grid", "/dashboard/exam/seating", group="Exams"),
+    _nav("obe", "Outcomes (OBE)", "check-circle", "/dashboard/exam/obe", group="Exams"),
     _nav("supplementary", "Supplementary exams", "exams", "/dashboard/exam/supplementary", group="Exams"),
     _nav("students", "Student lookup", "students", "/dashboard/exam/students", group="Exams"),
     _nav("reg-numbers", "University Reg Nos", "file", "/dashboard/exam/reg-numbers", group="Exams"),
@@ -497,6 +499,7 @@ FACULTY_NAV_ITEMS = [
     _nav("homework", "Homework diary", "exams", "/dashboard/faculty/homework", group="Teaching"),                                # School mode only
     _nav("exam-marks", "Exam marks & report cards", "exams", "/dashboard/faculty/exam-marks", group="Teaching", short="Marks"),  # School mode only
     _nav("grading", "Grading", "exams", "/dashboard/faculty/grading", group="Teaching", mobile=True),
+    _nav("obe", "Course outcomes (OBE)", "check-circle", "/dashboard/faculty/obe", group="Teaching"),
     _nav("watch", "Students to watch", "students", "/dashboard/faculty/watch", group="Teaching"),
     _nav("feedback", "Student feedback", "check-circle", "/dashboard/faculty/feedback", group="Teaching"),
     _nav("timetable", "My Timetable", "clock", "/dashboard/faculty/timetable", group="Teaching"),
@@ -735,6 +738,7 @@ from app.navigation.router import router as nav_shortcuts_router  # noqa: E402
 from app.reports.morning import router as morning_summary_router  # noqa: E402
 from app.reports.datacheck import router as data_check_router  # noqa: E402
 from app.academics.rollover_router import router as rollover_router  # noqa: E402
+from app.obe.router import router as obe_router  # noqa: E402
 from app.reports.center_router import router as report_center_router  # noqa: E402
 from app.reports.monthly_router import router as monthly_report_router  # noqa: E402
 from app.discipline.router import router as discipline_router  # noqa: E402
@@ -750,6 +754,7 @@ app.include_router(nav_shortcuts_router, prefix=settings.api_v1_prefix)
 app.include_router(morning_summary_router, prefix=settings.api_v1_prefix)
 app.include_router(data_check_router, prefix=settings.api_v1_prefix)
 app.include_router(rollover_router, prefix=settings.api_v1_prefix)
+app.include_router(obe_router, prefix=settings.api_v1_prefix)
 from app.calendar.router import router as calendar_router  # noqa: E402
 
 app.include_router(calendar_router, prefix=settings.api_v1_prefix)
@@ -1852,6 +1857,21 @@ async def student_report_cards_page(request: Request):
 @app.get("/dashboard/parent/report-cards", include_in_schema=False)
 async def parent_report_cards_page(request: Request):
     return templates.TemplateResponse(request, "parent/report_cards.html", {"nav_items": PARENT_NAV_ITEMS, "active_nav": "report-cards"})
+
+
+@app.get("/dashboard/faculty/obe", include_in_schema=False)
+async def faculty_obe_page(request: Request):
+    return templates.TemplateResponse(request, "faculty/obe.html", {"nav_items": FACULTY_NAV_ITEMS, "active_nav": "obe"})
+
+
+@app.get("/dashboard/admin/obe", include_in_schema=False)
+async def admin_obe_page(request: Request):
+    return templates.TemplateResponse(request, "admin/obe.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "obe"})
+
+
+@app.get("/dashboard/exam/obe", include_in_schema=False)
+async def exam_obe_page(request: Request):
+    return templates.TemplateResponse(request, "admin/obe.html", {"nav_items": EXAM_NAV_ITEMS, "active_nav": "obe"})
 
 
 @app.get("/dashboard/faculty/exams", include_in_schema=False)

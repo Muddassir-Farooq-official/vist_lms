@@ -1,5 +1,23 @@
 [
   {
+    "version": "1.51.0",
+    "date": "2026-11-22",
+    "title": "Outcome-based education (CLO/PLO)",
+    "summary": "Course and program learning outcomes, mapped and measured from the marks, for accreditation.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "Outcomes (OBE): PLOs and pass levels per program, teachers' course files to lock or send back, and PLO attainment per program."
+      },
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "Course outcomes (OBE): CLOs with Bloom level mapped to PLOs, assessments tagged whole or by question part, part marks, and CLO attainment."
+      }
+    ]
+  },
+  {
     "version": "1.50.0",
     "date": "2026-11-22",
     "title": "Exam seating and invigilation",
