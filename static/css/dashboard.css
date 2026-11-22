@@ -4302,3 +4302,9 @@ details.tg-session > summary.tg-head { cursor: pointer; }
 .fam-list { list-style: none; margin: 0; padding: 0; font-size: 0.88rem; line-height: 1.7; }
 .fam-ok { color: #15803d; font-weight: 600; } .fam-bad { color: #b91c1c; font-weight: 600; } .fam-dim { color: var(--text-secondary); font-size: 0.86rem; }
 .fam-pay { display: inline-block; margin: 2px 0 4px; } .fam-grid small { display: block; }
+
+/* Clinical rotations */
+.cl-inline { display: flex; align-items: center; gap: 6px; }
+.cl-days { display: flex; flex-wrap: wrap; gap: 10px; border: 0; padding: 0; margin: 0; }
+.cl-days legend { font-size: .85rem; margin-bottom: 4px; }
+.cl-wide { grid-column: 1 / -1; }

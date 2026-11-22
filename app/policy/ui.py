@@ -126,6 +126,8 @@ UI: dict[str, dict] = {
     "certificate_fee_migration": {"section": "Certificates", "label": "Migration certificate / NOC", "control": "number", "before": "Rs."},
     "certificate_fee_fee_clearance": {"section": "Certificates", "label": "Fee clearance letter", "control": "number", "before": "Rs."},
     "notify_family_absence": {"section": "Reports", "label": "Phone notice to student and parents when marked absent", "control": "switch"},
+    "notify_hostel_absence": {"section": "Reports", "label": "Phone notice to student and parents when absent at the hostel roll call", "control": "switch"},
+    "hostel_mess_fee": {"section": "Fees & fines", "sub": "Hostel", "label": "Monthly mess fee for a new resident", "control": "number", "before": "Rs."},
     "notify_family_results": {"section": "Reports", "label": "Phone notice to student and parents when a result is published", "control": "switch"},
     "morning_summary": {"section": "Reports", "label": "Morning summary to administrators (8 AM, Monday to Saturday)", "control": "switch"},
     "monthly_report_notice": {"section": "Reports", "label": "Tell the principal on the 1st that last month's report is ready", "control": "switch"},

@@ -38,7 +38,7 @@ class HostelService:
         by_room: dict = {}
         for st, s in stays:
             by_room.setdefault(st.room_id, []).append({"stay_id": st.id, "student_id": s.id, "name": f"{s.first_name} {s.last_name}", "roll_number": s.roll_number,
-                                                       "bed_no": st.bed_no, "since": st.start_date, "monthly_fee": _f(st.monthly_fee)})
+                                                       "bed_no": st.bed_no, "since": st.start_date, "monthly_fee": _f(st.monthly_fee), "mess_fee": _f(st.mess_fee)})
         return [{"id": r.id, "code": r.code, "block": r.block, "floor": r.floor, "capacity": r.capacity, "gender": r.gender, "monthly_fee": _f(r.monthly_fee),
                  "is_active": r.is_active, "note": r.note, "residents": by_room.get(r.id, []), "free_beds": max(0, r.capacity - len(by_room.get(r.id, [])))}
                 for r in rooms]
@@ -73,7 +73,7 @@ class HostelService:
 
     # ------------------------------------------------------------------ stays
     async def check_in(self, *, room_id: uuid.UUID, student_id: uuid.UUID, start_date: date | None, bed_no: str | None,
-                       monthly_fee: Decimal | None, actor_id: uuid.UUID) -> HostelStay:
+                       monthly_fee: Decimal | None, actor_id: uuid.UUID, mess_fee: Decimal | None = None) -> HostelStay:
         from app.students.models import Student, StudentStatus
 
         room = await self.session.get(HostelRoom, room_id)
@@ -93,8 +93,11 @@ class HostelService:
         start = start_date or institute_today()
         if start > institute_today() + timedelta(days=60):
             raise BusinessRuleViolationError("The start date is too far ahead.")
+        from app.core.config import settings
+
         stay = HostelStay(room_id=room.id, student_id=s.id, start_date=start, bed_no=(bed_no or "").strip() or None,
-                          monthly_fee=monthly_fee if monthly_fee is not None else room.monthly_fee, created_by=actor_id)
+                          monthly_fee=monthly_fee if monthly_fee is not None else room.monthly_fee,
+                          mess_fee=mess_fee if mess_fee is not None else Decimal(str(getattr(settings, "hostel_mess_fee", 0) or 0)), created_by=actor_id)
         self.session.add(stay)
         await self.session.flush()
         await self.audit.log(actor_user_id=actor_id, action="hostel.checked_in", entity_type="student", entity_id=s.id,
@@ -175,14 +178,114 @@ class HostelService:
         await self.check_out(stay.id, end_date=max(today - timedelta(days=1), stay.start_date), reason="Moved to another room", actor_id=actor_id,
                              moving=True)
         return await self.check_in(room_id=room_id, student_id=stay.student_id, start_date=max(today, stay.start_date), bed_no=bed_no,
-                                   monthly_fee=None, actor_id=actor_id)
+                                   monthly_fee=None, actor_id=actor_id, mess_fee=Decimal(str(stay.mess_fee or 0)))
+
+    async def set_mess(self, stay_id: uuid.UUID, mess_fee: Decimal, *, actor_id: uuid.UUID) -> HostelStay:
+        """Join or leave the mess (0 = not in the mess). Charges already approved are not changed."""
+        stay = await self.session.get(HostelStay, stay_id)
+        if stay is None or stay.end_date is not None:
+            raise BusinessRuleViolationError("Only a current stay can be changed.")
+        before = str(stay.mess_fee)
+        stay.mess_fee = mess_fee
+        await self.session.flush()
+        await self.audit.log(actor_user_id=actor_id, action="hostel.mess_changed", entity_type="student", entity_id=stay.student_id,
+                             metadata={"stay": str(stay.id), "from": before, "to": str(mess_fee)})
+        return stay
+
+    # ------------------------------------------------------------------ night roll call
+    async def roll_call(self, day: date) -> dict:
+        from app.hostel.models import HostelRollCall, HostelRollMark
+        from app.students.models import Student
+
+        rc = (await self.session.execute(select(HostelRollCall).where(HostelRollCall.day == day))).scalar_one_or_none()
+        marks = {}
+        if rc:
+            marks = {m.student_id: m for m in (await self.session.execute(select(HostelRollMark).where(HostelRollMark.roll_call_id == rc.id))).scalars()}
+        rows = (await self.session.execute(select(HostelStay, HostelRoom, Student).join(HostelRoom, HostelRoom.id == HostelStay.room_id)
+                                           .join(Student, Student.id == HostelStay.student_id)
+                                           .where(HostelStay.start_date <= day, (HostelStay.end_date.is_(None)) | (HostelStay.end_date >= day))
+                                           .order_by(HostelRoom.block, HostelRoom.code, Student.first_name))).all()
+        out = [{"student_id": s.id, "name": f"{s.first_name} {s.last_name}", "roll_number": s.roll_number, "room": r.code, "block": r.block,
+                "status": marks[s.id].status if s.id in marks else None, "note": marks[s.id].note if s.id in marks else None} for _st, r, s in rows]
+        return {"day": day, "taken": rc is not None, "taken_at": rc.taken_at if rc else None, "residents": out,
+                "absent": sum(1 for x in out if x["status"] == "ABSENT")}
+
+    async def mark_roll_call(self, day: date, entries: list[dict], *, actor_id: uuid.UUID) -> dict:
+        """Save the night roll call. A resident marked absent (not on leave) is reported to the student's parents and the
+        student, once per night; correcting the mark later does not send it again."""
+        from app.hostel.models import HostelRollCall, HostelRollMark
+
+        today = institute_today()
+        if day > today:
+            raise BusinessRuleViolationError("The roll call cannot be taken for a night that has not come.")
+        if (today - day).days > 3:
+            raise BusinessRuleViolationError("A roll call older than three days cannot be changed.")
+        living = {x["student_id"] for x in (await self.roll_call(day))["residents"]}
+        rc = (await self.session.execute(select(HostelRollCall).where(HostelRollCall.day == day))).scalar_one_or_none()
+        if rc is None:
+            rc = HostelRollCall(day=day, taken_by=actor_id)
+            self.session.add(rc)
+            await self.session.flush()
+        newly_absent = []
+        for e in entries:
+            sid, status = uuid.UUID(str(e["student_id"])), str(e["status"]).upper()
+            if sid not in living:
+                raise BusinessRuleViolationError("A student in the list does not live in the hostel on that night.")
+            if status not in ("PRESENT", "ABSENT", "LEAVE"):
+                raise BusinessRuleViolationError("Present, absent or on leave.")
+            m = await self.session.get(HostelRollMark, (rc.id, sid))
+            if m is None:
+                m = HostelRollMark(roll_call_id=rc.id, student_id=sid, status=status)
+                self.session.add(m)
+            m.status, m.note = status, (str(e.get("note") or "").strip()[:200] or None)
+            if status == "ABSENT" and not m.notified:
+                m.notified = True
+                newly_absent.append(sid)
+        await self.session.flush()
+        told = await self._tell_absent(newly_absent, day)
+        await self.audit.log(actor_user_id=actor_id, action="hostel.roll_call", entity_type="hostel", entity_id=rc.id,
+                             metadata={"day": str(day), "marked": len(entries), "absent_reported": len(newly_absent)})
+        return {"marked": len(entries), "absent_reported": len(newly_absent), "notified": told}
+
+    async def _tell_absent(self, student_ids: list, day: date) -> int:
+        """Never raises: the roll call is saved whatever happens to the notices."""
+        from app.core.config import settings
+
+        if not student_ids or not int(getattr(settings, "notify_hostel_absence", 1) or 0):
+            return 0
+        try:
+            async with self.session.begin_nested():
+                from app.family.service import parent_ids
+                from app.notifications.models import NotificationCategory
+                from app.notifications.service import create_notification
+                from app.students.models import Student
+
+                n = 0
+                for sid in student_ids:
+                    s = await self.session.get(Student, sid)
+                    if s is None:
+                        continue
+                    name = f"{s.first_name} {s.last_name}"
+                    for uid in await parent_ids(self.session, s.id):
+                        await create_notification(self.session, user_id=uid, title=f"{name} was not in the hostel at roll call",
+                                                  message=f"Night of {day:%a %d %b}. Please contact the hostel warden.",
+                                                  category=NotificationCategory.GENERAL, link="/dashboard/parent")
+                        n += 1
+                    if s.user_id:
+                        await create_notification(self.session, user_id=s.user_id, title="Marked absent at the hostel roll call",
+                                                  message=f"Night of {day:%a %d %b}. See the warden if this is wrong.",
+                                                  category=NotificationCategory.GENERAL, link="/dashboard/student")
+                        n += 1
+                return n
+        except Exception:                        # noqa: BLE001
+            return 0
 
     # ------------------------------------------------------------------ the monthly charge
-    async def charge_month(self, month: date, *, actor_id: uuid.UUID, dry_run: bool = False) -> dict:
-        """Add each resident's hostel charge for the month to their dues. A stay that started or ended
-        part-way is charged for the days it covered. Running it again charges only who was missed."""
-        from app.fines.models import FinePayerType, FineSource
-        from app.fines.service import FineService
+    async def month_lines(self, month: date) -> dict:
+        """What each resident owes for the month: rent (and mess, for those in the mess). A stay that started or ended
+        part-way is charged for the days it covered, and a day already charged to the student (a room move) is never
+        charged again. Stays already charged for the month are counted, not repeated."""
+        from app.monthly_charges.models import ChargeLine
 
         month = month.replace(day=1)
         last = month.replace(day=calendar.monthrange(month.year, month.month)[1])
@@ -192,6 +295,8 @@ class HostelService:
                                                                     (HostelStay.end_date.is_(None)) | (HostelStay.end_date >= month)))).scalars().all()
         charges = (await self.session.execute(select(HostelCharge).where(HostelCharge.month == month))).scalars().all()
         done = {c.stay_id for c in charges}
+        mess_done = set((await self.session.execute(select(ChargeLine.ref_id).where(ChargeLine.kind == "MESS", ChargeLine.month == month,
+                                                                                    ChargeLine.fine_id.is_not(None)))).scalars())
         rooms = {r.id: r for r in (await self.session.execute(select(HostelRoom))).scalars()}
         days = (last - month).days + 1
         # The days each student has already been charged for this month (a stay charged while still open was charged
@@ -208,7 +313,7 @@ class HostelService:
             n = days if fee <= 0 or Decimal(str(c.amount)) >= fee else int((Decimal(str(c.amount)) * days / fee).to_integral_value())
             n = min(n, (last - first).days + 1)
             billed.setdefault(st.student_id, set()).update(first + timedelta(days=k) for k in range(n))
-        charged, total, skipped = 0, Decimal(0), 0
+        lines, skipped = [], 0
         for st in stays:
             if st.id in done:
                 skipped += 1
@@ -218,23 +323,43 @@ class HostelService:
             covered = len(mine - billed.get(st.student_id, set()))
             billed.setdefault(st.student_id, set()).update(mine)
             amount = (Decimal(str(st.monthly_fee)) * covered / days).quantize(Decimal("1")) if covered < days else Decimal(str(st.monthly_fee))
-            if amount <= 0:
+            mess_fee = Decimal(str(st.mess_fee or 0))
+            mess = Decimal(0) if st.id in mess_done else ((mess_fee * covered / days).quantize(Decimal("1")) if covered < days else mess_fee)
+            room = rooms.get(st.room_id)
+            part = f" ({covered} of {days} days)" if covered < days else ""
+            lines.append({"stay": st, "student_id": st.student_id, "covered": covered, "days": days, "rent": amount, "mess": mess,
+                          "label": f"Hostel {month:%B %Y}, room {room.code if room else '?'}{part}", "mess_label": f"Mess {month:%B %Y}{part}"})
+        return {"month": month, "days": days, "lines": lines, "already_charged": skipped}
+
+    async def charge_stay(self, st: HostelStay, month: date, amount: Decimal, label: str, *, actor_id: uuid.UUID):
+        """Add one stay's rent for the month to the student's dues (once: hostel_charges is unique per stay and month)."""
+        from app.fines.models import FinePayerType, FineSource
+        from app.fines.service import FineService
+
+        fine = await FineService(self.session).issue(payer_type=FinePayerType.STUDENT, payer_id=st.student_id, amount=float(amount), reason=label,
+                                                     source=FineSource.HOSTEL, actor_id=actor_id, related_entity_type="hostel_stay",
+                                                     related_entity_id=st.id, notify_title="Hostel charge added to your dues")
+        self.session.add(HostelCharge(stay_id=st.id, month=month, amount=amount, fine_id=fine.id, created_by=actor_id))
+        return fine
+
+    async def charge_month(self, month: date, *, actor_id: uuid.UUID, dry_run: bool = False) -> dict:
+        """Add each resident's hostel rent for the month to their dues straight away (the administrator; the hostel office
+        prepares a draft for the accounts office instead, app/monthly_charges). Running it again charges only who was missed."""
+        out = await self.month_lines(month)
+        month = out["month"]
+        charged, total = 0, Decimal(0)
+        for ln in out["lines"]:
+            if ln["rent"] <= 0:
                 continue
             charged += 1
-            total += amount
-            if dry_run:
-                continue
-            room = rooms.get(st.room_id)
-            label = f"Hostel {month:%B %Y}, room {room.code if room else '?'}" + (f" ({covered} of {days} days)" if covered < days else "")
-            fine = await FineService(self.session).issue(payer_type=FinePayerType.STUDENT, payer_id=st.student_id, amount=float(amount), reason=label,
-                                                         source=FineSource.HOSTEL, actor_id=actor_id, related_entity_type="hostel_stay",
-                                                         related_entity_id=st.id, notify_title="Hostel charge added to your dues")
-            self.session.add(HostelCharge(stay_id=st.id, month=month, amount=amount, fine_id=fine.id, created_by=actor_id))
+            total += ln["rent"]
+            if not dry_run:
+                await self.charge_stay(ln["stay"], month, ln["rent"], ln["label"], actor_id=actor_id)
         if not dry_run:
             await self.session.flush()
             await self.audit.log(actor_user_id=actor_id, action="hostel.month_charged", entity_type="hostel", entity_id=None,
-                                 metadata={"month": str(month), "students": charged, "total": str(total), "already_charged": skipped})
-        return {"month": month, "students": charged, "total": float(total), "already_charged": skipped, "dry_run": dry_run}
+                                 metadata={"month": str(month), "students": charged, "total": str(total), "already_charged": out["already_charged"]})
+        return {"month": month, "students": charged, "total": float(total), "already_charged": out["already_charged"], "dry_run": dry_run}
 
     async def summary(self) -> dict:
         rooms = await self.rooms()
@@ -252,7 +377,7 @@ class HostelService:
             return None
         room = await self.session.get(HostelRoom, st.room_id)
         return {"stay_id": st.id, "room": room.code if room else None, "block": room.block if room else None, "bed_no": st.bed_no, "since": st.start_date,
-                "monthly_fee": _f(st.monthly_fee)}
+                "monthly_fee": _f(st.monthly_fee), "mess_fee": _f(st.mess_fee)}
 
     async def history(self, *, q: str | None = None, limit: int = 300) -> list[dict]:
         from app.students.models import Student

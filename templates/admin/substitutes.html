@@ -1,0 +1,14 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN{% endblock %}
+{% block title %}Substitute teachers{% endblock %}
+{% block page_title %}Substitute teachers{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">When a teacher's leave is approved, each of their classes gets a free teacher proposed (no class or duty then, fewest substitute classes this week). Confirm, choose someone else, or cancel the class.</div>{% endblock %}
+
+{% block content %}
+<section class="sh-card">
+  <div class="toolbar"><label class="field-label-sm" for="sb-status">Show</label>
+    <select id="sb-status" class="text-input"><option value="PROPOSED">To confirm</option><option value="">All coming classes</option><option value="CONFIRMED">Confirmed</option><option value="CANCELLED">Cancelled</option></select></div>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>When</th><th>Class</th><th>Teacher on leave</th><th>Substitute</th><th>Status</th><th></th></tr></thead><tbody id="sb-body"></tbody></table></div>
+</section>
+{% endblock %}
+{% block extra_scripts %}<script src="/static/js/substitutes-admin.js"></script>{% endblock %}

@@ -3,7 +3,7 @@
 {% block allowed_roles %}{{ allowed_roles|default("ADMIN") }}{% endblock %}
 {% block title %}Hostel{% endblock %}
 {% block page_title %}Hostel{% endblock %}
-{% block page_subtitle %}<div class="content-subtitle">Rooms and beds, who lives where, the monthly hostel charge (added to each resident's dues), and the history of stays.</div>{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Rooms and beds, who lives where, the night roll call, the monthly hostel and mess draft for the accounts office, and the history of stays.</div>{% endblock %}
 
 {% block content %}
 <section class="stat-grid" id="h-kpis" aria-label="Hostel summary"></section>
@@ -37,14 +37,26 @@
 </section>
 
 <section class="sh-card" data-manage hidden>
-  <h2 class="panel-title">Monthly hostel charge</h2>
-  <p class="cc-meta">Adds one month's room fee to the dues of every current resident. A month can be charged only once per resident.</p>
+  <h2 class="panel-title">Night roll call</h2>
+  <p class="cc-meta">Mark every resident present, absent or on leave (home with permission). An absent resident's parents and the student are told on their phones, once per night.</p>
+  <div class="ar-form">
+    <label>Night<input id="h-rc-day" class="text-input" type="date" /></label>
+    <div class="att-go"><button type="button" class="role-btn secondary-btn" id="h-rc-all">Everyone present</button></div>
+  </div>
+  <p class="cc-meta" id="h-rc-note"></p>
+  <div class="table-scroll"><table class="dash-table" id="h-rc"><thead><tr><th>Room</th><th>Resident</th><th>Present</th><th>Absent</th><th>Leave</th></tr></thead><tbody></tbody></table></div>
+  <div class="decision-bar"><button type="button" class="role-btn" id="h-rc-save">Save roll call</button></div>
+</section>
+
+<section class="sh-card" data-manage hidden>
+  <h2 class="panel-title">Monthly hostel and mess charges</h2>
+  <p class="cc-meta">Prepare the month's draft: each resident's room fee and mess fee (part months by days). Nothing reaches a student's dues until the accounts office approves it under <b>Monthly charges</b>. Preparing again replaces a draft not yet approved.</p>
   <div class="ar-form">
     <label>Month<input id="h-month" class="text-input" type="month" /></label>
-    <div class="att-go"><button type="button" class="role-btn secondary-btn" id="h-check">Check first</button></div>
-    <div class="att-go"><button type="button" class="role-btn" id="h-charge" disabled>Add the charge</button></div>
+    <div class="att-go"><button type="button" class="role-btn" id="h-prepare">Prepare draft</button></div>
   </div>
   <p class="cc-meta" id="h-charge-note"></p>
+  <div class="table-scroll"><table class="dash-table" id="h-runs"><thead><tr><th>Month</th><th>Students</th><th class="num">Total</th><th>Status</th></tr></thead><tbody></tbody></table></div>
 </section>
 
 <section class="sh-card">

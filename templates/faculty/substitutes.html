@@ -1,0 +1,16 @@
+{% extends "faculty/_base.html" %}
+{% block title %}Substitute classes{% endblock %}
+{% block page_title %}Substitute classes{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Classes you take for a colleague on leave. Mark their attendance here.</div>{% endblock %}
+{% block content %}
+<section class="sh-card">
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>When</th><th>Class</th><th>Room</th><th>Attendance</th><th></th></tr></thead><tbody id="ms-body"></tbody></table></div>
+</section>
+<section class="sh-card" id="ms-mark" hidden>
+  <h2 class="panel-title" id="ms-title"></h2>
+  <p class="panel-hint">Tick who is present; everyone else is marked absent.</p>
+  <div id="ms-students" class="se-inv-list"></div>
+  <div class="decision-bar"><button type="button" class="role-btn" id="ms-save">Save attendance</button></div>
+</section>
+{% endblock %}
+{% block extra_scripts %}<script src="/static/js/substitutes-teacher.js"></script>{% endblock %}

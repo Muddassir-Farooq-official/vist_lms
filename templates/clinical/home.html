@@ -1,0 +1,21 @@
+{% extends "clinical/_base.html" %}
+{% block title %}My rotations{% endblock %}
+{% block page_title %}My rotations{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">The clinical groups you supervise. Mark each day's attendance and sign the students' logbook entries.</div>{% endblock %}
+{% block content %}
+<section class="sh-card">
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Dates</th><th>Group</th><th>Ward</th><th>Days</th><th>To sign</th><th></th></tr></thead><tbody id="cv-rots"></tbody></table></div>
+</section>
+<section class="sh-card" id="cv-att" hidden>
+  <h2 class="panel-title" id="cv-att-title"></h2>
+  <div class="toolbar"><label class="field-label-sm" for="cv-day">Day</label><input id="cv-day" type="date" class="text-input"></div>
+  <p class="panel-hint" id="cv-att-hint"></p>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Roll no.</th><th>Name</th><th>Present</th><th>Absent</th><th>Leave</th></tr></thead><tbody id="cv-att-body"></tbody></table></div>
+  <div class="decision-bar"><button type="button" class="role-btn" id="cv-att-save">Save attendance</button></div>
+</section>
+<section class="sh-card" id="cv-log" hidden>
+  <h2 class="panel-title">Logbook</h2>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Day</th><th>Student</th><th>Skill</th><th>Times</th><th>Status</th><th></th></tr></thead><tbody id="cv-log-body"></tbody></table></div>
+</section>
+{% endblock %}
+{% block extra_scripts %}<script src="/static/js/clinical-supervisor.js"></script>{% endblock %}

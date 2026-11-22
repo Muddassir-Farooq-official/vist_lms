@@ -27,7 +27,8 @@ class FineSource(str, enum.Enum):
     ATTENDANCE = "ATTENDANCE"
     GATE = "GATE"                       # late arrival, marked at the gate
     INVENTORY = "INVENTORY"             # an item from the store, issued now and paid later
-    HOSTEL = "HOSTEL"                   # the monthly hostel charge
+    HOSTEL = "HOSTEL"                   # the monthly hostel charge (and mess)
+    TRANSPORT = "TRANSPORT"             # the monthly transport fee
     OTHER = "OTHER"
 
 

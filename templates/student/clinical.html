@@ -1,0 +1,30 @@
+{% extends "student/_base.html" %}
+{% block title %}My clinical{% endblock %}
+{% block page_title %}My clinical{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Your hospital rotations, clinical attendance and logbook. Add what you did; your supervisor signs it.</div>{% endblock %}
+{% block content %}
+<section class="sh-card">
+  <h2 class="panel-title">Rotations</h2>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Dates</th><th>Ward</th><th>Supervisor</th><th>Days</th><th>Attendance</th></tr></thead><tbody id="mc-rots"></tbody></table></div>
+</section>
+<section class="sh-card">
+  <h2 class="panel-title">Logbook progress</h2>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Skill</th><th>Signed</th><th>Required</th><th>Waiting</th></tr></thead><tbody id="mc-prog"></tbody></table></div>
+</section>
+<section class="sh-card">
+  <h2 class="panel-title">Add a logbook entry</h2>
+  <form id="mc-form" class="form-grid">
+    <label>Skill<select id="mc-skill" class="text-input" required></select></label>
+    <label>Rotation<select id="mc-rot" class="text-input" required></select></label>
+    <label>Day<input id="mc-day" type="date" class="text-input" required></label>
+    <label>Times<input id="mc-times" type="number" min="1" max="50" value="1" class="text-input" required></label>
+    <label>Note<input id="mc-note" class="text-input" maxlength="500"></label>
+    <div class="decision-bar"><button type="submit" class="role-btn">Send for signing</button></div>
+  </form>
+</section>
+<section class="sh-card">
+  <h2 class="panel-title">My entries</h2>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Day</th><th>Skill</th><th>Times</th><th>Status</th><th></th></tr></thead><tbody id="mc-entries"></tbody></table></div>
+</section>
+{% endblock %}
+{% block extra_scripts %}<script src="/static/js/clinical-student.js"></script>{% endblock %}

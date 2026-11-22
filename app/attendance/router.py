@@ -48,7 +48,7 @@ async def _resolve_own_student_id(db, current_user: CurrentUser) -> uuid.UUID | 
     return student.id if student else None
 
 
-async def _assert_can_mark_or_view_offering(db, offering_id: uuid.UUID, current_user: CurrentUser) -> None:
+async def _assert_can_mark_or_view_offering(db, offering_id: uuid.UUID, current_user: CurrentUser, class_session_id: uuid.UUID | None = None) -> None:
     """ADMIN can mark/view any offering. A TEACHER can only mark/view
     the ones they're actually assigned to -- matches the same
     ownership-check pattern used everywhere else offering content is
@@ -60,6 +60,11 @@ async def _assert_can_mark_or_view_offering(db, offering_id: uuid.UUID, current_
         raise ResourceNotFoundError("Course offering not found.")
     own_teacher_id = await _resolve_own_teacher_id(db, current_user)
     if own_teacher_id is None or offering.assigned_teacher_id != own_teacher_id:
+        if class_session_id is not None:
+            from app.substitutes.service import SubstituteService
+
+            if await SubstituteService(db).is_substitute(class_session_id, own_teacher_id):     # the confirmed substitute for this one class
+                return
         raise AuthorizationError("You are not the assigned teacher for this offering.")
 
 
@@ -86,7 +91,7 @@ async def mark_session(
     class_session = await ClassSessionRepository(db).get_by_id(class_session_id)
     if class_session is None:
         raise ResourceNotFoundError("Class session not found.")
-    await _assert_can_mark_or_view_offering(db, class_session.course_offering_id, current_user)
+    await _assert_can_mark_or_view_offering(db, class_session.course_offering_id, current_user, class_session.id)
 
     service = AttendanceService(db)
     is_admin = Permissions.ATTENDANCE_LOCK in current_user.permissions
@@ -189,7 +194,7 @@ async def get_session_attendance(
     class_session = await ClassSessionRepository(db).get_by_id(class_session_id)
     if class_session is None:
         raise ResourceNotFoundError("Class session not found.")
-    await _assert_can_mark_or_view_offering(db, class_session.course_offering_id, current_user)
+    await _assert_can_mark_or_view_offering(db, class_session.course_offering_id, current_user, class_session.id)
 
     if not combined:
         records = await AttendanceRepository(db).list_for_session(class_session_id)

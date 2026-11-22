@@ -1,5 +1,97 @@
 [
   {
+    "version": "1.56.0",
+    "date": "2026-11-22",
+    "title": "Exam paper files",
+    "summary": "Teachers send question papers as PDF or Word files; the exam office prints them.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "Send exam papers: attach the question paper for each coming exam; see when it is printed or returned."
+      },
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "Exam paper files: who has sent their paper, download and print, mark printed or return with a note."
+      }
+    ]
+  },
+  {
+    "version": "1.55.0",
+    "date": "2026-11-22",
+    "title": "Hostel mess, roll call and transport",
+    "summary": "Mess fees, the night roll call, transport routes, and monthly charges the accounts office approves.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Hostel warden",
+        "text": "Night roll call (parents told about an absent resident) and a monthly mess fee per resident."
+      },
+      {
+        "kind": "improved",
+        "for": "Hostel warden",
+        "text": "The month's hostel and mess charges are prepared as a draft; the accounts office approves them before they reach students' dues."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Transport: routes, stops with pick-up times, riders, and the monthly transport fee draft."
+      },
+      {
+        "kind": "new",
+        "for": "Accounts office",
+        "text": "Monthly charges: approve or send back the hostel, mess and transport drafts."
+      },
+      {
+        "kind": "new",
+        "for": "Parents",
+        "text": "The home card shows the transport route, stop and pick-up time."
+      }
+    ]
+  },
+  {
+    "version": "1.54.0",
+    "date": "2026-11-22",
+    "title": "Clinical rotations",
+    "summary": "Hospital rotations for clinical groups, with clinical attendance, a signed logbook and placement letters.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Clinical rotations: hospitals and wards, groups, supervisors (staff or a limited hospital login), the rotation schedule with clash checks, placement letters and group progress."
+      },
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "Clinical supervision: mark clinical attendance and sign logbook entries for the groups you supervise."
+      },
+      {
+        "kind": "new",
+        "for": "Students",
+        "text": "My clinical: your rotations, clinical attendance and logbook; add entries for your supervisor to sign."
+      }
+    ]
+  },
+  {
+    "version": "1.53.0",
+    "date": "2026-11-22",
+    "title": "Substitute teachers",
+    "summary": "Classes of a teacher on leave get a free teacher proposed; the office confirms.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Substitute teachers: approving leave proposes a free teacher for each class; confirm, change or cancel the class."
+      },
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "Substitute classes: the classes you cover, with attendance marking."
+      }
+    ]
+  },
+  {
     "version": "1.52.0",
     "date": "2026-11-22",
     "title": "Home cards for families",

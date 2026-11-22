@@ -236,11 +236,15 @@ ADMIN_NAV_ITEMS = [
     _nav("profile-changes", "Profile changes", "user", "/dashboard/admin/profile-changes", group="Students", badge="profile_changes"),
     _nav("certificates", "Certificate requests", "file", "/dashboard/admin/certificates", group="Students", badge="certificates", keywords="bonafide character"),
     _nav("warnings", "Warnings", "alert", "/dashboard/admin/warnings", group="Students", keywords="discipline"),
-    _nav("hostel", "Hostel", "hostel", "/dashboard/admin/hostel", group="Students", keywords="rooms boarders"),
+    _nav("hostel", "Hostel", "hostel", "/dashboard/admin/hostel", group="Students", keywords="rooms boarders mess roll call"),
+    _nav("transport", "Transport", "students", "/dashboard/admin/transport", group="Students", keywords="bus van route pick drop"),
     _nav("programs", "Programs", "programs", "/dashboard/admin/programs", group="Teaching & exams", keywords="degrees"),
     _nav("courses", "Courses", "graduation-cap", "/dashboard/admin/courses", group="Teaching & exams", mobile=True, keywords="subjects offerings sections terms sessions"),
     _nav("timetable", "Timetable", "clock", "/dashboard/admin/timetable", group="Teaching & exams", keywords="periods rooms"),
     _nav("smart-timetable", "Smart timetable", "grid", "/dashboard/admin/timetable/smart", group="Teaching & exams", keywords="workload free slots"),
+    _nav("substitutes", "Substitute teachers", "employees", "/dashboard/admin/substitutes", group="Teaching & exams", keywords="cover absent teacher"),
+    _nav("clinical", "Clinical rotations", "students", "/dashboard/admin/clinical", group="Teaching & exams",
+         keywords="hospital ward placement logbook nursing supervisor"),
     _nav("attendance", "Attendance", "attendance", "/dashboard/admin/attendance", group="Teaching & exams", mobile=True, keywords="absent present"),
     _nav("progress", "Teacher Progress", "exams", "/dashboard/admin/progress", group="Teaching & exams"),
     _nav("feedback", "Course feedback", "check-circle", "/dashboard/admin/feedback", group="Teaching & exams"),
@@ -250,12 +254,14 @@ ADMIN_NAV_ITEMS = [
     _nav("result-sheets", "Result Approval", "tasks", "/dashboard/admin/result-sheets", group="Teaching & exams", badge="result_sheets", keywords="award list university result publish"),
     _nav("datesheets", "Datesheets", "clock", "/dashboard/admin/datesheets", group="Teaching & exams", keywords="admit cards exam schedule"),
     _nav("seating", "Seating & invigilation", "grid", "/dashboard/admin/seating", group="Teaching & exams", keywords="exam rooms seats door list invigilators duty"),
+    _nav("paper-files", "Exam paper files", "file", "/dashboard/admin/paper-files", group="Teaching & exams", keywords="question paper printing teacher sent pdf word"),
     _nav("supplementary", "Supplementary Exams", "exams", "/dashboard/admin/supplementary", group="Teaching & exams", keywords="resit"),
     _nav("obe", "Outcomes (OBE)", "check-circle", "/dashboard/admin/obe", group="Teaching & exams", keywords="CLO PLO accreditation attainment course file"),
     _nav("fees", "Fees", "fees", "/dashboard/admin/fees", group="Fees & accounts", keywords="challan installments structures"),
     _nav("fee-defaulters", "Fee defaulters", "fees", "/dashboard/admin/fee-defaulters", group="Fees & accounts", keywords="overdue reminders promise"),
     _nav("fines", "Fines", "ban", "/dashboard/admin/fines", group="Fees & accounts"),
     _nav("refunds", "Refunds", "fees", "/dashboard/admin/refunds", group="Fees & accounts"),
+    _nav("monthly-charges", "Monthly charges", "fees", "/dashboard/admin/monthly-charges", group="Fees & accounts", keywords="hostel mess transport draft approve"),
     _nav("onebill", "1Bill payments", "fees", "/dashboard/admin/onebill", group="Fees & accounts", keywords="online bank"),
     _nav("finance", "Accounts", "tasks", "/dashboard/admin/finance", group="Fees & accounts", keywords="expenses income day book"),
     _nav("approvals", "Approvals", "check-circle", "/dashboard/admin/approvals", group="Fees & accounts", badge="approvals"),
@@ -400,6 +406,7 @@ EXAM_NAV_ITEMS = [
     _nav("result-types", "Result types", "exams", "/dashboard/exam/result-types", group="Exams"),
     _nav("datesheets", "Datesheets & admit cards", "clock", "/dashboard/exam/datesheets", group="Exams"),
     _nav("seating", "Seating & invigilation", "grid", "/dashboard/exam/seating", group="Exams"),
+    _nav("paper-files", "Exam paper files", "file", "/dashboard/exam/paper-files", group="Exams", keywords="question paper printing"),
     _nav("obe", "Outcomes (OBE)", "check-circle", "/dashboard/exam/obe", group="Exams"),
     _nav("supplementary", "Supplementary exams", "exams", "/dashboard/exam/supplementary", group="Exams"),
     _nav("students", "Student lookup", "students", "/dashboard/exam/students", group="Exams"),
@@ -443,6 +450,7 @@ ACCOUNTS_NAV_ITEMS = [
     _nav("finance-reports", "Finance reports", "exams", "/dashboard/accounts/finance-reports", group="Reports"),
     _nav("fee-defaulters", "Fee defaulters", "fees", "/dashboard/accounts/fee-defaulters", group="Fees"),
     _nav("refunds", "Refunds", "fees", "/dashboard/accounts/refunds", group="Fees"),
+    _nav("monthly-charges", "Monthly charges", "fees", "/dashboard/accounts/monthly-charges", group="Fees"),
     _nav("onebill", "1Bill payments", "fees", "/dashboard/accounts/onebill", group="Fees"),
     _nav("inventory", "Inventory / Store", "tasks", "/dashboard/accounts/inventory", group="Accounts & store"),
     _nav("assets", "Fixed assets", "tasks", "/dashboard/accounts/assets", group="Accounts & store"),
@@ -474,6 +482,7 @@ STUDENT_NAV_ITEMS = [
     _nav("results", "My Results", "exams", "/dashboard/student/results", group="Study", mobile=True, short="Results"),
     _nav("feedback", "Course feedback", "check-circle", "/dashboard/student/feedback", group="Study"),
     _nav("records", "Degree progress & documents", "graduation-cap", "/dashboard/student/records", group="Study"),
+    _nav("clinical", "My clinical", "students", "/dashboard/student/clinical", group="Study"),
     _nav("library", "Library", "library", "/dashboard/student/library", group="Services"),
     _nav("applications", "Applications", "file", "/dashboard/student/applications", group="Services"),
     _nav("certificates", "Certificates", "file", "/dashboard/student/certificates", group="Services"),
@@ -484,6 +493,12 @@ STUDENT_NAV_ITEMS = [
     _nav("my-warnings", "My warnings", "alert", "/dashboard/student/my-warnings", group="Account"),
     _nav("calendar", "Calendar", "clock", "/dashboard/student/calendar", group="Services"),
     _nav("help", "Help & manual", "file", "/dashboard/student/help", group="Account"),
+]
+
+# Clinical supervisor portal: a hospital's supervisor (limited login), or one of our teachers supervising.
+CLINICAL_NAV_ITEMS = [
+    _nav("home", "My rotations", "students", "/dashboard/clinical", mobile=True, short="Rotations"),
+    _nav("help", "Help & manual", "file", "/dashboard/clinical/help"),
 ]
 
 # Teacher self-service.
@@ -500,9 +515,12 @@ FACULTY_NAV_ITEMS = [
     _nav("exam-marks", "Exam marks & report cards", "exams", "/dashboard/faculty/exam-marks", group="Teaching", short="Marks"),  # School mode only
     _nav("grading", "Grading", "exams", "/dashboard/faculty/grading", group="Teaching", mobile=True),
     _nav("obe", "Course outcomes (OBE)", "check-circle", "/dashboard/faculty/obe", group="Teaching"),
+    _nav("exam-papers", "Send exam papers", "file", "/dashboard/faculty/exam-papers", group="Teaching", keywords="question paper printing upload"),
     _nav("watch", "Students to watch", "students", "/dashboard/faculty/watch", group="Teaching"),
     _nav("feedback", "Student feedback", "check-circle", "/dashboard/faculty/feedback", group="Teaching"),
     _nav("timetable", "My Timetable", "clock", "/dashboard/faculty/timetable", group="Teaching"),
+    _nav("substitutes", "Substitute classes", "employees", "/dashboard/faculty/substitutes", group="Teaching"),
+    _nav("clinical", "Clinical supervision", "students", "/dashboard/clinical", group="Teaching"),
     _nav("exams", "Exam duties", "exams", "/dashboard/faculty/exams", group="Teaching"),
     _nav("library", "Library", "library", "/dashboard/faculty/library", group="Services"),
     _nav("tasks", "Tasks", "tasks", "/dashboard/faculty/tasks", group="Services"),
@@ -546,7 +564,7 @@ async def view_as_is_read_only(request: Request, call_next):
 # Only where the portal copy is the SAME screen (same template) with the portal's own menu: e.g. a teacher's
 # /dashboard/faculty/attendance is a different screen from the administration's, so it is not a redirect target.
 _SAME_SCREEN = {"ACCOUNTS_OFFICER": ("accounts", {"fees", "fines", "refunds", "inventory", "assets", "payroll", "finance", "finance-reports", "fee-defaulters",
-                                                 "approvals", "staff-attendance"})}
+                                                 "approvals", "staff-attendance", "monthly-charges"})}
 _page_routes: set[str] | None = None
 
 
@@ -740,6 +758,9 @@ from app.reports.datacheck import router as data_check_router  # noqa: E402
 from app.academics.rollover_router import router as rollover_router  # noqa: E402
 from app.obe.router import router as obe_router  # noqa: E402
 from app.family.router import router as family_router  # noqa: E402
+from app.substitutes.router import router as substitutes_router  # noqa: E402
+from app.clinical.router import router as clinical_router  # noqa: E402
+from app.paperfiles.router import router as paper_files_router  # noqa: E402
 from app.reports.center_router import router as report_center_router  # noqa: E402
 from app.reports.monthly_router import router as monthly_report_router  # noqa: E402
 from app.discipline.router import router as discipline_router  # noqa: E402
@@ -757,6 +778,9 @@ app.include_router(data_check_router, prefix=settings.api_v1_prefix)
 app.include_router(rollover_router, prefix=settings.api_v1_prefix)
 app.include_router(obe_router, prefix=settings.api_v1_prefix)
 app.include_router(family_router, prefix=settings.api_v1_prefix)
+app.include_router(substitutes_router, prefix=settings.api_v1_prefix)
+app.include_router(clinical_router, prefix=settings.api_v1_prefix)
+app.include_router(paper_files_router, prefix=settings.api_v1_prefix)
 from app.calendar.router import router as calendar_router  # noqa: E402
 
 app.include_router(calendar_router, prefix=settings.api_v1_prefix)
@@ -765,8 +789,12 @@ from app.records.router import public_router as records_public_router, router as
 app.include_router(records_router, prefix=settings.api_v1_prefix)
 app.include_router(records_public_router, prefix=settings.api_v1_prefix)
 from app.hostel.router import router as hostel_router  # noqa: E402
+from app.transport.router import router as transport_router  # noqa: E402
+from app.monthly_charges.router import router as monthly_charges_router  # noqa: E402
 
 app.include_router(hostel_router, prefix=settings.api_v1_prefix)
+app.include_router(transport_router, prefix=settings.api_v1_prefix)
+app.include_router(monthly_charges_router, prefix=settings.api_v1_prefix)
 app.include_router(supplementary_router, prefix=settings.api_v1_prefix)
 app.include_router(refund_router, prefix=settings.api_v1_prefix)
 app.include_router(inventory_router, prefix=settings.api_v1_prefix)
@@ -964,6 +992,7 @@ _CALENDAR_PAGES = {
     "faculty": ("faculty/_base.html", "FACULTY_NAV_ITEMS", None), "student": ("student/_base.html", "STUDENT_NAV_ITEMS", None),
     "parent": ("parent/_base.html", "PARENT_NAV_ITEMS", None), "principal": ("admin/_base.html", "PRINCIPAL_NAV_ITEMS", "ADMIN,PRINCIPAL"),
     "hod": ("admin/_base.html", "HOD_NAV_ITEMS", "ADMIN,HOD"), "staff": ("staff/_base.html", "STAFF_NAV_ITEMS", None),
+    "clinical": ("clinical/_base.html", "CLINICAL_NAV_ITEMS", None),
 }
 
 
@@ -1245,6 +1274,22 @@ async def admin_settings_page(request: Request):
 @app.get("/dashboard/admin/admissions", include_in_schema=False)
 async def admin_admissions_page(request: Request):
     return templates.TemplateResponse(request, "admin/admissions.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "admissions"})
+
+
+@app.get("/dashboard/admin/transport", include_in_schema=False)
+async def admin_transport_page(request: Request):
+    return templates.TemplateResponse(request, "admin/transport.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "transport"})
+
+
+@app.get("/dashboard/admin/monthly-charges", include_in_schema=False)
+async def admin_monthly_charges_page(request: Request):
+    return templates.TemplateResponse(request, "shared/monthly_charges.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "monthly-charges", "allowed_roles": "ADMIN"})
+
+
+@app.get("/dashboard/accounts/monthly-charges", include_in_schema=False)
+async def accounts_monthly_charges_page(request: Request):
+    return templates.TemplateResponse(request, "shared/monthly_charges.html", {"nav_items": ACCOUNTS_NAV_ITEMS, "active_nav": "monthly-charges",
+                                                                               "allowed_roles": "ADMIN,ACCOUNTS_OFFICER"})
 
 
 @app.get("/dashboard/admin/refunds", include_in_schema=False)
@@ -1811,6 +1856,21 @@ async def admin_seating_page(request: Request):
     return templates.TemplateResponse(request, "admin/seating.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "seating"})
 
 
+@app.get("/dashboard/admin/paper-files", include_in_schema=False)
+async def admin_paper_files_page(request: Request):
+    return templates.TemplateResponse(request, "admin/paper_files.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "paper-files"})
+
+
+@app.get("/dashboard/exam/paper-files", include_in_schema=False)
+async def exam_paper_files_page(request: Request):
+    return templates.TemplateResponse(request, "admin/paper_files.html", {"nav_items": EXAM_NAV_ITEMS, "active_nav": "paper-files"})
+
+
+@app.get("/dashboard/faculty/exam-papers", include_in_schema=False)
+async def faculty_exam_papers_page(request: Request):
+    return templates.TemplateResponse(request, "faculty/exam_papers.html", {"nav_items": FACULTY_NAV_ITEMS, "active_nav": "exam-papers"})
+
+
 @app.get("/dashboard/exam/seating", include_in_schema=False)
 async def exam_seating_page(request: Request):
     return templates.TemplateResponse(request, "admin/seating.html", {"nav_items": EXAM_NAV_ITEMS, "active_nav": "seating"})
@@ -1859,6 +1919,31 @@ async def student_report_cards_page(request: Request):
 @app.get("/dashboard/parent/report-cards", include_in_schema=False)
 async def parent_report_cards_page(request: Request):
     return templates.TemplateResponse(request, "parent/report_cards.html", {"nav_items": PARENT_NAV_ITEMS, "active_nav": "report-cards"})
+
+
+@app.get("/dashboard/faculty/substitutes", include_in_schema=False)
+async def faculty_substitutes_page(request: Request):
+    return templates.TemplateResponse(request, "faculty/substitutes.html", {"nav_items": FACULTY_NAV_ITEMS, "active_nav": "substitutes"})
+
+
+@app.get("/dashboard/admin/clinical", include_in_schema=False)
+async def admin_clinical_page(request: Request):
+    return templates.TemplateResponse(request, "admin/clinical.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "clinical"})
+
+
+@app.get("/dashboard/clinical", include_in_schema=False)
+async def clinical_supervisor_page(request: Request):
+    return templates.TemplateResponse(request, "clinical/home.html", {"nav_items": CLINICAL_NAV_ITEMS, "active_nav": "home"})
+
+
+@app.get("/dashboard/student/clinical", include_in_schema=False)
+async def student_clinical_page(request: Request):
+    return templates.TemplateResponse(request, "student/clinical.html", {"nav_items": STUDENT_NAV_ITEMS, "active_nav": "clinical"})
+
+
+@app.get("/dashboard/admin/substitutes", include_in_schema=False)
+async def admin_substitutes_page(request: Request):
+    return templates.TemplateResponse(request, "admin/substitutes.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "substitutes"})
 
 
 @app.get("/dashboard/faculty/obe", include_in_schema=False)

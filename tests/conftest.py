@@ -74,6 +74,11 @@ from app.navigation import models as _navigation_models  # noqa: F401
 from app.academics import rollover as _rollover_models  # noqa: F401
 from app.exams import seating as _seating_models  # noqa: F401
 from app.obe import models as _obe_models  # noqa: F401
+from app.substitutes import models as _substitutes_models  # noqa: F401
+from app.clinical import models as _clinical_models  # noqa: F401
+from app.transport import models as _transport_models  # noqa: F401
+from app.monthly_charges import models as _monthly_charges_models  # noqa: F401
+from app.paperfiles import models as _paperfiles_models  # noqa: F401
 
 TEST_DATABASE_URL = settings.database_url.rsplit("/", 1)[0] + "/vist_lms_test"
 

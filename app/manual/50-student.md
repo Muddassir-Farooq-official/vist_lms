@@ -13,6 +13,7 @@
 - **My Results**: marks and outcome for every subject once published, and your result card (transcript) with GPA and CGPA.
 - **Course feedback**: tell the institute how each course went (anonymous).
 - **Degree progress & documents**: how far you are through your degree and the documents you gave the office.
+- **My clinical** (nursing and allied health): your hospital rotations with their days and supervisor, your clinical attendance, and your logbook progress against what your program requires. Add an entry (skill, rotation, day, how many times) and your supervisor signs it; if it is not signed you see why. You can withdraw an entry until it is signed.
 
 School mode only: **Diary & attendance** and **Report cards**.
 
