@@ -1,5 +1,18 @@
 [
   {
+    "version": "1.49.0",
+    "date": "2026-11-22",
+    "title": "Semester rollover wizard",
+    "summary": "End a session and start the next in four checked steps, with undo for promotions.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Teaching & exams → Semester rollover: close the terms, promote students (hold back with a reason, carry-over subjects listed, undo within 7 days), start the next session with the same teachers, and copy fee structures as drafts."
+      }
+    ]
+  },
+  {
     "version": "1.48.0",
     "date": "2026-11-22",
     "title": "Data checker",

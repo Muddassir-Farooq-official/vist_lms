@@ -126,6 +126,11 @@ Not used in School mode: a school's subjects are not counted in credit hours.
 
 Teachers book make-up classes (for a missed class) and extra classes (for a course that is behind) in free periods. Each request arrives in **Approvals**. Approving checks the slot again, adds the class to the timetable and attendance, marks the missed class "made up" and tells the students and the teacher. A booking is refused if the teacher is on approved leave that day.
 
+- **Semester rollover**: at the end of a session, four steps, each previewed first and done all at once or not at all.
+  1. **Close the terms**: ends the semester for each batch term (open enrollments completed) and closes it. Unfinished courses (attendance not locked, results not published) are listed; closing anyway needs a reason.
+  2. **Promote students**: everyone moves to the next semester except those you hold back (tick and write why). Failed subjects stay as carry-over for supplementary exams. A batch in its program's last semester is not promoted. **Undo** works for 7 days and puts back everyone whose semester was not changed since; fees charged for the new semester are kept and listed (financial records are never removed).
+  3. **Start the next session**: the next semester's batch terms, their subjects from the curriculum (same sections), the promoted students enrolled, and the same teachers where they still work here.
+  4. **Fee structures**: each batch's active fee structures copied to its next batch term as drafts (optionally raised by a %). Nothing is charged until you activate them in Fees.
 ## Fees & accounts, HR, store
 
 - **Fees**, **Refunds**, **1Bill payments**, **Fines**, **Finance reports**, **Fee defaulters** and **Accounts**: see the Accounts office chapter. Only administrators can allow an admit card despite overdue fees (**Fee defaulters → Allow admit card…**).
