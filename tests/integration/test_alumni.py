@@ -90,7 +90,7 @@ async def test_graduation_alumni_documents_directory_and_surveys(app_client, adm
     assert listed[0]["employer"] == "Mayo Hospital" and listed[0]["email"] is None                                    # contact kept private
     t = await _ok(await app_client.post(f"{A}/me/transcript", json={"copies": 2}), 201)
     assert t["status"] == "REQUESTED"
-    assert (await app_client.get("/api/v1/qbank/courses")).status_code == 403
+    assert (await app_client.get("/api/v1/exam-paper-files/mine")).status_code == 403
     assert (await app_client.get(f"{A}/documents")).status_code == 403
 
     # a current student is not an alumnus
