@@ -38,6 +38,7 @@ ROLE_NAMES = {
     Roles.HOD: "Head of Department / Coordinator",
     Roles.PRINCIPAL: "Principal / Director",
     Roles.PARENT: "Parent / Guardian",
+    Roles.CLINICAL_SUPERVISOR: "Clinical supervisor",
 }
 
 ALL_PERMISSION_CODES = sorted({code for codes in ROLE_PERMISSION_SEED.values() for code in codes})

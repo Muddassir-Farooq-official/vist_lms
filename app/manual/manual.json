@@ -1,5 +1,5 @@
 {
-  "version": "1.53.0",
+  "version": "1.54.0",
   "title": "VIST LMS user manual",
   "chapters": [
     {
@@ -124,6 +124,16 @@
       "portals": [
         "admin",
         "staff"
+      ]
+    },
+    {
+      "slug": "clinical",
+      "title": "Clinical supervisors",
+      "file": "90-clinical.md",
+      "portals": [
+        "admin",
+        "clinical",
+        "faculty"
       ]
     }
   ]
