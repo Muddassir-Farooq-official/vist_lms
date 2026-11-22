@@ -4240,3 +4240,20 @@ details.tg-session > summary.tg-head { cursor: pointer; }
 .ms-block a.kpi:hover { border-color: var(--blue-500); }
 .ms-list { margin: 0; padding-left: 18px; line-height: 1.8; }
 .ms-list .ms-bad { color: #b91c1c; }
+
+/* ---------- Data checker ---------- */
+.dc-check { border: 1px solid var(--border); border-radius: 12px; margin: 10px 0; background: var(--surface, #fff); }
+.dc-check > summary { display: flex; align-items: center; gap: 14px; padding: 12px 14px; cursor: pointer; list-style: none; }
+.dc-check > summary::-webkit-details-marker { display: none; }
+.dc-count { min-width: 44px; text-align: center; font-size: 1.15rem; font-weight: 800; color: var(--text-primary); }
+.dc-title { flex: 1; display: flex; flex-direction: column; }
+.dc-title small { color: var(--text-secondary); font-size: 0.8rem; }
+.dc-sev { font-size: 0.72rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: #fef3c7; color: #92400e; }
+.sev-high .dc-sev { background: #fee2e2; color: #b91c1c; }
+.sev-low .dc-sev { background: #e0e7ff; color: #3730a3; }
+.dc-ok { font-size: 0.75rem; color: #15803d; font-weight: 700; }
+.dc-check .table-scroll { padding: 0 14px 12px; }
+.dc-check td small { display: block; color: var(--text-secondary); }
+.dc-areas { display: flex; flex-wrap: wrap; gap: 6px; }
+.dc-areas button { border: 1px solid var(--border-strong); background: transparent; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 0.84rem; cursor: pointer; color: var(--text-primary); }
+.dc-areas button[aria-selected="true"] { background: var(--blue-600, #2563eb); border-color: var(--blue-600, #2563eb); color: #fff; }

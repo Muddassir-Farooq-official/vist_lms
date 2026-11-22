@@ -168,6 +168,7 @@ These are under **Settings → More tools** (and the menu's search), not in the 
 - **Backups**: see the backups and download a complete copy. See *Backups* below.
 - **Server health**: the server's disk, memory and load, and whether the site, its database, its HTTPS certificate and its backups are fine. See *Server health* below.
 - **Settings** (in the menu): institute details, look, rules and your own account, and the **More tools** above.
+- **Data checker** (in the menu): finds gaps and mistakes in the records, each with **Fix…** to open the right page: students without a CNIC, mobile or parent's mobile, numbers that are not mobile numbers, students without a program or semester, the same name and date of birth on two students; staff without a CNIC, mobile, salary or login, and teachers with no subject; subjects without a teacher, students enrolled in nothing, open terms without dates, affiliated students without a Reg No; active students with no fee, and payments larger than the charges. It only reads; nothing is changed.
 
 ### Backups
 

@@ -280,6 +280,7 @@ ADMIN_NAV_ITEMS = [
     _nav("panel-staff", "General staff", "employees", "/dashboard/staff", group="Other offices"),
     _nav("view-as", "View as a person", "user", "/dashboard/admin/view-as", group="Other offices", keywords="impersonate"),
     _nav("settings", "Settings", "settings", "/dashboard/admin/settings", group="System", keywords="rules policy institute profile"),
+    _nav("data-check", "Data checker", "check-circle", "/dashboard/admin/data-check", group="System", keywords="missing duplicates cnic phone clean"),
     _nav("help", "Help & manual", "file", "/dashboard/admin/help", group="System"),
     # Rarely used setup pages: on the Settings page ("More tools") and in the menu's search, not in the list.
     _nav("imports", "CSV Imports", "imports", "/dashboard/admin/imports", group="System", hub=True, keywords="upload excel bulk"),
@@ -727,6 +728,7 @@ from app.fees.defaulters_router import router as fee_defaulters_router  # noqa: 
 from app.core.nav_badges import router as nav_badges_router  # noqa: E402
 from app.navigation.router import router as nav_shortcuts_router  # noqa: E402
 from app.reports.morning import router as morning_summary_router  # noqa: E402
+from app.reports.datacheck import router as data_check_router  # noqa: E402
 from app.reports.center_router import router as report_center_router  # noqa: E402
 from app.reports.monthly_router import router as monthly_report_router  # noqa: E402
 from app.discipline.router import router as discipline_router  # noqa: E402
@@ -740,6 +742,7 @@ app.include_router(fee_defaulters_router, prefix=settings.api_v1_prefix)
 app.include_router(nav_badges_router, prefix=settings.api_v1_prefix)
 app.include_router(nav_shortcuts_router, prefix=settings.api_v1_prefix)
 app.include_router(morning_summary_router, prefix=settings.api_v1_prefix)
+app.include_router(data_check_router, prefix=settings.api_v1_prefix)
 from app.calendar.router import router as calendar_router  # noqa: E402
 
 app.include_router(calendar_router, prefix=settings.api_v1_prefix)
@@ -1540,6 +1543,11 @@ async def admin_result_sheets_page(request: Request):
 @app.get("/dashboard/student/fees", include_in_schema=False)
 async def student_fees_page(request: Request):
     return templates.TemplateResponse(request, "student/fees.html", {"nav_items": STUDENT_NAV_ITEMS, "active_nav": "fees"})
+
+
+@app.get("/dashboard/admin/data-check", include_in_schema=False)
+async def admin_data_check_page(request: Request):
+    return templates.TemplateResponse(request, "admin/data_check.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "data-check"})
 
 
 @app.get("/dashboard/admin/morning-summary", include_in_schema=False)

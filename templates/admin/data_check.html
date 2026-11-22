@@ -1,0 +1,19 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN{% endblock %}
+{% block title %}Data checker{% endblock %}
+{% block page_title %}Data checker{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Gaps and mistakes in the records, with a link to fix each one. It only reads: nothing is changed here.</div>{% endblock %}
+
+{% block content %}
+<section class="sh-card">
+  <div class="toolbar">
+    <div class="dc-areas" role="tablist" aria-label="Area" id="dc-areas"></div>
+    <label class="rn-missing"><input type="checkbox" id="dc-hide-ok" checked /> Hide checks with nothing found</label>
+    <button type="button" class="role-btn secondary-btn" id="dc-run">Check again</button>
+  </div>
+  <p class="panel-hint" id="dc-summary" aria-live="polite">Checking…</p>
+  <div id="dc-list"></div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}<script src="/static/js/data-check.js"></script>{% endblock %}

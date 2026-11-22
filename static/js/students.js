@@ -751,6 +751,7 @@
     if (wanted && programsCache.some(function (p) { return p.id === wanted; })) programFilter.value = wanted;
     if (qs.get("semester")) document.getElementById("semester-filter").value = qs.get("semester");
     if (qs.get("status")) statusFilter.value = qs.get("status");
+    if (qs.get("q")) searchInput.value = qs.get("q");      // opened from the data checker: that student
     syncExportLink();
     loadStudents();
   });
