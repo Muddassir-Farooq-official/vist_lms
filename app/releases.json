@@ -1,5 +1,18 @@
 [
   {
+    "version": "1.62.0",
+    "date": "2026-11-22",
+    "title": "Regulator returns",
+    "summary": "Enrolment, teaching staff and results summaries for regulator returns.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Reports → Regulator returns: enrolment, teaching staff and results summaries, on screen and as CSV."
+      }
+    ]
+  },
+  {
     "version": "1.61.0",
     "date": "2026-11-22",
     "title": "Internship year",
