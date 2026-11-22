@@ -205,6 +205,9 @@ class ResultSheetService:
                 continue
             await sms.queue_for_student(sid, event="RESULTS", attachment=f"RESULT:{sid}",
                                         body=f"{settings.app_name}: result for {course.code} {course.title[:40]} ({offering.term_label}) is published. See My Results.")
+        from app.family.service import result_notices
+
+        await result_notices(self.session, offering_id, course_code=course.code, course_title=course.title, internal_only=affiliated)   # to phones; never raises
         await self.audit.log(actor_user_id=actor_id, action="result_sheet.published", entity_type="result_sheet", entity_id=sheet.id, metadata={"students": decided})
         teacher = await self._teacher_user(offering)
         if teacher:

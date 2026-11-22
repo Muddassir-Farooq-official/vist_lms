@@ -739,6 +739,7 @@ from app.reports.morning import router as morning_summary_router  # noqa: E402
 from app.reports.datacheck import router as data_check_router  # noqa: E402
 from app.academics.rollover_router import router as rollover_router  # noqa: E402
 from app.obe.router import router as obe_router  # noqa: E402
+from app.family.router import router as family_router  # noqa: E402
 from app.reports.center_router import router as report_center_router  # noqa: E402
 from app.reports.monthly_router import router as monthly_report_router  # noqa: E402
 from app.discipline.router import router as discipline_router  # noqa: E402
@@ -755,6 +756,7 @@ app.include_router(morning_summary_router, prefix=settings.api_v1_prefix)
 app.include_router(data_check_router, prefix=settings.api_v1_prefix)
 app.include_router(rollover_router, prefix=settings.api_v1_prefix)
 app.include_router(obe_router, prefix=settings.api_v1_prefix)
+app.include_router(family_router, prefix=settings.api_v1_prefix)
 from app.calendar.router import router as calendar_router  # noqa: E402
 
 app.include_router(calendar_router, prefix=settings.api_v1_prefix)

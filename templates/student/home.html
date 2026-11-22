@@ -22,6 +22,8 @@
     </nav>
   </section>
 
+  <section class="fam-cards" id="family-cards" aria-label="Today" data-who="student"></section>
+
   <section class="panel dash-panel news-strip" aria-labelledby="st-latest-h">
     <div class="dash-panel-head">
       <h2 id="st-latest-h">{{ nav_icon("megaphone") }} Latest announcement</h2>
@@ -173,4 +175,5 @@
 {% block extra_scripts %}
 <script src="/static/js/dash-common.js?v={{ app_version() }}"></script>
 <script src="/static/js/student-home.js?v={{ app_version() }}"></script>
+<script src="/static/js/family-cards.js?v={{ app_version() }}"></script>
 {% endblock %}

@@ -17,6 +17,8 @@
     <select id="child-picker" class="select-input" hidden></select>
   </section>
 
+  <section class="fam-cards" id="family-cards" aria-label="Your children today" data-who="parent"></section>
+
   <p class="empty-state" id="no-children" hidden>No student is linked to your account yet. Please contact the institute office.</p>
   <p class="dash-alert error" id="pr-error" hidden></p>
 
@@ -121,4 +123,5 @@
 {% block extra_scripts %}
 <script src="/static/js/dash-common.js"></script>
 <script src="/static/js/parent-portal.js"></script>
+<script src="/static/js/family-cards.js"></script>
 {% endblock %}
