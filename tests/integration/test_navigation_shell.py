@@ -46,8 +46,13 @@ async def test_every_sign_in_destination_is_in_that_portals_menu():
 
 async def test_menu_is_grouped_and_shell_has_phone_bar_and_no_api_docs_button(app_client):
     html = (await app_client.get("/dashboard/admin/students")).text
-    for heading in ("People", "Academics", "Finance", "System"):
-        assert f'class="drawer-group" role="presentation">{heading}<' in re.sub(r"\s+", " ", html).replace("> ", ">").replace(" <", "<") or heading in html
+    for heading in ("Students", "Teaching &amp; exams", "Fees &amp; accounts", "HR &amp; payroll", "Store &amp; assets", "Reports", "Communication", "System"):
+        assert f'data-group="{heading}"' in html, heading
+    # each group heading is a button that opens and closes its links; the menu has a search box
+    assert len(re.findall(r'<button type="button" class="drawer-group" aria-expanded="true" aria-controls="nav-g\d+">', html)) == 9
+    assert 'id="nav-search"' in html and 'data-nav="students"' in html
+    # rarely used setup pages: kept for the search (hidden), listed on Settings -> More tools
+    assert re.search(r'data-nav="backups"[^>]*hidden', html) and 'data-badge="approvals"' in html
     assert 'class="bottom-nav"' in html
     assert len(re.findall(r'class="bottom-link', html)) == 5          # 4 quick links + More
     assert 'href="/docs"' not in html and "API Docs" not in html

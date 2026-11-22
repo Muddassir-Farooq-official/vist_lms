@@ -1,5 +1,38 @@
 [
   {
+    "version": "1.45.0",
+    "date": "2026-11-21",
+    "title": "An easier menu",
+    "summary": "Search the menu, open and close its groups, see where work is waiting, and find pages grouped by job.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Everyone",
+        "text": "Search the menu: type part of a page's name (or another word for it) and press Enter. On a computer, / or Ctrl+K jumps to the search."
+      },
+      {
+        "kind": "new",
+        "for": "Everyone",
+        "text": "Menu groups open and close; the group of the page you are on is always open and the rest stay as you left them."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Numbers beside Approvals, Profile changes, Certificate requests, Admissions and Result Approval show the work waiting; a closed group shows its total."
+      },
+      {
+        "kind": "improved",
+        "for": "Administrators",
+        "text": "The menu is grouped by job: Students, Teaching & exams, Fees & accounts, HR & payroll, Store & assets, Reports, Communication, Other offices, System. Setup pages moved to Settings → More tools."
+      },
+      {
+        "kind": "improved",
+        "for": "Staff",
+        "text": "The accounts office, exam office, warden and gate menus have groups too, with your own things under Me."
+      }
+    ]
+  },
+  {
     "version": "1.44.0",
     "date": "2026-11-21",
     "title": "Fee defaulter follow-up",

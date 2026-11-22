@@ -2,6 +2,14 @@
    bar phones use. Items come from app/main.py (group / mobile / short). #}
 {% from "_icons.html" import nav_icon %}
 
+{% macro _link(item, active) -%}
+<a href="{{ item.href }}" class="drawer-link{% if item.slug == active %} active{% endif %}{% if item.hub %} drawer-hub{% endif %}" data-nav="{{ item.slug }}"
+   {%- if item.badge %} data-badge="{{ item.badge }}"{% endif %}{% if item.keywords %} data-keywords="{{ item.keywords }}"{% endif %}
+   {%- if item.slug == active %} aria-current="page"{% elif item.hub %} hidden{% endif %}>
+  {{ nav_icon(item.icon) }}<span>{{ item.label }}</span>
+</a>
+{%- endmacro %}
+
 {% macro drawer_nav(items, active, label, admin_back=False) %}
 <nav class="drawer-nav" aria-label="{{ label }}">
   {% if admin_back %}
@@ -9,15 +17,27 @@
     {{ nav_icon("dashboard") }}<span>&larr; Back to Admin</span>
   </a>
   {% endif %}
-  {% set ns = namespace(group=None) %}
-  {% for item in items|portal_nav if item.enabled %}
-    {% if item.group and item.group != ns.group %}
-      <div class="drawer-group" role="presentation">{{ item.group }}</div>
+  {# Search: type part of a page's name (or another word for it); Enter opens the first match. "/" jumps here. #}
+  <div class="drawer-search" role="search">
+    {{ nav_icon("search") }}
+    <input type="search" id="nav-search" placeholder="Search the menu" aria-label="Search the menu" autocomplete="off" enterkeyhint="go" />
+    <kbd class="drawer-kbd" aria-hidden="true">/</kbd>
+  </div>
+  <p class="drawer-noresult" id="nav-noresult" hidden>No page matches.</p>
+  {% for group, list in items|portal_nav|selectattr("enabled")|list|nav_sections %}
+    {% if group %}
+    {% set here = list|selectattr("slug", "equalto", active)|list %}
+    <div class="drawer-section{% if here %} has-active{% endif %}" data-group="{{ group }}">
+      <button type="button" class="drawer-group" aria-expanded="true" aria-controls="nav-g{{ loop.index }}">
+        <span class="drawer-group-name">{{ group }}</span><span class="drawer-group-badge" hidden></span>{{ nav_icon("chevron-down") }}
+      </button>
+      <div class="drawer-group-items" id="nav-g{{ loop.index }}">
+        {% for item in list %}{{ _link(item, active) }}{% endfor %}
+      </div>
+    </div>
+    {% else %}
+      {% for item in list %}{{ _link(item, active) }}{% endfor %}
     {% endif %}
-    {% set ns.group = item.group %}
-    <a href="{{ item.href }}" class="drawer-link{% if item.slug == active %} active{% endif %}"{% if item.slug == active %} aria-current="page"{% endif %}>
-      {{ nav_icon(item.icon) }}<span>{{ item.label }}</span>
-    </a>
   {% endfor %}
 </nav>
 {% endmacro %}
@@ -25,7 +45,7 @@
 {% macro bottom_nav(items, active) %}
 <nav class="bottom-nav" aria-label="Quick navigation">
   {% for item in items|portal_nav if item.enabled and item.mobile %}
-    <a href="{{ item.href }}" class="bottom-link{% if item.slug == active %} active{% endif %}"{% if item.slug == active %} aria-current="page"{% endif %}>
+    <a href="{{ item.href }}" data-nav="{{ item.slug }}"{% if item.badge %} data-badge="{{ item.badge }}"{% endif %} class="bottom-link{% if item.slug == active %} active{% endif %}"{% if item.slug == active %} aria-current="page"{% endif %}>
       {{ nav_icon(item.icon) }}<span>{{ item.short or item.label }}</span>
     </a>
   {% endfor %}

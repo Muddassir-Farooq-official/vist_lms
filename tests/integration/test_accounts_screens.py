@@ -11,7 +11,7 @@ pytestmark = pytest.mark.asyncio
 async def test_both_portals_have_an_accounts_page_in_their_menu(app_client):
     admin = next(i for i in ADMIN_NAV_ITEMS if i["slug"] == "finance")
     office = next(i for i in ACCOUNTS_NAV_ITEMS if i["slug"] == "finance")
-    assert admin["href"] == "/dashboard/admin/finance" and admin["group"] == "Finance" and office["href"] == "/dashboard/accounts/finance"
+    assert admin["href"] == "/dashboard/admin/finance" and admin["group"] == "Fees & accounts" and office["href"] == "/dashboard/accounts/finance"
     for href in (admin["href"], office["href"]):
         html = (await app_client.get(href)).text
         for tab in ("overview", "book", "expenses", "purchasing", "income", "vendors", "categories"):

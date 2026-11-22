@@ -4,6 +4,16 @@
 {% block page_subtitle %}<div class="content-subtitle">Your institute's name, logo and details (they appear on every page, document and SMS), its look, the rules the system applies, and your own account.</div>{% endblock %}
 
 {% block content %}
+{% from "_icons.html" import nav_icon %}
+{# Setup pages kept off the menu list (app/main.py, hub=True); the menu's search finds them too. #}
+<section class="st-tools" data-admin-only aria-labelledby="st-tools-h">
+  <h2 id="st-tools-h" class="st-tools-h">More tools</h2>
+  <div class="st-tools-grid">
+    {% for item in nav_items if item.hub %}
+    <a class="st-tool" href="{{ item.href }}">{{ nav_icon(item.icon) }}<span>{{ item.label }}</span></a>
+    {% endfor %}
+  </div>
+</section>
 <label class="st-nav-mobile" for="st-nav-select"><span>Section</span>
   <select id="st-nav-select" class="select-input" aria-label="Settings section"></select>
 </label>
