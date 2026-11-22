@@ -75,6 +75,7 @@ from app.academics import rollover as _rollover_models  # noqa: F401
 from app.exams import seating as _seating_models  # noqa: F401
 from app.obe import models as _obe_models  # noqa: F401
 from app.substitutes import models as _substitutes_models  # noqa: F401
+from app.clinical import models as _clinical_models  # noqa: F401
 
 TEST_DATABASE_URL = settings.database_url.rsplit("/", 1)[0] + "/vist_lms_test"
 

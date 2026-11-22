@@ -1,5 +1,28 @@
 [
   {
+    "version": "1.54.0",
+    "date": "2026-11-22",
+    "title": "Clinical rotations",
+    "summary": "Hospital rotations for clinical groups, with clinical attendance, a signed logbook and placement letters.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Clinical rotations: hospitals and wards, groups, supervisors (staff or a limited hospital login), the rotation schedule with clash checks, placement letters and group progress."
+      },
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "Clinical supervision: mark clinical attendance and sign logbook entries for the groups you supervise."
+      },
+      {
+        "kind": "new",
+        "for": "Students",
+        "text": "My clinical: your rotations, clinical attendance and logbook; add entries for your supervisor to sign."
+      }
+    ]
+  },
+  {
     "version": "1.53.0",
     "date": "2026-11-22",
     "title": "Substitute teachers",

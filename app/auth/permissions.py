@@ -34,6 +34,7 @@ class Roles:
     PARENT = "PARENT"   # a student's guardian: read-only view of their own children (attendance, results, fees)
     EXAM_CONTROLLER = "EXAM_CONTROLLER"    # the exam department: approves, publishes and corrects results, and keeps the grading scale
     STAFF = "STAFF"                        # general staff (office boy, IT, driver, cleaner...): only their own pay, attendance, tasks and requests
+    CLINICAL_SUPERVISOR = "CLINICAL_SUPERVISOR"   # a hospital's supervisor: only the clinical groups given to them (attendance, logbook sign-off)
 
     ALL = (ADMIN, TEACHER, STUDENT, ACCOUNTS_OFFICER, LIBRARIAN, HOSTEL_WARDEN, SECURITY_GUARD, EXAM_CONTROLLER, STAFF)
 
@@ -245,6 +246,10 @@ class Permissions:
     FEE_REFUND_APPROVE = "fee.refund.approve"
     # Run admissions: rounds, applications, verification, merit lists, admitting (admin).
     ADMISSION_MANAGE = "admission.manage"
+    # Clinical rotations: set up hospitals, groups, rotations and logbook skills (administration).
+    CLINICAL_MANAGE = "clinical.manage"
+    # Supervise clinical rotations given to oneself: mark attendance, sign logbook entries (teachers, hospital supervisors).
+    CLINICAL_SUPERVISE = "clinical.supervise"
     # Parent portal: see one's OWN linked children only.
     PARENT_VIEW = "parent.view"
     # Create/link/unlink a guardian's parent login from a student's record (administration).
@@ -271,6 +276,8 @@ class Permissions:
 # seed script), not editing scattered `if` statements.
 ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
     Roles.ADMIN: (
+        Permissions.CLINICAL_MANAGE,
+        Permissions.CLINICAL_SUPERVISE,
         Permissions.WARNING_ISSUE,
         Permissions.WARNING_DECIDE,
         Permissions.POLICY_MANAGE,
@@ -361,6 +368,7 @@ ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
         Permissions.PAYROLL_APPROVE,
     ),
     Roles.TEACHER: (
+        Permissions.CLINICAL_SUPERVISE,
         Permissions.STUDENT_VIEW,  # scoped to assigned sections at the service layer
         Permissions.PROGRAM_VIEW,
         Permissions.COURSE_VIEW,
@@ -450,6 +458,7 @@ ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
     Roles.HOSTEL_WARDEN: (Permissions.HOSTEL_VIEW, Permissions.HOSTEL_MANAGE, Permissions.STUDENT_VIEW, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
     Roles.EXAM_CONTROLLER: (Permissions.EXAM_SCHEDULE_MANAGE, Permissions.COURSE_VIEW, Permissions.RESULT_APPROVE, Permissions.MARKS_ENTER, Permissions.STUDENT_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
     Roles.PARENT: (Permissions.PARENT_VIEW,),
+    Roles.CLINICAL_SUPERVISOR: (Permissions.CLINICAL_SUPERVISE,),
     Roles.PRINCIPAL: (Permissions.INSTITUTE_OVERVIEW, Permissions.WARNING_DECIDE, Permissions.AUDIT_VIEW, Permissions.HOSTEL_VIEW, Permissions.INVENTORY_VIEW, Permissions.ASSET_VIEW, Permissions.STAFF_ATTENDANCE_VIEW, Permissions.ACADEMIC_OVERSIGHT, Permissions.ATTENDANCE_VIEW,
                       Permissions.COURSE_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.STUDENT_VIEW,
                       Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),

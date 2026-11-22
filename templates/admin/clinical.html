@@ -1,0 +1,109 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN{% endblock %}
+{% block title %}Clinical rotations{% endblock %}
+{% block page_title %}Clinical rotations{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Hospitals and wards, clinical groups, supervisors and the rotation schedule. Supervisors mark clinical attendance and sign the students' logbooks.</div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="schedule" role="tab" aria-selected="true"><span>Schedule</span></button>
+  <button class="portal-tab" data-tab="groups" role="tab" aria-selected="false"><span>Groups</span></button>
+  <button class="portal-tab" data-tab="sites" role="tab" aria-selected="false"><span>Hospitals &amp; wards</span></button>
+  <button class="portal-tab" data-tab="supervisors" role="tab" aria-selected="false"><span>Supervisors</span></button>
+  <button class="portal-tab" data-tab="skills" role="tab" aria-selected="false"><span>Logbook skills</span></button>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="schedule">
+<section class="sh-card">
+  <h2 class="panel-title">Schedule a rotation</h2>
+  <p class="panel-hint">Refused when the group is already somewhere on those dates, or the ward would have more students than it takes.</p>
+  <form id="cr-form" class="form-grid">
+    <label>Group<select id="cr-group" class="text-input" required></select></label>
+    <label>Ward<select id="cr-unit" class="text-input" required></select></label>
+    <label>Supervisor<select id="cr-sup" class="text-input"><option value="">— later —</option></select></label>
+    <label>From<input id="cr-from" type="date" class="text-input" required></label>
+    <label>To<input id="cr-to" type="date" class="text-input" required></label>
+    <label>Hours<span class="cl-inline"><input id="cr-st" type="time" class="text-input" value="08:00" required> – <input id="cr-en" type="time" class="text-input" value="14:00" required></span></label>
+    <fieldset class="cl-days" id="cr-days"><legend>Days</legend></fieldset>
+    <label>Note<input id="cr-note" class="text-input" maxlength="300"></label>
+    <div class="decision-bar"><button type="submit" class="role-btn">Save rotation</button></div>
+  </form>
+</section>
+<section class="sh-card">
+  <div class="toolbar"><label class="field-label-sm"><input type="checkbox" id="cr-current" checked> Current and coming only</label></div>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Dates</th><th>Group</th><th>Ward</th><th>Supervisor</th><th>Days</th><th></th></tr></thead><tbody id="cr-body"></tbody></table></div>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="groups" hidden>
+<section class="sh-card">
+  <h2 class="panel-title">Make a group</h2>
+  <form id="cg-form" class="form-grid">
+    <label>Name<input id="cg-name" class="text-input" maxlength="100" required placeholder="BSN-3 Group A"></label>
+    <label>Program<select id="cg-program" class="text-input"><option value="">—</option></select></label>
+    <label>Semester<input id="cg-sem" type="number" min="1" max="16" class="text-input"></label>
+    <label class="cl-wide">Roll numbers (one per line or comma separated)<textarea id="cg-rolls" class="text-input" rows="4"></textarea></label>
+    <div class="decision-bar"><button type="submit" class="role-btn">Save group</button></div>
+  </form>
+</section>
+<section class="sh-card">
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Group</th><th>Program</th><th>Students</th><th></th></tr></thead><tbody id="cg-body"></tbody></table></div>
+</section>
+<section class="sh-card" id="cg-report" hidden>
+  <h2 class="panel-title" id="cg-report-title"></h2>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Roll no.</th><th>Name</th><th>Clinical attendance</th><th>Logbook skills complete</th></tr></thead><tbody id="cg-report-body"></tbody></table></div>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="sites" hidden>
+<section class="sh-card">
+  <h2 class="panel-title">Add a hospital</h2>
+  <form id="cs-form" class="form-grid">
+    <label>Name<input id="cs-name" class="text-input" maxlength="150" required></label>
+    <label>Address<input id="cs-addr" class="text-input" maxlength="300"></label>
+    <label>Letter addressed to<input id="cs-person" class="text-input" maxlength="120" placeholder="The Medical Superintendent"></label>
+    <label>Phone<input id="cs-phone" class="text-input" maxlength="30"></label>
+    <div class="decision-bar"><button type="submit" class="role-btn">Add hospital</button></div>
+  </form>
+</section>
+<div id="cs-list"></div>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="supervisors" hidden>
+<section class="sh-card">
+  <h2 class="panel-title">Add a supervisor</h2>
+  <p class="panel-hint">One of our staff signs in with their own login. A hospital's staff member gets a new login that only opens their own rotations; the temporary password is shown once.</p>
+  <form id="cv-form" class="form-grid">
+    <label>Who<select id="cv-kind" class="text-input"><option value="int">Our staff (employee code)</option><option value="ext">Hospital staff (new login)</option></select></label>
+    <label id="cv-code-l">Employee code<input id="cv-code" class="text-input" maxlength="20"></label>
+    <label id="cv-name-l" hidden>Name<input id="cv-name" class="text-input" maxlength="120"></label>
+    <label id="cv-user-l" hidden>Username<input id="cv-user" class="text-input" maxlength="64" autocomplete="off"></label>
+    <label>Phone<input id="cv-phone" class="text-input" maxlength="30"></label>
+    <label>Hospital<select id="cv-site" class="text-input"><option value="">—</option></select></label>
+    <div class="decision-bar"><button type="submit" class="role-btn">Add supervisor</button></div>
+  </form>
+  <p id="cv-pass" class="home-alert" hidden></p>
+</section>
+<section class="sh-card">
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Name</th><th>Kind</th><th>Phone</th><th>Status</th><th></th></tr></thead><tbody id="cv-body"></tbody></table></div>
+</section>
+</div>
+
+<div class="portal-tab-panel" data-tab-panel="skills" hidden>
+<section class="sh-card">
+  <h2 class="panel-title">Add a logbook skill</h2>
+  <p class="panel-hint">What a program's students must do and how many times, signed by a supervisor.</p>
+  <form id="ck-form" class="form-grid">
+    <label>Program<select id="ck-program" class="text-input" required></select></label>
+    <label>Skill<input id="ck-name" class="text-input" maxlength="150" required placeholder="IV cannulation"></label>
+    <label>Times required<input id="ck-req" type="number" min="1" max="500" value="5" class="text-input" required></label>
+    <label>Semester<input id="ck-sem" type="number" min="1" max="16" class="text-input"></label>
+    <div class="decision-bar"><button type="submit" class="role-btn">Add skill</button></div>
+  </form>
+</section>
+<section class="sh-card">
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Program</th><th>Skill</th><th>Required</th><th>Semester</th><th></th></tr></thead><tbody id="ck-body"></tbody></table></div>
+</section>
+</div>
+{% endblock %}
+{% block extra_scripts %}<script src="/static/js/clinical-admin.js"></script>{% endblock %}

@@ -242,6 +242,8 @@ ADMIN_NAV_ITEMS = [
     _nav("timetable", "Timetable", "clock", "/dashboard/admin/timetable", group="Teaching & exams", keywords="periods rooms"),
     _nav("smart-timetable", "Smart timetable", "grid", "/dashboard/admin/timetable/smart", group="Teaching & exams", keywords="workload free slots"),
     _nav("substitutes", "Substitute teachers", "employees", "/dashboard/admin/substitutes", group="Teaching & exams", keywords="cover absent teacher"),
+    _nav("clinical", "Clinical rotations", "students", "/dashboard/admin/clinical", group="Teaching & exams",
+         keywords="hospital ward placement logbook nursing supervisor"),
     _nav("attendance", "Attendance", "attendance", "/dashboard/admin/attendance", group="Teaching & exams", mobile=True, keywords="absent present"),
     _nav("progress", "Teacher Progress", "exams", "/dashboard/admin/progress", group="Teaching & exams"),
     _nav("feedback", "Course feedback", "check-circle", "/dashboard/admin/feedback", group="Teaching & exams"),
@@ -475,6 +477,7 @@ STUDENT_NAV_ITEMS = [
     _nav("results", "My Results", "exams", "/dashboard/student/results", group="Study", mobile=True, short="Results"),
     _nav("feedback", "Course feedback", "check-circle", "/dashboard/student/feedback", group="Study"),
     _nav("records", "Degree progress & documents", "graduation-cap", "/dashboard/student/records", group="Study"),
+    _nav("clinical", "My clinical", "students", "/dashboard/student/clinical", group="Study"),
     _nav("library", "Library", "library", "/dashboard/student/library", group="Services"),
     _nav("applications", "Applications", "file", "/dashboard/student/applications", group="Services"),
     _nav("certificates", "Certificates", "file", "/dashboard/student/certificates", group="Services"),
@@ -485,6 +488,12 @@ STUDENT_NAV_ITEMS = [
     _nav("my-warnings", "My warnings", "alert", "/dashboard/student/my-warnings", group="Account"),
     _nav("calendar", "Calendar", "clock", "/dashboard/student/calendar", group="Services"),
     _nav("help", "Help & manual", "file", "/dashboard/student/help", group="Account"),
+]
+
+# Clinical supervisor portal: a hospital's supervisor (limited login), or one of our teachers supervising.
+CLINICAL_NAV_ITEMS = [
+    _nav("home", "My rotations", "students", "/dashboard/clinical", mobile=True, short="Rotations"),
+    _nav("help", "Help & manual", "file", "/dashboard/clinical/help"),
 ]
 
 # Teacher self-service.
@@ -505,6 +514,7 @@ FACULTY_NAV_ITEMS = [
     _nav("feedback", "Student feedback", "check-circle", "/dashboard/faculty/feedback", group="Teaching"),
     _nav("timetable", "My Timetable", "clock", "/dashboard/faculty/timetable", group="Teaching"),
     _nav("substitutes", "Substitute classes", "employees", "/dashboard/faculty/substitutes", group="Teaching"),
+    _nav("clinical", "Clinical supervision", "students", "/dashboard/clinical", group="Teaching"),
     _nav("exams", "Exam duties", "exams", "/dashboard/faculty/exams", group="Teaching"),
     _nav("library", "Library", "library", "/dashboard/faculty/library", group="Services"),
     _nav("tasks", "Tasks", "tasks", "/dashboard/faculty/tasks", group="Services"),
@@ -743,6 +753,7 @@ from app.academics.rollover_router import router as rollover_router  # noqa: E40
 from app.obe.router import router as obe_router  # noqa: E402
 from app.family.router import router as family_router  # noqa: E402
 from app.substitutes.router import router as substitutes_router  # noqa: E402
+from app.clinical.router import router as clinical_router  # noqa: E402
 from app.reports.center_router import router as report_center_router  # noqa: E402
 from app.reports.monthly_router import router as monthly_report_router  # noqa: E402
 from app.discipline.router import router as discipline_router  # noqa: E402
@@ -761,6 +772,7 @@ app.include_router(rollover_router, prefix=settings.api_v1_prefix)
 app.include_router(obe_router, prefix=settings.api_v1_prefix)
 app.include_router(family_router, prefix=settings.api_v1_prefix)
 app.include_router(substitutes_router, prefix=settings.api_v1_prefix)
+app.include_router(clinical_router, prefix=settings.api_v1_prefix)
 from app.calendar.router import router as calendar_router  # noqa: E402
 
 app.include_router(calendar_router, prefix=settings.api_v1_prefix)
@@ -968,6 +980,7 @@ _CALENDAR_PAGES = {
     "faculty": ("faculty/_base.html", "FACULTY_NAV_ITEMS", None), "student": ("student/_base.html", "STUDENT_NAV_ITEMS", None),
     "parent": ("parent/_base.html", "PARENT_NAV_ITEMS", None), "principal": ("admin/_base.html", "PRINCIPAL_NAV_ITEMS", "ADMIN,PRINCIPAL"),
     "hod": ("admin/_base.html", "HOD_NAV_ITEMS", "ADMIN,HOD"), "staff": ("staff/_base.html", "STAFF_NAV_ITEMS", None),
+    "clinical": ("clinical/_base.html", "CLINICAL_NAV_ITEMS", None),
 }
 
 
@@ -1868,6 +1881,21 @@ async def parent_report_cards_page(request: Request):
 @app.get("/dashboard/faculty/substitutes", include_in_schema=False)
 async def faculty_substitutes_page(request: Request):
     return templates.TemplateResponse(request, "faculty/substitutes.html", {"nav_items": FACULTY_NAV_ITEMS, "active_nav": "substitutes"})
+
+
+@app.get("/dashboard/admin/clinical", include_in_schema=False)
+async def admin_clinical_page(request: Request):
+    return templates.TemplateResponse(request, "admin/clinical.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "clinical"})
+
+
+@app.get("/dashboard/clinical", include_in_schema=False)
+async def clinical_supervisor_page(request: Request):
+    return templates.TemplateResponse(request, "clinical/home.html", {"nav_items": CLINICAL_NAV_ITEMS, "active_nav": "home"})
+
+
+@app.get("/dashboard/student/clinical", include_in_schema=False)
+async def student_clinical_page(request: Request):
+    return templates.TemplateResponse(request, "student/clinical.html", {"nav_items": STUDENT_NAV_ITEMS, "active_nav": "clinical"})
 
 
 @app.get("/dashboard/admin/substitutes", include_in_schema=False)
