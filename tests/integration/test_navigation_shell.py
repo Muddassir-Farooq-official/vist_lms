@@ -6,14 +6,14 @@ import re
 import pytest
 
 from app.auth.redirects import PORTAL_BY_ROLE
-from app.main import ACCOUNTS_NAV_ITEMS, ADMIN_NAV_ITEMS, CLINICAL_NAV_ITEMS, EXAM_NAV_ITEMS, FACULTY_NAV_ITEMS, GATE_NAV_ITEMS, HOD_NAV_ITEMS, LIBRARY_NAV_ITEMS, PARENT_NAV_ITEMS, PRINCIPAL_NAV_ITEMS, STAFF_NAV_ITEMS, STUDENT_NAV_ITEMS, WARDEN_NAV_ITEMS
+from app.main import ACCOUNTS_NAV_ITEMS, ADMIN_NAV_ITEMS, ALUMNI_NAV_ITEMS, CLINICAL_NAV_ITEMS, EXAM_NAV_ITEMS, FACULTY_NAV_ITEMS, GATE_NAV_ITEMS, HOD_NAV_ITEMS, LIBRARY_NAV_ITEMS, PARENT_NAV_ITEMS, PRINCIPAL_NAV_ITEMS, STAFF_NAV_ITEMS, STUDENT_NAV_ITEMS, WARDEN_NAV_ITEMS
 
 pytestmark = pytest.mark.asyncio
 
 ALL_NAVS = {
     "admin": ADMIN_NAV_ITEMS, "library": LIBRARY_NAV_ITEMS, "accounts": ACCOUNTS_NAV_ITEMS,
     "student": STUDENT_NAV_ITEMS, "faculty": FACULTY_NAV_ITEMS, "gate": GATE_NAV_ITEMS, "exam": EXAM_NAV_ITEMS, "warden": WARDEN_NAV_ITEMS,
-    "staff": STAFF_NAV_ITEMS, "clinical": CLINICAL_NAV_ITEMS,
+    "staff": STAFF_NAV_ITEMS, "clinical": CLINICAL_NAV_ITEMS, "alumni": ALUMNI_NAV_ITEMS,
 }
 
 
@@ -39,7 +39,7 @@ async def test_every_sign_in_destination_is_in_that_portals_menu():
              "/dashboard/library": LIBRARY_NAV_ITEMS, "/dashboard/faculty": FACULTY_NAV_ITEMS,
              "/dashboard/student": STUDENT_NAV_ITEMS, "/dashboard/gate/home": GATE_NAV_ITEMS, "/dashboard/exam/home": EXAM_NAV_ITEMS, "/dashboard/warden/home": WARDEN_NAV_ITEMS,
              "/dashboard/hod": HOD_NAV_ITEMS, "/dashboard/principal": PRINCIPAL_NAV_ITEMS, "/dashboard/parent": PARENT_NAV_ITEMS,
-             "/dashboard/staff": STAFF_NAV_ITEMS, "/dashboard/clinical": CLINICAL_NAV_ITEMS}
+             "/dashboard/staff": STAFF_NAV_ITEMS, "/dashboard/clinical": CLINICAL_NAV_ITEMS, "/dashboard/alumni": ALUMNI_NAV_ITEMS}
     for _role, path in PORTAL_BY_ROLE:
         assert path in {i["href"] for i in menus[path]}, f"{path} is a landing page but not in its own menu"
 
