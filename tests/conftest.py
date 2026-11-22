@@ -70,6 +70,7 @@ from app.selfassess import service as _selfassess_models  # noqa: F401
 from app.backups import models as _backups_models  # noqa: F401
 from app.timetabling import models as _timetabling_models  # noqa: F401
 from app.serverhealth import models as _serverhealth_models  # noqa: F401
+from app.navigation import models as _navigation_models  # noqa: F401
 
 TEST_DATABASE_URL = settings.database_url.rsplit("/", 1)[0] + "/vist_lms_test"
 
