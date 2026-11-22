@@ -275,6 +275,7 @@ class Settings(BaseSettings):
     notify_sound_repeat: int = 1
     phone_alert_vibrate: int = 1
     phone_alert_keep_urgent: int = 1
+    morning_summary: int = 1                # 8 AM Mon-Sat: money, attendance, work waiting, problems to administrators (app/reports/morning.py)
     monthly_report_notice: int = 1          # the 1st of each month: tell the principal last month's report is ready
     sms_on_school_absence: int = 1           # School mode: a child marked absent or late in the morning roll call (to the guardian)
     sms_on_homework: int = 1                 # School mode: the evening homework message (to the guardian)
