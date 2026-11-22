@@ -26,5 +26,29 @@
   <h2 class="panel-title">My entries</h2>
   <div class="table-scroll"><table class="dash-table"><thead><tr><th>Day</th><th>Skill</th><th>Times</th><th>Status</th><th></th></tr></thead><tbody id="mc-entries"></tbody></table></div>
 </section>
+<section class="sh-card" id="internship" hidden>
+  <h2 class="panel-title">Internship</h2>
+  <p class="panel-hint" id="ip-meta"></p>
+  <ul id="ip-places"></ul>
+  <h3>Log a duty</h3>
+  <form id="ip-form" class="form-grid">
+    <label>Day<input id="ip-day" type="date" class="text-input" required></label>
+    <label>Shift<select id="ip-shift" class="text-input"><option value="MORNING">Morning</option><option value="EVENING">Evening</option><option value="NIGHT">Night</option></select></label>
+    <label>Hours<input id="ip-hours" type="number" min="0.5" max="16" step="0.5" value="6" class="text-input" required></label>
+    <label>Note<input id="ip-note" class="text-input" maxlength="300"></label>
+    <div class="decision-bar"><button type="submit" class="role-btn">Send for verification</button></div>
+  </form>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Day</th><th>Shift</th><th>Hours</th><th>Status</th><th></th></tr></thead><tbody id="ip-logs"></tbody></table></div>
+  <h3>Leave</h3>
+  <form id="ip-leave" class="form-grid">
+    <label>From<input id="ip-l-from" type="date" class="text-input" required></label>
+    <label>To<input id="ip-l-to" type="date" class="text-input" required></label>
+    <label class="cl-wide">Reason<input id="ip-l-reason" class="text-input" maxlength="500" required></label>
+    <div class="decision-bar"><button type="submit" class="role-btn secondary-btn">Ask for leave</button></div>
+  </form>
+  <ul id="ip-leaves"></ul>
+  <h3>Evaluations</h3>
+  <div id="ip-evals"></div>
+</section>
 {% endblock %}
-{% block extra_scripts %}<script src="/static/js/clinical-student.js"></script>{% endblock %}
+{% block extra_scripts %}<script src="/static/js/clinical-student.js"></script><script src="/static/js/internship-student.js"></script>{% endblock %}

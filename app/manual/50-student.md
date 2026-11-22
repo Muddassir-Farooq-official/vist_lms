@@ -14,6 +14,7 @@
 - **Course feedback**: tell the institute how each course went (anonymous).
 - **Degree progress & documents**: how far you are through your degree and the documents you gave the office.
 - **My clinical** (nursing and allied health): your hospital rotations with their days and supervisor, your clinical attendance, and your logbook progress against what your program requires. Add an entry (skill, rotation, day, how many times) and your supervisor signs it; if it is not signed you see why. You can withdraw an entry until it is signed.
+- **Internship** (on **My clinical**, during your internship year): your placements, how many hours are verified out of the hours required, and your evaluations. **Log a duty** (day, shift, hours) within two weeks; your supervisor verifies it, or rejects it with a reason. You can withdraw a duty until it is verified. **Ask for leave** with the dates and reason; you are told the answer, and you cannot log duties on approved leave days. You are told when your internship is complete.
 
 School mode only: **Diary & attendance** and **Report cards**.
 

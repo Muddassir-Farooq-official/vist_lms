@@ -81,6 +81,7 @@ from app.paperfiles import models as _paperfiles_models  # noqa: F401
 from app.alumni import models as _alumni_models  # noqa: F401
 from app.mentoring import models as _mentoring_models  # noqa: F401
 from app.committees import models as _committees_models  # noqa: F401
+from app.internship import models as _internship_models  # noqa: F401
 
 TEST_DATABASE_URL = settings.database_url.rsplit("/", 1)[0] + "/vist_lms_test"
 

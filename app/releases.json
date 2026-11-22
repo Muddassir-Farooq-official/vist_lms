@@ -1,5 +1,28 @@
 [
   {
+    "version": "1.61.0",
+    "date": "2026-11-22",
+    "title": "Internship year",
+    "summary": "Final-year interns: placements, duty hours verified by supervisors, leave, evaluations and completion.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Clinical rotations → Internship: start internships, place interns, decide leave, mark complete; graduation lists check it."
+      },
+      {
+        "kind": "new",
+        "for": "Clinical supervisors",
+        "text": "Interns: verify logged duties and evaluate interns placed with you."
+      },
+      {
+        "kind": "new",
+        "for": "Students",
+        "text": "My clinical → Internship: log duties, ask for leave, follow your hours and evaluations."
+      }
+    ]
+  },
+  {
     "version": "1.60.0",
     "date": "2026-11-22",
     "title": "Committees and minutes",
