@@ -43,7 +43,7 @@
     return VA.formatMoney(n);
   }
   const SOURCE = { LIBRARY: "Library", DISCIPLINARY: "Disciplinary", FEE_LATE_PAYMENT: "Late fee", ATTENDANCE: "Attendance",
-                   GATE: "Gate (late)", INVENTORY: "Store", HOSTEL: "Hostel", OTHER: "Other" };
+                   GATE: "Gate (late)", INVENTORY: "Store", HOSTEL: "Hostel", TRANSPORT: "Transport", OTHER: "Other" };
   const STATUS = { PENDING: "Unpaid", PAID: "Paid", WAIVED: "Waived" };
   let allFines = [];
 

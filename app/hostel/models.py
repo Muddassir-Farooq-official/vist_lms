@@ -7,7 +7,9 @@ from __future__ import annotations
 import uuid
 from datetime import date
 
-from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Index, Integer, Numeric, String, UniqueConstraint, text
+from datetime import datetime
+
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, Numeric, String, UniqueConstraint, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base, TimestampMixin, UUIDPKMixin
@@ -43,6 +45,7 @@ class HostelStay(UUIDPKMixin, TimestampMixin, Base):
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     bed_no: Mapped[str | None] = mapped_column(String(10), nullable=True)
     monthly_fee: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)        # agreed for this stay (copied from the room, can differ)
+    mess_fee: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0, server_default="0")   # monthly mess, 0 = not in the mess
     end_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
@@ -58,3 +61,24 @@ class HostelCharge(UUIDPKMixin, TimestampMixin, Base):
     amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     fine_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("fines.id", ondelete="SET NULL"), nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+
+class HostelRollCall(UUIDPKMixin, Base):
+    """The night roll call: one per night."""
+
+    __tablename__ = "hostel_roll_calls"
+    __table_args__ = (UniqueConstraint("day", name="uq_hostel_roll_calls_day"),)
+
+    day: Mapped[date] = mapped_column(Date, nullable=False)
+    taken_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    taken_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class HostelRollMark(Base):
+    __tablename__ = "hostel_roll_marks"
+
+    roll_call_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("hostel_roll_calls.id", ondelete="CASCADE"), primary_key=True)
+    student_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), primary_key=True, index=True)
+    status: Mapped[str] = mapped_column(String(8), nullable=False)          # PRESENT | ABSENT | LEAVE (home with permission)
+    note: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    notified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")

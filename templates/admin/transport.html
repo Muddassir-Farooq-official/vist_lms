@@ -1,0 +1,27 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN{% endblock %}
+{% block title %}Transport{% endblock %}
+{% block page_title %}Transport{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Routes with their stops and pick-up times, who rides which route, and the month's transport fee draft for the accounts office.</div>{% endblock %}
+{% block content %}
+<section class="sh-card">
+  <h2 class="panel-title">Add a route</h2>
+  <form id="tr-form" class="form-grid">
+    <label>Name<input id="tr-name" class="text-input" maxlength="100" required placeholder="Route 3 — Model Town"></label>
+    <label>Vehicle<input id="tr-vehicle" class="text-input" maxlength="60"></label>
+    <label>Seats<input id="tr-seats" type="number" min="1" max="200" class="text-input"></label>
+    <label>Driver<input id="tr-driver" class="text-input" maxlength="100"></label>
+    <label>Driver's phone<input id="tr-phone" class="text-input" maxlength="30"></label>
+    <label>Monthly fee (Rs.)<input id="tr-fee" type="number" min="0" class="text-input" required></label>
+    <div class="decision-bar"><button type="submit" class="role-btn">Add route</button></div>
+  </form>
+</section>
+<div id="tr-routes"></div>
+<section class="sh-card">
+  <h2 class="panel-title">Monthly transport fee</h2>
+  <p class="panel-hint">Prepare the month's draft: each rider's fee (part months by days). Nothing reaches a student's dues until the accounts office approves it under <b>Monthly charges</b>.</p>
+  <div class="toolbar"><label class="field-label-sm" for="tr-month">Month</label><input id="tr-month" type="month" class="text-input"> <button type="button" class="role-btn" id="tr-prepare">Prepare draft</button></div>
+  <p class="panel-hint" id="tr-note"></p>
+</section>
+{% endblock %}
+{% block extra_scripts %}<script src="/static/js/transport-admin.js"></script>{% endblock %}

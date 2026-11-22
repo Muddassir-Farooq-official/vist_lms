@@ -46,6 +46,7 @@ class CheckInIn(BaseModel):
     start_date: date | None = None
     bed_no: str | None = Field(default=None, max_length=10)
     monthly_fee: Decimal | None = Field(default=None, ge=0, le=1_000_000)
+    mess_fee: Decimal | None = Field(default=None, ge=0, le=1_000_000)          # none: the default mess fee (Settings)
 
 
 class CheckOutIn(BaseModel):
@@ -104,9 +105,38 @@ async def move(stay_id: uuid.UUID, payload: MoveIn, current_user: CurrentUser = 
     return {"id": st.id}
 
 
-@router.post("/charges", summary="Add the month's hostel charge to every resident's dues (dry_run=true only counts)")
+@router.post("/charges", summary="Count the month's hostel rent (dry_run=true); charging it straight away needs the accounts approval right")
 async def charge(payload: ChargeIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    from app.core.exceptions import AuthorizationError
+
+    if not payload.dry_run and Permissions.CHARGES_APPROVE not in current_user.permissions:
+        raise AuthorizationError("Prepare the month's draft; the accounts office approves it (Monthly charges).")
     return await HostelService(db).charge_month(payload.month, actor_id=current_user.id, dry_run=payload.dry_run)
+
+
+class MessIn(BaseModel):
+    mess_fee: Decimal = Field(ge=0, le=1_000_000)
+
+
+@router.post("/stays/{stay_id}/mess", summary="Join or leave the mess (0 = not in the mess)")
+async def set_mess(stay_id: uuid.UUID, payload: MessIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    st = await HostelService(db).set_mess(stay_id, payload.mess_fee, actor_id=current_user.id)
+    return {"id": st.id, "mess_fee": float(st.mess_fee)}
+
+
+@router.get("/roll-call", summary="The night roll call: every resident that night, with the marks saved")
+async def roll_call(day: date | None = None, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    return await HostelService(db).roll_call(day or institute_today())
+
+
+class RollIn(BaseModel):
+    day: date
+    entries: list[dict] = Field(max_length=2000)
+
+
+@router.post("/roll-call", summary="Save the night roll call (parents are told about an absent resident, once)")
+async def mark_roll_call(payload: RollIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    return await HostelService(db).mark_roll_call(payload.day, payload.entries, actor_id=current_user.id)
 
 
 @router.get("/history", summary="Who lived where, newest first")

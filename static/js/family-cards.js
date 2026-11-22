@@ -25,9 +25,12 @@
       (c.next_exam.room ? " · " + esc(c.next_exam.room) : "") + (c.next_exam.days === 0 ? " · today" : " · in " + c.next_exam.days + " day(s)") + "</small></p>" : '<p class="fam-dim">No exam coming up.</p>';
     const r = c.latest_result ? "<p><b>" + esc(c.latest_result.course_code) + "</b>: " + esc(c.latest_result.grade) + " (" + Math.round(c.latest_result.percentage) + "%)" +
       (c.latest_result.outcome === "FAILED" ? ' <span class="fam-bad">failed</span>' : "") + "</p>" : '<p class="fam-dim">No result yet.</p>';
+    const v = c.transport;
+    const bus = v ? "<section><h4>Transport</h4><p><b>" + esc(v.route) + "</b>" + (v.stop ? "<br><small>" + esc(v.stop) + (v.pickup_time ? " · pick-up " + esc(v.pickup_time) : "") + "</small>" : "") +
+      (v.driver_phone ? "<br><small>Driver " + esc(v.driver_name || "") + " " + esc(v.driver_phone) + "</small>" : "") + "</p></section>" : "";
     return '<article class="fam-card">' + (parent || box.children.length ? "<h3>" + esc(c.name) + " <small>" + esc((c.program || "") + (c.semester ? " · Sem " + c.semester : "") + " · " + (c.roll_number || "")) + "</small></h3>" : "") +
       '<div class="fam-grid"><section><h4>Today' + (t.absent ? ' <span class="fam-bad">· absent in ' + t.absent + "</span>" : "") + "</h4>" + classes + "</section>" +
-      "<section><h4>Fees</h4>" + fees + "</section><section><h4>Next exam</h4>" + ex + "</section><section><h4>Latest result</h4>" + r + "</section></div></article>";
+      "<section><h4>Fees</h4>" + fees + "</section><section><h4>Next exam</h4>" + ex + "</section><section><h4>Latest result</h4>" + r + "</section>" + bus + "</div></article>";
   }
 
   get("/api/v1/family/cards").then(function (r) {
