@@ -149,14 +149,13 @@ class AcademicTermService:
         return term
 
     async def usage(self, labels: list[str] | None = None) -> dict[str, dict[str, int]]:
-        """How many records refer to each term label (by its text): course offerings, fee structures, datesheets, admission rounds."""
+        """How many records refer to each term label (by its text): course offerings, fee structures, datesheets."""
         from app.academics.models import CourseOffering
-        from app.admissions.models import AdmissionRound
         from app.exams.models import ExamSchedule
         from app.fees.models import FeeStructure
 
         out: dict[str, dict[str, int]] = {}
-        for key, model in (("offerings", CourseOffering), ("fee_structures", FeeStructure), ("datesheets", ExamSchedule), ("admission_rounds", AdmissionRound)):
+        for key, model in (("offerings", CourseOffering), ("fee_structures", FeeStructure), ("datesheets", ExamSchedule)):
             stmt = select(model.term_label, func.count()).group_by(model.term_label)
             if model is ExamSchedule:                       # a session's datesheet carries the session's name, not a term's
                 stmt = stmt.where(ExamSchedule.session_id.is_(None))
@@ -179,12 +178,11 @@ class AcademicTermService:
         from sqlalchemy import update
 
         from app.academics.models import CourseOffering
-        from app.admissions.models import AdmissionRound
         from app.exams.models import ExamSchedule
         from app.fees.models import FeeStructure
 
         out: dict[str, int] = {}
-        for key, model in (("offerings", CourseOffering), ("fee_structures", FeeStructure), ("datesheets", ExamSchedule), ("admission_rounds", AdmissionRound)):
+        for key, model in (("offerings", CourseOffering), ("fee_structures", FeeStructure), ("datesheets", ExamSchedule)):
             cond = [model.term_label == old] + ([ExamSchedule.session_id.is_(None)] if model is ExamSchedule else [])
             result = await self.session.execute(update(model).where(*cond).values(term_label=new).execution_options(synchronize_session="fetch"))
             out[key] = int(result.rowcount or 0)

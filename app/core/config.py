@@ -303,7 +303,6 @@ class Settings(BaseSettings):
     sms_on_certificate_ready: int = 1        # a message (certificate on WhatsApp) when a requested certificate is ready
     sms_on_parent_weekly: int = 1            # Monday note to parents when a child needs attention
     sms_to_guardian: int = 1
-    sms_on_admission: int = 1
     sms_on_security_alert: int = 1                  # text administrators when a security alert fires (at most once per half hour per kind)
     # The weighted-average cutoff on a course's graded components (see
     # app/academics's AssessmentComponent/StudentMark) that separates

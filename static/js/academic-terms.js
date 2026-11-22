@@ -9,7 +9,7 @@
   const API = "/api/v1/academics/academic-terms";
   const $ = function (id) { return document.getElementById(id); };
   const USED = { offerings: ["course offering", "course offerings"], fee_structures: ["fee structure", "fee structures"],
-                 datesheets: ["datesheet", "datesheets"], admission_rounds: ["admission round", "admission rounds"],
+                 datesheets: ["datesheet", "datesheets"],
                  fee_charges: ["student fee charge", "student fee charges"] };
   const ALL_BATCHES = "All batches";        // a fee for several batches: each student sees their own batch term
   let terms = [], editing = null, programs = [];

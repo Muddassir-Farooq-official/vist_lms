@@ -1,5 +1,18 @@
 [
   {
+    "version": "1.58.0",
+    "date": "2026-11-22",
+    "title": "Admissions moved out",
+    "summary": "The Admissions screens are removed; admissions will have their own portal.",
+    "changes": [
+      {
+        "kind": "improved",
+        "for": "Administrators",
+        "text": "Admissions (rounds, applicants, merit lists) is removed from this portal. New students are added under Students or by CSV import; students already admitted are not affected."
+      }
+    ]
+  },
+  {
     "version": "1.57.0",
     "date": "2026-11-22",
     "title": "Graduation and alumni",

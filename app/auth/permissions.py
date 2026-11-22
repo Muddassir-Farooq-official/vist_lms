@@ -245,8 +245,6 @@ class Permissions:
     SMS_MANAGE = "sms.manage"
     # Approve or reject fee refunds requested by the accounts office (admin; never the requester).
     FEE_REFUND_APPROVE = "fee.refund.approve"
-    # Run admissions: rounds, applications, verification, merit lists, admitting (admin).
-    ADMISSION_MANAGE = "admission.manage"
     # Clinical rotations: set up hospitals, groups, rotations and logbook skills (administration).
     CLINICAL_MANAGE = "clinical.manage"
     # Supervise clinical rotations given to oneself: mark attendance, sign logbook entries (teachers, hospital supervisors).
@@ -303,7 +301,6 @@ ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
         Permissions.EXAM_SCHEDULE_MANAGE,
         Permissions.SMS_MANAGE,
         Permissions.FEE_REFUND_APPROVE,
-        Permissions.ADMISSION_MANAGE,
         Permissions.PARENT_ACCESS_MANAGE,
         Permissions.STUDENT_VIEW,
         Permissions.STUDENT_CREATE,

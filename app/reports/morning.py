@@ -154,7 +154,7 @@ async def _problems_part(session, first, last, today) -> list[str]:
     return found
 
 
-WAITING_LABELS = (("approvals", "approval"), ("admissions", "admission form"), ("profile_changes", "profile change"),
+WAITING_LABELS = (("approvals", "approval"), ("profile_changes", "profile change"),
                   ("certificates", "certificate request"), ("result_sheets", "result sheet to approve"), ("applications", "application"),
                   ("money_review", "money change to review"))
 

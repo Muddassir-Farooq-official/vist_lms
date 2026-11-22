@@ -31,7 +31,7 @@ def test_days_covered():
 def test_text():
     r = {"label": "Sat 21 Nov", "money": {"received": 45000, "payments": 3, "overdue": 120000, "defaulters": 4, "promises_today": 1},
          "attendance": {"classes": 10, "average": 86.5, "not_marked": 2, "staff": {"working": 9, "absent": 1, "late": 2, "leave": 0}},
-         "waiting": {"approvals": 1, "admissions": 0, "applications": 3}, "problems": ["Disk 88% full."]}
+         "waiting": {"approvals": 1, "applications": 3}, "problems": ["Disk 88% full."]}
     t = morning.render(r)
     assert "Rs. 45,000 received Sat 21 Nov (3 payment(s))" in t and "Overdue now Rs. 120,000 from 4 student(s). 1 promise(s)" in t
     assert "10 class(es), average 86.5%. 2 class(es) not marked. Staff: 1 absent, 2 late, 0 on leave." in t
