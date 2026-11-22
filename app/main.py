@@ -244,6 +244,7 @@ ADMIN_NAV_ITEMS = [
     _nav("progress", "Teacher Progress", "exams", "/dashboard/admin/progress", group="Teaching & exams"),
     _nav("feedback", "Course feedback", "check-circle", "/dashboard/admin/feedback", group="Teaching & exams"),
     _nav("calendar", "Calendar", "clock", "/dashboard/admin/calendar", group="Teaching & exams", keywords="holidays events"),
+    _nav("rollover", "Semester rollover", "grid", "/dashboard/admin/rollover", group="Teaching & exams", keywords="promote end semester next session close term"),
     _nav("results", "Result Types", "exams", "/dashboard/admin/results", group="Teaching & exams", keywords="assessment marks grading"),
     _nav("result-sheets", "Result Approval", "tasks", "/dashboard/admin/result-sheets", group="Teaching & exams", badge="result_sheets", keywords="award list university result publish"),
     _nav("datesheets", "Datesheets", "clock", "/dashboard/admin/datesheets", group="Teaching & exams", keywords="admit cards exam schedule"),
@@ -729,6 +730,7 @@ from app.core.nav_badges import router as nav_badges_router  # noqa: E402
 from app.navigation.router import router as nav_shortcuts_router  # noqa: E402
 from app.reports.morning import router as morning_summary_router  # noqa: E402
 from app.reports.datacheck import router as data_check_router  # noqa: E402
+from app.academics.rollover_router import router as rollover_router  # noqa: E402
 from app.reports.center_router import router as report_center_router  # noqa: E402
 from app.reports.monthly_router import router as monthly_report_router  # noqa: E402
 from app.discipline.router import router as discipline_router  # noqa: E402
@@ -743,6 +745,7 @@ app.include_router(nav_badges_router, prefix=settings.api_v1_prefix)
 app.include_router(nav_shortcuts_router, prefix=settings.api_v1_prefix)
 app.include_router(morning_summary_router, prefix=settings.api_v1_prefix)
 app.include_router(data_check_router, prefix=settings.api_v1_prefix)
+app.include_router(rollover_router, prefix=settings.api_v1_prefix)
 from app.calendar.router import router as calendar_router  # noqa: E402
 
 app.include_router(calendar_router, prefix=settings.api_v1_prefix)
@@ -1543,6 +1546,11 @@ async def admin_result_sheets_page(request: Request):
 @app.get("/dashboard/student/fees", include_in_schema=False)
 async def student_fees_page(request: Request):
     return templates.TemplateResponse(request, "student/fees.html", {"nav_items": STUDENT_NAV_ITEMS, "active_nav": "fees"})
+
+
+@app.get("/dashboard/admin/rollover", include_in_schema=False)
+async def admin_rollover_page(request: Request):
+    return templates.TemplateResponse(request, "admin/rollover.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "rollover"})
 
 
 @app.get("/dashboard/admin/data-check", include_in_schema=False)

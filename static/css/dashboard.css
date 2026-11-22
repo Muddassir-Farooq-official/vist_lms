@@ -4257,3 +4257,12 @@ details.tg-session > summary.tg-head { cursor: pointer; }
 .dc-areas { display: flex; flex-wrap: wrap; gap: 6px; }
 .dc-areas button { border: 1px solid var(--border-strong); background: transparent; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 0.84rem; cursor: pointer; color: var(--text-primary); }
 .dc-areas button[aria-selected="true"] { background: var(--blue-600, #2563eb); border-color: var(--blue-600, #2563eb); color: #fff; }
+
+/* ---------- Semester rollover ---------- */
+.ro-step .panel-title { display: flex; align-items: center; gap: 10px; }
+.ro-n { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--blue-600, #2563eb); color: #fff; font-size: 0.85rem; font-weight: 800; }
+.ro-batch { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin: 10px 0; }
+.ro-batch h3 { margin: 0 0 6px; font-size: 0.95rem; }
+.ro-batch td small, #ro-c-body td small, #ro-n-body td small { display: block; color: var(--text-secondary); }
+.ro-hold-reason { width: 100%; min-width: 180px; }
+.ro-bad { color: #b91c1c; }

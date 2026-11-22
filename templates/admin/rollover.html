@@ -1,0 +1,65 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN{% endblock %}
+{% block title %}Semester rollover{% endblock %}
+{% block page_title %}Semester rollover{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">End one session and start the next in four checked steps. Each step shows what will happen first and is done all at once or not at all.</div>{% endblock %}
+
+{% block content %}
+<section class="sh-card">
+  <div class="toolbar">
+    <label class="field-label-sm" for="ro-session">Session ending</label>
+    <select id="ro-session" class="text-input" aria-label="Session ending"></select>
+    <label class="field-label-sm" for="ro-next">Next session</label>
+    <input id="ro-next" class="text-input" placeholder="e.g. Spring 2027" maxlength="50" />
+  </div>
+  <p class="panel-hint" id="ro-status" aria-live="polite"></p>
+</section>
+
+<section class="sh-card ro-step" id="ro-step1">
+  <h2 class="panel-title"><span class="ro-n">1</span> Close the terms</h2>
+  <p class="panel-hint">Ends the semester (open enrollments completed) and closes each batch term. Unfinished courses (attendance not locked, results not published) need a reason.</p>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th><input type="checkbox" id="ro-c-all" aria-label="Select all terms" /></th><th>Batch term</th><th>Status</th><th>Subjects</th><th>Open enrollments</th><th>Unfinished</th></tr></thead><tbody id="ro-c-body"></tbody></table></div>
+  <input id="ro-c-reason" class="text-input" maxlength="300" placeholder="Reason to close with unfinished courses (only if needed)" style="width:100%;margin-top:8px" />
+  <div class="decision-bar"><button type="button" class="role-btn" id="ro-c-go">Close the chosen terms</button></div>
+  <p class="panel-hint" id="ro-c-msg" aria-live="polite"></p>
+</section>
+
+<section class="sh-card ro-step" id="ro-step2">
+  <h2 class="panel-title"><span class="ro-n">2</span> Promote students</h2>
+  <p class="panel-hint">Everyone moves to the next semester except those you hold back (write why). Failed subjects stay as carry-over for supplementary exams. A batch in its last semester is not promoted. You can undo within 7 days.</p>
+  <div id="ro-p-body"></div>
+  <div class="decision-bar"><button type="button" class="role-btn" id="ro-p-go">Promote</button></div>
+  <p class="panel-hint" id="ro-p-msg" aria-live="polite"></p>
+  <div id="ro-p-runs"></div>
+</section>
+
+<section class="sh-card ro-step" id="ro-step3">
+  <h2 class="panel-title"><span class="ro-n">3</span> Start the next session</h2>
+  <p class="panel-hint">Creates the next semester's batch terms, opens their subjects from the curriculum (same sections), enrolls the promoted students and keeps the same teachers where they still work here.</p>
+  <div class="toolbar">
+    <label class="field-label-sm" for="ro-n-start">Starts</label><input type="date" id="ro-n-start" class="text-input" />
+    <label class="field-label-sm" for="ro-n-end">Ends</label><input type="date" id="ro-n-end" class="text-input" />
+    <label class="rn-missing"><input type="checkbox" id="ro-n-enroll" checked /> Enroll promoted students</label>
+    <label class="rn-missing"><input type="checkbox" id="ro-n-teach" checked /> Same teachers</label>
+    <button type="button" class="role-btn secondary-btn" id="ro-n-check">Preview</button>
+  </div>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Batch now</th><th>Next term</th><th>Subjects</th><th>Sections</th><th>Promoted</th><th>Note</th></tr></thead><tbody id="ro-n-body"></tbody></table></div>
+  <div class="decision-bar"><button type="button" class="role-btn" id="ro-n-go" disabled>Start the next session</button></div>
+  <p class="panel-hint" id="ro-n-msg" aria-live="polite"></p>
+</section>
+
+<section class="sh-card ro-step" id="ro-step4">
+  <h2 class="panel-title"><span class="ro-n">4</span> Fee structures for the next session</h2>
+  <p class="panel-hint">Copies each batch's active fee structures to its next batch term as <b>drafts</b>. Nothing is charged until you check and activate them in Fees.</p>
+  <div class="toolbar">
+    <label class="field-label-sm" for="ro-f-pct">Change %</label><input type="number" id="ro-f-pct" class="text-input" value="0" step="0.5" style="max-width:110px" />
+    <label class="field-label-sm" for="ro-f-from">First due date</label><input type="date" id="ro-f-from" class="text-input" />
+    <button type="button" class="role-btn secondary-btn" id="ro-f-check">Preview</button>
+  </div>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Fee structure</th><th class="num">Amount</th><th>From</th><th>To</th><th></th></tr></thead><tbody id="ro-f-body"></tbody></table></div>
+  <div class="decision-bar"><button type="button" class="role-btn" id="ro-f-go" disabled>Copy as drafts</button></div>
+  <p class="panel-hint" id="ro-f-msg" aria-live="polite"></p>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}<script src="/static/js/rollover.js"></script>{% endblock %}
