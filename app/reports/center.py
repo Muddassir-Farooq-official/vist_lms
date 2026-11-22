@@ -907,6 +907,135 @@ class ReportCenter:
             out["totals"]["pass_pct"] = round(100 * out["totals"]["passed"] / out["totals"]["results"], 1)
         return out
 
+    # ============================================================ REGULATOR RETURNS (generic: not any regulator's exact form)
+    async def regulator_enrolment(self, params: dict, user) -> dict:
+        """Per program and semester: current students by gender, and the year's movement (added, graduated, dropped)."""
+        from datetime import datetime as _dt, timezone as _tz
+
+        from app.programs.models import Program
+        from app.students.models import Student, StudentStatus, StudentStatusHistory
+
+        year = _int(params.get("year")) or institute_today().year
+        start, end = _dt(year, 1, 1, tzinfo=_tz.utc), _dt(year + 1, 1, 1, tzinfo=_tz.utc)
+        pid = _uuid(params.get("program_id"))
+        rows: dict = {}
+
+        def row(prog, sem):
+            return rows.setdefault((prog or "", sem or 0), {"program": prog or "No program", "semester": sem, "male": 0, "female": 0, "other": 0, "total": 0,
+                                                             "added": 0, "graduated": 0, "dropped": 0})
+
+        q = (select(Program.code, Student.current_semester, Student.gender, func.count()).outerjoin(Program, Program.id == Student.program_id)
+             .where(Student.status == StudentStatus.ACTIVE).group_by(Program.code, Student.current_semester, Student.gender))
+        if pid:
+            q = q.where(Student.program_id == pid)
+        for prog, sem, gender, n in (await self.session.execute(q)).all():
+            r = row(prog, sem)
+            g = (gender or "").strip().lower()
+            r["male" if g.startswith("m") else "female" if g.startswith("f") else "other"] += n
+            r["total"] += n
+        q = (select(Program.code, Student.current_semester, func.count()).outerjoin(Program, Program.id == Student.program_id)
+             .where(Student.created_at >= start, Student.created_at < end).group_by(Program.code, Student.current_semester))
+        if pid:
+            q = q.where(Student.program_id == pid)
+        for prog, sem, n in (await self.session.execute(q)).all():
+            row(prog, sem)["added"] += n
+        q = (select(Program.code, Student.current_semester, StudentStatusHistory.new_status, func.count(func.distinct(Student.id)))
+             .join(Student, Student.id == StudentStatusHistory.student_id).outerjoin(Program, Program.id == Student.program_id)
+             .where(StudentStatusHistory.changed_at >= start, StudentStatusHistory.changed_at < end,
+                    StudentStatusHistory.new_status.in_((StudentStatus.GRADUATED, StudentStatus.DROPPED)))
+             .group_by(Program.code, Student.current_semester, StudentStatusHistory.new_status))
+        if pid:
+            q = q.where(Student.program_id == pid)
+        for prog, sem, st, n in (await self.session.execute(q)).all():
+            row(prog, sem)["graduated" if st == StudentStatus.GRADUATED else "dropped"] += n
+        columns = [col("program", "Program"), col("semester", "Semester", "number"), col("male", "Male", "number", True), col("female", "Female", "number", True),
+                   col("other", "Other / not given", "number", True), col("total", "Current students", "number", True),
+                   col("added", f"Added in {year}", "number", True), col("graduated", f"Graduated in {year}", "number", True), col("dropped", f"Dropped in {year}", "number", True)]
+        return table(columns, [rows[k] for k in sorted(rows)], subtitle=f"Year {year}",
+                     notes=["Current students are those active today, by their current semester.",
+                            "Added = student records created in the year. A generic summary: check the columns against the regulator's own form."])
+
+    async def regulator_faculty(self, params: dict, user) -> dict:
+        """Teaching staff: one line per teacher with designation, gender, type, joining date, and the term's courses."""
+        from app.academics.models import Course, CourseOffering
+        from app.employees.models import Employee, EmployeeStatus, JobRole
+
+        term = (params.get("term") or "").strip() or None
+        teaching = set((await self.session.execute(select(Employee.id).join(JobRole, JobRole.id == Employee.job_role_id)
+                                                   .where(JobRole.default_role_code.in_(("TEACHER", "HOD"))))).scalars())
+        q = select(CourseOffering.assigned_teacher_id, Course.code, Course.credit_hours).join(Course, Course.id == CourseOffering.course_id) \
+            .where(CourseOffering.assigned_teacher_id.is_not(None))
+        if term:
+            q = q.where(CourseOffering.term_label == term)
+        load: dict = {}
+        for tid, code, ch in (await self.session.execute(q)).all():
+            l = load.setdefault(tid, {"courses": [], "credits": 0})
+            l["courses"].append(code)
+            l["credits"] += int(ch or 0)
+        if term:
+            teaching |= set(load)
+        emps = (await self.session.execute(select(Employee, JobRole.title).join(JobRole, JobRole.id == Employee.job_role_id)
+                                           .where(Employee.id.in_(teaching or {uuid.uuid4()}), Employee.status == EmployeeStatus.ACTIVE)
+                                           .order_by(JobRole.title, Employee.first_name))).all()
+        today = institute_today()
+        rows = []
+        for e, title in emps:
+            l = load.get(e.id, {"courses": [], "credits": 0})
+            rows.append({"name": f"{e.first_name} {e.last_name}", "code": e.employee_code, "cnic": e.cnic, "gender": e.gender, "designation": title,
+                         "department": e.department or "", "type": (e.employment_type or "").replace("_", " ").title(), "joined": e.hire_date,
+                         "years": round((today - e.hire_date).days / 365.25, 1) if e.hire_date else None,
+                         "courses": ", ".join(sorted(set(l["courses"]))), "credit_hours": l["credits"]})
+        columns = [col("name", "Name"), col("code", "Employee code"), col("cnic", "CNIC"), col("gender", "Gender"), col("designation", "Designation"),
+                   col("department", "Department"), col("type", "Employment"), col("joined", "Joined", "date"), col("years", "Years of service", "number"),
+                   col("courses", "Courses" + (f" ({term})" if term else " (all terms)")), col("credit_hours", "Credit hours", "number", True)]
+        male = sum(1 for r in rows if (r["gender"] or "").lower().startswith("m"))
+        return table(columns, rows, subtitle=term or "All terms",
+                     notes=[f"{len(rows)} teaching staff: {male} male, {len(rows) - male} female or not given.",
+                            "Teaching staff = active employees whose job role signs in as a teacher or HOD, plus anyone teaching a class in the term.",
+                            "Qualifications are not kept in this system; add them by hand if the form asks."])
+
+    async def regulator_results(self, params: dict, user) -> dict:
+        """Per program and semester for a term: students with results, passed in every course, failed any, pass %, average grade points."""
+        from app.academics.models import Course, CourseOffering, Enrollment, EnrollmentResult
+        from app.programs.models import Program
+        from app.students.models import Student
+
+        term = (params.get("term") or "").strip()
+        q = (select(Student.id, Program.code, Student.current_semester, EnrollmentResult.outcome, EnrollmentResult.grade_points, EnrollmentResult.credit_hours)
+             .join(Enrollment, Enrollment.id == EnrollmentResult.enrollment_id).join(CourseOffering, CourseOffering.id == Enrollment.course_offering_id)
+             .join(Course, Course.id == CourseOffering.course_id).join(Student, Student.id == Enrollment.student_id)
+             .outerjoin(Program, Program.id == Student.program_id).where(CourseOffering.term_label == term))
+        if _uuid(params.get("program_id")):
+            q = q.where(Student.program_id == _uuid(params["program_id"]))
+        per_student: dict = {}
+        for sid, prog, sem, outcome, gp, ch in (await self.session.execute(q)).all():
+            s = per_student.setdefault(sid, {"key": (prog or "", sem or 0), "fail": False, "qp": 0.0, "ch": 0})
+            s["fail"] = s["fail"] or outcome != "PASSED"
+            s["qp"] += float(gp or 0) * int(ch or 0)
+            s["ch"] += int(ch or 0)
+        rows: dict = {}
+        for s in per_student.values():
+            prog, sem = s["key"]
+            r = rows.setdefault(s["key"], {"program": prog or "No program", "semester": sem, "appeared": 0, "passed": 0, "failed": 0, "qp": 0.0, "ch": 0})
+            r["appeared"] += 1
+            r["failed" if s["fail"] else "passed"] += 1
+            r["qp"] += s["qp"]
+            r["ch"] += s["ch"]
+        out = []
+        for k in sorted(rows):
+            r = rows[k]
+            out.append({"program": r["program"], "semester": r["semester"], "appeared": r["appeared"], "passed": r["passed"], "failed": r["failed"],
+                        "pass_pct": round(100 * r["passed"] / r["appeared"], 1) if r["appeared"] else None,
+                        "avg_gpa": round(r["qp"] / r["ch"], 2) if r["ch"] else None})
+        columns = [col("program", "Program"), col("semester", "Semester", "number"), col("appeared", "Students with results", "number", True),
+                   col("passed", "Passed every course", "number", True), col("failed", "Failed one or more", "number", True), col("pass_pct", "Pass %", "percent"),
+                   col("avg_gpa", "Average GPA (credit-weighted)", "number")]
+        result = table(columns, out, subtitle=term, notes=["Published results of the term only. Semester is each student's current semester.",
+                                                           "A generic summary: check the columns against the regulator's own form."])
+        if result["totals"].get("appeared"):
+            result["totals"]["pass_pct"] = round(100 * result["totals"]["passed"] / result["totals"]["appeared"], 1)
+        return result
+
     # ============================================================ STAFF
     async def staff_attendance(self, params: dict, user) -> dict:
         from app.timekeeping.service import TimekeepingService
@@ -1181,6 +1310,15 @@ REPORTS: dict[str, Report] = {r.key: r for r in [
            ACADEMIC, [F_TERM, F_PROGRAM, {"key": "below", "label": "Below (%)", "type": "number"}], lambda c, p, u: c.attendance_shortage(p, u), needs=("term",)),
     Report("academics.result_analysis", "Academics", "Result analysis", "Per course and section: pass %, average, grade spread and result-sheet status.",
            ACADEMIC, [F_TERM], lambda c, p, u: c.result_analysis(p, u), needs=("term",)),
+    Report("regulator.enrolment", "Regulator returns", "Enrolment summary",
+           "Current students by program, semester and gender, and the year's added, graduated and dropped. Generic: not any regulator's exact form.",
+           ACADEMIC + (P.STUDENT_CREATE,), [F_YEAR, F_PROGRAM], lambda c, p, u: c.regulator_enrolment(p, u)),
+    Report("regulator.faculty", "Regulator returns", "Teaching staff summary",
+           "Each teacher: designation, gender, employment type, joining date, years of service, and the term's courses and credit hours.",
+           ACADEMIC + (P.EMPLOYEE_VIEW,), [F_TERM], lambda c, p, u: c.regulator_faculty(p, u)),
+    Report("regulator.results", "Regulator returns", "Results summary",
+           "Per program and semester for a term: students with results, passed every course, failed any, pass % and average GPA.",
+           ACADEMIC, [F_TERM, F_PROGRAM], lambda c, p, u: c.regulator_results(p, u), needs=("term",)),
     Report("staff.attendance", "Staff", "Staff attendance summary", "Each member of staff's month: present, leave, absent, late, early.",
            (P.STAFF_ATTENDANCE_VIEW,), [F_MONTH], lambda c, p, u: c.staff_attendance(p, u)),
     Report("staff.joiners_leavers", "Staff", "Staff joined and left", "Who joined and who left in a period.",

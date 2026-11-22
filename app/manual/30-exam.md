@@ -95,4 +95,4 @@ Pick a program, semester (year, for annual programs) and term, then **Show**:
 - **Supplementary exams**: students who failed a subject on marks re-sit only the failed part: the final paper for theory, the practical paper for practical, two papers when both were failed. Register them, enter the marks (or mark absent), then publish. The table's re-sit cap limits the percentage; a pass shows as (S).
 - **Student lookup**: find a student and their transcript. Read-only.
 - **University Reg Nos**: fill in or correct each student's university registration number, one by one or from a CSV (download the class list, fill the `reg_number` column, upload, check the changes, save). It is printed on award lists, admit cards, result cards and transcripts. Set each batch's **Deadlines** there: after the last day an admit card is held while the Reg No is missing, unless you **Exempt…** that student with a reason.
-- **Reports**: academic reports to print or download.
+- **Reports**: academic reports to print or download, including the **Regulator returns** (enrolment, teaching staff and results summaries).

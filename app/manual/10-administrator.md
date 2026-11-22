@@ -156,6 +156,7 @@ Teachers book make-up classes (for a missed class) and extra classes (for a cour
 ## Reports
 
 - **Reports**: fees, accounts, payroll, academics, staff and store reports. Choose a report, set the filters, then print it or download it as a spreadsheet.
+  - **Regulator returns**: three summaries for the Nursing Council, HEC and similar returns. **Enrolment summary**: current students by program, semester and gender, with the year's added, graduated and dropped. **Teaching staff summary**: each teacher's designation, gender, employment type, joining date, years of service, and a term's courses and credit hours. **Results summary**: for a term, per program and semester, the students with results, those who passed every course, those who failed any, pass % and average GPA. They are generic: download them (CSV) and check the columns against the regulator's own form. Qualifications are not kept here.
 - **Monthly report**: one month at a glance, also sent to you on the 1st of every month.
 - **Morning summary**: at 8 AM, Monday to Saturday, every administrator gets a short notice (also by email when email notices are on): money received the day before and what is overdue, class and staff attendance, work waiting for you, and problems (server, backups, SMS that failed, Reg No deadlines). Monday's covers Saturday and Sunday. The page shows the same figures any time, with links. Switch it off in **Settings → Rules → Reports**.
 
