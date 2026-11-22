@@ -266,6 +266,10 @@ class LeaveService:
         else:
             r.status = "REJECTED"
         r.decided_by, r.decided_at, r.decision_note = actor_id, datetime.now(timezone.utc), note[:300] or None
+        if approve:
+            from app.substitutes.service import SubstituteService
+
+            await SubstituteService(self.session).propose_for_leave(r)     # their classes: free teachers proposed; never raises
         await self.audit.log(actor_user_id=actor_id, action="leave.approved" if approve else "leave.rejected", entity_type="leave_request", entity_id=r.id,
                              after={"kind": r.kind, "from": str(r.first_day), "to": str(r.last_day), "days": r.days, "note": r.decision_note})
         if emp.user_id:
