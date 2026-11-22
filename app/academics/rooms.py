@@ -36,6 +36,9 @@ class Room(UUIDPKMixin, TimestampMixin, Base):
     key: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)       # room_key(name)
     kind: Mapped[str] = mapped_column(String(10), nullable=False, default="CLASS")
     seats: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Exam seating (app/exams/seating.py): the room's exam layout, rows x columns of seats; empty = not an exam room.
+    exam_rows: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    exam_cols: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
 
 

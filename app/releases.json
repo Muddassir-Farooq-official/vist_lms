@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.50.0",
+    "date": "2026-11-22",
+    "title": "Exam seating and invigilation",
+    "summary": "Seat students room by room, put invigilators in each room, and print door lists and attendance sheets.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "Seating & invigilation: rooms with rows × columns, seating that mixes papers in neighbouring columns, room grids, door lists and room attendance sheets."
+      },
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "Invigilators per room and time: proposed fairly (free teachers, never the paper's own teacher), editable, with a duty sheet and one message to each teacher."
+      },
+      {
+        "kind": "new",
+        "for": "Students",
+        "text": "Admit cards show the room and seat for each paper."
+      },
+      {
+        "kind": "improved",
+        "for": "Teachers",
+        "text": "Exam duties list the papers seated in your room; you can mark their exam roll."
+      }
+    ]
+  },
+  {
     "version": "1.49.0",
     "date": "2026-11-22",
     "title": "Semester rollover wizard",

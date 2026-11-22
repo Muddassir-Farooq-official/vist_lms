@@ -1,0 +1,55 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN,EXAM_CONTROLLER{% endblock %}
+{% block title %}Seating & invigilation{% endblock %}
+{% block page_title %}Seating & invigilation{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Seat students room by room, with different papers side by side, then put invigilators in each room. Door lists, room attendance sheets and duty sheets print from here; admit cards show each student's room and seat.</div>{% endblock %}
+
+{% block content %}
+<section class="sh-card">
+  <div class="toolbar">
+    <label class="field-label-sm" for="se-sched">Datesheet</label>
+    <select id="se-sched" class="text-input" aria-label="Datesheet"></select>
+    <a class="role-btn secondary-btn" id="se-duty-pdf" href="#" target="_blank" rel="noopener">Duty sheet (PDF)</a>
+    <button type="button" class="role-btn secondary-btn" id="se-tell">Tell invigilators</button>
+  </div>
+  <p class="panel-hint" id="se-msg" aria-live="polite"></p>
+</section>
+
+<section class="sh-card">
+  <h2 class="panel-title">Time slots</h2>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>When</th><th>Papers</th><th>Students</th><th>Seated</th><th>Rooms</th><th>Invigilators</th><th></th></tr></thead>
+    <tbody id="se-slots"></tbody></table></div>
+</section>
+
+<section class="sh-card" id="se-slot" hidden>
+  <h2 class="panel-title" id="se-slot-title"></h2>
+  <div class="toolbar">
+    <button type="button" class="role-btn" id="se-seat">Make the seating</button>
+    <button type="button" class="role-btn secondary-btn" id="se-auto">Propose invigilators</button>
+    <a class="role-btn secondary-btn" id="se-door" href="#" target="_blank" rel="noopener">Door lists (PDF)</a>
+    <a class="role-btn secondary-btn" id="se-sheets" href="#" target="_blank" rel="noopener">Attendance sheets (PDF)</a>
+  </div>
+  <p class="panel-hint">Rooms used, in this order (untick a room to leave it out):</p>
+  <div id="se-room-pick" class="se-room-pick"></div>
+  <div id="se-rooms"></div>
+</section>
+
+<section class="sh-card">
+  <h2 class="panel-title">Exam rooms</h2>
+  <p class="panel-hint">Rows and columns of exam seats in each room (leave both empty for rooms not used for exams). Rooms are listed on Timetable → Rooms.</p>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Room</th><th>Rows</th><th>Columns</th><th>Exam seats</th><th></th></tr></thead><tbody id="se-room-body"></tbody></table></div>
+</section>
+
+<dialog id="se-inv-modal" class="modal" aria-labelledby="se-inv-title"><div class="modal-body">
+  <h2 id="se-inv-title">Invigilators</h2>
+  <p class="cc-meta" id="se-inv-who"></p>
+  <div id="se-inv-list" class="se-inv-list"></div>
+  <label class="field-label-sm" style="display:block" for="se-inv-lead">In charge</label>
+  <select id="se-inv-lead" class="text-input"></select>
+  <p id="se-inv-error" class="dash-alert error" hidden></p>
+  <div class="decision-bar"><button type="button" class="role-btn" id="se-inv-save">Save</button>
+    <button type="button" class="role-btn secondary-btn" id="se-inv-cancel">Cancel</button></div>
+</div></dialog>
+{% endblock %}
+
+{% block extra_scripts %}<script src="/static/js/seating.js"></script>{% endblock %}

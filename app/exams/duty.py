@@ -291,6 +291,14 @@ class ExamDutyService:
             return True, True
         emp = await self._employee_id(user)
         on = emp is not None and (await self.session.execute(select(ExamDuty.id).where(ExamDuty.paper_id == paper.id, ExamDuty.employee_id == emp))).first()
+        if not on and emp is not None:
+            # on duty in a room where this paper is seated (app/exams/seating.py)
+            from app.exams.seating import ExamRoomDuty, ExamSeat
+
+            on = (await self.session.execute(select(ExamRoomDuty.id).join(ExamSeat, (ExamSeat.room_id == ExamRoomDuty.room_id)
+                                                                          & (ExamSeat.exam_date == ExamRoomDuty.exam_date)
+                                                                          & (ExamSeat.start_time == ExamRoomDuty.start_time)).where(
+                ExamRoomDuty.employee_id == emp, ExamSeat.paper_id == paper.id).limit(1))).first()
         if not on:
             raise AuthorizationError("Only the teachers on duty for this paper can open its roll.")
         return True, institute_now().date() == paper.exam_date
@@ -483,7 +491,29 @@ class ExamDutyService:
             .order_by(ExamPaper.exam_date, ExamPaper.start_time))).all()
         others = await self.duties([p.id for _d, p, _s, _o, _c in rows])
         today = institute_now().date()
-        return [{"paper_id": p.id, "schedule": s.name, "term_label": s.term_label, "label": self._label(c, o), "course_title": c.title,
-                 "exam_date": p.exam_date, "start_time": _hm(p.start_time), "end_time": _hm(p.end_time), "room": p.room, "role": d.role.value,
-                 "with": [x for x in others[p.id] if x["employee_id"] != employee_id], "is_today": p.exam_date == today,
-                 "is_past": p.exam_date < today} for d, p, s, o, c in rows]
+        out = [{"paper_id": p.id, "schedule": s.name, "term_label": s.term_label, "label": self._label(c, o), "course_title": c.title,
+                "exam_date": p.exam_date, "start_time": _hm(p.start_time), "end_time": _hm(p.end_time), "room": p.room, "role": d.role.value,
+                "with": [x for x in others[p.id] if x["employee_id"] != employee_id], "is_today": p.exam_date == today,
+                "is_past": p.exam_date < today} for d, p, s, o, c in rows]
+        # room duties (app/exams/seating.py): each paper seated in the room, so its roll can be opened from here
+        from app.academics.rooms import Room
+        from app.exams.seating import ExamRoomDuty, ExamSeat
+
+        seen = {r["paper_id"] for r in out}
+        rd = (await self.session.execute(
+            select(ExamRoomDuty, Room.name, ExamPaper, ExamSchedule, CourseOffering, Course).join(Room, Room.id == ExamRoomDuty.room_id)
+            .join(ExamSeat, (ExamSeat.room_id == ExamRoomDuty.room_id) & (ExamSeat.exam_date == ExamRoomDuty.exam_date)
+                  & (ExamSeat.start_time == ExamRoomDuty.start_time) & (ExamSeat.schedule_id == ExamRoomDuty.schedule_id))
+            .join(ExamPaper, ExamPaper.id == ExamSeat.paper_id).join(ExamSchedule, ExamSchedule.id == ExamPaper.schedule_id)
+            .join(CourseOffering, CourseOffering.id == ExamPaper.course_offering_id).join(Course, Course.id == CourseOffering.course_id)
+            .where(ExamRoomDuty.employee_id == employee_id, ExamSchedule.status == ScheduleStatus.PUBLISHED).distinct()
+            .order_by(ExamPaper.exam_date, ExamPaper.start_time))).all()
+        for d, room, p, s, o, c in rd:
+            if p.id in seen:
+                continue
+            seen.add(p.id)
+            out.append({"paper_id": p.id, "schedule": s.name, "term_label": s.term_label, "label": self._label(c, o), "course_title": c.title,
+                        "exam_date": p.exam_date, "start_time": _hm(p.start_time), "end_time": _hm(p.end_time), "room": room, "role": d.role.value,
+                        "with": [], "is_today": p.exam_date == today, "is_past": p.exam_date < today})
+        out.sort(key=lambda r: (r["exam_date"], r["start_time"]))
+        return out
