@@ -1,0 +1,6 @@
+{% extends "faculty/_base.html" %}
+{% block title %}Question bank{% endblock %}
+{% block page_title %}Question bank{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Add questions for the courses you teach, tagged with their CLO, Bloom level, difficulty and marks. The exam office builds papers from them. Students never see the bank.</div>{% endblock %}
+{% block content %}{% include "shared/_qbank.html" %}{% endblock %}
+{% block extra_scripts %}<script src="/static/js/qbank.js"></script>{% endblock %}

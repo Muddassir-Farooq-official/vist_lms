@@ -1,5 +1,23 @@
 [
   {
+    "version": "1.56.0",
+    "date": "2026-11-22",
+    "title": "Question bank",
+    "summary": "Teachers add questions; the exam office builds, finalises and prints papers.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "Question bank: questions for your courses with CLO, Bloom level, difficulty and marks."
+      },
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "Question papers: build a paper from a blueprint, swap and reorder, make it final, print the paper and answer key."
+      }
+    ]
+  },
+  {
     "version": "1.55.0",
     "date": "2026-11-22",
     "title": "Hostel mess, roll call and transport",
