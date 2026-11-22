@@ -4279,3 +4279,14 @@ details.tg-session > summary.tg-head { cursor: pointer; }
 .se-seat[data-p="3"] { background: #fce7f3; } .se-seat[data-p="4"] { background: #ede9fe; } .se-seat[data-p="5"] { background: #f1f5f9; }
 .se-inv-list { display: grid; gap: 4px; max-height: 320px; overflow: auto; margin: 6px 0 10px; }
 .se-inv-list .busy { color: var(--text-secondary); }
+
+/* ---------- OBE ---------- */
+.ob-row { display: grid; grid-template-columns: 90px 1fr 120px minmax(160px, 260px) 32px; gap: 8px; align-items: start; margin: 6px 0; }
+.ob-row textarea { min-height: 54px; }
+.ob-plos { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 0.82rem; }
+.ob-assess { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin: 10px 0; }
+.ob-item { display: grid; grid-template-columns: 110px 110px 1fr 32px; gap: 8px; margin: 4px 0; }
+.ob-status { font-weight: 700; font-size: 0.8rem; padding: 3px 10px; border-radius: 999px; background: #e0e7ff; color: #3730a3; }
+.ob-status.LOCKED { background: #dcfce7; color: #166534; } .ob-status.SUBMITTED { background: #fef3c7; color: #92400e; }
+.ob-yes { color: #15803d; font-weight: 700; } .ob-no { color: #b91c1c; font-weight: 700; }
+@media (max-width: 720px) { .ob-row, .ob-item { grid-template-columns: 1fr; } }

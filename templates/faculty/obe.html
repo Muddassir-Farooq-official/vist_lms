@@ -1,0 +1,18 @@
+{% extends "faculty/_base.html" %}
+{% block title %}Course outcomes (OBE){% endblock %}
+{% block page_title %}Course outcomes (OBE){% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Write your class's learning outcomes (CLOs), map them to the program's outcomes (PLOs), say what each assessment measures, and see how far your students reached them.</div>{% endblock %}
+
+{% block content %}
+<section class="sh-card">
+  <div class="toolbar">
+    <label class="field-label-sm" for="ob-class">Class</label>
+    <select id="ob-class" class="text-input" aria-label="Class"></select>
+    <span class="ob-status" id="ob-status"></span>
+  </div>
+  <p class="dash-alert error" id="ob-note" hidden></p>
+</section>
+{% include "_obe_course_file.html" %}
+{% endblock %}
+
+{% block extra_scripts %}<script src="/static/js/obe-course-file.js"></script>{% endblock %}

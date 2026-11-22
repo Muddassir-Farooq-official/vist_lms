@@ -7,7 +7,7 @@ from app.school.service import school_mode
 
 WORDS = [("Courses", "Subjects"), ("Course", "Subject"), ("Programs", "Classes"), ("Program", "Class"), ("Semesters", "Classes"),
          ("Semester", "Class")]
-HIDE = {"supplementary"}                         # university-only pages
+HIDE = {"supplementary", "obe"}                        # university-only pages
 # School mode only (stage 2): hidden in a college / university copy.
 SCHOOL_ONLY = {"/dashboard/faculty/my-class", "/dashboard/faculty/homework", "/dashboard/student/diary", "/dashboard/parent/diary",
                "/dashboard/parent/meetings", "/dashboard/faculty/exam-marks", "/dashboard/student/report-cards", "/dashboard/parent/report-cards"}

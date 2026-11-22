@@ -1,0 +1,31 @@
+{# One class's OBE course file: shared by the teacher's page and the exam office (static/js/obe-course-file.js). #}
+<section class="sh-card" id="ob-clo-card">
+  <h2 class="panel-title">1. Course outcomes (CLOs)</h2>
+  <p class="panel-hint">One line per outcome: what students can do by the end, its Bloom level, and the program outcomes (PLOs) it serves.</p>
+  <div id="ob-clos"></div>
+  <div class="decision-bar">
+    <button type="button" class="role-btn secondary-btn ob-edit" id="ob-add">Add a CLO</button>
+    <button type="button" class="role-btn secondary-btn ob-edit" id="ob-copy">Start from this course's last class</button>
+    <button type="button" class="role-btn ob-edit" id="ob-save">Save CLOs</button>
+  </div>
+</section>
+<section class="sh-card">
+  <h2 class="panel-title">2. What each assessment measures</h2>
+  <p class="panel-hint">Tag the whole assessment to one or more CLOs (its marks are shared), or split it into question parts (Q1, Q2 …) each with its own marks and CLO; part marks are then entered below.</p>
+  <div id="ob-assess"></div>
+</section>
+<section class="sh-card">
+  <h2 class="panel-title">3. Send for checking</h2>
+  <p class="panel-hint">The exam office checks and locks the course file. After that, outcomes and tags stay fixed; part marks can still be entered.</p>
+  <div class="decision-bar" id="ob-actions"></div>
+</section>
+<section class="sh-card" id="ob-marks-card" hidden>
+  <h2 class="panel-title" id="ob-marks-title">Question-part marks</h2>
+  <div class="table-scroll"><table class="dash-table" id="ob-marks"></table></div>
+  <div class="decision-bar"><button type="button" class="role-btn" id="ob-marks-save">Save marks</button></div>
+</section>
+<section class="sh-card">
+  <h2 class="panel-title">4. Attainment</h2>
+  <p class="panel-hint" id="ob-att-hint"></p>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>CLO</th><th>Bloom</th><th>Students assessed</th><th>Average</th><th>Reached the level</th><th>Attained</th></tr></thead><tbody id="ob-att"></tbody></table></div>
+</section>
