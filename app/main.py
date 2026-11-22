@@ -233,6 +233,7 @@ ADMIN_NAV_ITEMS = [
     _nav("reg-numbers", "University Reg Nos", "file", "/dashboard/admin/reg-numbers", group="Students", keywords="registration KMU AUST affiliation"),
     _nav("profile-changes", "Profile changes", "user", "/dashboard/admin/profile-changes", group="Students", badge="profile_changes"),
     _nav("certificates", "Certificate requests", "file", "/dashboard/admin/certificates", group="Students", badge="certificates", keywords="bonafide character"),
+    _nav("mentoring", "Mentors", "user", "/dashboard/admin/mentoring", group="Students", keywords="mentor mentee counselling referral"),
     _nav("alumni", "Graduation & alumni", "graduation-cap", "/dashboard/admin/alumni", group="Students", keywords="graduates convocation degree transcript survey directory"),
     _nav("warnings", "Warnings", "alert", "/dashboard/admin/warnings", group="Students", keywords="discipline"),
     _nav("hostel", "Hostel", "hostel", "/dashboard/admin/hostel", group="Students", keywords="rooms boarders mess roll call"),
@@ -526,6 +527,7 @@ FACULTY_NAV_ITEMS = [
     _nav("feedback", "Student feedback", "check-circle", "/dashboard/faculty/feedback", group="Teaching"),
     _nav("timetable", "My Timetable", "clock", "/dashboard/faculty/timetable", group="Teaching"),
     _nav("substitutes", "Substitute classes", "employees", "/dashboard/faculty/substitutes", group="Teaching"),
+    _nav("mentees", "My mentees", "user", "/dashboard/faculty/mentees", group="Teaching", keywords="mentor counselling"),
     _nav("clinical", "Clinical supervision", "students", "/dashboard/clinical", group="Teaching"),
     _nav("exams", "Exam duties", "exams", "/dashboard/faculty/exams", group="Teaching"),
     _nav("library", "Library", "library", "/dashboard/faculty/library", group="Services"),
@@ -768,6 +770,7 @@ from app.substitutes.router import router as substitutes_router  # noqa: E402
 from app.clinical.router import router as clinical_router  # noqa: E402
 from app.paperfiles.router import router as paper_files_router  # noqa: E402
 from app.alumni.router import router as alumni_router  # noqa: E402
+from app.mentoring.router import router as mentoring_router  # noqa: E402
 from app.reports.center_router import router as report_center_router  # noqa: E402
 from app.reports.monthly_router import router as monthly_report_router  # noqa: E402
 from app.discipline.router import router as discipline_router  # noqa: E402
@@ -789,6 +792,7 @@ app.include_router(substitutes_router, prefix=settings.api_v1_prefix)
 app.include_router(clinical_router, prefix=settings.api_v1_prefix)
 app.include_router(paper_files_router, prefix=settings.api_v1_prefix)
 app.include_router(alumni_router, prefix=settings.api_v1_prefix)
+app.include_router(mentoring_router, prefix=settings.api_v1_prefix)
 from app.calendar.router import router as calendar_router  # noqa: E402
 
 app.include_router(calendar_router, prefix=settings.api_v1_prefix)
@@ -1862,6 +1866,16 @@ async def admin_seating_page(request: Request):
 @app.get("/dashboard/admin/paper-files", include_in_schema=False)
 async def admin_paper_files_page(request: Request):
     return templates.TemplateResponse(request, "admin/paper_files.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "paper-files"})
+
+
+@app.get("/dashboard/admin/mentoring", include_in_schema=False)
+async def admin_mentoring_page(request: Request):
+    return templates.TemplateResponse(request, "admin/mentoring.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "mentoring"})
+
+
+@app.get("/dashboard/faculty/mentees", include_in_schema=False)
+async def faculty_mentees_page(request: Request):
+    return templates.TemplateResponse(request, "faculty/mentees.html", {"nav_items": FACULTY_NAV_ITEMS, "active_nav": "mentees"})
 
 
 @app.get("/dashboard/admin/alumni", include_in_schema=False)

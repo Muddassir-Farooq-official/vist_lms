@@ -251,6 +251,8 @@ class Permissions:
     CLINICAL_SUPERVISE = "clinical.supervise"
     # Approve (or discard) a month's draft of hostel / mess / transport charges, adding them to students' dues (accounts office).
     CHARGES_APPROVE = "charges.approve"
+    # Assign mentors to students and read every mentor's notes and referrals (administration).
+    MENTORING_MANAGE = "mentoring.manage"
     # Graduation lists, alumni directory and surveys (administration).
     ALUMNI_MANAGE = "alumni.manage"
     # Track degrees and transcripts being prepared and handed over (administration, exam office).
@@ -285,6 +287,7 @@ class Permissions:
 # seed script), not editing scattered `if` statements.
 ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
     Roles.ADMIN: (
+        Permissions.MENTORING_MANAGE,
         Permissions.ALUMNI_MANAGE,
         Permissions.DOCUMENT_ISSUE,
         Permissions.CHARGES_APPROVE,

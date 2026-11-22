@@ -1,0 +1,26 @@
+{% extends "faculty/_base.html" %}
+{% block title %}My mentees{% endblock %}
+{% block page_title %}My mentees{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">The students you mentor, with warning signs from their classes and follow-ups due. Your notes are private: only you and the administration read them.</div>{% endblock %}
+{% block content %}
+<section class="sh-card">
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Student</th><th>Warning signs</th><th>Last met</th><th>Follow-up</th><th></th></tr></thead><tbody id="me-list"></tbody></table></div>
+</section>
+<section class="sh-card" id="me-file" hidden>
+  <h2 class="panel-title" id="me-name"></h2>
+  <p class="panel-hint" id="me-meta"></p>
+  <ul id="me-signs"></ul>
+  <form id="me-form" class="form-grid">
+    <label>Date<input id="me-date" type="date" class="text-input" required></label>
+    <label>Kind<select id="me-kind" class="text-input"><option value="MEETING">Meeting</option><option value="PHONE">Phone call</option><option value="PARENTS">With parents</option></select></label>
+    <label>Follow up on<input id="me-fu" type="date" class="text-input"></label>
+    <label class="cl-wide">What was discussed (private)<textarea id="me-notes" class="text-input" rows="3" maxlength="20000" required></textarea></label>
+    <label class="cl-wide">What was agreed<input id="me-actions" class="text-input" maxlength="1000"></label>
+    <label class="cl-wide"><input type="checkbox" id="me-refer"> Refer to the principal</label>
+    <label class="cl-wide" id="me-reason-l" hidden>Why<input id="me-reason" class="text-input" maxlength="500"></label>
+    <div class="decision-bar"><button type="submit" class="role-btn">Save meeting</button></div>
+  </form>
+  <div id="me-meetings"></div>
+</section>
+{% endblock %}
+{% block extra_scripts %}<script src="/static/js/mentoring-mentor.js"></script>{% endblock %}
