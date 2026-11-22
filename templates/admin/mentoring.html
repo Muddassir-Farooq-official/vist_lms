@@ -1,0 +1,38 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN{% endblock %}
+{% block title %}Mentors{% endblock %}
+{% block page_title %}Mentors{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Give every student a teacher as mentor. Mentors record meetings (private: only the mentor and administrators read them) and refer students to you when needed.</div>{% endblock %}
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="assign" role="tab" aria-selected="true"><span>Students &amp; mentors</span></button>
+  <button class="portal-tab" data-tab="referrals" role="tab" aria-selected="false"><span>Referrals <b id="mt-refcount"></b></span></button>
+</div>
+<div class="portal-tab-panel" data-tab-panel="assign">
+<section class="sh-card">
+  <div class="toolbar">
+    <select id="mt-program" class="text-input" aria-label="Program"><option value="">All programs</option></select>
+    <input id="mt-sem" type="number" min="1" max="16" class="text-input" placeholder="Semester" aria-label="Semester">
+    <label class="field-label-sm"><input type="checkbox" id="mt-unassigned"> Without a mentor only</label>
+  </div>
+  <p class="panel-hint" id="mt-mentors"></p>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th><input type="checkbox" id="mt-all" aria-label="Choose all"></th><th>Roll no.</th><th>Student</th><th>Program</th><th>Mentor</th><th></th></tr></thead><tbody id="mt-list"></tbody></table></div>
+</section>
+<section class="sh-card">
+  <h2 class="panel-title">Give the chosen students a mentor</h2>
+  <p class="panel-hint">Choose one or more teachers (employee codes, comma separated). With several, the chosen students are shared out evenly, fewest mentees first.</p>
+  <form id="mt-form" class="form-grid">
+    <label class="cl-wide">Mentors (employee codes)<input id="mt-codes" class="text-input" required placeholder="T-001, T-014"></label>
+    <label class="cl-wide"><input type="checkbox" id="mt-keep" checked> Keep students who already have a mentor</label>
+    <div class="decision-bar"><button type="submit" class="role-btn">Assign</button></div>
+  </form>
+</section>
+</div>
+<div class="portal-tab-panel" data-tab-panel="referrals" id="referrals" hidden>
+<section class="sh-card">
+  <div class="toolbar"><select id="rf-status" class="text-input" aria-label="Show"><option value="OPEN">Open</option><option value="RESOLVED">Answered</option></select></div>
+  <div id="rf-list"></div>
+</section>
+</div>
+{% endblock %}
+{% block extra_scripts %}<script src="/static/js/mentoring-admin.js"></script>{% endblock %}

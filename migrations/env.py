@@ -78,6 +78,7 @@ from app.transport import models as transport_models  # noqa: F401
 from app.monthly_charges import models as monthly_charges_models  # noqa: F401
 from app.paperfiles import models as paperfiles_models  # noqa: F401
 from app.alumni import models as alumni_models  # noqa: F401
+from app.mentoring import models as mentoring_models  # noqa: F401
 
 config = context.config
 # ALEMBIC_DATABASE_URL lets CI/tests migrate a scratch database without touching .env

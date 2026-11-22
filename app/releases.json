@@ -1,5 +1,28 @@
 [
   {
+    "version": "1.59.0",
+    "date": "2026-11-22",
+    "title": "Student mentoring",
+    "summary": "Every student gets a teacher as mentor, with private meeting notes and referrals to the principal.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Mentors: give students a mentor (shared out evenly), and answer mentors' referrals."
+      },
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "My mentees: warning signs, follow-ups due, private meeting notes, refer to the principal."
+      },
+      {
+        "kind": "new",
+        "for": "Students",
+        "text": "Your home card shows who your mentor is (parents see it too)."
+      }
+    ]
+  },
+  {
     "version": "1.58.0",
     "date": "2026-11-22",
     "title": "Admissions moved out",
