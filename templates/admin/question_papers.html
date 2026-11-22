@@ -1,0 +1,37 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN,EXAM_CONTROLLER{% endblock %}
+{% block title %}Question papers{% endblock %}
+{% block page_title %}Question papers{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Build a paper from the question bank: say how many questions of each kind and level, then swap, reorder, and make it final. Print the paper and its answer key.</div>{% endblock %}
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="papers" role="tab" aria-selected="true"><span>Papers</span></button>
+  <button class="portal-tab" data-tab="bank" role="tab" aria-selected="false"><span>Question bank</span></button>
+</div>
+<div class="portal-tab-panel" data-tab-panel="papers">
+<section class="sh-card">
+  <h2 class="panel-title">Build a paper</h2>
+  <form id="qp-form" class="form-grid">
+    <label>Course<select id="qp-course" class="text-input" required></select></label>
+    <label>Title<input id="qp-title" class="text-input" maxlength="150" required placeholder="Midterm, Fall 2026"></label>
+    <label>Time (minutes)<input id="qp-time" type="number" min="5" max="600" class="text-input"></label>
+    <label class="cl-wide">Instructions<textarea id="qp-instr" class="text-input" rows="2" maxlength="1000"></textarea></label>
+    <div class="cl-wide"><table class="dash-table"><thead><tr><th>Kind</th><th>How many</th><th>Difficulty</th><th>Bloom</th><th>CLO</th><th>Marks each</th><th></th></tr></thead><tbody id="qp-rows"></tbody></table>
+      <button type="button" class="link-btn" id="qp-addrow">+ Another row</button></div>
+    <div class="decision-bar"><button type="submit" class="role-btn">Build paper</button></div>
+  </form>
+</section>
+<section class="sh-card">
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Paper</th><th>Course</th><th>Marks</th><th>Status</th><th></th></tr></thead><tbody id="qp-list"></tbody></table></div>
+</section>
+<section class="sh-card" id="qp-detail" hidden>
+  <h2 class="panel-title" id="qp-d-title"></h2>
+  <p class="panel-hint" id="qp-d-meta"></p>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>#</th><th>Question</th><th>Level</th><th>Marks</th><th></th></tr></thead><tbody id="qp-items"></tbody></table></div>
+  <div class="decision-bar"><a class="role-btn secondary-btn" id="qp-pdf" href="#">Question paper (PDF)</a> <a class="role-btn secondary-btn" id="qp-key" href="#">Answer key (PDF)</a>
+    <button type="button" class="role-btn" id="qp-final">Make final</button> <button type="button" class="role-btn secondary-btn" id="qp-del">Delete draft</button></div>
+</section>
+</div>
+<div class="portal-tab-panel" data-tab-panel="bank" hidden>{% include "shared/_qbank.html" %}</div>
+{% endblock %}
+{% block extra_scripts %}<script src="/static/js/qbank.js"></script><script src="/static/js/qpapers.js"></script>{% endblock %}

@@ -1,0 +1,23 @@
+<section class="sh-card">
+  <div class="toolbar"><label class="field-label-sm" for="qb-course">Course</label><select id="qb-course" class="text-input"></select>
+    <label class="field-label-sm"><input type="checkbox" id="qb-retired"> Show retired</label></div>
+  <p class="panel-hint" id="qb-summary"></p>
+</section>
+<section class="sh-card">
+  <h2 class="panel-title" id="qb-form-title">Add a question</h2>
+  <form id="qb-form" class="form-grid">
+    <label>Kind<select id="qb-kind" class="text-input"><option value="MCQ">Multiple choice</option><option value="SHORT">Short</option><option value="LONG">Long</option></select></label>
+    <label>Marks<input id="qb-marks" type="number" min="0.5" max="100" step="0.5" value="1" class="text-input" required></label>
+    <label>Difficulty<select id="qb-level" class="text-input"><option value="EASY">Easy</option><option value="MEDIUM" selected>Medium</option><option value="HARD">Hard</option></select></label>
+    <label>Bloom level<select id="qb-bloom" class="text-input"><option value="">—</option></select></label>
+    <label>CLO<input id="qb-clo" class="text-input" maxlength="12" placeholder="CLO1"></label>
+    <label class="cl-wide">Question<textarea id="qb-text" class="text-input" rows="3" maxlength="5000" required></textarea></label>
+    <div class="cl-wide" id="qb-opts"></div>
+    <label class="cl-wide" id="qb-answer-l">Right option<select id="qb-answer" class="text-input"></select></label>
+    <label class="cl-wide" id="qb-key-l" hidden>Marking key (only the exam office and teachers see it)<textarea id="qb-key" class="text-input" rows="2" maxlength="3000"></textarea></label>
+    <div class="decision-bar"><button type="submit" class="role-btn">Save question</button> <button type="button" class="role-btn secondary-btn" id="qb-cancel" hidden>Cancel</button></div>
+  </form>
+</section>
+<section class="sh-card">
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Question</th><th>Kind</th><th>Level</th><th>Marks</th><th>Used</th><th></th></tr></thead><tbody id="qb-list"></tbody></table></div>
+</section>
