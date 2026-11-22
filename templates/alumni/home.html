@@ -1,0 +1,37 @@
+{% extends "alumni/_base.html" %}
+{% block title %}My alumni page{% endblock %}
+{% block page_title %}My alumni page{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle" id="al-sub">Keep your details up to date, follow your degree and transcripts, and find classmates.</div>{% endblock %}
+{% block content %}
+<section class="sh-card">
+  <h2 class="panel-title">Degree and transcripts</h2>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>What</th><th>Status</th><th>Serial no.</th></tr></thead><tbody id="al-docs"></tbody></table></div>
+  <div class="decision-bar"><a class="role-btn secondary-btn" href="/api/v1/results/me/transcript.pdf">My result card (PDF)</a> <button type="button" class="role-btn" id="al-ask">Ask for a printed transcript</button></div>
+</section>
+<section class="sh-card">
+  <h2 class="panel-title">My details</h2>
+  <form id="al-form" class="form-grid">
+    <label>Employer<input name="employer" class="text-input" maxlength="150"></label>
+    <label>Job title<input name="job_title" class="text-input" maxlength="120"></label>
+    <label>City<input name="city" class="text-input" maxlength="80"></label>
+    <label>Country<input name="country" class="text-input" maxlength="80"></label>
+    <label>Further study<input name="further_study" class="text-input" maxlength="200" placeholder="e.g. MSN, University of ..."></label>
+    <label>Email<input name="email" type="email" class="text-input" maxlength="150"></label>
+    <label>Phone<input name="phone" class="text-input" maxlength="30"></label>
+    <label>LinkedIn<input name="linkedin" class="text-input" maxlength="200"></label>
+    <label class="cl-wide"><input type="checkbox" name="in_directory"> List me in the alumni directory (name, program, year, work and city)</label>
+    <label class="cl-wide"><input type="checkbox" name="share_contact"> ... and show my email, phone and LinkedIn to other alumni</label>
+    <div class="decision-bar"><button type="submit" class="role-btn">Save</button></div>
+  </form>
+</section>
+<section class="sh-card" id="survey">
+  <h2 class="panel-title">Surveys</h2>
+  <div id="al-surveys"></div>
+</section>
+<section class="sh-card">
+  <h2 class="panel-title">Alumni directory</h2>
+  <div class="toolbar"><input id="al-q" type="search" class="text-input" placeholder="Name, employer or city" aria-label="Search alumni"></div>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Name</th><th>Program</th><th>Work</th><th>City</th><th>Contact</th></tr></thead><tbody id="al-dir"></tbody></table></div>
+</section>
+{% endblock %}
+{% block extra_scripts %}<script src="/static/js/alumni-portal.js"></script>{% endblock %}

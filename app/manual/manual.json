@@ -1,5 +1,5 @@
 {
-  "version": "1.56.0",
+  "version": "1.57.0",
   "title": "VIST LMS user manual",
   "chapters": [
     {
@@ -134,6 +134,15 @@
         "admin",
         "clinical",
         "faculty"
+      ]
+    },
+    {
+      "slug": "alumni",
+      "title": "Alumni",
+      "file": "95-alumni.md",
+      "portals": [
+        "admin",
+        "alumni"
       ]
     }
   ]

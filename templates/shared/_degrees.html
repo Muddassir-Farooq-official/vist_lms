@@ -1,0 +1,16 @@
+<section class="sh-card">
+  <h2 class="panel-title">Start a degree or transcript</h2>
+  <form id="dg-form" class="form-grid">
+    <label>Roll number<input id="dg-roll" class="text-input" maxlength="30" required></label>
+    <label>What<select id="dg-kind" class="text-input"><option value="DEGREE">Degree</option><option value="TRANSCRIPT">Transcript</option></select></label>
+    <label>Copies<input id="dg-copies" type="number" min="1" max="10" value="1" class="text-input"></label>
+    <label>Note<input id="dg-note" class="text-input" maxlength="300"></label>
+    <div class="decision-bar"><button type="submit" class="role-btn">Start</button></div>
+  </form>
+</section>
+<section class="sh-card">
+  <div class="toolbar"><label class="field-label-sm" for="dg-status">Show</label>
+    <select id="dg-status" class="text-input"><option value="OPEN">On their way</option><option value="REQUESTED">Requested</option><option value="PREPARING">Being prepared</option><option value="READY">Ready to collect</option><option value="COLLECTED">Collected</option><option value="POSTED">Posted</option><option value="">All</option></select>
+    <input id="dg-q" type="search" class="text-input" placeholder="Name or roll number" aria-label="Search"></div>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Student</th><th>What</th><th>Status</th><th>Serial no.</th><th></th></tr></thead><tbody id="dg-list"></tbody></table></div>
+</section>
