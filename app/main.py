@@ -254,6 +254,7 @@ ADMIN_NAV_ITEMS = [
     _nav("result-sheets", "Result Approval", "tasks", "/dashboard/admin/result-sheets", group="Teaching & exams", badge="result_sheets", keywords="award list university result publish"),
     _nav("datesheets", "Datesheets", "clock", "/dashboard/admin/datesheets", group="Teaching & exams", keywords="admit cards exam schedule"),
     _nav("seating", "Seating & invigilation", "grid", "/dashboard/admin/seating", group="Teaching & exams", keywords="exam rooms seats door list invigilators duty"),
+    _nav("paper-files", "Exam paper files", "file", "/dashboard/admin/paper-files", group="Teaching & exams", keywords="question paper printing teacher sent pdf word"),
     _nav("supplementary", "Supplementary Exams", "exams", "/dashboard/admin/supplementary", group="Teaching & exams", keywords="resit"),
     _nav("obe", "Outcomes (OBE)", "check-circle", "/dashboard/admin/obe", group="Teaching & exams", keywords="CLO PLO accreditation attainment course file"),
     _nav("fees", "Fees", "fees", "/dashboard/admin/fees", group="Fees & accounts", keywords="challan installments structures"),
@@ -405,6 +406,7 @@ EXAM_NAV_ITEMS = [
     _nav("result-types", "Result types", "exams", "/dashboard/exam/result-types", group="Exams"),
     _nav("datesheets", "Datesheets & admit cards", "clock", "/dashboard/exam/datesheets", group="Exams"),
     _nav("seating", "Seating & invigilation", "grid", "/dashboard/exam/seating", group="Exams"),
+    _nav("paper-files", "Exam paper files", "file", "/dashboard/exam/paper-files", group="Exams", keywords="question paper printing"),
     _nav("obe", "Outcomes (OBE)", "check-circle", "/dashboard/exam/obe", group="Exams"),
     _nav("supplementary", "Supplementary exams", "exams", "/dashboard/exam/supplementary", group="Exams"),
     _nav("students", "Student lookup", "students", "/dashboard/exam/students", group="Exams"),
@@ -513,6 +515,7 @@ FACULTY_NAV_ITEMS = [
     _nav("exam-marks", "Exam marks & report cards", "exams", "/dashboard/faculty/exam-marks", group="Teaching", short="Marks"),  # School mode only
     _nav("grading", "Grading", "exams", "/dashboard/faculty/grading", group="Teaching", mobile=True),
     _nav("obe", "Course outcomes (OBE)", "check-circle", "/dashboard/faculty/obe", group="Teaching"),
+    _nav("exam-papers", "Send exam papers", "file", "/dashboard/faculty/exam-papers", group="Teaching", keywords="question paper printing upload"),
     _nav("watch", "Students to watch", "students", "/dashboard/faculty/watch", group="Teaching"),
     _nav("feedback", "Student feedback", "check-circle", "/dashboard/faculty/feedback", group="Teaching"),
     _nav("timetable", "My Timetable", "clock", "/dashboard/faculty/timetable", group="Teaching"),
@@ -757,6 +760,7 @@ from app.obe.router import router as obe_router  # noqa: E402
 from app.family.router import router as family_router  # noqa: E402
 from app.substitutes.router import router as substitutes_router  # noqa: E402
 from app.clinical.router import router as clinical_router  # noqa: E402
+from app.paperfiles.router import router as paper_files_router  # noqa: E402
 from app.reports.center_router import router as report_center_router  # noqa: E402
 from app.reports.monthly_router import router as monthly_report_router  # noqa: E402
 from app.discipline.router import router as discipline_router  # noqa: E402
@@ -776,6 +780,7 @@ app.include_router(obe_router, prefix=settings.api_v1_prefix)
 app.include_router(family_router, prefix=settings.api_v1_prefix)
 app.include_router(substitutes_router, prefix=settings.api_v1_prefix)
 app.include_router(clinical_router, prefix=settings.api_v1_prefix)
+app.include_router(paper_files_router, prefix=settings.api_v1_prefix)
 from app.calendar.router import router as calendar_router  # noqa: E402
 
 app.include_router(calendar_router, prefix=settings.api_v1_prefix)
@@ -1849,6 +1854,21 @@ async def admin_supplementary_page(request: Request):
 @app.get("/dashboard/admin/seating", include_in_schema=False)
 async def admin_seating_page(request: Request):
     return templates.TemplateResponse(request, "admin/seating.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "seating"})
+
+
+@app.get("/dashboard/admin/paper-files", include_in_schema=False)
+async def admin_paper_files_page(request: Request):
+    return templates.TemplateResponse(request, "admin/paper_files.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "paper-files"})
+
+
+@app.get("/dashboard/exam/paper-files", include_in_schema=False)
+async def exam_paper_files_page(request: Request):
+    return templates.TemplateResponse(request, "admin/paper_files.html", {"nav_items": EXAM_NAV_ITEMS, "active_nav": "paper-files"})
+
+
+@app.get("/dashboard/faculty/exam-papers", include_in_schema=False)
+async def faculty_exam_papers_page(request: Request):
+    return templates.TemplateResponse(request, "faculty/exam_papers.html", {"nav_items": FACULTY_NAV_ITEMS, "active_nav": "exam-papers"})
 
 
 @app.get("/dashboard/exam/seating", include_in_schema=False)

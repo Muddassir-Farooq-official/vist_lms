@@ -51,6 +51,7 @@ From a student's or employee's record (or many at once from the list) print **ID
 - **Result Approval**: approve and publish results, print award lists, result cards and the gazette, promote classes, and set grading tables (see the Exam department chapter).
 - **Datesheets**: plan exam papers, put teachers on duty, fix clashes, publish and print admit cards.
 - **Outcomes (OBE)**: program outcomes (PLOs) and pass levels, teachers' course files to lock, and PLO attainment. See the Exam office chapter.
+- **Exam paper files**: the question papers teachers sent for each datesheet; see the Exam office chapter.
 - **Seating & invigilation**: seat students room by room (different papers side by side), put invigilators in each room, print door lists, room attendance sheets and duty sheets; admit cards show the room and seat. See the Exam office chapter.
 - **Supplementary Exams**: re-sit papers for students who failed on marks.
 - **Calendar**: holidays, exams, events and deadlines.

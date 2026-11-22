@@ -1,5 +1,23 @@
 [
   {
+    "version": "1.56.0",
+    "date": "2026-11-22",
+    "title": "Exam paper files",
+    "summary": "Teachers send question papers as PDF or Word files; the exam office prints them.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "Send exam papers: attach the question paper for each coming exam; see when it is printed or returned."
+      },
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "Exam paper files: who has sent their paper, download and print, mark printed or return with a note."
+      }
+    ]
+  },
+  {
     "version": "1.55.0",
     "date": "2026-11-22",
     "title": "Hostel mess, roll call and transport",

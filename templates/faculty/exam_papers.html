@@ -1,0 +1,11 @@
+{% extends "faculty/_base.html" %}
+{% block title %}Send exam papers{% endblock %}
+{% block page_title %}Send exam papers{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Your courses' coming exam papers. Attach each question paper (PDF or Word) for the exam office to print. You are told when it is printed, or returned for a correction. Students never see these files.</div>{% endblock %}
+{% block content %}
+<section class="sh-card">
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Exam</th><th>Course</th><th>Date</th><th>Paper file</th><th></th></tr></thead><tbody id="ep-list"></tbody></table></div>
+</section>
+<input type="file" id="ep-file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+{% endblock %}
+{% block extra_scripts %}<script src="/static/js/paper-files-teacher.js"></script>{% endblock %}

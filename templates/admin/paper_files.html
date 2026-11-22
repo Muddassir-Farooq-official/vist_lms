@@ -1,0 +1,14 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN,EXAM_CONTROLLER{% endblock %}
+{% block title %}Exam paper files{% endblock %}
+{% block page_title %}Exam paper files{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">The question papers teachers sent for a datesheet: who has sent theirs, download and print, then mark printed, or return with what to correct. Every download is recorded.</div>{% endblock %}
+{% block content %}
+<section class="sh-card">
+  <div class="toolbar"><label class="field-label-sm" for="pf-schedule">Datesheet</label><select id="pf-schedule" class="text-input"></select></div>
+  <p class="panel-hint" id="pf-count"></p>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Date</th><th>Course</th><th>Teacher</th><th>Paper file</th><th></th></tr></thead><tbody id="pf-list"></tbody></table></div>
+</section>
+<input type="file" id="pf-file" accept=".pdf,.doc,.docx" hidden>
+{% endblock %}
+{% block extra_scripts %}<script src="/static/js/paper-files-office.js"></script>{% endblock %}
