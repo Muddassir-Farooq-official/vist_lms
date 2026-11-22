@@ -20,7 +20,11 @@ async def _count(db, stmt) -> int:
 
 @router.get("/badges", summary="Waiting work for the menu: approvals, profile changes, certificate requests, admissions, result sheets")
 async def badges(current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
-    perms = set(current_user.permissions)
+    return await waiting_counts(db, set(current_user.permissions))
+
+
+async def waiting_counts(db, perms: set) -> dict[str, int]:
+    """The counts for someone with these permissions (also used by the morning summary, app/reports/morning.py)."""
     out: dict[str, int] = {}
     if Permissions.APPROVALS_DECIDE in perms:
         from app.approvals.models import ApprovalRequest

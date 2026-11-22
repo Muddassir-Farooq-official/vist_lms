@@ -153,6 +153,8 @@ POLICY: tuple[Policy, ...] = (
            "Charged when the office approves a student's request; the student downloads it once the challan is paid."),
     Policy("certificate_fee_fee_clearance", "Fee clearance letter fee (Rs., 0 = free)", "Certificates", float, 0, 1_000_000,
            "Charged when the office approves a student's request; the student downloads it once the challan is paid."),
+    Policy("morning_summary", "Send administrators a morning summary at 8 AM, Monday to Saturday (1 = yes, 0 = no)", "Reports", int, 0, 1,
+           "Money, attendance, work waiting and problems; as a notification, emailed to anyone with email notices on."),
     Policy("monthly_report_notice", "Tell the principal on the 1st that last month's report is ready (1 = yes, 0 = no)", "Reports", int, 0, 1,
            "Fees, class attendance, results, staff attendance and leave for the month, with a PDF. Always on the Monthly report page."),
     Policy("fee_backdated_grace_days", "Late fee grace for backdated instalments (days)", "Fees", int, 0, 90,

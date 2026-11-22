@@ -4232,3 +4232,11 @@ details.tg-session > summary.tg-head { cursor: pointer; }
 .page-star:hover, .page-star[aria-pressed="true"] { color: #d97706; border-color: #f59e0b; }
 .page-star:focus-visible { outline: 2px solid var(--blue-500); outline-offset: 2px; }
 .page-star:disabled { opacity: .6; cursor: progress; }
+
+/* ---------- Morning summary page ---------- */
+.ms-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+.ms-block .stat-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.ms-block a.kpi { text-decoration: none; color: inherit; }
+.ms-block a.kpi:hover { border-color: var(--blue-500); }
+.ms-list { margin: 0; padding-left: 18px; line-height: 1.8; }
+.ms-list .ms-bad { color: #b91c1c; }

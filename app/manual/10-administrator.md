@@ -139,6 +139,7 @@ Teachers book make-up classes (for a missed class) and extra classes (for a cour
 
 - **Reports**: fees, accounts, payroll, academics, staff and store reports. Choose a report, set the filters, then print it or download it as a spreadsheet.
 - **Monthly report**: one month at a glance, also sent to you on the 1st of every month.
+- **Morning summary**: at 8 AM, Monday to Saturday, every administrator gets a short notice (also by email when email notices are on): money received the day before and what is overdue, class and staff attendance, work waiting for you, and problems (server, backups, SMS that failed, Reg No deadlines). Monday's covers Saturday and Sunday. The page shows the same figures any time, with links. Switch it off in **Settings → Rules → Reports**.
 
 ## Library
 

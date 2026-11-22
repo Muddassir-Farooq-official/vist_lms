@@ -1,0 +1,19 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN{% endblock %}
+{% block title %}Morning summary{% endblock %}
+{% block page_title %}Morning summary{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">What happened since the last working day and what needs you today. Sent to administrators at 8 AM, Monday to Saturday (Settings → Rules → Reports can switch it off).</div>{% endblock %}
+
+{% block content %}
+<section class="sh-card">
+  <p class="panel-hint" id="ms-when" aria-live="polite">Loading…</p>
+  <div class="ms-grid">
+    <div class="ms-block"><h2 class="panel-title">Money</h2><div class="stat-grid" id="ms-money"></div></div>
+    <div class="ms-block"><h2 class="panel-title">Attendance</h2><div class="stat-grid" id="ms-att"></div></div>
+    <div class="ms-block"><h2 class="panel-title">Work waiting</h2><ul class="ms-list" id="ms-wait"></ul></div>
+    <div class="ms-block"><h2 class="panel-title">Problems</h2><ul class="ms-list" id="ms-prob"></ul></div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}<script src="/static/js/morning-summary.js"></script>{% endblock %}

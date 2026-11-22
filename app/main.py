@@ -263,6 +263,7 @@ ADMIN_NAV_ITEMS = [
     _nav("overview", "Institute Overview", "dashboard", "/dashboard/admin/overview", group="Reports"),
     _nav("reports", "Reports", "exams", "/dashboard/admin/reports", group="Reports"),
     _nav("monthly", "Monthly report", "exams", "/dashboard/admin/monthly", group="Reports"),
+    _nav("morning-summary", "Morning summary", "clock", "/dashboard/admin/morning-summary", group="Reports", keywords="daily digest today"),
     _nav("finance-reports", "Finance reports", "exams", "/dashboard/admin/finance-reports", group="Reports", keywords="collection payables reconciliation"),
     _nav("announcements", "Announcements", "megaphone", "/dashboard/admin/announcements", group="Communication", keywords="notices"),
     _nav("applications", "Applications", "file", "/dashboard/admin/applications", group="Communication", keywords="requests letters"),
@@ -725,6 +726,7 @@ from app.reports.finance_router import router as finance_reports_router  # noqa:
 from app.fees.defaulters_router import router as fee_defaulters_router  # noqa: E402
 from app.core.nav_badges import router as nav_badges_router  # noqa: E402
 from app.navigation.router import router as nav_shortcuts_router  # noqa: E402
+from app.reports.morning import router as morning_summary_router  # noqa: E402
 from app.reports.center_router import router as report_center_router  # noqa: E402
 from app.reports.monthly_router import router as monthly_report_router  # noqa: E402
 from app.discipline.router import router as discipline_router  # noqa: E402
@@ -737,6 +739,7 @@ app.include_router(finance_reports_router, prefix=settings.api_v1_prefix)
 app.include_router(fee_defaulters_router, prefix=settings.api_v1_prefix)
 app.include_router(nav_badges_router, prefix=settings.api_v1_prefix)
 app.include_router(nav_shortcuts_router, prefix=settings.api_v1_prefix)
+app.include_router(morning_summary_router, prefix=settings.api_v1_prefix)
 from app.calendar.router import router as calendar_router  # noqa: E402
 
 app.include_router(calendar_router, prefix=settings.api_v1_prefix)
@@ -1537,6 +1540,11 @@ async def admin_result_sheets_page(request: Request):
 @app.get("/dashboard/student/fees", include_in_schema=False)
 async def student_fees_page(request: Request):
     return templates.TemplateResponse(request, "student/fees.html", {"nav_items": STUDENT_NAV_ITEMS, "active_nav": "fees"})
+
+
+@app.get("/dashboard/admin/morning-summary", include_in_schema=False)
+async def admin_morning_summary_page(request: Request):
+    return templates.TemplateResponse(request, "admin/morning_summary.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "morning-summary"})
 
 
 @app.get("/dashboard/admin/fee-defaulters", include_in_schema=False)

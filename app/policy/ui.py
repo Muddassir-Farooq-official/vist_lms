@@ -125,6 +125,7 @@ UI: dict[str, dict] = {
     "certificate_fee_provisional": {"section": "Certificates", "label": "Provisional certificate (result)", "control": "number", "before": "Rs."},
     "certificate_fee_migration": {"section": "Certificates", "label": "Migration certificate / NOC", "control": "number", "before": "Rs."},
     "certificate_fee_fee_clearance": {"section": "Certificates", "label": "Fee clearance letter", "control": "number", "before": "Rs."},
+    "morning_summary": {"section": "Reports", "label": "Morning summary to administrators (8 AM, Monday to Saturday)", "control": "switch"},
     "monthly_report_notice": {"section": "Reports", "label": "Tell the principal on the 1st that last month's report is ready", "control": "switch"},
     "sms_on_fee_overdue": {"section": "SMS messages", "label": "Weekly reminder for overdue fees", "control": "switch"},
     "sms_on_fee_reminder": {"section": "SMS messages", "label": "Fee reminder before the due date", "control": "switch"},

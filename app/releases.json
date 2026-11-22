@@ -1,5 +1,23 @@
 [
   {
+    "version": "1.47.0",
+    "date": "2026-11-22",
+    "title": "Morning summary",
+    "summary": "Administrators get one short summary at 8 AM, Monday to Saturday.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Morning summary at 8 AM (Monday to Saturday) as a notification and email: money, attendance, work waiting and problems. Monday's covers the weekend."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Reports → Morning summary shows the same figures any time, with links to each page."
+      }
+    ]
+  },
+  {
     "version": "1.46.0",
     "date": "2026-11-22",
     "title": "My shortcuts",
