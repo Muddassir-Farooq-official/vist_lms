@@ -80,6 +80,7 @@ from app.paperfiles import models as paperfiles_models  # noqa: F401
 from app.alumni import models as alumni_models  # noqa: F401
 from app.mentoring import models as mentoring_models  # noqa: F401
 from app.committees import models as committees_models  # noqa: F401
+from app.internship import models as internship_models  # noqa: F401
 
 config = context.config
 # ALEMBIC_DATABASE_URL lets CI/tests migrate a scratch database without touching .env

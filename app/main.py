@@ -782,6 +782,7 @@ from app.paperfiles.router import router as paper_files_router  # noqa: E402
 from app.alumni.router import router as alumni_router  # noqa: E402
 from app.mentoring.router import router as mentoring_router  # noqa: E402
 from app.committees.router import router as committees_router  # noqa: E402
+from app.internship.router import router as internship_router  # noqa: E402
 from app.reports.center_router import router as report_center_router  # noqa: E402
 from app.reports.monthly_router import router as monthly_report_router  # noqa: E402
 from app.discipline.router import router as discipline_router  # noqa: E402
@@ -805,6 +806,7 @@ app.include_router(paper_files_router, prefix=settings.api_v1_prefix)
 app.include_router(alumni_router, prefix=settings.api_v1_prefix)
 app.include_router(mentoring_router, prefix=settings.api_v1_prefix)
 app.include_router(committees_router, prefix=settings.api_v1_prefix)
+app.include_router(internship_router, prefix=settings.api_v1_prefix)
 from app.calendar.router import router as calendar_router  # noqa: E402
 
 app.include_router(calendar_router, prefix=settings.api_v1_prefix)

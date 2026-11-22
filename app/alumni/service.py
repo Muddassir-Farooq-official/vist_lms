@@ -36,6 +36,11 @@ class AlumniService:
         a = await rs.degree_audit(student_id)
         c = await rs.clearance("STUDENT", student_id)
         problems = list(a["problems"]) + [p for p in c.get("problems", []) if p not in a["problems"]]
+        from app.internship.service import graduation_problem
+
+        intern = await graduation_problem(self.session, student_id)
+        if intern:
+            problems.append(intern)
         return problems, a.get("cgpa"), a.get("credits_passed")
 
     async def draw_up(self, *, program_id: uuid.UUID, title: str, graduation_date: date, actor_id: uuid.UUID) -> dict:

@@ -17,5 +17,10 @@
   <h2 class="panel-title">Logbook</h2>
   <div class="table-scroll"><table class="dash-table"><thead><tr><th>Day</th><th>Student</th><th>Skill</th><th>Times</th><th>Status</th><th></th></tr></thead><tbody id="cv-log-body"></tbody></table></div>
 </section>
+<section class="sh-card" id="iv-card" hidden>
+  <h2 class="panel-title">Interns</h2>
+  <p class="panel-hint">Interns placed with you: verify the duties they log, and evaluate them (1 to 5 on each point).</p>
+  <div id="iv-list"></div>
+</section>
 {% endblock %}
-{% block extra_scripts %}<script src="/static/js/clinical-supervisor.js"></script>{% endblock %}
+{% block extra_scripts %}<script src="/static/js/clinical-supervisor.js"></script><script src="/static/js/internship-supervisor.js"></script>{% endblock %}
