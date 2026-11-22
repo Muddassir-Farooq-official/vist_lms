@@ -1,5 +1,23 @@
 [
   {
+    "version": "1.48.0",
+    "date": "2026-11-22",
+    "title": "Data checker",
+    "summary": "Find missing or wrong records in one place, with a link to fix each.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "System → Data checker: students, staff, academics and fees checked for gaps and mistakes (missing CNIC or mobile numbers, duplicates, subjects without a teacher, students with no fee …), each with Fix…."
+      },
+      {
+        "kind": "improved",
+        "for": "Administrators",
+        "text": "Students and Employees open already searched when you follow a Fix… link."
+      }
+    ]
+  },
+  {
     "version": "1.47.0",
     "date": "2026-11-22",
     "title": "Morning summary",

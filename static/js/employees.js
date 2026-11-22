@@ -1054,6 +1054,8 @@
   document.addEventListener("click", function (ev) { if (moreMenu.open && !moreMenu.contains(ev.target)) moreMenu.open = false; });
 
   document.addEventListener("vistadmin:ready", function () {
+    const q = new URLSearchParams(location.search).get("q");      // opened from the data checker: that person
+    if (q) searchInput.value = q;
     loadJobRoles();
     loadEmployees();
   });
