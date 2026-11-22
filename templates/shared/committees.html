@@ -1,0 +1,63 @@
+{% extends base_template %}
+{% block allowed_roles %}{{ allowed_roles|default("ADMIN") }}{% endblock %}
+{% block title %}Committees{% endblock %}
+{% block page_title %}Committees{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Your committees, their meetings and minutes, and the actions given to you. Only a committee's members and the administration see its minutes.</div>{% endblock %}
+{% block content %}
+<section class="sh-card" id="actions">
+  <h2 class="panel-title">My actions</h2>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Action</th><th>Committee</th><th>Due</th><th>Status</th><th></th></tr></thead><tbody id="cm-mine"></tbody></table></div>
+</section>
+{% if is_admin_page %}
+<section class="sh-card">
+  <h2 class="panel-title" id="cm-form-title">Make a committee</h2>
+  <form id="cm-form" class="form-grid">
+    <label>Name<input id="cm-name" class="text-input" maxlength="120" required placeholder="Academic Council"></label>
+    <label class="cl-wide">Purpose<input id="cm-purpose" class="text-input" maxlength="1000"></label>
+    <label class="cl-wide">Members: one per line, employee code then role (chair, secretary or member), e.g. <i>T-001 chair</i>
+      <textarea id="cm-members" class="text-input" rows="5" required></textarea></label>
+    <div class="decision-bar"><button type="submit" class="role-btn">Save committee</button> <button type="button" class="role-btn secondary-btn" id="cm-cancel" hidden>Cancel</button></div>
+  </form>
+</section>
+<section class="sh-card">
+  <h2 class="panel-title">Every open action</h2>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Action</th><th>Committee</th><th>Owner</th><th>Due</th></tr></thead><tbody id="cm-open"></tbody></table></div>
+</section>
+{% endif %}
+<section class="sh-card">
+  <h2 class="panel-title">Committees</h2>
+  <div id="cm-list"></div>
+</section>
+<section class="sh-card" id="cm-detail" hidden>
+  <h2 class="panel-title" id="cm-d-title"></h2>
+  <form id="cm-mt-form" class="form-grid" hidden>
+    <label>Date<input id="cm-mt-date" type="date" class="text-input" required></label>
+    <label>Time<input id="cm-mt-time" type="time" class="text-input"></label>
+    <label>Place<input id="cm-mt-place" class="text-input" maxlength="120"></label>
+    <label class="cl-wide">Agenda<textarea id="cm-mt-agenda" class="text-input" rows="3" required></textarea></label>
+    <div class="decision-bar"><button type="submit" class="role-btn">Schedule meeting (members are told)</button></div>
+  </form>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Date</th><th>Place</th><th>Status</th><th>Open actions</th><th></th></tr></thead><tbody id="cm-meetings"></tbody></table></div>
+</section>
+<section class="sh-card" id="cm-meeting" hidden>
+  <h2 class="panel-title" id="cm-m-title"></h2>
+  <form id="cm-min-form" class="form-grid">
+    <label class="cl-wide">Agenda<textarea name="agenda" class="text-input" rows="3"></textarea></label>
+    <label class="cl-wide">Present<input name="attended" class="text-input" maxlength="2000"></label>
+    <label class="cl-wide">Minutes<textarea name="minutes" class="text-input" rows="8"></textarea></label>
+    <label class="cl-wide">Decisions<textarea name="decisions" class="text-input" rows="4"></textarea></label>
+    <div class="decision-bar" id="cm-min-bar"><button type="submit" class="role-btn">Save minutes</button> <button type="button" class="role-btn secondary-btn" id="cm-final">Make final</button>
+      <button type="button" class="role-btn secondary-btn" id="cm-cancel-mt">Cancel meeting</button></div>
+  </form>
+  <p><a class="role-btn secondary-btn" id="cm-pdf" href="#">Minutes (PDF)</a></p>
+  <h3>Actions</h3>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Action</th><th>Owner</th><th>Due</th><th>Status</th><th></th></tr></thead><tbody id="cm-actions"></tbody></table></div>
+  <form id="cm-act-form" class="form-grid" hidden>
+    <label class="cl-wide">Action<input id="cm-act-title" class="text-input" maxlength="300" required></label>
+    <label>Owner (employee code)<input id="cm-act-owner" class="text-input" maxlength="20" required></label>
+    <label>Due<input id="cm-act-due" type="date" class="text-input" required></label>
+    <div class="decision-bar"><button type="submit" class="role-btn">Give action</button></div>
+  </form>
+</section>
+{% endblock %}
+{% block extra_scripts %}<script src="/static/js/committees.js"></script>{% endblock %}

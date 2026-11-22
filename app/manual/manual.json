@@ -1,5 +1,5 @@
 {
-  "version": "1.59.0",
+  "version": "1.60.0",
   "title": "VIST LMS user manual",
   "chapters": [
     {
@@ -143,6 +143,23 @@
       "portals": [
         "admin",
         "alumni"
+      ]
+    },
+    {
+      "slug": "committees",
+      "title": "Committees",
+      "file": "96-committees.md",
+      "portals": [
+        "admin",
+        "accounts",
+        "exam",
+        "faculty",
+        "gate",
+        "hod",
+        "library",
+        "principal",
+        "staff",
+        "warden"
       ]
     }
   ]

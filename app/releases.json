@@ -1,5 +1,23 @@
 [
   {
+    "version": "1.60.0",
+    "date": "2026-11-22",
+    "title": "Committees and minutes",
+    "summary": "Committees with meetings, final minutes, decisions and action items that remind their owners.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Committees: make committees with a chair, secretary and members; see every open action."
+      },
+      {
+        "kind": "new",
+        "for": "Staff",
+        "text": "Committees: meetings, agenda, minutes and decisions (members only), minutes PDF, and your actions with daily reminders."
+      }
+    ]
+  },
+  {
     "version": "1.59.0",
     "date": "2026-11-22",
     "title": "Student mentoring",
