@@ -1,0 +1,18 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}{{ allowed_roles|default("ADMIN") }}{% endblock %}
+{% block title %}Monthly charges{% endblock %}
+{% block page_title %}Monthly charges{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">The hostel office (room and mess) and the transport office prepare each month's charges as a draft. Check the lines, then approve to add them to the students' dues, or send the draft back with a reason.</div>{% endblock %}
+{% block content %}
+<section class="sh-card">
+  <div class="toolbar"><label class="field-label-sm" for="mc-status">Show</label>
+    <select id="mc-status" class="text-input"><option value="DRAFT">Waiting for approval</option><option value="">All</option><option value="APPROVED">Approved</option><option value="DISCARDED">Sent back</option></select></div>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Month</th><th>Charges</th><th>Students</th><th class="num">Total</th><th>Status</th><th></th></tr></thead><tbody id="mc-runs"></tbody></table></div>
+</section>
+<section class="sh-card" id="mc-detail" hidden>
+  <h2 class="panel-title" id="mc-title"></h2>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Roll no.</th><th>Student</th><th>Charge</th><th class="num">Amount</th><th></th></tr></thead><tbody id="mc-lines"></tbody></table></div>
+  <div class="decision-bar" id="mc-actions"><button type="button" class="role-btn" id="mc-approve">Approve and add to dues</button> <button type="button" class="role-btn secondary-btn" id="mc-discard">Send back…</button></div>
+</section>
+{% endblock %}
+{% block extra_scripts %}<script src="/static/js/monthly-charges.js"></script>{% endblock %}

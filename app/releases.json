@@ -1,5 +1,38 @@
 [
   {
+    "version": "1.55.0",
+    "date": "2026-11-22",
+    "title": "Hostel mess, roll call and transport",
+    "summary": "Mess fees, the night roll call, transport routes, and monthly charges the accounts office approves.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Hostel warden",
+        "text": "Night roll call (parents told about an absent resident) and a monthly mess fee per resident."
+      },
+      {
+        "kind": "improved",
+        "for": "Hostel warden",
+        "text": "The month's hostel and mess charges are prepared as a draft; the accounts office approves them before they reach students' dues."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Transport: routes, stops with pick-up times, riders, and the monthly transport fee draft."
+      },
+      {
+        "kind": "new",
+        "for": "Accounts office",
+        "text": "Monthly charges: approve or send back the hostel, mess and transport drafts."
+      },
+      {
+        "kind": "new",
+        "for": "Parents",
+        "text": "The home card shows the transport route, stop and pick-up time."
+      }
+    ]
+  },
+  {
     "version": "1.54.0",
     "date": "2026-11-22",
     "title": "Clinical rotations",

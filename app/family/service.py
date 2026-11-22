@@ -75,7 +75,17 @@ async def card(session: AsyncSession, student) -> dict:
             "today": {"date": today, "classes": classes, "absent": sum(1 for c in classes if c["attendance"] == "ABSENT"),
                       "present": sum(1 for c in classes if c["attendance"] == "PRESENT")},
             "fees": {"to_pay": s["total_to_pay"], "overdue": s["overdue"], "next_due": s["next_due"], "pay": pay},
-            "next_exam": nxt, "latest_result": result}
+            "next_exam": nxt, "latest_result": result, "transport": await _transport(session, student.id)}
+
+
+async def _transport(session: AsyncSession, student_id) -> dict | None:
+    try:
+        async with session.begin_nested():
+            from app.transport.service import TransportService
+
+            return await TransportService(session).student_seat(student_id)
+    except Exception:                       # noqa: BLE001 - the card shows without it
+        return None
 
 
 async def parent_ids(session: AsyncSession, student_id: uuid.UUID) -> list[uuid.UUID]:

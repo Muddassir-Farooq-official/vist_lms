@@ -35,8 +35,8 @@
     list.forEach(function (r) {
       const tr = document.createElement("tr");
       const people = r.residents.map(function (p) {
-        return '<div class="hr-person"><span>' + esc(p.name) + " <small>" + esc((p.roll_number || "") + (p.bed_no ? " · bed " + p.bed_no : "") + " · since " + day(p.since)) + "</small></span>" +
-          (canManage ? '<span class="row-actions"><button type="button" class="role-btn small-btn secondary-btn" data-move="' + esc(p.stay_id) + '">Move</button><button type="button" class="role-btn small-btn secondary-btn" data-out="' + esc(p.stay_id) + '" data-name="' + esc(p.name) + '">Leaves</button></span>' : "") + "</div>";
+        return '<div class="hr-person"><span>' + esc(p.name) + " <small>" + esc((p.roll_number || "") + (p.bed_no ? " · bed " + p.bed_no : "") + " · since " + day(p.since) + (p.mess_fee > 0 ? " · mess " + money(p.mess_fee) : "")) + "</small></span>" +
+          (canManage ? '<span class="row-actions"><button type="button" class="role-btn small-btn secondary-btn" data-mess="' + esc(p.stay_id) + '" data-fee="' + p.mess_fee + '">Mess</button><button type="button" class="role-btn small-btn secondary-btn" data-move="' + esc(p.stay_id) + '">Move</button><button type="button" class="role-btn small-btn secondary-btn" data-out="' + esc(p.stay_id) + '" data-name="' + esc(p.name) + '">Leaves</button></span>' : "") + "</div>";
       }).join("") || '<span class="cc-meta">Empty</span>';
       tr.innerHTML = "<td><strong>" + esc(r.code) + "</strong><small>" + esc([r.block, r.floor ? "floor " + r.floor : ""].filter(Boolean).join(" · ")) + "</small></td><td>" + esc(FOR[r.gender] || r.gender) +
         '</td><td><div class="tp-cell"><div class="tp-bar hs-beds"><span class="tp-meter"><i style="width:' + Math.round(100 * (r.capacity - r.free_beds) / Math.max(1, r.capacity)) + "%;background:" + (r.free_beds ? "var(--blue-500)" : "#16a34a") + '"></i></span><b>' + (r.capacity - r.free_beds) + " / " + r.capacity + "</b></div>" +
@@ -91,6 +91,15 @@
   $("h-rooms").addEventListener("click", async function (e) {
     const out = e.target.closest("[data-out]");
     const mv = e.target.closest("[data-move]");
+    const mess = e.target.closest("[data-mess]");
+    if (mess) {
+      const fee = await VA.ask({ title: "Monthly mess fee", label: "Rs. a month (0 = not in the mess)", input: "number", min: 1 });
+      if (fee === null || fee === "" || isNaN(Number(fee))) return;
+      const r = await VA.fetchJson(API + "/stays/" + mess.getAttribute("data-mess") + "/mess", json("POST", { mess_fee: Number(fee) }));
+      if (!r.ok) return VA.toast(err(r, "Not saved."), "error");
+      VA.toast("Mess fee saved. It is used from the next draft."); loadRooms();
+      return;
+    }
     if (out) {
       const reason = await VA.ask({ title: out.getAttribute("data-name") + " leaves the hostel", label: "Why (left, graduated, expelled...)", min: 3 });
       if (!reason) return;
@@ -125,29 +134,49 @@
   $("h-q").addEventListener("input", renderRooms);
   $("h-free").addEventListener("change", renderRooms);
 
-  // ---- the monthly charge
-  async function charge(dry) {
+  // ---- the monthly draft (approved by the accounts office: /api/v1/monthly-charges)
+  const STATUS = { DRAFT: "Waiting for accounts", APPROVED: "Approved", DISCARDED: "Sent back" };
+  async function runs() {
+    const r = await VA.fetchJson("/api/v1/monthly-charges?kind=HOSTEL", { quiet: true });
+    $("h-runs").tBodies[0].innerHTML = (r.ok ? r.body : []).slice(0, 12).map(function (x) {
+      return "<tr><td>" + esc(new Date(String(x.month) + "T00:00:00").toLocaleDateString("en-GB", { month: "long", year: "numeric" })) + "</td><td>" + x.students + '</td><td class="num">' + money(x.total) +
+        "</td><td>" + esc(STATUS[x.status] || x.status) + (x.note ? "<small>" + esc(x.note) + "</small>" : "") + "</td></tr>";
+    }).join("") || '<tr><td colspan="4" class="sd-dim">No drafts yet.</td></tr>';
+  }
+  $("h-prepare").addEventListener("click", async function () {
     const m = $("h-month").value;
     if (!m) return VA.toast("Choose the month.", "error");
-    const r = await VA.fetchJson(API + "/charges", json("POST", { month: m + "-01", dry_run: dry }));
-    const note = $("h-charge-note");
-    if (!r.ok) { note.textContent = err(r, "Could not work it out."); $("h-charge").disabled = true; return; }
-    const b = r.body;
-    if (dry) {
-      note.textContent = b.students + " resident(s) to charge, " + money(b.total) + " in all." + (b.already_charged ? " " + b.already_charged + " already charged for this month." : "");
-      $("h-charge").disabled = !b.students;
-    } else {
-      note.textContent = "Added: " + b.students + " resident(s), " + money(b.total) + ". It now shows in each student's dues.";
-      $("h-charge").disabled = true;
-      summary();
-    }
-  }
-  $("h-check").addEventListener("click", function () { charge(true); });
-  $("h-charge").addEventListener("click", async function () {
-    if (!(await VA.confirm("Add the hostel charge for this month to every resident's dues?"))) return;
-    charge(false);
+    const r = await VA.fetchJson("/api/v1/monthly-charges/prepare", json("POST", { kind: "HOSTEL", month: m + "-01" }));
+    if (!r.ok) { $("h-charge-note").textContent = err(r, "Could not prepare it."); return; }
+    $("h-charge-note").textContent = "Draft ready: " + r.body.students + " resident(s), " + money(r.body.total) + ". The accounts office approves it.";
+    runs();
   });
-  $("h-month").addEventListener("change", function () { $("h-charge").disabled = true; $("h-charge-note").textContent = ""; });
+
+  // ---- night roll call
+  async function rollCall() {
+    const r = await VA.fetchJson(API + "/roll-call?day=" + $("h-rc-day").value);
+    if (!r.ok) { $("h-rc-note").textContent = err(r, "Could not load."); return; }
+    const b = r.body;
+    $("h-rc-note").textContent = b.taken ? "Taken. " + b.absent + " absent." : "Not taken yet for this night.";
+    $("h-rc").tBodies[0].innerHTML = b.residents.map(function (x) {
+      const st = x.status || "PRESENT";
+      return '<tr data-id="' + x.student_id + '"><td>' + esc(x.room) + "</td><td>" + esc(x.name) + "<small>" + esc(x.roll_number || "") + "</small></td>" + ["PRESENT", "ABSENT", "LEAVE"].map(function (v) {
+        return '<td><input type="radio" name="rc-' + x.student_id + '" value="' + v + '"' + (st === v ? " checked" : "") + ' aria-label="' + v.toLowerCase() + '"></td>';
+      }).join("") + "</tr>";
+    }).join("") || '<tr><td colspan="5" class="sd-dim">Nobody lives in the hostel on this night.</td></tr>';
+  }
+  $("h-rc-day").addEventListener("change", rollCall);
+  $("h-rc-all").addEventListener("click", function () { $("h-rc").querySelectorAll('input[value="PRESENT"]').forEach(function (i) { i.checked = true; }); });
+  $("h-rc-save").addEventListener("click", async function () {
+    const entries = Array.prototype.map.call($("h-rc").querySelectorAll("tr[data-id]"), function (tr) {
+      const c = tr.querySelector("input:checked");
+      return { student_id: tr.getAttribute("data-id"), status: c ? c.value : "PRESENT" };
+    });
+    const r = await VA.fetchJson(API + "/roll-call", json("POST", { day: $("h-rc-day").value, entries: entries }));
+    if (!r.ok) return VA.toast(err(r, "Not saved."), "error");
+    VA.toast("Roll call saved." + (r.body.absent_reported ? " " + r.body.absent_reported + " absent: their parents were told." : ""));
+    rollCall();
+  });
 
   // ---- history
   let timer = null;
@@ -170,9 +199,10 @@
     const perms = (ev.detail && ev.detail.me && ev.detail.me.permissions) || [];
     canManage = perms.indexOf("hostel.manage") !== -1;
     document.querySelectorAll("[data-manage]").forEach(function (el) { el.hidden = !canManage; });
-    $("h-check").hidden = $("h-charge").hidden = !canManage;
     const now = new Date();
     $("h-month").value = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+    $("h-rc-day").value = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
     loadRooms();
+    if (canManage) { runs(); rollCall(); }
   });
 })();

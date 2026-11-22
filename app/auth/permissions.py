@@ -250,6 +250,10 @@ class Permissions:
     CLINICAL_MANAGE = "clinical.manage"
     # Supervise clinical rotations given to oneself: mark attendance, sign logbook entries (teachers, hospital supervisors).
     CLINICAL_SUPERVISE = "clinical.supervise"
+    # Approve (or discard) a month's draft of hostel / mess / transport charges, adding them to students' dues (accounts office).
+    CHARGES_APPROVE = "charges.approve"
+    # Transport routes, stops, riders, and preparing the monthly transport draft (administration).
+    TRANSPORT_MANAGE = "transport.manage"
     # Parent portal: see one's OWN linked children only.
     PARENT_VIEW = "parent.view"
     # Create/link/unlink a guardian's parent login from a student's record (administration).
@@ -276,6 +280,8 @@ class Permissions:
 # seed script), not editing scattered `if` statements.
 ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
     Roles.ADMIN: (
+        Permissions.CHARGES_APPROVE,
+        Permissions.TRANSPORT_MANAGE,
         Permissions.CLINICAL_MANAGE,
         Permissions.CLINICAL_SUPERVISE,
         Permissions.WARNING_ISSUE,
@@ -407,6 +413,7 @@ ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
         Permissions.APPLICATION_SUBMIT,
     ),
     Roles.ACCOUNTS_OFFICER: (
+        Permissions.CHARGES_APPROVE,   # the month's hostel / mess / transport draft
         Permissions.STUDENT_VIEW,  # read-only, for billing context
         Permissions.FEE_VIEW,
         # NOTE: deliberately NO Permissions.FEE_MANAGE — per approved

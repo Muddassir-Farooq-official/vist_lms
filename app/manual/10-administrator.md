@@ -19,7 +19,8 @@ The administrator sets the institute up and oversees everything. Your menu is gr
 - **University Reg Nos**: the registration number the affiliating university (KMU, AUST …) gives each student. Type them in one by one, or download the class list as CSV, fill the `reg_number` column and upload it (you see every change before it is saved). The Reg No is printed on award lists, admit cards, result cards, the gazette and transcripts, students and parents see it on their profile, and you can search for a student by it. Two students can never share one. **Deadlines** (same page, affiliated programs only): set the last day for one batch term or for every batch of a session. Before it, the administration, the exam office and each student without a Reg No are reminded (once a week, then every day in the last 7 days; students also get an SMS). After it, that student's admit card is held until the Reg No is entered. To let one student's admit card print anyway, press **Exempt…** on the student, write the reason and optionally the last day; revoking keeps the record.
 - **Admissions**: open a round per program and term, take applications (one by one or CSV), verify documents, publish merit lists and admit. Admitting creates the student record, roll number and login.
 - **Employees**: everyone on staff. Open a person to see their record, pay and access, and give them roles (teacher, accounts officer, exam controller and others).
-- **Hostel**: rooms and beds, who lives where, the monthly hostel charge (added to each resident's dues) and the history of stays.
+- **Hostel**: rooms and beds, who lives where, each resident's mess fee (**Mess**), the night roll call, the month's hostel and mess draft for the accounts office, and the history of stays. The default mess fee for new residents is on Settings (Fees & fines → Hostel).
+- **Transport**: routes (vehicle, seats, driver, monthly fee), their stops with pick-up times, and who rides which route (**Give a seat** by roll number; **Stops riding** ends it). **Prepare draft** works out the month's transport fees (part months by days) for the accounts office to approve. Parents and students see the route, stop and pick-up time on their home card.
 - **Profile changes**: students and staff ask to change their contact details and photo. Nothing changes until you approve.
 - **Certificate requests**: certificates students asked for. Approve with the fee (or waive it); the student downloads the certificate once it is paid.
 - **Warnings**: formal warnings to students and staff. A warning counts for 12 months; the 3rd one is final and you decide the action.
@@ -137,6 +138,7 @@ Teachers book make-up classes (for a missed class) and extra classes (for a cour
   4. **Fee structures**: each batch's active fee structures copied to its next batch term as drafts (optionally raised by a %). Nothing is charged until you activate them in Fees.
 ## Fees & accounts, HR, store
 
+- **Monthly charges**: the hostel, mess and transport drafts waiting for approval; see the Accounts office chapter.
 - **Fees**, **Refunds**, **1Bill payments**, **Fines**, **Finance reports**, **Fee defaulters** and **Accounts**: see the Accounts office chapter. Only administrators can allow an admit card despite overdue fees (**Fee defaulters → Allow admit card…**).
 - **Inventory / Store**: what the institute keeps in stock, where every item went and who has it.
 - **Fixed assets**: furniture, computers, equipment, vehicles and buildings, with tag numbers, holders and depreciation.

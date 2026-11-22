@@ -276,6 +276,8 @@ class Settings(BaseSettings):
     phone_alert_vibrate: int = 1
     phone_alert_keep_urgent: int = 1
     notify_family_absence: int = 1          # a student marked absent in a class -> the student and parents (notification, pushed to phones)
+    hostel_mess_fee: float = 0.0            # monthly mess fee given to a new hostel resident (each stay can differ; 0 = no mess)
+    notify_hostel_absence: int = 1          # a resident marked absent at the night roll call -> the student and parents
     notify_family_results: int = 1          # a course result published -> the student and parents (notification, pushed to phones)
     morning_summary: int = 1                # 8 AM Mon-Sat: money, attendance, work waiting, problems to administrators (app/reports/morning.py)
     monthly_report_notice: int = 1          # the 1st of each month: tell the principal last month's report is ready
