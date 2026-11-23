@@ -39,8 +39,11 @@ async def test_leave_proposes_office_confirms_substitute_marks(app_client, admin
     absent = off.assigned_teacher_id
     now = institute_now()
     today = institute_today()
-    start = (datetime.combine(today, now.time()) - timedelta(minutes=5)).time() if now.hour >= 1 else time(0, 0)     # started, inside the marking window
-    end = (datetime.combine(today, now.time()) + timedelta(minutes=40)).time() if now.hour < 23 else time(23, 59)
+    # The class started five minutes ago (inside the 15-minute marking window) and has not ended. Only in the first
+    # minutes after midnight does it start at 00:00 instead, which is still inside the window.
+    minutes = now.hour * 60 + now.minute
+    start = (datetime.combine(today, now.time()) - timedelta(minutes=5)).time() if minutes >= 5 else time(0, 0)
+    end = (datetime.combine(today, now.time()) + timedelta(minutes=40)).time() if minutes < 23 * 60 + 19 else time(23, 59)
     s1 = ClassSession(course_offering_id=off.id, session_date=today, start_time=start, end_time=end, room="R-1", status=ClassSessionStatus.SCHEDULED)
     s2 = ClassSession(course_offering_id=off.id, session_date=today + timedelta(days=1), start_time=time(9), end_time=time(10), room="R-1",
                       status=ClassSessionStatus.SCHEDULED)
