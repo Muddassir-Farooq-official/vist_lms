@@ -631,13 +631,20 @@ window.VistAdmin = (function () {
     fetchJson("/api/v1/decisions/count", { quiet: true }).then(function (r) {
       if (!r.ok || !r.body || !r.body.waiting) return;
       const seg = window.location.pathname.split("/")[2] || "";
+      const n = r.body.waiting;
       const a = document.createElement("a");
       a.id = "decisions-chip";
-      a.className = "role-btn small-btn decisions-chip";
+      // the same round button as the bell on phones; "My decisions" in words beside it on wide screens
+      a.className = "bell-btn decisions-btn";
       a.href = DECISION_PORTALS.indexOf(seg) !== -1 ? "/dashboard/" + seg + "/decisions" : "/dashboard/decisions";
-      a.textContent = "My decisions (" + r.body.waiting + ")";
+      a.setAttribute("aria-label", "My decisions: " + n + " waiting");
       a.title = "Requests waiting for your approval";
-      holder.insertBefore(a, holder.firstChild);
+      a.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9z"/><path d="M9 13l2 2 4-4"/></svg>' +
+        '<span class="decisions-label">My decisions</span><span class="bell-count">' + (n > 99 ? "99+" : n) + "</span>";
+      const bell = holder.querySelector(".bell-btn, #bell-btn");
+      const anchor = bell ? (bell.closest(".bell-wrap") || bell) : null;
+      if (anchor && anchor.parentNode === holder) holder.insertBefore(a, anchor); else holder.insertBefore(a, holder.firstChild);
     });
   }
 
