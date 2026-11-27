@@ -87,6 +87,10 @@ async def send_due(session: AsyncSession, *, time_budget: float = 20) -> dict:
     from app.committees.service import remind_actions
 
     await remind_actions(session)                                        # from 9 AM, once a day per item: committee actions due or overdue; never raises
+    from app.access.service import end_date_round
+
+    async with session.begin_nested():
+        await end_date_round(session)                                    # access given until a date: 2 days' notice, once; never raises
     from app.reports.morning import morning_round
 
     await morning_round(session)                                         # from 8 AM Mon-Sat: the administrators' morning summary; never raises

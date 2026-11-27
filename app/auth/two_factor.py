@@ -84,10 +84,15 @@ def qr_svg(uri: str) -> str:
 
 
 # ---------------------------------------------------------------------------- who is asked
-def required_for(roles: list[str]) -> bool:
+def required_for(roles: list[str], extra: list[str] | tuple = ()) -> bool:
+    """Administrators, and anyone given money or control rights on Settings -> Access control (a custom role, a right
+    added to their role, or their own right), must use two-step sign-in while the setting is on."""
+    from app.access.catalog import SENSITIVE
     from app.auth.permissions import Roles
 
-    return bool(int(getattr(settings, "two_factor_required_for_admins", 1))) and Roles.ADMIN in roles
+    if not int(getattr(settings, "two_factor_required_for_admins", 1)):
+        return False
+    return Roles.ADMIN in roles or bool(set(extra or ()) & SENSITIVE)
 
 
 def _pv(user) -> str:
@@ -211,8 +216,8 @@ async def reset(session: AsyncSession, user, *, actor_id: uuid.UUID | None, how:
                                     metadata={"username": user.username, "how": how})
 
 
-def status(user, roles: list[str]) -> dict:
-    return {"enabled": user.totp_secret_enc is not None, "enabled_at": user.totp_enabled_at, "required": required_for(roles)}
+def status(user, roles: list[str], extra: list[str] | tuple = ()) -> dict:
+    return {"enabled": user.totp_secret_enc is not None, "enabled_at": user.totp_enabled_at, "required": required_for(roles, extra)}
 
 
 def check_setup_secret_valid(secret: str | None) -> str:

@@ -121,8 +121,10 @@ class SecurityWatch:
 
 DEVICE_COOKIE = "vist_device"
 LOGIN_PATH = f"{settings.api_v1_prefix}/auth/login"
-# Portals a student or a parent may open. Anything else under /dashboard/ is someone else's screens.
+# Portals a student or a parent may open. Anything else under /dashboard/ is someone else's screens -- except the
+# shared addresses that send each person on to their OWN page (notification links use them).
 OWN_PORTALS = {"STUDENT": ("student",), "PARENT": ("parent",)}
+SHARED_PAGES = ("my-profile", "my-announcements", "my-committees", "my-warnings", "decisions")
 
 
 def _cookie(headers: dict, name: str) -> str | None:
@@ -152,7 +154,7 @@ def _wrong_portal(scope, headers: dict, status: int) -> str | None:
     if not roles or any(r not in OWN_PORTALS for r in roles):
         return None                                       # staff move between screens as their work needs; the APIs decide
     allowed = {p for r in roles for p in OWN_PORTALS[r]}
-    if portal in allowed or not portal:
+    if portal in allowed or not portal or (portal in SHARED_PAGES and len(parts) == 3):
         return None
     return f"A {'student' if 'STUDENT' in roles else 'parent'} account opened {path[:120]} (the {portal} screens)."
 

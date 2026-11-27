@@ -62,6 +62,7 @@
     if (!r.ok) { msg(errOf(r, "Could not load access control."), "error"); return; }
     data = r.body;
     drawRoles();
+    fillWho();
     const again = keepRole && data.roles.find(function (x) { return x.id === keepRole; });
     if (again) openRole(again.id);
     const copy = $("ac-new-copy");
@@ -132,8 +133,10 @@
         ' &middot; <button type="button" class="link-btn" id="ac-reset">Back to the standard</button></p>';
     }
     if (role.own_use.length) head += '<p class="panel-hint">Also comes with its own-use rights (not changed here): ' + esc(role.own_use.map(label).join(", ")) + ".</p>";
+    head += '<details class="ac-members" id="ac-members"' + (role.people && role.people <= 12 ? " open" : "") + '><summary>People with this role (' + role.people + ')</summary><div id="ac-members-body"><p class="muted">Loading...</p></div></details>';
     box.innerHTML = head + '<div class="ac-mods">' + data.modules.map(function (m) { return moduleRow(m, draft, locked); }).join("") + "</div>" +
       (locked ? "" : '<div class="ac-save"><button type="button" class="role-btn secondary-btn" id="ac-undo-draft">Discard changes</button> <button type="button" class="role-btn" id="ac-save-role">Check and save</button></div>');
+    loadMembers();
     if (locked) return;
     box.querySelectorAll(".ac-mod").forEach(function (row) { wireModule(row, draft, function () { openRoleKeep(); }); });
     $("ac-save-role").addEventListener("click", saveRole);
@@ -159,6 +162,69 @@
     });
   }
   function openRoleKeep() { redraw(); }
+
+  // ------------------------------------------------------------------ a role's people (give it to many at once)
+  async function loadMembers() {
+    const body = $("ac-members-body");
+    if (!body || !role) return;
+    const r = await VA.fetchJson(API + "/roles/" + role.id + "/members", { quiet: true });
+    if (!r.ok) { body.innerHTML = ""; return; }
+    const canGive = !role.own_portal;
+    body.innerHTML = (r.body.length ? '<ul class="ac-member-list">' + r.body.map(function (m) {
+      return "<li><span>" + esc(m.name) + ' <small class="muted">' + esc(m.code) + (m.department ? " &middot; " + esc(m.department) : "") + "</small></span>" +
+        (m.from_job_title ? '<small class="muted">from their job title</small>' : (canGive ? '<button type="button" class="link-btn" data-take="' + esc(m.employee_id) + '">Take away</button>' : "")) + "</li>";
+    }).join("") + "</ul>" : '<p class="muted">Nobody yet.</p>') +
+      (canGive ? '<button type="button" class="role-btn secondary-btn small-btn" id="ac-add-people-btn">Give it to people...</button>' : "");
+    const add = $("ac-add-people-btn");
+    if (add) add.addEventListener("click", openAddPeople);
+    body.querySelectorAll("[data-take]").forEach(function (b) {
+      b.addEventListener("click", async function () {
+        if (!(await VA.confirm("Take the " + role.name + " role from this person?", "Take it away"))) return;
+        const s = await VA.fetchJson(API + "/roles/" + role.id + "/members", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ add: [], remove: [b.getAttribute("data-take")] }) });
+        bulkDone(s);
+      });
+    });
+  }
+  let picked = new Set(), pickTimer = null;
+  function openAddPeople() {
+    picked = new Set();
+    $("ac-add-title").textContent = "Give " + role.name + " to";
+    $("ac-add-q").value = "";
+    $("ac-add-count").textContent = "";
+    $("ac-add-people").showModal();
+    searchPick();
+  }
+  $("ac-add-q").addEventListener("input", function () { clearTimeout(pickTimer); pickTimer = setTimeout(searchPick, 250); });
+  async function searchPick() {
+    const q = $("ac-add-q").value.trim();
+    const r = await VA.fetchJson(API + "/people" + (q ? "?q=" + encodeURIComponent(q) : ""), { quiet: true });
+    if (!r.ok) return;
+    $("ac-add-list").innerHTML = r.body.map(function (p) {
+      const has = p.roles.some(function (x) { return x.code === role.code; });
+      return '<label class="' + (has ? "muted" : "") + '"><input type="checkbox" data-pick="' + esc(p.employee_id) + '"' + (has ? " disabled checked" : picked.has(p.employee_id) ? " checked" : "") + "> " +
+        esc(p.name) + ' <small class="muted">' + esc(p.code) + (p.department ? " &middot; " + esc(p.department) : "") + (has ? " &middot; already has it" : "") + "</small></label>";
+    }).join("") || '<p class="muted">Nobody found.</p>';
+  }
+  $("ac-add-list").addEventListener("change", function (e) {
+    const id = e.target.getAttribute("data-pick");
+    if (!id) return;
+    if (e.target.checked) picked.add(id); else picked.delete(id);
+    $("ac-add-count").textContent = picked.size ? picked.size + " chosen" : "";
+  });
+  $("ac-add-ok").addEventListener("click", async function () {
+    if (!picked.size) return;
+    $("ac-add-people").close();
+    const s = await VA.fetchJson(API + "/roles/" + role.id + "/members", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ add: Array.from(picked), remove: [] }) });
+    bulkDone(s);
+  });
+  function bulkDone(s) {
+    if (!s.ok) { msg(errOf(s, "Could not save."), "error"); return; }
+    const b = s.body, bad = b.results.filter(function (x) { return !x.ok; });
+    msg((b.done ? b.done + " saved. " : "") + (b.waiting ? b.waiting + " waiting for a second administrator. " : "") +
+      (bad.length ? "Not changed: " + bad.map(function (x) { return x.name + " (" + x.message + ")"; }).join("; ") : ""), bad.length ? "error" : "ok");
+    load(role.id);
+    loadHistory();
+  }
   function redraw() {
     // keep the draft, redraw the module rows
     const box = $("ac-role-editor");
@@ -393,6 +459,120 @@
     });
   }
 
+  // ------------------------------------------------------------------ approval rules
+  let ap = null, staff = [];
+  async function loadRules() {
+    const [r, p] = await Promise.all([VA.fetchJson(API + "/approval-rules", { quiet: true }), VA.fetchJson(API + "/people", { quiet: true })]);
+    if (!r.ok) return;
+    ap = r.body;
+    staff = p.ok ? p.body : [];
+    $("ap-try-action").innerHTML = ap.actions.map(function (a) { return '<option value="' + a.key + '">' + esc(a.label) + "</option>"; }).join("");
+    $("ap-try-user").innerHTML = staff.map(function (x) { return '<option value="' + esc(x.user_id) + '">' + esc(x.name) + "</option>"; }).join("");
+    drawRules();
+  }
+  function roleOpts(sel, anyLabel) {
+    return (anyLabel ? '<option value="">' + esc(anyLabel) + "</option>" : "") + ap.roles.map(function (r) {
+      return '<option value="' + esc(r.code) + '"' + (sel === r.code ? " selected" : "") + ">" + esc(r.name) + "</option>";
+    }).join("");
+  }
+  function ruleRow(a, r, i) {
+    const t = r.mode === "NONE" ? "NONE" : (r.approver_type || "DEFAULT");
+    const val = t === "ROLE" ? '<select class="select-input small-input" data-k="role_value">' + roleOpts(r.approver_value) + "</select>" :
+      t === "USER" ? '<select class="select-input small-input" data-k="user_value">' + staff.map(function (x) {
+        return '<option value="' + esc(x.user_id) + '"' + (String(r.approver_value) === String(x.user_id) ? " selected" : "") + ">" + esc(x.name) + "</option>"; }).join("") + "</select>" : "";
+    return '<tr data-i="' + i + '"><td><select class="select-input small-input" data-k="requester_role">' + roleOpts(r.requester_role, "Anyone") + "</select></td>" +
+      (a.amount ? '<td><input class="text-input small-input" type="number" min="0" step="1" data-k="min_amount" value="' + (r.min_amount == null ? "" : r.min_amount) + '" placeholder="any amount"></td>' : "") +
+      '<td><select class="select-input small-input" data-k="type">' +
+      (a.allow_none ? '<option value="NONE"' + (t === "NONE" ? " selected" : "") + ">No approval needed</option>" : "") +
+      a.approvers.map(function (x) { return '<option value="' + x + '"' + (t === x ? " selected" : "") + ">" + esc(x === "DEFAULT" ? "Approved as now (" + a.default_text + ")" : ap.approver_labels[x]) + "</option>"; }).join("") +
+      "</select> " + val + '</td><td><button type="button" class="link-btn" data-del>Remove</button></td></tr>';
+  }
+  function drawRules() {
+    const groups = {};
+    ap.actions.forEach(function (a) { (groups[a.group] = groups[a.group] || []).push(a); });
+    $("ap-actions").innerHTML = Object.keys(groups).map(function (g) {
+      return '<h3 class="ac-h3">' + esc(g) + "</h3>" + groups[g].map(function (a) {
+        return '<div class="sh-card ap-card" data-action="' + a.key + '"><div class="ac-ed-head"><div><strong>' + esc(a.label) + "</strong><small class=\"muted\"> " + esc(a.about) +
+          "</small><p class=\"panel-hint\">Without rules: " + esc(a.default_text) + ".</p></div>" + (a.amount ? '<span class="ac-tag" title="Rules about money wait for a second administrator">2nd admin</span>' : "") + "</div>" +
+          '<div class="table-scroll"><table class="dash-table ap-rules"><thead><tr><th>When asked by</th>' + (a.amount ? "<th>From amount (Rs.)</th>" : "") +
+          "<th>Then</th><th></th></tr></thead><tbody>" + a.rules.map(function (r, i) { return ruleRow(a, r, i); }).join("") + "</tbody></table></div>" +
+          (a.rules.length ? "" : '<p class="muted ap-none">No rules: works as the system does now.</p>') +
+          '<div class="ac-save"><button type="button" class="role-btn secondary-btn small-btn" data-add>Add a rule</button> <button type="button" class="role-btn small-btn" data-save>Save</button></div></div>';
+      }).join("");
+    }).join("");
+  }
+  function readCard(card) {
+    const a = ap.actions.find(function (x) { return x.key === card.getAttribute("data-action"); });
+    return Array.prototype.map.call(card.querySelectorAll("tbody tr"), function (tr) {
+      const get = function (k) { const el = tr.querySelector('[data-k="' + k + '"]'); return el ? el.value : null; };
+      const t = get("type");
+      return { requester_role: get("requester_role") || null, min_amount: a.amount && get("min_amount") !== "" ? Number(get("min_amount")) : null,
+        mode: t === "NONE" ? "NONE" : "APPROVE", approver_type: t === "NONE" ? null : t,
+        approver_value: t === "ROLE" ? get("role_value") : t === "USER" ? get("user_value") : null };
+    });
+  }
+  $("ap-actions").addEventListener("change", function (e) {
+    if (e.target.getAttribute("data-k") !== "type") return;
+    const card = e.target.closest("[data-action]"), a = ap.actions.find(function (x) { return x.key === card.getAttribute("data-action"); });
+    a.rules = readCard(card);
+    drawRules();
+  });
+  $("ap-actions").addEventListener("click", async function (e) {
+    const card = e.target.closest("[data-action]");
+    if (!card) return;
+    const a = ap.actions.find(function (x) { return x.key === card.getAttribute("data-action"); });
+    if (e.target.closest("[data-add]")) {
+      a.rules = readCard(card).concat([{ requester_role: null, min_amount: null, mode: "APPROVE", approver_type: "ROLE", approver_value: (ap.roles[0] || {}).code }]);
+      drawRules();
+    } else if (e.target.closest("[data-del]")) {
+      const i = +e.target.closest("tr").getAttribute("data-i");
+      a.rules = readCard(card); a.rules.splice(i, 1);
+      drawRules();
+    } else if (e.target.closest("[data-save]")) {
+      const rules = readCard(card);
+      if (!(await VA.confirm("Save who approves " + a.label + "? It applies to new requests and to those still waiting.", "Save"))) return;
+      const r = await VA.fetchJson(API + "/approval-rules/" + a.key, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rules: rules }) });
+      if (done(r, "Approvals for " + a.label)) { loadRules(); loadHistory(); loadWaiting(); }
+    }
+  });
+  $("ap-try-btn").addEventListener("click", async function () {
+    const amt = $("ap-try-amount").value;
+    const r = await VA.fetchJson(API + "/approval-rules/" + $("ap-try-action").value + "/try", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: $("ap-try-user").value, amount: amt === "" ? null : Number(amt) }) });
+    $("ap-try-out").textContent = r.ok ? (r.body.no_approval ? "No approval needed." : "Decided by: " + r.body.text + (r.body.people.length ? " (" + r.body.people.join(", ") + ")" : "") +
+      (r.body.note ? " " + r.body.note : "")) : errOf(r, "Could not check.");
+  });
+
+  // ------------------------------------------------------------------ who can do this?
+  function fillWho() {
+    const sel = $("ac-who-code");
+    if (sel.options.length) return;
+    sel.innerHTML = '<option value="">Choose a right...</option>' + data.modules.map(function (m) {
+      const rights = [].concat(m.levels.view, m.levels.edit, m.levels.approve);
+      return '<optgroup label="' + esc(m.label) + '">' + rights.map(function (c) { return '<option value="' + esc(c.code) + '">' + esc(c.label) + "</option>"; }).join("") + "</optgroup>";
+    }).join("") + '<optgroup label="Administrator only">' + data.locked.map(function (c) { return '<option value="' + esc(c) + '">' + esc(label(c)) + "</option>"; }).join("") + "</optgroup>";
+  }
+  $("ac-who-code").addEventListener("change", async function () {
+    const code = $("ac-who-code").value;
+    if (!code) { $("ac-who").innerHTML = ""; $("ac-who-sum").textContent = ""; return; }
+    const r = await VA.fetchJson(API + "/who?code=" + encodeURIComponent(code));
+    if (!r.ok) { msg(errOf(r, "Could not look it up."), "error"); return; }
+    $("ac-who-sum").textContent = r.body.count + (r.body.count === 1 ? " person can " : " people can ") + r.body.label.toLowerCase() + "." +
+      (r.body.sensitive ? " (A money or control right.)" : "");
+    $("ac-who").innerHTML = r.body.people.map(function (p) {
+      const through = [].concat(p.roles.map(function (x) { return "role: " + x; }),
+        p.own ? [(p.own.effect === "GRANT" ? "own right" : "taken away") + (p.own.until ? " until " + p.own.until : "")] : []);
+      return "<tr" + (p.has_it ? "" : ' class="muted"') + '><td><button type="button" class="link-btn" data-open-user="' + esc(p.user_id) + '">' + esc(p.name) + "</button></td><td>" +
+        esc(p.department || "") + "</td><td>" + (p.has_it ? "Yes" : "No") + "</td><td>" + esc(through.join("; ")) + "</td></tr>";
+    }).join("") || '<tr><td colspan="4" class="muted">Nobody.</td></tr>';
+  });
+  $("ac-who").addEventListener("click", function (e) {
+    const b = e.target.closest("[data-open-user]");
+    if (!b) return;
+    VA.showTab("people");
+    openPerson(b.getAttribute("data-open-user"));
+  });
+
   // ------------------------------------------------------------------ waiting and history
   async function loadWaiting() {
     const r = await VA.fetchJson(API + "/waiting", { quiet: true });
@@ -443,6 +623,7 @@
     load();
     loadPeople();
     loadHistory();
+    loadRules();
     const want = new URLSearchParams(location.search).get("user");
     if (want) { VA.showTab("people"); openPerson(want); }
   }, { once: true });

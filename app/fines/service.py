@@ -192,6 +192,11 @@ class FineService:
             raise ResourceNotFoundError(f"{payer_type.value.title()} not found.")
 
         auto_approved = Roles.ADMIN in actor_roles
+        from app.approvals import rules
+
+        ctx = {"department": await rules.department_of(self.session, actor_id)}
+        res = await rules.effective(self.session, "FINE_REQUEST", requester_id=actor_id, amount=amount, ctx=ctx)
+        by_rule = not auto_approved and res.no_approval          # approval rule: no approval needed for this amount
         if not auto_approved:
             allowed_source = default_source_for_roles(actor_roles)
             if source != allowed_source:
@@ -199,6 +204,7 @@ class FineService:
                     f"Your role may only request {allowed_source.value.title()} fines, not {source.value.title()}."
                 )
 
+        auto_approved = auto_approved or by_rule
         now = datetime.now(UTC)
         fine = Fine(
             payer_type=payer_type,
@@ -227,6 +233,12 @@ class FineService:
             },
         )
 
+        if by_rule:
+            await rules.log_no_approval(self.session, "FINE_REQUEST", actor_id=actor_id, entity_type="fine", entity_id=fine.id,
+                                        summary=f"Fine Rs. {amount:,.2f}: {reason.strip()}")
+        elif not auto_approved and not res.default:
+            await rules.tell_approvers(self.session, res, requester_id=actor_id, ctx=ctx, title="Fine to approve",
+                                       message=f"Rs. {amount:,.2f}: {reason.strip()}")
         if auto_approved:
             # Same "the payer finds out now" behavior as issue() —
             # an admin's own request needed no one else's approval.

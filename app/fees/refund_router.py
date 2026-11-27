@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from app.auth.permissions import Permissions
 from app.auth.schemas import CurrentUser
 from app.core.database import get_db
-from app.core.dependencies import require_permission
+from app.core.dependencies import get_current_user, require_permission
 from app.fees import refund_models as _models  # noqa: F401  (registers the table)
 from app.fees.models import PaymentMethod
 from app.fees.refund_models import RefundKind, RefundStatus
@@ -63,7 +63,10 @@ async def request(payload: RefundIn, current_user: CurrentUser = Depends(staff),
 
 
 @router.post("/{refund_id}/decision", summary="Approve or reject a refund (administrator who did not request it)")
-async def decide(refund_id: uuid.UUID, payload: DecisionIn, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
+async def decide(refund_id: uuid.UUID, payload: DecisionIn, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    from app.approvals.inbox import check
+
+    await check(db, "REFUND", current_user, refund_id)           # fee.refund.approve as always, or whom a rule names
     return _out(await RefundService(db).decide(refund_id, approve=payload.approve, note=payload.note, actor_id=current_user.id))
 
 

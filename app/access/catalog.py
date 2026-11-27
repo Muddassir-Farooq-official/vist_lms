@@ -125,6 +125,11 @@ LABELS: dict[str, str] = {
     P.REPORTS_VIEW: "Reports", P.INSTITUTE_OVERVIEW: "Institute overview", P.AUDIT_VIEW: "Activity log", P.AUDIT_EXPORT: "Download the activity log",
     P.INSTITUTE_PROFILE_MANAGE: "Institute details and logo", P.POLICY_MANAGE: "Rules (Settings)", P.BACKUP_MANAGE: "Backups", P.SYSTEM_HEALTH: "Server health and tools",
     P.ROLE_MANAGE: "Access control", P.VIEW_AS: "View as a person",
+    # own use (come with the built-in roles; not handed out)
+    P.APPLICATION_SUBMIT: "Send applications", P.ENROLLMENT_SELF: "Enrol themselves", P.ASSIGNMENT_SUBMIT: "Hand in assignments",
+    P.ASSIGNMENT_MANAGE: "Set assignments (own classes)", P.ALUMNI_SELF: "Own alumni record", P.COMPLAINT_SUBMIT: "Make complaints",
+    P.TASK_USE: "Own tasks", P.LIBRARY_REQUEST: "Ask to borrow books", P.FINE_REQUEST: "Ask for a fine", P.PURCHASE_REQUEST: "Purchase requests",
+    P.PARENT_VIEW: "Their children's records", P.STUDENT_VIEW: "Students in their own classes / own record",
 }
 
 GRANTABLE = frozenset(c for m in MODULES for lvl in ("view", "edit", "approve") for c in m[lvl]) - LOCKED - OWN_USE

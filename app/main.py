@@ -796,9 +796,11 @@ from app.feedback.router import router as feedback_router  # noqa: E402
 app.include_router(feedback_router, prefix=settings.api_v1_prefix)
 from app.onboarding.router import router as onboarding_router  # noqa: E402
 from app.access.router import router as access_router  # noqa: E402
+from app.approvals.inbox_router import router as decisions_router  # noqa: E402
 
 app.include_router(onboarding_router, prefix=settings.api_v1_prefix)
 app.include_router(access_router, prefix=settings.api_v1_prefix)
+app.include_router(decisions_router, prefix=settings.api_v1_prefix)
 from app.fees.onebill_router import report_router as onebill_report_router, router as onebill_router  # noqa: E402
 
 app.include_router(onebill_router, prefix=settings.api_v1_prefix)
@@ -1071,6 +1073,39 @@ async def calendar_page(portal: str, request: Request):
     base, nav, roles = _CALENDAR_PAGES[portal]
     return templates.TemplateResponse(request, "shared/calendar.html", {"base_template": base, "nav_items": globals()[nav], "active_nav": "calendar",
                                                                        "allowed_roles": roles})
+
+
+@app.get("/dashboard/decisions", include_in_schema=False)
+async def decisions_home(request: Request):
+    """Notification links land here: sent on to My decisions in the person's own portal."""
+    from fastapi.responses import RedirectResponse
+
+    from app.auth.redirects import home_for_roles
+    from app.core.security import decode_access_token
+
+    roles = []
+    try:
+        roles = decode_access_token(request.cookies.get("access_token") or "").get("roles", [])
+    except Exception:  # noqa: BLE001 - not signed in: the page itself asks to sign in
+        pass
+    home = home_for_roles(roles) or "/dashboard/admin"
+    portal = {"/dashboard/exam/home": "exam", "/dashboard/warden/home": "warden", "/dashboard/gate/home": "gate"}.get(home, home.rstrip("/").split("/")[-1])
+    if portal not in _DECISION_PORTALS:
+        portal = "admin"
+    return RedirectResponse(f"/dashboard/{portal}/decisions", status_code=303)
+
+
+_DECISION_PORTALS = ("admin", "accounts", "library", "gate", "exam", "warden", "faculty", "principal", "hod", "staff", "clinical")
+
+
+@app.get("/dashboard/{portal}/decisions", include_in_schema=False)
+async def decisions_page(portal: str, request: Request):
+    """My decisions in any staff portal (app/approvals/inbox.py)."""
+    if portal not in _DECISION_PORTALS:
+        raise HTTPException(status_code=404)
+    base, nav, roles = _CALENDAR_PAGES[portal]
+    return templates.TemplateResponse(request, "shared/decisions.html", {"base_template": base, "nav_items": globals()[nav], "active_nav": "decisions",
+                                                                        "allowed_roles": roles})
 
 
 _COMMITTEE_PORTALS = ("admin", "library", "gate", "staff", "principal", "hod", "exam", "warden", "accounts", "faculty")

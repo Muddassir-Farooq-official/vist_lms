@@ -134,6 +134,21 @@ async def publish_preview(draft_id: uuid.UUID, from_date: date = Query(...), cur
 async def publish(draft_id: uuid.UUID, payload: PublishIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
     _no_view_as(current_user)
     notify = {x for x in payload.notify if x in ("teachers", "students", "parents")}
+    # Approval rule (Access control -> Approvals): if publishing needs someone's approval, it waits for them
+    # (My decisions); without a rule it is published at once, as always.
+    from app.approvals import rules
+    from app.approvals.service import gate, pending_response
+
+    res = await rules.effective(db, "TIMETABLE_PUBLISH", requester_id=current_user.id,
+                                ctx={"department": await rules.department_of(db, current_user.id)})
+    if not (res.default or res.no_approval):
+        r = await gate(db, kind="TIMETABLE_PUBLISH", actor_id=current_user.id, target_id=draft_id,
+                       payload={"draft_id": str(draft_id), "from_date": payload.from_date.isoformat(), "notify": sorted(notify)},
+                       summary=f"Publish a new timetable from {payload.from_date:%d %b %Y}")
+        if r is not None:
+            out = pending_response(r)
+            out["message"] = f"Sent for approval ({res.text}). The timetable is published when they approve."
+            return out
     return await SmartTimetableService(db).publish(draft_id, from_date=payload.from_date, notify=notify, actor_id=current_user.id)
 
 

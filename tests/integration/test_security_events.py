@@ -141,3 +141,17 @@ async def test_a_student_opening_the_administration_pages_is_flagged(app_client,
     assert (await app_client.get("/dashboard/faculty")).status_code == 200
     rows = (await db_session.execute(select(SecurityEvent).where(SecurityEvent.kind == "WRONG_PORTAL"))).scalars().all()
     assert len(rows) == 2 and "student account opened /dashboard/admin/students" in rows[0].detail.replace("A student", "student")
+
+
+async def test_shared_pages_that_send_a_student_to_their_own_screen_are_not_flagged(app_client, admin_user, db_session):
+    """Notification links like /dashboard/my-profile forward each person to their own page: not a wrong portal."""
+    from tests.integration.test_fees import _create_and_activate_student
+
+    await _create_and_activate_student(app_client, cnic="79001-0000003-3")
+    for path in ("/dashboard/my-profile", "/dashboard/my-announcements", "/dashboard/my-warnings", "/dashboard/my-committees", "/dashboard/decisions"):
+        await app_client.get(path, follow_redirects=False)
+    rows = (await db_session.execute(select(SecurityEvent).where(SecurityEvent.kind == "WRONG_PORTAL"))).scalars().all()
+    assert rows == []
+    await app_client.get("/dashboard/my-profile/../admin", follow_redirects=False)       # not a way around it
+    await app_client.get("/dashboard/admin/students")
+    assert len((await db_session.execute(select(SecurityEvent).where(SecurityEvent.kind == "WRONG_PORTAL"))).scalars().all()) >= 1

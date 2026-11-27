@@ -206,6 +206,7 @@
     ok.disabled = false; ok.textContent = "Publish";
     if (!r.ok) { $("st-pub-err").textContent = msg(r, "Could not publish."); $("st-pub-err").hidden = false; return; }
     $("st-pub").close();
+    if (r.body.pending_approval) { VA.toast(r.body.message || "Sent for approval.", "success"); return; }
     const t = r.body.told || {};
     VA.toast("Published. " + r.body.class_sessions_created + " classes created" + (Object.keys(t).length ? "; told " + Object.keys(t).map(function (k) { return t[k] + " " + k; }).join(", ") : "") + ".");
     const v = await VA.fetchJson(API + "/drafts/" + draft.id);

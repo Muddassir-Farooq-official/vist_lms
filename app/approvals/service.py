@@ -28,6 +28,7 @@ LABELS = {
     "CLASS_REQUEST": "Make-up or extra class",
     "PAYMENT_MOVE": "Move a payment to the right fee",
     "ACCESS_CHANGE": "Access change (second administrator)",
+    "TIMETABLE_PUBLISH": "Publish a timetable",
 }
 # Confirmed on Settings -> Access control by another administrator, not on the Approvals page.
 HIDDEN_KINDS = ("ACCESS_CHANGE",)
@@ -63,8 +64,16 @@ async def other_approvers(session: AsyncSession, actor_id) -> int:
 
 async def gate(session: AsyncSession, *, kind: str, actor_id, target_id=None, payload: dict, summary: str, amount=None,
                reason: str | None = None) -> ApprovalRequest | None:
-    """None = go ahead now (nobody else can approve; logged as a sole-approver decision). Otherwise the stored request."""
-    if await other_approvers(session, actor_id) == 0:
+    """None = go ahead now (no approval needed by a rule, or nobody else can approve; logged either way). Otherwise the
+    stored request. Who approves follows the approval rules (app/approvals/rules.py); without a rule, as always."""
+    from app.approvals import rules
+
+    res = await rules.effective(session, kind, requester_id=actor_id, amount=amount,
+                                ctx={"department": await rules.department_of(session, actor_id)}) if kind in rules.BY_KEY else rules.Resolution()
+    if res.no_approval:
+        await rules.log_no_approval(session, kind, actor_id=actor_id, entity_type="approval", entity_id=target_id, summary=summary)
+        return None
+    if res.default and await other_approvers(session, actor_id) == 0:
         await AuditService(session).log(actor_user_id=actor_id, action="approval.sole_approver", entity_type="approval", entity_id=target_id,
                                         metadata={"kind": kind, "summary": summary[:300]})
         return None
@@ -79,7 +88,11 @@ async def gate(session: AsyncSession, *, kind: str, actor_id, target_id=None, pa
     await session.flush()
     await AuditService(session).log(actor_user_id=actor_id, action="approval.requested", entity_type="approval_request", entity_id=r.id,
                                     metadata={"kind": kind, "summary": r.summary, "amount": str(amount) if amount is not None else None})
-    await _notify_approvers(session, r, actor_id)
+    if res.default:
+        await _notify_approvers(session, r, actor_id)
+    else:
+        await rules.tell_approvers(session, res, requester_id=actor_id, ctx={"department": await rules.department_of(session, actor_id)},
+                                   title=f"Approval needed: {LABELS.get(kind, kind)}", message=r.summary)
     return r
 
 
@@ -121,13 +134,32 @@ class ApprovalService:
             raise ResourceNotFoundError("Approval request not found.")
         return r
 
-    async def decide(self, request_id, *, approve: bool, note: str | None, actor_id) -> ApprovalRequest:
+    async def decide(self, request_id, *, approve: bool, note: str | None, actor_id, user=None) -> ApprovalRequest:
         from app.core.controls import four_eyes
 
         r = await self._get(request_id, lock=True)
         if r.status != "REQUESTED":
             raise BusinessRuleViolationError(f"This request is already {r.status.lower()}.")
-        if r.kind in HIDDEN_KINDS:
+        named = None
+        if r.kind not in HIDDEN_KINDS:
+            from app.approvals import rules
+
+            if r.kind in rules.BY_KEY:
+                named = await rules.effective(self.session, r.kind, requester_id=r.requested_by, amount=r.amount,
+                                              ctx={"department": await rules.department_of(self.session, r.requested_by)})
+                named = None if named.default or named.no_approval else named
+        if named is not None:
+            # a rule names who decides: them (or an Administrator), never the one who asked
+            from app.approvals import rules
+            from app.core.exceptions import AuthorizationError
+
+            if user is None:
+                raise AuthorizationError("Decide this from My decisions or the Approvals page.")
+            await rules.check_decider(self.session, r.kind, user, requester_id=r.requested_by, amount=r.amount,
+                                      ctx={"department": await rules.department_of(self.session, r.requested_by)},
+                                      default_ok=Permissions.APPROVALS_DECIDE in (user.permissions or []))
+            sole = False
+        elif r.kind in HIDDEN_KINDS:
             # an access change is confirmed only by ANOTHER administrator (never the one who asked, even if alone now)
             from app.access.resolve import effective
 
@@ -138,6 +170,10 @@ class ApprovalService:
                 raise BusinessRuleViolationError("You asked for this change; another administrator must confirm it.")
             sole = False
         else:
+            if user is not None and Permissions.APPROVALS_DECIDE not in (user.permissions or []):
+                from app.core.exceptions import AuthorizationError
+
+                raise AuthorizationError("Missing required permission: approvals.decide")
             sole = await four_eyes(self.session, actor_id, [r.requested_by], Permissions.APPROVALS_DECIDE,
                                    "You asked for this; another administrator must approve or reject it.")
         note = (note or "").strip() or None
@@ -276,3 +312,14 @@ async def _access_change(session: AsyncSession, r: ApprovalRequest, actor_id) ->
     from app.access.service import AccessService
 
     return await AccessService(session).apply_confirmed(r.payload, actor_id=actor_id, approval_id=r.id, requested_by=r.requested_by)
+
+
+@executor("TIMETABLE_PUBLISH")
+async def _timetable_publish(session: AsyncSession, r: ApprovalRequest, actor_id) -> dict:
+    from app.timetabling.service import SmartTimetableService
+
+    p = r.payload
+    out = await SmartTimetableService(session).publish(uuid.UUID(p["draft_id"]), from_date=date.fromisoformat(p["from_date"]),
+                                                       notify=set(p.get("notify") or []), actor_id=r.requested_by or actor_id)
+    return {"class_sessions_created": out.get("class_sessions_created") if isinstance(out, dict) else None}
+
