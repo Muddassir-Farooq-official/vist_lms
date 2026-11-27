@@ -143,8 +143,8 @@ class EmployeeCreateRequest(BaseModel):
     department: str | None = Field(default=None, max_length=100)
     job_role_id: uuid.UUID
     base_salary: float = Field(default=0, ge=0)    # 0 / left out = not decided yet; set it later with "Set basic salary"
-    # Admin sets this directly per the approved decision — no fixed
-    # institution-wide default for staff the way students have vertex123.
+    # Admin sets this directly per the approved decision — no shared default password for staff
+    # (students get their own random first password too).
     password: str = Field(min_length=10, max_length=256)
 
     # Profile — all optional at creation time (an employee can exist and
@@ -456,7 +456,7 @@ class EmployeeStatusChangeRequest(BaseModel):
 
 
 class EmployeePasswordResetRequest(BaseModel):
-    """Unlike students (fixed vertex123 default), employee passwords are
+    """Unlike students (a random first password each), employee passwords are
     admin-set per person at creation — so 'reset' here means the admin
     chooses a new password directly, not a reset to some shared default
     that doesn't exist for this role."""

@@ -1593,7 +1593,9 @@ async def my_timetable_calendar(
     today = institute_today()
     horizon = today + timedelta(days=120)
     events = [_event_from_entry(e) for e in entries if today <= e.session_date <= horizon]
-    return _ics_response(events, "my-timetable.ics", "My VIST timetable")
+    from app.core import brand as _brand
+
+    return _ics_response(events, "my-timetable.ics", f"My {_brand.short_name()} timetable")
 
 
 @router.get(

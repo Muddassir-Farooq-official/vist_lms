@@ -51,7 +51,7 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def _probe(url: str) -> str:
-    request = urllib.request.Request(url, method="GET", headers={"User-Agent": "Mozilla/5.0 (VIST-LMS link check)"})
+    request = urllib.request.Request(url, method="GET", headers={"User-Agent": "Mozilla/5.0 (LMS link check)"})
     opener = urllib.request.build_opener(_NoRedirect)
     try:
         with opener.open(request, timeout=4) as response:

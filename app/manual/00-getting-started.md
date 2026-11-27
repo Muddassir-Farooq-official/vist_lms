@@ -1,6 +1,6 @@
 # Getting started
 
-VIST LMS is one portal for the whole institute. Administrators, the accounts office, the exam department, teachers, students, parents, the library, the hostel, the gate and general staff each sign in to their own part of it and see only what their job needs.
+This portal is one place for the whole institute. Administrators, the accounts office, the exam department, teachers, students, parents, the library, the hostel, the gate and general staff each sign in to their own part of it and see only what their job needs.
 
 ## Signing in
 
@@ -33,6 +33,7 @@ Forgot your password? Press **Forgot password** on the sign-in page and follow t
   - **Students**: fees due or overdue, assignments due in the next 3 days, and important notices not yet read.
   - **Parents**: their children's fees due.
 - **Complete your profile**: your profile page shows a checklist of what is missing (photo, contact details, guardian or emergency contact, blood group, copies of your CNIC and certificates). Anything you sent for the office to approve already counts. You have 7 days. After that, while it is still incomplete, your profile page opens first after you sign in; the menu still works.
+- **First run** (a brand-new institute): the first administrator to open the dashboard gets a short wizard: the institute's name and contact details, its logo and colour, and what kind of institute it is (university, affiliated college or school). Everything in it can be changed later in Settings. **Skip for now** leaves it until the next sign-in.
 - **Set up your LMS** (administrators): the dashboard shows the steps to start, in order. They are institute details, programs, academic terms, courses and curriculum, staff, salaries, students, course sections with teachers, periods and rooms, the timetable, and fees. Each step ticks itself when it is done. **Do it** opens the page, and **Show me how** opens it with its tour. **Hide for 7 days** hides the list.
 
 ## Good habits

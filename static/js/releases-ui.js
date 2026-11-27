@@ -132,6 +132,8 @@
     try { seen = localStorage.getItem(SEEN_KEY); } catch (e) { return; }
     if (seen === current) return;
     function done() { try { localStorage.setItem(SEEN_KEY, current); } catch (e) { /* ignore */ } }
+    // a brand-new institute's first-run wizard: nothing is "new" to them yet, so no popup now or later for this version
+    if (location.pathname.replace(/\/+$/, "") === "/dashboard/admin/welcome") { done(); return; }
     fetch("/api/v1/system/version", { credentials: "include", headers: { Accept: "application/json" } })
       .then(function (r) { if (!r.ok) throw r.status; return r.json(); })
       .then(function (v) {

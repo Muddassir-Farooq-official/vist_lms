@@ -125,8 +125,14 @@ If any step 1-7 fails, **everything it made is removed again** (database, user, 
 cause and run the same command again. Vertex and the other institutes are never touched.
 
 At the end it shows the **first login** (address, `admin`, a random password) once. Give it only to that institute's
-administrator; they must choose a new password at first login, then set the institute name, logo, fees and SMS in
-Settings.
+administrator; they must choose a new password at first login. Their first visit to the dashboard opens a short
+**first-run wizard**: the institute's name and contact details, its logo and colour, and what kind of institute it is
+(university, affiliated college or school). Then **Set up your LMS** on the dashboard takes them through the rest
+(term, programs, staff, students, courses, timetable), each step with a *Show me how* tour.
+
+The new institute shows **only its own name**: pages, documents, SMS, the installed app, two-factor codes, calendar
+feeds and asset tags all use the name you gave (and whatever they change it to in Settings). Students each get their
+own random first password, so there is no shared default to change.
 
 **If it says "The app cannot log in to lms_abc"**: PostgreSQL only accepts the users it was told about. Open
 `/etc/postgresql/*/main/pg_hba.conf`, find the line that lets Vertex's user in from `172.16.0.0/12` (or similar),
@@ -144,6 +150,26 @@ then `systemctl reload postgresql` and run the `add` command again.
 ```bash
 bash /opt/vist-lms/scripts/server/sites.sh https abc
 ```
+
+## A demo site, to show an institute before it signs up
+
+```bash
+bash /opt/vist-lms/scripts/server/sites.sh add-demo abc "ABC College of Nursing"
+```
+
+makes **demoabc** at `https://demo-abc.<server-ip>.sslip.io`: the same steps as `add` (its own database, user, secrets
+and port; Vertex and the others are never touched), plus
+
+- sample data: a current term, two programs (BS Computer Science, BBA), seven first-semester courses, rooms, periods,
+  three teachers with a weekly timetable, an accounts officer, a librarian and twenty students enrolled in their
+  courses;
+- a **"Demo site – sample data"** ribbon on every page;
+- **no backups** (nothing real is kept there; the nightly backups skip it).
+
+It prints the admin login (random, keep it to yourself) and the sample logins (password `Demo@12345`) for showing
+each portal. When the institute signs up, make its real site with `add` (it starts empty: never copy the demo's data)
+and switch the demo off with `sites.sh disable demoabc`, or remove it as in *Removing an institute for good*.
+Demo sites need about the same memory as a real one, so switch them off when not in use.
 
 ## Moving an institute to its official domain later
 

@@ -4411,3 +4411,23 @@ details.tg-session > summary.tg-head { cursor: pointer; }
 .og-steps .og-acts, .og-steps .og-done { float: right; display: inline-flex; gap: 8px; align-items: center; }
 .og-steps .og-done { color: var(--success); font-weight: 600; }
 @media (max-width: 640px) { .og-steps li > div { max-width: 100%; display: block; } .og-steps .og-acts, .og-steps .og-done { float: none; margin-top: 6px; } }
+
+/* First-run wizard (templates/admin/welcome.html) */
+.wz-card { max-width: 760px; }
+.wz-dots { display: flex; gap: 8px; flex-wrap: wrap; list-style: none; padding: 0; margin: 0 0 18px; counter-reset: wz; }
+.wz-dots li { counter-increment: wz; font-size: 13px; color: var(--muted, #6b7280); padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border, #e5e7eb); }
+.wz-dots li::before { content: counter(wz) ". "; }
+.wz-dots li.now { color: #fff; background: var(--blue-600, #1d4ed8); border-color: transparent; font-weight: 600; }
+.wz-dots li.done { color: var(--success, #047857); }
+.wz-actions { display: flex; align-items: center; gap: 8px; margin-top: 18px; }
+.wz-spacer { flex: 1; }
+.wz-logo { display: flex; align-items: center; gap: 16px; margin: 10px 0; }
+.wz-logo img { width: 72px; height: 72px; object-fit: contain; border: 1px solid var(--border, #e5e7eb); border-radius: 8px; background: #fff; }
+.wz-swatches { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 8px; }
+.wz-swatch { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+.wz-swatch.on { outline: 3px solid var(--border-strong, #111); outline-offset: 2px; }
+.wz-kind { display: grid; gap: 10px; border: 0; padding: 0; }
+.wz-kind label { display: block; padding: 10px 12px; border: 1px solid var(--border, #e5e7eb); border-radius: 8px; cursor: pointer; }
+.wz-kind label small { display: block; margin: 4px 0 0 24px; color: var(--muted, #6b7280); }
+.wz-kind label:has(input:checked) { border-color: var(--blue-600, #1d4ed8); background: var(--blue-50, #eff6ff); }
+.wz-card #wz-color { max-width: 140px; }

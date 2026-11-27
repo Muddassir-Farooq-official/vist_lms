@@ -106,6 +106,7 @@
 
   function autoTour() {
     if (document.getElementById("tw-tour-btn")) return;            // that page starts its own
+    if (path === "/dashboard/admin/welcome") return;                 // the first-run wizard explains itself
     if (!params.get("tour") && store.get(seenKey())) return;
     setTimeout(tour, 1500);        // after the page has drawn and any message that opens with it (the tour waits for it to close)
   }
@@ -165,6 +166,17 @@
   function sessionHidden() { try { return sessionStorage.getItem("vist.og.later") === "1"; } catch (e) { return false; } }
 
   // ------------------------------------------------------------------ the administrator's setup checklist
+  // A brand-new institute (nothing in Settings -> Institute, no programs or students): its administrator goes to the
+  // short first-run wizard once per sign-in, unless they chose "Skip for now".
+  async function firstRun() {
+    if (path !== "/dashboard/admin" || me.viewing_as_by) return false;
+    try { if (sessionStorage.getItem("vist.firstrun.skip")) return false; } catch (e) { /* private mode */ }
+    const r = await VA.fetchJson("/api/v1/onboarding/first-run", { quiet: true });
+    if (!r.ok || !r.body.needed) return false;
+    location.replace("/dashboard/admin/welcome");
+    return true;
+  }
+
   async function setup() {
     if (path !== "/dashboard/admin" || (me.roles || []).indexOf("ADMIN") === -1) return;
     const until = Number(store.get("vist.og.setup.hidden") || 0);
@@ -193,7 +205,10 @@
     if (!document.querySelector(".content-main")) return;
     if (!window.VIST_TOURS) await load("/static/js/tours.js");
     tourButton();
-    if ((me.roles || []).indexOf("ADMIN") !== -1) await setup();
+    if ((me.roles || []).indexOf("ADMIN") !== -1) {
+      if (await firstRun()) return;
+      await setup();
+    }
     if (!me.viewing_as_by) await todo();
     autoTour();
   }

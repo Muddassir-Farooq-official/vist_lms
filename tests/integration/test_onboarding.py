@@ -91,3 +91,41 @@ async def test_tours_use_the_manuals_words_and_load_on_every_page(app_client, ad
     assert "/static/js/guide.js" in common
     for f in ("guide.js", "tours.js", "tour.js"):
         assert (await app_client.get(f"/static/js/{f}")).status_code == 200
+
+
+async def test_a_brand_new_institute_gets_the_first_run_wizard_until_it_has_its_details(app_client, admin_user, db_session):
+    """1.70.0: no institute details saved, no programs, no students -> the administrator is sent to the short wizard."""
+    await _login_admin(app_client)
+    assert (await app_client.get(f"{O}/first-run")).json() == {"needed": True}
+    page = await app_client.get("/dashboard/admin/welcome")
+    assert page.status_code == 200 and "welcome.js" in page.text and "Kind of institute" in page.text
+    r = await app_client.put("/api/v1/institute/profile", json={"name": "ABC College of Nursing", "short_name": "ABC LMS"})
+    assert r.status_code == 200, r.text
+    assert (await app_client.get(f"{O}/first-run")).json() == {"needed": False}
+
+    _sid, username = await _create_and_activate_student(app_client, cnic="35202-7800009-9")
+    await _login(app_client, username, "StudentPass123!")
+    assert (await app_client.get(f"{O}/first-run")).json() == {"needed": False}
+
+
+async def test_an_institute_already_in_use_never_sees_the_first_run_wizard(app_client, admin_user, db_session):
+    await _login_admin(app_client)
+    assert (await app_client.post("/api/v1/programs", json={"code": "FRW", "name": "First Run", "duration_years": 4, "total_semesters": 8})).status_code == 201
+    assert (await app_client.get(f"{O}/first-run")).json() == {"needed": False}
+
+
+async def test_another_institute_shows_only_its_own_name(app_client, admin_user, monkeypatch):
+    from app.assets.service import tag_prefix
+    from app.auth import two_factor
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "app_name", "ABC LMS")
+    monkeypatch.setattr(settings, "asset_tag_prefix", "")
+    assert tag_prefix() == "ABC"
+    src = open(two_factor.__file__).read()
+    assert "VIST" not in src
+    monkeypatch.setattr(settings, "demo_site", True)
+    page = await app_client.get("/")
+    assert "demo-ribbon" in page.text
+    monkeypatch.setattr(settings, "demo_site", False)
+    assert "demo-ribbon" not in (await app_client.get("/")).text

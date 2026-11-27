@@ -64,14 +64,14 @@ CURATED_RESOURCES: list[CuratedResourceOut] = [
     ),
     CuratedResourceOut(
         name="CINAHL",
-        description="Nursing and allied health literature database. Requires institutional subscription — not yet configured for VIST.",
+        description="Nursing and allied health literature database. Requires institutional subscription — not yet configured for this institute.",
         url="https://www.ebsco.com/products/research-databases/cinahl-database",
         category="Institutional (not yet available)",
         searchable_in_app=False,
     ),
     CuratedResourceOut(
         name="Cochrane Library",
-        description="Systematic reviews and clinical trial evidence. Requires institutional/HEC-negotiated access — not yet configured for VIST.",
+        description="Systematic reviews and clinical trial evidence. Requires institutional/HEC-negotiated access — not yet configured for this institute.",
         url="https://www.cochranelibrary.com/",
         category="Institutional (not yet available)",
         searchable_in_app=False,
