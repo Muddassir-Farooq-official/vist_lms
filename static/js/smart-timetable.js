@@ -235,8 +235,13 @@
     if (!r.ok) { err.textContent = msg(r, "Could not load the sections."); err.hidden = false; return; }
     rooms = rr.ok ? (Array.isArray(rr.body) ? rr.body : rr.body.items || []).filter(function (x) { return x.is_active !== false; }) : [];
     $("ss-tbody").innerHTML = r.body.map(function (s) {
-      return '<tr data-id="' + esc(s.id) + '"><td><strong>' + esc(s.code) + "</strong> " + esc(s.title) + (s.combined ? ' <span class="pt-comb">combined</span>' : "") + "</td><td>" + esc(s.section) +
-        "</td><td>" + esc(s.term) + '</td><td class="num">' + esc(s.credit_hours) + "</td>" +
+      const together = s.combined
+        ? '<span class="pt-comb">combined</span> <small>with ' + esc((s.combined_with || []).join(", ")) + '</small> <button type="button" class="link-btn co-sep" data-sep="' + esc(s.id) + '">Separate</button>'
+        : s.can_combine && window.VistCombine
+          ? '<small>Same course in ' + esc(s.can_combine.with.join(", ")) + "</small><br>" + window.VistCombine.controls(s.can_combine)
+          : '<span class="sd-dim">—</span>';
+      return '<tr data-id="' + esc(s.id) + '"><td><strong>' + esc(s.code) + "</strong> " + esc(s.title) + "</td><td>" + esc(s.section) +
+        "</td><td>" + esc(s.term) + '</td><td class="co-cell">' + together + '</td><td class="num">' + esc(s.credit_hours) + "</td>" +
         '<td><input type="number" class="text-input stt-num" min="1" max="7" data-f="classes_per_week" value="' + esc(s.classes_per_week || "") + '" placeholder="' + esc(s.per_week) + '" aria-label="Classes a week" /></td>' +
         '<td><input type="checkbox" data-f="double_period"' + (s.double_period ? " checked" : "") + ' aria-label="Lab, double period" /></td>' +
         '<td><select class="select-input" data-f="home_room" aria-label="Home room"><option value="">(any)</option>' + rooms.map(function (x) {
@@ -246,9 +251,18 @@
     $("ss-table").hidden = false;
   }
   $("ss-show").addEventListener("click", showSections);
+  // taught together: combine sections of the same course (other batches too), or separate one again
+  function afterCombine() { showSections(); document.dispatchEvent(new CustomEvent("tw:refresh")); }
+  if (window.VistCombine) window.VistCombine.wire($("ss-tbody"), afterCombine);
+  $("ss-tbody").addEventListener("click", async function (e) {
+    const b = e.target.closest(".co-sep");
+    if (!b) return;
+    if (!window.confirm("Take this section out of the combined class? It keeps its timetable, which you can then change on its own.")) return;
+    if (await window.VistCombine.separate(b.getAttribute("data-sep"))) afterCombine();
+  });
   $("ss-tbody").addEventListener("change", async function (e) {
     const tr = e.target.closest("tr[data-id]");
-    if (!tr) return;
+    if (!tr || e.target.classList.contains("co-teacher")) return;
     const get = function (f) { return tr.querySelector('[data-f="' + f + '"]'); };
     const n = get("classes_per_week").value.trim();
     const body = { classes_per_week: n ? parseInt(n, 10) : null, double_period: get("double_period").checked, home_room: get("home_room").value || null };

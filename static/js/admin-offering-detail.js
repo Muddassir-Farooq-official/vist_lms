@@ -283,6 +283,8 @@
     if (!result.ok) {
       addSlotError.textContent = extractErrorMessage(result.body, "Could not add this slot.");
       addSlotError.hidden = false;
+      // the same course of another batch is already there: offer to make them one class
+      if (window.VistCombine) window.VistCombine.offer(result.body, { onDone: function () { window.location.reload(); } });
       return;
     }
 

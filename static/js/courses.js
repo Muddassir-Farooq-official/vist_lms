@@ -456,7 +456,9 @@
       const pct = cap ? Math.min(100, Math.round(100 * o.enrolled_count / cap)) : 0;
       tr.innerHTML =
         '<td class="crs-course"><span class="crs-code">' + esc(o.course_code) + '</span><span class="crs-title"><strong>' + esc(o.course_title) + "</strong><small>Section " +
-          esc(o.section_label || "A") + " · " + esc(o.credit_hours) + " credit hours</small></span></td>" +
+          esc(o.section_label || "A") + " · " + esc(o.credit_hours) + " credit hours" +
+          ((o.combined_with || []).length ? ' <span class="pt-comb" title="Taught together with section ' + esc(o.combined_with.join(", ")) + '">combined with ' + esc(o.combined_with.join(", ")) + "</span>" : "") +
+          "</small></span></td>" +
         '<td class="crs-cur">' + esc((o.curriculum && o.curriculum.length) ? o.curriculum.join(", ") : "Not in a curriculum") + "</td>" +
         '<td class="teacher-cell">' + (o.teacher_name ? '<span class="crs-teacher">' + esc(o.teacher_name) + "</span>" : '<span class="status-pill dropped">No teacher</span>') + " </td>" +
         '<td class="crs-seats"><b>' + o.enrolled_count + "</b>" + (cap ? " / " + cap + '<span class="crs-meter"><i style="width:' + pct + '%"></i></span>' : "<small>no seat limit</small>") + "</td>" +

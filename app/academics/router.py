@@ -286,16 +286,18 @@ async def _to_offering_out_many(db, offerings: list) -> list[CourseOfferingOut]:
 
 
 async def _combined_groups(db, offerings) -> dict:
-    """{group id: {offering id: [the other sections' labels]}} for the combined classes among these offerings."""
+    """{group id: {offering id: [the other sections' labels]}} for the combined classes among these offerings. A section of
+    another batch term is named with its term, e.g. "A (AHS 1st)", since "A" alone would be ambiguous."""
     gids = {o.combined_group_id for o in offerings if o.combined_group_id}
     if not gids:
         return {}
-    rows = (await db.execute(select(CourseOffering.combined_group_id, CourseOffering.id, CourseOffering.section_label)
+    rows = (await db.execute(select(CourseOffering.combined_group_id, CourseOffering.id, CourseOffering.section_label, CourseOffering.term_label)
                              .where(CourseOffering.combined_group_id.in_(gids)))).all()
     out: dict = {}
-    for gid, oid, label in rows:
-        out.setdefault(gid, {})[oid] = label
-    return {gid: {oid: sorted(lbl for other, lbl in m.items() if other != oid) for oid in m} for gid, m in out.items()}
+    for gid, oid, label, term in rows:
+        out.setdefault(gid, {})[oid] = (label, term)
+    return {gid: {oid: sorted(lbl if (term or "").lower() == (m[oid][1] or "").lower() else f"{lbl} ({term})"
+                              for other, (lbl, term) in m.items() if other != oid) for oid in m} for gid, m in out.items()}
 
 
 async def _combined_with(db, offerings) -> list[str]:
@@ -1114,7 +1116,7 @@ async def combined_view(offering_id: uuid.UUID, current_user: CurrentUser = Depe
     from app.academics.combined import CombinedClassService
 
     offering = await CourseOfferingService(db).get(offering_id)
-    if Permissions.COURSE_OFFERING_MANAGE not in current_user.permissions:
+    if not ({Permissions.COURSE_OFFERING_MANAGE, Permissions.TIMETABLE_MANAGE} & set(current_user.permissions)):
         own_teacher_id = await _resolve_own_teacher_id(db, current_user)
         if own_teacher_id is None or offering.assigned_teacher_id != own_teacher_id:
             raise AuthorizationError("You are not the assigned teacher for this offering.")
@@ -1129,7 +1131,8 @@ class CombineRequest(BaseModel):
 
 @router.post("/offerings/{offering_id}/combine", summary="Combine this section with other sections of the same course (one teacher, one time, one room)")
 async def combine_sections(offering_id: uuid.UUID, payload: CombineRequest,
-                           current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_OFFERING_MANAGE)), db=Depends(get_db)) -> dict:
+                           current_user: CurrentUser = Depends(require_any_permission(Permissions.COURSE_OFFERING_MANAGE, Permissions.TIMETABLE_MANAGE)),
+                           db=Depends(get_db)) -> dict:
     from app.academics.combined import CombinedClassService
 
     return await CombinedClassService(db).combine(offering_id, payload.offering_ids, teacher_id=payload.teacher_id, actor_id=current_user.id,
@@ -1137,7 +1140,8 @@ async def combine_sections(offering_id: uuid.UUID, payload: CombineRequest,
 
 
 @router.post("/offerings/{offering_id}/separate", summary="Take this section out of its combined class (it keeps its timetable)")
-async def separate_section(offering_id: uuid.UUID, current_user: CurrentUser = Depends(require_permission(Permissions.COURSE_OFFERING_MANAGE)),
+async def separate_section(offering_id: uuid.UUID, current_user: CurrentUser = Depends(require_any_permission(Permissions.COURSE_OFFERING_MANAGE,
+                                                                                                             Permissions.TIMETABLE_MANAGE)),
                            db=Depends(get_db)) -> dict:
     from app.academics.combined import CombinedClassService
 
