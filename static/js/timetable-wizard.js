@@ -105,14 +105,29 @@
     box.innerHTML = '<ol class="tw-check">' + rows.map(function (x) {
       const ok = x[1];
       return '<li class="' + (ok ? "ok" : "warn") + '"><button type="button" class="link-btn tw-go" data-go="' + x[0] + '">' + esc(x[2]) + "</button>" + (x[3] ? '<small>' + esc(x[3]) + "</small>" : "") + "</li>";
-    }).join("") + "</ol>";
+    }).join("") + "</ol>" + suggestions(d.combine || []);
     mark("choose", sec.total ? "ok" : "warn", rows[0][2]);
     mark("periods", d.periods["class"] ? "ok" : "warn", rows[1][2]);
     mark("workload", sec.without_teacher ? "warn" : "ok", rows[2][2]);
-    mark("sections", sec.total ? "ok" : "", rows[3][2]);
+    mark("sections", (d.combine || []).length ? "warn" : sec.total ? "ok" : "", (d.combine || []).length
+      ? (d.combine.length + " course" + (d.combine.length === 1 ? "" : "s") + " may be taught together: see step 1") : rows[3][2]);
     mark("teachers", "", rows[4][2]);
     mark("draft", d.draft && d.draft.status === "PUBLISHED" ? "ok" : d.draft ? "warn" : "", rows[5][2]);
   }
+
+  // the same course in several chosen batches (e.g. LB101 for BSN and AHS 1st): offer to make each one class
+  function suggestions(list) {
+    if (!list.length || !window.VistCombine) return "";
+    return '<div class="tw-combine"><h3>Taught together?</h3><p class="sd-dim">These courses are in more than one of the chosen batches at the same time of year. ' +
+      "If one teacher teaches them together in one room, combine them: one class, one timetable, one exam paper; each batch keeps its own students, attendance and results. " +
+      "Leave them as they are if they are taught separately.</p><ul class=\"tw-combine-list\">" + list.map(function (s) {
+        return "<li><div><strong>" + esc(s.course) + "</strong> " + esc(s.title) + "<small>" + s.sections.map(function (x) {
+          return esc(x.term) + " (" + esc(x.section) + ")" + (x.teacher ? " · " + esc(x.teacher) : " · no teacher yet");
+        }).join(" &nbsp;+&nbsp; ") + "</small></div><div>" + window.VistCombine.controls(s) + "</div></li>";
+      }).join("") + "</ul></div>";
+  }
+  if (window.VistCombine) window.VistCombine.wire($("tw-ready"), function () { refresh(); });
+  document.addEventListener("tw:refresh", function () { refresh(); });
 
   // ------------------------------------------------------------------ moving between steps
   function go(step) {

@@ -4355,3 +4355,11 @@ details.tg-session > summary.tg-head { cursor: pointer; }
 /* A suspended student on a register: kept on the list, greyed and locked */
 .att-locked { opacity: 0.6; }
 .att-locked td, label.att-locked { font-style: italic; }
+
+/* Timetable wizard: courses that may be taught together (combined across batches) */
+.tw-combine { margin-top: 16px; padding: 12px 14px; border: 1px solid var(--yellow-400); border-radius: var(--radius); background: var(--yellow-100); }
+.tw-combine h3 { margin: 0 0 4px; font-size: 0.95rem; }
+.tw-combine-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.tw-combine-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 10px; background: var(--surface); border-radius: var(--radius); }
+.tw-combine-list small { display: block; color: var(--text-muted); }
+.co-cell small { color: var(--text-muted); }

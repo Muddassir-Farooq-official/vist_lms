@@ -1393,7 +1393,27 @@ class TimetableService:
         await RoomService(self.session).check_for_class(room, len(await self._enrolled_for(course_offering_id)))
         neighbours = await self._live_neighbours(offering, day_of_week, start_time, end_time, exclude_slot_id)
         when = f"{day_of_week.value} {{}}\u2013{{}}"
+        try:
+            await self._room_and_people(offering, neighbours, room, when)
+        except BusinessRuleViolationError as exc:
+            # The same course of another batch is already here at this time (e.g. LB101 for BSN and for AHS 1st, one
+            # teacher, one room): that is one class taught together. Say so, and offer to combine; nothing is merged unasked.
+            from app.academics.combined import concurrent, same_group
 
+            twin = next((other for slot, other in neighbours if other.id != offering.id and other.course_id == offering.course_id
+                         and not same_group(offering, other) and concurrent(offering, other)
+                         and slot.start_time == start_time and slot.end_time == end_time), None)
+            if twin is None:
+                raise
+            course = await self.session.get(Course, offering.course_id)
+            code = course.code if course else "This course"
+            raise BusinessRuleViolationError(
+                f"{code} for {twin.term_label} (section {twin.section_label}) is already at this time ({exc.message.rstrip('.')}). "
+                f"If both batches are taught together, combine {offering.term_label} with it: one teacher, one room, one timetable.",
+                details={"combine": {"offering_id": str(offering.id), "with_offering_id": str(twin.id), "course": code,
+                                     "term": offering.term_label, "with_term": twin.term_label, "with_section": twin.section_label}}) from None
+
+    async def _room_and_people(self, offering, neighbours, room, when) -> None:
         # 1. Room -- a physical resource, whoever owns the booking.
         from app.academics.combined import same_group
 

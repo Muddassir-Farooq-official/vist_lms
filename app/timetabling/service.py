@@ -274,6 +274,12 @@ class SmartTimetableService:
         await self.session.execute(update(TimetableDraft).where(TimetableDraft.status == "DRAFT").values(status="DISCARDED", updated_at=datetime.now(timezone.utc)))
         problems = meta["problems"] + [{"offering_id": str(p["unit"]), "label": p["label"], "missing": p["missing"], "reason": p["reason"]}
                                        for p in res.unplaced]
+        for s in await self.combine_suggestions(terms):
+            if s["same_teacher"] and s["teachers"]:
+                problems.append({"offering_id": str(s["lead_id"]), "label": s["course"], "missing": 0, "warning": True,
+                                 "reason": f"{', '.join(x['term'] + ' (' + x['section'] + ')' for x in s['sections'])} have the same teacher but are "
+                                           "separate classes, so they are placed at different times. If they are taught together, combine them "
+                                           "(step 4, Classes & labs) and generate again."})
         for k, inf in meta["info"].items():
             if inf["lead"].assigned_teacher_id is None:
                 problems.append({"offering_id": str(k), "label": inf["label"], "missing": 0, "warning": True,
@@ -694,6 +700,47 @@ class SmartTimetableService:
         return {**preview, "weekly_patterns_removed": removed_slots, "told": told}
 
     # ================================================================== where the wizard stands
+    async def combine_suggestions(self, terms: list[str]) -> list[dict]:
+        """Sections of the SAME course in DIFFERENT chosen batch terms, running at the same time of year, that are not one
+        combined class yet (e.g. LB101 for BSN and for AHS 1st). Each suggestion can be combined with one click; nothing is merged here."""
+        from app.academics.combined import concurrent
+        from app.employees.models import Employee
+
+        terms = await self._terms(terms)
+        rows = (await self.session.execute(select(CourseOffering, Course).join(Course, Course.id == CourseOffering.course_id).where(
+            func.lower(CourseOffering.term_label).in_([t.lower() for t in terms]))
+            .order_by(Course.code, CourseOffering.term_label, CourseOffering.section_label))).all()
+        by_course: dict[uuid.UUID, list] = {}
+        for o, c in rows:
+            by_course.setdefault(c.id, []).append((o, c))
+        teacher_ids = {o.assigned_teacher_id for o, _c in rows if o.assigned_teacher_id}
+        names = {e.id: f"{e.first_name} {e.last_name}".strip() for e in (await self.session.execute(
+            select(Employee).where(Employee.id.in_(teacher_ids or {uuid.uuid4()})))).scalars()}
+        out = []
+        for items in by_course.values():
+            units: dict = {}                               # one unit per combined class (or per section on its own)
+            for o, c in items:
+                units.setdefault(o.combined_group_id or o.id, []).append(o)
+            if len(units) < 2:
+                continue
+            pending = list(units.values())
+            while pending:
+                lead = pending.pop(0)
+                # other BATCHES only: sections A and B of one batch term are normally taught separately
+                lead_terms = {(o.term_label or "").lower() for o in lead}
+                cluster = [lead] + [u for u in pending if concurrent(u[0], lead[0]) and not ({(o.term_label or "").lower() for o in u} & lead_terms)]
+                pending = [u for u in pending if u not in cluster]
+                if len(cluster) < 2:
+                    continue
+                code = items[0][1].code
+                teachers = {o.assigned_teacher_id for u in cluster for o in u if o.assigned_teacher_id}
+                out.append({"course": code, "title": items[0][1].title, "lead_id": lead[0].id, "join_ids": [u[0].id for u in cluster[1:]],
+                            "same_teacher": len(teachers) <= 1,
+                            "teachers": [{"id": t, "name": names.get(t, "")} for t in sorted(teachers, key=lambda t: names.get(t, ""))],
+                            "sections": [{"id": o.id, "term": o.term_label, "section": o.section_label, "combined": o.combined_group_id is not None,
+                                          "teacher": names.get(o.assigned_teacher_id)} for u in cluster for o in u]})
+        return out
+
     async def readiness(self, terms: list[str]) -> dict:
         """What is in place for the chosen terms, for the wizard's step badges. Read only."""
         terms = await self._terms(terms)
@@ -713,7 +760,7 @@ class SmartTimetableService:
                                                   .order_by(TimetableDraft.created_at.desc()).limit(20))).scalars())
         tl = {t.lower() for t in terms}
         draft = next((d for d in drafts if {x.lower() for x in (d.terms or [])} & tl), None)
-        return {"terms": terms,
+        return {"terms": terms, "combine": await self.combine_suggestions(terms),
                 "periods": {"class": sum(1 for x in periods if x.holds_class), "breaks": sum(1 for x in periods if not x.holds_class)},
                 "rooms": rooms,
                 "sections": {"total": len(rows), "without_teacher": sum(1 for o, _c in rows if not o.assigned_teacher_id),
@@ -729,9 +776,23 @@ class SmartTimetableService:
         rows = (await self.session.execute(select(CourseOffering, Course).join(Course, Course.id == CourseOffering.course_id).where(
             func.lower(CourseOffering.term_label).in_([t.lower() for t in terms]))
             .order_by(CourseOffering.term_label, Course.code, CourseOffering.section_label))).all()
+        groups = {o.combined_group_id for o, _c in rows if o.combined_group_id}
+        mates: dict = {}
+        for m in (await self.session.execute(select(CourseOffering).where(CourseOffering.combined_group_id.in_(groups or {uuid.uuid4()}))
+                                             .order_by(CourseOffering.term_label, CourseOffering.section_label))).scalars():
+            mates.setdefault(m.combined_group_id, []).append(m)
+        could = {}
+        for s in await self.combine_suggestions(terms):         # sections that could be combined with others of the same course
+            for x in s["sections"]:
+                could[x["id"]] = s
         return [{"id": o.id, "code": c.code, "title": c.title, "section": o.section_label, "term": o.term_label,
                  "credit_hours": c.credit_hours, "classes_per_week": o.classes_per_week, "per_week": default_per_week(c, o),
-                 "double_period": o.double_period, "home_room": o.home_room, "combined": o.combined_group_id is not None}
+                 "double_period": o.double_period, "home_room": o.home_room, "combined": o.combined_group_id is not None,
+                 "combined_with": [f"{m.term_label} ({m.section_label})" for m in mates.get(o.combined_group_id, []) if m.id != o.id],
+                 "can_combine": ({"lead_id": could[o.id]["lead_id"], "join_ids": could[o.id]["join_ids"], "same_teacher": could[o.id]["same_teacher"],
+                                  "teachers": could[o.id]["teachers"],
+                                  "with": [f"{x['term']} ({x['section']})" for x in could[o.id]["sections"] if x["id"] != o.id]}
+                                 if o.id in could else None)}
                 for o, c in rows]
 
     async def update_section(self, offering_id: uuid.UUID, *, classes_per_week: int | None, double_period: bool, home_room: str | None,

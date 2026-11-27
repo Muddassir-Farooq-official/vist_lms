@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.65.0",
+    "date": "2026-11-27",
+    "title": "One class for the same subject in several batches",
+    "summary": "The same subject in two batch terms taught together (e.g. LB101 for BSN and AHS 1st) is easy to make one class: the clash message offers to combine, and the Timetable suggests it.",
+    "changes": [
+      {
+        "kind": "improved",
+        "for": "Administrators",
+        "text": "Adding a class where the same subject of another batch already is no longer just says 'teacher busy' or 'room booked'. It names the other batch and offers Combine: one teacher, one room, one timetable, one exam paper, while each batch keeps its own students, attendance and results."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Timetable step 1 suggests subjects that may be taught together across the chosen batches, with a Combine button. Step 4 has a Taught together column with Combine and Separate. The draft notes same-teacher sections that are not combined."
+      },
+      {
+        "kind": "improved",
+        "for": "Exam office",
+        "text": "The exam department can combine and separate sections from the Timetable."
+      },
+      {
+        "kind": "improved",
+        "for": "Administrators",
+        "text": "The Courses list shows 'combined with' on each combined section, naming another batch's section with its term, e.g. 'A (AHS 1st)'."
+      }
+    ]
+  },
+  {
     "version": "1.64.0",
     "date": "2026-11-27",
     "title": "Suspended and expelled students are locked",
