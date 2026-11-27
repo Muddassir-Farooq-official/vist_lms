@@ -786,6 +786,9 @@ app.include_router(release_router, prefix=settings.api_v1_prefix)
 from app.feedback.router import router as feedback_router  # noqa: E402
 
 app.include_router(feedback_router, prefix=settings.api_v1_prefix)
+from app.onboarding.router import router as onboarding_router  # noqa: E402
+
+app.include_router(onboarding_router, prefix=settings.api_v1_prefix)
 from app.fees.onebill_router import report_router as onebill_report_router, router as onebill_router  # noqa: E402
 
 app.include_router(onebill_router, prefix=settings.api_v1_prefix)

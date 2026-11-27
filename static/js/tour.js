@@ -51,6 +51,7 @@
       el.scrollIntoView({ block: "center", behavior: "smooth" });
       card.innerHTML = '<div class="vt-count">' + (i + 1) + " / " + steps.length + '</div><h3 class="vt-title" id="vt-title">' + esc(s.title) + "</h3>" +
         '<p class="vt-text">' + esc(s.text) + "</p>" +
+        (s.list && s.list.length ? '<ul class="vt-list">' + s.list.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") +
         '<div class="vt-actions"><button type="button" class="link-btn vt-skip">Skip tour</button><span class="vt-spacer"></span>' +
         (i > 0 ? '<button type="button" class="role-btn secondary-btn vt-back">Back</button>' : "") +
         '<button type="button" class="role-btn vt-next">' + (i === steps.length - 1 ? "Finish" : "Next") + "</button></div>";
@@ -64,7 +65,12 @@
     }, 120);
   }
 
-  function start(list, options) {
+  function start(list, options, waited) {
+    // a message box open on the page (e.g. What's new) would sit on top of the tour: wait until it is closed
+    if (document.querySelector("dialog[open]") && (waited || 0) < 120) {
+      setTimeout(function () { start(list, options, (waited || 0) + 1); }, 500);
+      return;
+    }
     if (card) end();
     steps = list || [];
     opts = options || {};

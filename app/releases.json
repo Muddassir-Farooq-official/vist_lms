@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.69.0",
+    "date": "2026-11-27",
+    "title": "Tours on every page, a To do bar, and Set up your LMS",
+    "summary": "Every page has a guided tour. Everyone sees what still needs them until it is done. Administrators get a step-by-step checklist to set up a new institute.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Everyone",
+        "text": "Tour button on every page: a guided tour of what the page is for, its tabs and main buttons. It starts by itself the first time you open a page."
+      },
+      {
+        "kind": "new",
+        "for": "Everyone",
+        "text": "To do bar at the top of your pages: your profile still to complete, phone notifications, and for teachers, students and parents the important things waiting for them."
+      },
+      {
+        "kind": "new",
+        "for": "Everyone",
+        "text": "Complete your profile: a checklist on your profile page. After 7 days, an incomplete profile opens first after sign-in; the menu still works."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Set up your LMS on the dashboard: the steps to start a new institute in order, each ticked when done, with Do it and Show me how."
+      }
+    ]
+  },
+  {
     "version": "1.68.0",
     "date": "2026-11-27",
     "title": "Audit fixes: leavers' pay, students who leave, clearer messages",
