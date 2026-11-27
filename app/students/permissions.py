@@ -6,17 +6,17 @@ here, using the caller's identity against the specific record.
 """
 from __future__ import annotations
 
-from app.auth.permissions import Roles
+from app.auth.permissions import Permissions, Roles
 from app.auth.schemas import CurrentUser
 from app.core.exceptions import AuthorizationError
 from app.students.models import Student
 
 
 def assert_can_view_student(current_user: CurrentUser, student: Student) -> None:
-    if Roles.ADMIN in current_user.roles or Roles.ACCOUNTS_OFFICER in current_user.roles:
+    # The offices (Administrator, Accounts, Principal, HOD, Exam Controller by default, or anyone given "See any
+    # student's record" on Access control) look any student up; editing still needs student.update.
+    if Permissions.STUDENT_LOOKUP in current_user.permissions or Roles.ADMIN in current_user.roles:
         return
-    if Roles.PRINCIPAL in current_user.roles or Roles.HOD in current_user.roles or Roles.EXAM_CONTROLLER in current_user.roles:
-        return                                  # look up, read-only (no edit permission is held)
     if Roles.STUDENT in current_user.roles:
         if student.user_id != current_user.id:
             raise AuthorizationError("You may only view your own student record.")

@@ -23,10 +23,16 @@ from app.core.exceptions import AuthenticationError, AuthorizationError
 from app.core.security import decode_access_token
 
 
-# user id -> (checked_at, is_active, must_change_password, roles, permissions, must_verify_email). A signed token alone would let a
-# deactivated, terminated or re-roled person keep working until it expires, so the account is re-read from the
-# database at most every `session_check_seconds` and what it says there wins over what the token claims.
-_session_ok: dict[str, tuple[float, bool, bool, list[str], list[str], bool]] = {}
+# user id -> (checked_at, is_active, must_change_password, roles, permissions, must_verify_email, extra_permissions). A
+# signed token alone would let a deactivated, terminated or re-roled person keep working until it expires, so the
+# account is re-read from the database at most every `session_check_seconds` and what it says there wins over what the
+# token claims. Rights are worked out by app/access/resolve.py (roles, custom roles, a person's own rights and end dates).
+_session_ok: dict[str, tuple] = {}
+
+
+def forget_all_sessions() -> None:
+    """Re-read every account on its next request (after a role's rights changed)."""
+    _session_ok.clear()
 
 
 async def email_gate_on(db: AsyncSession) -> bool:
@@ -39,9 +45,10 @@ async def email_gate_on(db: AsyncSession) -> bool:
     return bool(row and row[0] and row[1] and row[2] and row[3])
 
 
-async def _fresh_account(db: AsyncSession, user_id: str) -> tuple[bool, bool, list[str], list[str], bool] | None:
-    """(is_active, must_change_password, roles, permissions, must_verify_email)."""
-    from app.auth.models import Permission, Role, RolePermission, User, UserRole
+async def _fresh_account(db: AsyncSession, user_id: str) -> tuple | None:
+    """(is_active, must_change_password, roles, permissions, must_verify_email, extra_permissions)."""
+    from app.access.resolve import effective
+    from app.auth.models import User
 
     try:
         uid = uuid.UUID(str(user_id))
@@ -50,12 +57,9 @@ async def _fresh_account(db: AsyncSession, user_id: str) -> tuple[bool, bool, li
     row = (await db.execute(select(User.is_active, User.must_change_password, User.email, User.email_verified_at).where(User.id == uid))).one_or_none()
     if row is None:
         return None
-    roles = sorted((await db.execute(select(Role.code).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == uid))).scalars().all())
-    perms = sorted((await db.execute(
-        select(Permission.code).distinct().join(RolePermission, RolePermission.permission_id == Permission.id)
-        .join(UserRole, UserRole.role_id == RolePermission.role_id).where(UserRole.user_id == uid))).scalars().all())
+    roles, perms, extra = await effective(db, uid)
     must_verify = not (row[2] and row[3]) and await email_gate_on(db)
-    return bool(row[0]), bool(row[1]), roles, perms, must_verify
+    return bool(row[0]), bool(row[1]), roles, perms, must_verify, extra
 
 
 def forget_session(user_id) -> None:
@@ -98,7 +102,7 @@ async def _decode_current_user(
         if len(_session_ok) > 5000:
             _session_ok.clear()
         _session_ok[user_id] = cached
-    _, _, must_change, roles, perms, must_verify = cached
+    _, _, must_change, roles, perms, must_verify, extra = cached
 
     viewer = payload.get("va")
     return CurrentUser(
@@ -106,6 +110,7 @@ async def _decode_current_user(
         username=payload.get("username", ""),
         roles=roles,
         permissions=perms,
+        extra_permissions=extra,
         # An administrator viewing someone's screens is never sent to that person's change-password form.
         must_change_password=False if viewer else must_change,
         email_verification_required=False if viewer else must_verify,

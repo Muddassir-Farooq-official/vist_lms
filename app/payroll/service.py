@@ -207,11 +207,9 @@ class PayrollService:
         return a
 
     async def _approver_ids(self) -> list[uuid.UUID]:
-        from app.auth.models import Permission, RolePermission, User
+        from app.access.resolve import users_with_permission
 
-        return list(set((await self.session.execute(
-            select(User.id).join(UserRole, UserRole.user_id == User.id).join(RolePermission, RolePermission.role_id == UserRole.role_id)
-            .join(Permission, Permission.id == RolePermission.permission_id).where(Permission.code == "payroll.approve", User.is_active.is_(True)))).scalars()))
+        return await users_with_permission(self.session, "payroll.approve")
 
     async def decide_advance(self, advance_id: uuid.UUID, *, admin_id: uuid.UUID, approve: bool, note: str | None) -> SalaryAdvance:
         """Step 2: an administrator approves or rejects. Never their own request, never an advance to themselves."""

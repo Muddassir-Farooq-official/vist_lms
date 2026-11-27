@@ -5,6 +5,7 @@
 {% macro _link(item, active) -%}
 <a href="{{ item.href }}" class="drawer-link{% if item.slug == active %} active{% endif %}{% if item.hub %} drawer-hub{% endif %}" data-nav="{{ item.slug }}"
    {%- if item.badge %} data-badge="{{ item.badge }}"{% endif %}{% if item.keywords %} data-keywords="{{ item.keywords }}"{% endif %}
+   {%- if item.rights %} data-rights="{{ item.rights|join(',') }}"{% endif %}
    {%- if item.slug == active %} aria-current="page"{% elif item.hub %} hidden{% endif %}>
   {{ nav_icon(item.icon) }}<span>{{ item.label }}</span>
 </a>

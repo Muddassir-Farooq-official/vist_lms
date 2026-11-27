@@ -489,7 +489,7 @@
     const list = document.getElementById("access-roles-list");
     list.innerHTML = r.body.grantable.map(function (code) {
       return '<label class="ss-check"><input type="checkbox" value="' + code + '"' + (r.body.extra_roles.indexOf(code) !== -1 ? " checked" : "") + " /> " +
-        VA.escapeHtml(ROLE_NAMES[code] || code) + "</label>";
+        VA.escapeHtml(ROLE_NAMES[code] || (r.body.names && r.body.names[code]) || code) + "</label>";
     }).join(" ");
     box.dataset.employeeId = employeeId;
     box.hidden = false;
@@ -502,7 +502,8 @@
     const r = await VA.fetchJson("/api/v1/employees/" + box.dataset.employeeId + "/access-roles", {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ extra_roles: extra }),
     });
-    msgEl.textContent = r.ok ? "Access saved." : ((r.body && r.body.error && r.body.error.message) || "Could not save.");
+    msgEl.textContent = r.ok ? (r.body && r.body.waiting ? "Saved for a second administrator to confirm (Access control → To confirm)." : "Access saved.")
+      : ((r.body && r.body.error && r.body.error.message) || "Could not save.");
     msgEl.hidden = false;
     if (r.ok) loadAccessRoles(box.dataset.employeeId);
   });

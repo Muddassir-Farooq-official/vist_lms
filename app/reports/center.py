@@ -173,11 +173,11 @@ class ReportCenter:
             options["asset_check"] = [{"value": str(v.id), "label": f"{v.title} ({v.status.lower()})"} for v in (await self.session.execute(
                 select(AssetVerification).order_by(AssetVerification.created_at.desc()).limit(100))).scalars()]
         if "cashier" in need:
-            from app.auth.models import Permission, Role, RolePermission, User, UserRole
+            from app.access.resolve import users_with_any
+            from app.auth.models import User
 
-            users = (await self.session.execute(
-                select(User).distinct().join(UserRole, UserRole.user_id == User.id).join(RolePermission, RolePermission.role_id == UserRole.role_id)
-                .join(Permission, Permission.id == RolePermission.permission_id).where(Permission.code.in_((P.PAYMENT_RECORD, P.ACCOUNT_RECORD))))).scalars().all()
+            ids = await users_with_any(self.session, (P.PAYMENT_RECORD, P.ACCOUNT_RECORD))
+            users = (await self.session.execute(select(User).where(User.id.in_(ids)))).scalars().all() if ids else []
             names = await self._names({u.id for u in users})
             options["cashier"] = sorted([{"value": str(u.id), "label": names.get(u.id) or u.username} for u in users], key=lambda o: o["label"])
         if "fy" in need:

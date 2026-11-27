@@ -80,6 +80,17 @@ window.VIST_TOURS = {
   "/dashboard/admin/datesheets": {
     buttons: { "New datesheet": "Start a datesheet for a term (Midterm, Final...), then add each paper's day, time and room. Clashes are shown before you publish." }
   },
+  "/dashboard/admin/access": {
+    tabs: {
+      roles: "What each role can do. Pick a role, then for each module choose None, View or Edit, and tick Approve. Advanced shows single rights. New role makes your own (e.g. Exam cell assistant); start it from an existing role to save time.",
+      people: "One staff member: their extra roles (built-in or your own), and single rights given or taken away, until a date if you like. A right taken away wins over every role.",
+      waiting: "Money and control changes made by another administrator wait here for you to confirm or reject. Nobody confirms their own change.",
+      history: "Every access change: who, when, what. Undo puts it back as it was."
+    },
+    buttons: { "New role": "Make your own role. Give it a name, start from nothing or copy a role, then choose its rights.",
+               "Check and save": "Shows exactly what will change, and for whom, before anything is saved." },
+    steps: [{ el: "#ac-roles", title: "Built-in and your own roles", text: "The Administrator role always has everything and cannot be changed, so nobody can lock the institute out. A built-in role you changed shows 'changed'; Back to the standard undoes it." }]
+  },
   "/dashboard/admin/settings": {
     steps: [{ el: ".content-main", title: "Settings", text: "Your institute's name, logo, address and type; the rules for attendance, fees, payroll and results. Each setting says what it changes." }]
   },

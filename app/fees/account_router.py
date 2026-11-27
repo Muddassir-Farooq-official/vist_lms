@@ -36,7 +36,7 @@ from app.fees.scholarship_service import OPENING_CODE, ScholarshipService
 from app.students.repository import StudentRepository
 
 router = APIRouter(prefix="/fees", tags=["fee-accounts"])
-_STAFF = require_any_role(Roles.ADMIN, Roles.ACCOUNTS_OFFICER)
+_STAFF = require_permission(Permissions.FEE_OFFICE)       # the Administrator and Accounts by default; can be given on Access control
 _SECURITY_HEADERS = {"X-Content-Type-Options": "nosniff"}
 MAX_CSV_BYTES = 2 * 1024 * 1024
 
@@ -79,7 +79,7 @@ async def challan_pdf(challan_id: uuid.UUID, current_user: CurrentUser = Depends
     if challan is None:
         raise ResourceNotFoundError("Challan not found.")
     assignment = await db.get(FeeAssignment, challan.fee_assignment_id)
-    if not (Roles.ADMIN in current_user.roles or Roles.ACCOUNTS_OFFICER in current_user.roles):
+    if Permissions.FEE_OFFICE not in current_user.permissions:
         own = await _own_payer(db, current_user)
         if (own is None or (assignment.payer_type, assignment.payer_id) != own) and not await _parent_of(db, current_user, assignment):
             raise ResourceNotFoundError("Challan not found.")             # other people's challans are simply not there
@@ -96,7 +96,7 @@ async def receipt_pdf(entry_id: uuid.UUID, current_user: CurrentUser = Depends(r
     if entry is None or entry.entry_type not in (LedgerEntryType.CREDIT, LedgerEntryType.REFUND) or not entry.receipt_number:
         raise ResourceNotFoundError("Receipt not found.")
     assignment = await db.get(FeeAssignment, entry.fee_assignment_id)
-    if not (Roles.ADMIN in current_user.roles or Roles.ACCOUNTS_OFFICER in current_user.roles):
+    if Permissions.FEE_OFFICE not in current_user.permissions:
         own = await _own_payer(db, current_user)
         if (own is None or (assignment.payer_type, assignment.payer_id) != own) and not await _parent_of(db, current_user, assignment):
             raise ResourceNotFoundError("Receipt not found.")

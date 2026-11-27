@@ -47,7 +47,6 @@ async def _utc_bounds(first: date, last: date) -> tuple[datetime, datetime]:
 
 async def _admin_permissions(session: AsyncSession) -> set[str]:
     from app.auth.models import Permission, Role, RolePermission
-    from app.auth.permissions import Roles
 
     return set((await session.execute(select(Permission.code).join(RolePermission, RolePermission.permission_id == Permission.id)
                                       .join(Role, Role.id == RolePermission.role_id).where(Role.code == Roles.ADMIN))).scalars())
@@ -227,15 +226,15 @@ async def _round(session: AsyncSession, now: datetime | None) -> int:
 # ---------------------------------------------------------------------- the page
 from fastapi import APIRouter, Depends  # noqa: E402
 
-from app.auth.permissions import Roles  # noqa: E402
+from app.auth.permissions import Permissions, Roles  # noqa: E402
 from app.core.database import get_db  # noqa: E402
-from app.core.dependencies import CurrentUser, require_any_role  # noqa: E402
+from app.core.dependencies import CurrentUser, require_any_role, require_permission  # noqa: E402
 
 router = APIRouter(prefix="/morning-summary", tags=["reports"])
 
 
 @router.get("", summary="Today's morning summary, worked out now (administrators)")
-async def morning_summary(current_user: CurrentUser = Depends(require_any_role(Roles.ADMIN)), db=Depends(get_db)) -> dict:
+async def morning_summary(current_user: CurrentUser = Depends(require_permission(Permissions.SYSTEM_HEALTH)), db=Depends(get_db)) -> dict:
     from app.notifications.email_models import ServiceHeartbeat
 
     r = await build(db)

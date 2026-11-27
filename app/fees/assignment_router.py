@@ -41,7 +41,7 @@ router = APIRouter(prefix="/fees/assignments", tags=["fees"])
 # only roles that should ever see the whole institution's financial data.
 # Students/employees get their own data through the new /me endpoint
 # below instead, which filters by their own identity server-side.
-_STAFF_ONLY = require_any_role(Roles.ADMIN, Roles.ACCOUNTS_OFFICER)
+_STAFF_ONLY = require_permission(Permissions.FEE_OFFICE)
 
 
 async def _to_assignment_out(db, assignment) -> FeeAssignmentOut:

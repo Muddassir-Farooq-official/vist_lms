@@ -9,7 +9,9 @@
   {% from "_brand.html" import brand_head, brand_mark %}{{ brand_head() }}
   {% block extra_head %}{% endblock %}
 </head>
-<body data-allowed-roles="{% block allowed_roles %}ADMIN{% endblock %}" data-login-path="/?reauth=1">
+{%- set _here = (nav_items or [])|selectattr("slug", "equalto", active_nav)|list -%}
+<body data-allowed-roles="{% block allowed_roles %}ADMIN{% endblock %}" data-login-path="/?reauth=1"
+      {%- if _here and _here[0].rights %} data-page-rights="{{ _here[0].rights|join(',') }}"{% endif %}>
   {% from "_icons.html" import nav_icon %}
   {% from "_nav.html" import drawer_nav, bottom_nav %}
   <div id="auth-gate" class="gate-message"><div class="progress-ring"></div><span>Checking your session&hellip;</span></div>
@@ -17,7 +19,7 @@
   <div id="app-shell" class="app-shell" hidden>
     <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
 
-    <aside id="drawer" class="drawer">
+    <aside id="drawer" class="drawer"{% if nav_items and nav_items[0].rights is defined %} data-admin-menu{% endif %}>
       <div class="drawer-brand">
         {%- set _seg = request.url.path.split("/")[2] if request.url.path.startswith("/dashboard/") and request.url.path.count("/") >= 2 else "admin" -%}
         {{ brand_mark({"principal": "Principal", "hod": "Head of department", "exam": "Exams", "accounts": "Accounts", "library": "Library", "warden": "Hostel", "gate": "Gate"}.get(_seg, "Admin")) }}

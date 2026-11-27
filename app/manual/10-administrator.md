@@ -227,6 +227,17 @@ These are under **Settings → More tools** (and the menu's search), not in the 
 - **Settings** (in the menu): institute details, look, rules and your own account, and the **More tools** above.
 - **Data checker** (in the menu): finds gaps and mistakes in the records, each with **Fix…** to open the right page: students without a CNIC, mobile or parent's mobile, numbers that are not mobile numbers, students without a program or semester, the same name and date of birth on two students; staff without a CNIC, mobile, salary or login, and teachers with no subject; subjects without a teacher, students enrolled in nothing, open terms without dates, affiliated students without a Reg No; active students with no fee, and payments larger than the charges. It only reads; nothing is changed.
 
+### Access control
+
+**Access control** (System, in the menu) decides who can do what. Only administrators open it.
+
+- **Roles**: every built-in role (Teacher, Accounts Officer, Exam Controller, HOD, Principal...) and your own roles. Pick one, then for each module (Students, Timetable, Attendance & classes, Exams & results, Fees & fines, Payroll...) choose **None**, **View** or **Edit**, and tick **Approve** for the deciding rights (approve results, attendance corrections, refunds...). **Advanced** shows the single rights. **Check and save** shows exactly what changes and for whom before anything is saved. A built-in role you changed says *changed*; **Back to the standard** puts it back. Your changes are kept through every update.
+- **New role**: make your own, e.g. *Exam cell assistant* with Timetable and Exams. Start it from nothing or copy an existing role. Give it to people on the **People** tab or on Employees → Extra access.
+- **People**: one staff member's extra roles, and single rights **given** or **taken away**, with an end date if you like (it stops by itself the day after). A right taken away wins over every role. **Everything they can do now** lists each right and where it comes from. **See the system as them** opens their screens read-only.
+- Someone given rights from the administration's pages sees **Administration (given to you)** in their portal switcher, with only those pages in its menu.
+- **Safety**: the Administrator role always has everything and cannot be changed, and the last administrator can never lose it. Access control and View as stay with administrators. Nobody changes their own access. Students', parents' and alumni's roles keep their own portal. Giving money or control rights (refunds, reversing payments, payroll, scholarships, rules, backups...) or the Administrator role waits on **To confirm** for another administrator; with only one administrator it goes ahead and is logged.
+- **History**: every change with who and when; **Undo** puts it back.
+
 ### Backups
 
 Every night at 2:30 AM the server copies the database and all uploaded files, encrypted, to the backup account (off this server). On the 1st of each month it also restores the newest copy into a scratch database to prove the backup can really be opened. **Backups** shows:

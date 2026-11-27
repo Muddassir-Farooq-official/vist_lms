@@ -36,11 +36,14 @@ def _is_staff_for(party_type: ProfilePartyType, current_user: CurrentUser) -> bo
     wrongly let any student view any OTHER student's qualifications.
     Role checks are the actual scoping mechanism here, same as the rest
     of this codebase."""
+    # The Administrator and Accounts, as before; and anyone given the office rights on Access control (student.update /
+    # employee.update to change, never held by a student). Looking up alone does not let anyone change a profile.
+    perms = set(current_user.permissions or [])
+    if Roles.ADMIN in current_user.roles:
+        return True
     if party_type == ProfilePartyType.STUDENT:
-        return Roles.ADMIN in current_user.roles or Roles.ACCOUNTS_OFFICER in current_user.roles
-    # EMPLOYEE_VIEW/EMPLOYEE_UPDATE are ADMIN-only permissions today —
-    # no other role to disambiguate yet, unlike students.
-    return Roles.ADMIN in current_user.roles
+        return Roles.ACCOUNTS_OFFICER in current_user.roles or (Permissions.STUDENT_UPDATE in perms and Permissions.STUDENT_LOOKUP in perms)
+    return Permissions.EMPLOYEE_UPDATE in perms and Permissions.EMPLOYEE_VIEW in perms
 
 
 def _can_view(party_type: ProfilePartyType, own: tuple[ProfilePartyType, uuid.UUID] | None, party_id: uuid.UUID, current_user: CurrentUser) -> bool:

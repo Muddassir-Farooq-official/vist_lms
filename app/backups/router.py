@@ -24,18 +24,18 @@ from sqlalchemy import func, select
 
 from app.audit.service import AuditService
 from app.auth.models import Role, User, UserRole
-from app.auth.permissions import Roles
+from app.auth.permissions import Permissions, Roles
 from app.auth.schemas import CurrentUser
 from app.backups.models import BackupRun, ServerJob
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.dependencies import require_any_role
+from app.core.dependencies import require_any_role, require_permission
 from app.core.exceptions import (AuthenticationError, AuthorizationError, DuplicateResourceError, ResourceNotFoundError,
                                  ValidationAppError)
 from app.core.net import client_ip
 
 router = APIRouter(prefix="/backups", tags=["backups"])
-admin_only = require_any_role(Roles.ADMIN)
+admin_only = require_permission(Permissions.BACKUP_MANAGE)
 
 KINDS = ("BACKUP_NOW", "EXPORT_DB", "EXPORT_FILES")
 OPEN = ("PENDING", "RUNNING")

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, String, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, String, UniqueConstraint, func, true as sa_true
 from sqlalchemy.dialects.postgresql import INET
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -54,6 +54,10 @@ class Role(UUIDPKMixin, TimestampMixin, Base):
 
     code: Mapped[str] = mapped_column(String(32), nullable=False)  # e.g. ADMIN, TEACHER
     name: Mapped[str] = mapped_column(String(100), nullable=False)
+    # Built-in roles come with the system (their rights are seeded on every deploy, except any an administrator took
+    # away: RolePermissionRemoval). Custom roles are made on Settings -> Access control.
+    is_builtin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=sa_true())
+    description: Mapped[str | None] = mapped_column(String(300), nullable=True)
 
     role_permissions: Mapped[list["RolePermission"]] = relationship(
         back_populates="role", cascade="all, delete-orphan"

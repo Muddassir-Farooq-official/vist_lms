@@ -69,7 +69,7 @@ async def login(
     service = AuthService(db)
     ip, ua = client_ip(request), request.headers.get("user-agent")
     user = await service.check_password(username=payload.username, password=payload.password, ip=ip, user_agent=ua)
-    roles, _perms = service._roles_and_permissions(user)
+    roles, _perms = await service._roles_and_permissions(user)
     if tf.required_for(roles):
         if user.totp_secret_enc is None:
             return TokenResponse(access_token="", expires_in_minutes=0, two_factor="setup", challenge=tf.challenge_for(user, "setup"),
@@ -90,7 +90,7 @@ async def _signed_in(db, response: Response, service: AuthService, user, tokens,
         user.language = chosen
         await db.commit()
     _set_lang_cookie(response, getattr(user, "language", "en"))
-    roles, perms = service._roles_and_permissions(user)
+    roles, perms = await service._roles_and_permissions(user)
     from app.core.dependencies import email_gate_on
 
     must_verify = not (user.email and user.email_verified_at) and await email_gate_on(db)
@@ -237,6 +237,13 @@ async def reset_password(payload: _ResetIn, request: Request, db=Depends(get_db)
 
 @router.get("/me", response_model=CurrentUser, summary="Get the current authenticated user")
 async def me(current_user: CurrentUser = Depends(get_current_user_allow_pending_password_change)) -> CurrentUser:
+    if "ADMIN" not in current_user.roles and current_user.extra_permissions:
+        from app.main import ADMIN_NAV_ITEMS
+
+        held = set(current_user.extra_permissions)
+        first = next((i for i in ADMIN_NAV_ITEMS if held & set(i.get("rights") or [])), None)
+        if first is not None:
+            current_user = current_user.model_copy(update={"admin_home": first["href"]})
     return current_user
 
 
@@ -287,7 +294,7 @@ async def change_password(
     # (that flag is baked into the signed token), so without a fresh one the
     # very next page would send a brand-new student straight back to this form
     # until the old token expired. Issue a new access cookie reflecting reality.
-    roles, perms = service._roles_and_permissions(user)
+    roles, perms = await service._roles_and_permissions(user)
     fresh = create_access_token(
         user_id=user.id, username=user.username, roles=roles, permissions=perms,
         must_change_password=user.must_change_password,

@@ -290,6 +290,8 @@ ADMIN_NAV_ITEMS = [
     _nav("panel-warden", "Hostel warden", "hostel", "/dashboard/warden/home", group="Other offices"),
     _nav("panel-staff", "General staff", "employees", "/dashboard/staff", group="Other offices"),
     _nav("view-as", "View as a person", "user", "/dashboard/admin/view-as", group="Other offices", keywords="impersonate"),
+    _nav("access", "Access control", "shield", "/dashboard/admin/access", group="System",
+         keywords="roles permissions rights who can do what custom role grant revoke approve"),
     _nav("settings", "Settings", "settings", "/dashboard/admin/settings", group="System", keywords="rules policy institute profile"),
     _nav("data-check", "Data checker", "check-circle", "/dashboard/admin/data-check", group="System", keywords="missing duplicates cnic phone clean"),
     _nav("help", "Help & manual", "file", "/dashboard/admin/help", group="System"),
@@ -301,6 +303,12 @@ ADMIN_NAV_ITEMS = [
     _nav("backups", "Backups", "cloud-upload", "/dashboard/admin/backups", group="System", hub=True, keywords="restore"),
     _nav("server-health", "Server health", "dashboard", "/dashboard/admin/server-health", group="System", hub=True, keywords="disk memory certificate"),
 ]
+
+# Which rights open each administration page for someone who is not an Administrator (Settings -> Access control).
+from app.access.catalog import page_rights as _page_rights  # noqa: E402
+
+for _item in ADMIN_NAV_ITEMS:
+    _item["rights"] = _page_rights().get(_item["slug"], [])
 
 # Library staff (ADMIN + LIBRARIAN). Student/teacher borrowing lives in their
 # own portals (see STUDENT_NAV_ITEMS / FACULTY_NAV_ITEMS).
@@ -787,8 +795,10 @@ from app.feedback.router import router as feedback_router  # noqa: E402
 
 app.include_router(feedback_router, prefix=settings.api_v1_prefix)
 from app.onboarding.router import router as onboarding_router  # noqa: E402
+from app.access.router import router as access_router  # noqa: E402
 
 app.include_router(onboarding_router, prefix=settings.api_v1_prefix)
+app.include_router(access_router, prefix=settings.api_v1_prefix)
 from app.fees.onebill_router import report_router as onebill_report_router, router as onebill_router  # noqa: E402
 
 app.include_router(onebill_router, prefix=settings.api_v1_prefix)
@@ -1358,6 +1368,12 @@ async def admin_employee_handover_page(request: Request, employee_id: uuid.UUID)
     return templates.TemplateResponse(
         request, "admin/employee_handover.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "employees", "employee_id": employee_id}
     )
+
+
+@app.get("/dashboard/admin/access", include_in_schema=False)
+async def admin_access_page(request: Request):
+    """Settings -> Access control: roles, custom roles, one person's own rights, second-administrator confirmations, history."""
+    return templates.TemplateResponse(request, "admin/access.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "access"})
 
 
 @app.get("/dashboard/admin/welcome", include_in_schema=False)

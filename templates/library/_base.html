@@ -9,7 +9,7 @@
   {% from "_brand.html" import brand_head, brand_mark %}{{ brand_head() }}
   {% block extra_head %}{% endblock %}
 </head>
-<body data-allowed-roles="ADMIN,LIBRARIAN" data-login-path="/?reauth=1">
+<body data-allowed-roles="ADMIN,LIBRARIAN" data-page-rights="library.view,library.issue,library.manage" data-login-path="/?reauth=1">
   {% from "_icons.html" import nav_icon %}
   {% from "_nav.html" import drawer_nav, bottom_nav %}
   <div id="auth-gate" class="gate-message"><div class="progress-ring"></div><span>Checking your session&hellip;</span></div>

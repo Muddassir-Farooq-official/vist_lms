@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sqlalchemy import select
 
+from app.access.models import RolePermissionRemoval
 from app.auth.models import Permission, Role, RolePermission, User, UserRole
 from app.auth.permissions import ROLE_PERMISSION_SEED, Permissions, Roles
 from app.core.database import AsyncSessionLocal
@@ -71,11 +72,15 @@ async def seed(with_admin: bool, admin_username: str | None, admin_password: str
                 print(f"  + role {role_code}")
             code_to_role[role_code] = existing
 
-        # Role -> Permission mapping
+        # Role -> Permission mapping. A right an administrator took away from a built-in role (Settings -> Access
+        # control) is left out: a deploy must never quietly give it back. New rights added by an update still arrive.
+        removed = {(r, p) for r, p in (await session.execute(select(RolePermissionRemoval.role_id, RolePermissionRemoval.permission_id))).all()}
         for role_code, perm_codes in ROLE_PERMISSION_SEED.items():
             role = code_to_role[role_code]
             for perm_code in perm_codes:
                 permission = code_to_permission[perm_code]
+                if (role.id, permission.id) in removed:
+                    continue
                 exists = (
                     await session.execute(
                         select(RolePermission).where(
