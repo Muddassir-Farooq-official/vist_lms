@@ -309,11 +309,11 @@ async def _sheet(db, employee_id: uuid.UUID, month: date | None) -> dict:
     return await lecture_sheet(db, e, _month(month))
 
 
-def _sheet_pdf(sheet: dict) -> Response:
+async def _sheet_pdf(sheet: dict) -> Response:
     from app.payroll.lectures import render_sheet_pdf
 
     name = f"lectures-{sheet['employee']['code'] or 'staff'}-{sheet['month']:%Y-%m}.pdf"
-    return Response(content=render_sheet_pdf(sheet), media_type="application/pdf",
+    return Response(content=await run_in_threadpool(render_sheet_pdf, sheet), media_type="application/pdf",
                     headers={"Content-Disposition": f'inline; filename="{name}"', "Cache-Control": "no-store"})
 
 
@@ -324,7 +324,7 @@ async def visiting_lectures(employee_id: uuid.UUID, month: date | None = None, c
 
 @router.get("/visiting/{employee_id}/lectures.pdf", summary="The lecture sheet as a PDF")
 async def visiting_lectures_pdf(employee_id: uuid.UUID, month: date | None = None, current_user: CurrentUser = Depends(view), db=Depends(get_db)) -> Response:
-    return _sheet_pdf(await _sheet(db, employee_id, month))
+    return await _sheet_pdf(await _sheet(db, employee_id, month))
 
 
 async def _own_employee_id(db, current_user) -> uuid.UUID:
@@ -343,7 +343,7 @@ async def my_lectures(month: date | None = None, current_user: CurrentUser = Dep
 
 @router.get("/me/lectures.pdf", summary="My lecture sheet as a PDF (visiting faculty)")
 async def my_lectures_pdf(month: date | None = None, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> Response:
-    return _sheet_pdf(await _sheet(db, await _own_employee_id(db, current_user), month))
+    return await _sheet_pdf(await _sheet(db, await _own_employee_id(db, current_user), month))
 
 
 @router.get("/withholdings", summary="What salaries have held back in a year (security, deductions, advance recoveries), by head and month")
