@@ -44,16 +44,25 @@ class AccessRoleService:
         return list((await self.session.execute(
             select(Role.code).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == user_id))).scalars())
 
+    async def _grantable(self) -> list[str]:
+        """The built-in staff roles above, then the custom roles made on Settings -> Access control."""
+        custom = (await self.session.execute(select(Role.code).where(Role.is_builtin.is_(False)).order_by(Role.name))).scalars().all()
+        return list(GRANTABLE) + list(custom)
+
     async def get(self, employee_id: uuid.UUID) -> dict:
         employee, main = await self._employee_user(employee_id)
         codes = await self._codes(employee.user_id)
+        grantable = await self._grantable()
+        names = dict((await self.session.execute(select(Role.code, Role.name).where(Role.code.in_(grantable)))).all())
         return {"employee_id": employee.id, "main_role": main, "roles": sorted(codes),
-                "extra_roles": sorted(c for c in codes if c != main), "grantable": [c for c in GRANTABLE if c != main]}
+                "extra_roles": sorted(c for c in codes if c != main), "grantable": [c for c in grantable if c != main],
+                "names": names}
 
     async def set_extra(self, employee_id: uuid.UUID, extra: list[str], *, actor_user_id: uuid.UUID) -> dict:
         employee, main = await self._employee_user(employee_id)
         wanted = {c.strip().upper() for c in extra}
-        bad = [c for c in wanted if c not in GRANTABLE]
+        grantable = set(await self._grantable())
+        bad = [c for c in wanted if c not in grantable]
         if bad:
             raise ValidationAppError(f"These roles cannot be given to staff: {', '.join(sorted(bad))}.")
         wanted.discard(main or "")

@@ -27,7 +27,10 @@ LABELS = {
     "SCHOLARSHIP_EDIT": "Change a scholarship or discount",
     "CLASS_REQUEST": "Make-up or extra class",
     "PAYMENT_MOVE": "Move a payment to the right fee",
+    "ACCESS_CHANGE": "Access change (second administrator)",
 }
+# Confirmed on Settings -> Access control by another administrator, not on the Approvals page.
+HIDDEN_KINDS = ("ACCESS_CHANGE",)
 EXECUTORS: dict[str, Callable[[AsyncSession, ApprovalRequest, uuid.UUID], Awaitable[dict]]] = {}
 
 
@@ -53,12 +56,9 @@ def _jsonable(v: Any) -> Any:
 
 
 async def other_approvers(session: AsyncSession, actor_id) -> int:
-    from app.auth.models import Permission, RolePermission, User, UserRole
+    from app.access.resolve import users_with_permission
 
-    return (await session.execute(
-        select(func.count(func.distinct(User.id))).join(UserRole, UserRole.user_id == User.id)
-        .join(RolePermission, RolePermission.role_id == UserRole.role_id).join(Permission, Permission.id == RolePermission.permission_id)
-        .where(Permission.code == Permissions.APPROVALS_DECIDE, User.is_active.is_(True), User.id != actor_id))).scalar_one()
+    return len(await users_with_permission(session, Permissions.APPROVALS_DECIDE, exclude=actor_id))
 
 
 async def gate(session: AsyncSession, *, kind: str, actor_id, target_id=None, payload: dict, summary: str, amount=None,
@@ -84,25 +84,18 @@ async def gate(session: AsyncSession, *, kind: str, actor_id, target_id=None, pa
 
 
 async def _users_with_permission(session: AsyncSession, code: str, *, exclude=None) -> list:
-    """Active users holding this permission through any of their roles (optionally leaving one out)."""
-    from app.auth.models import Permission, RolePermission, User, UserRole
+    """Active users holding this permission (roles, custom roles and their own rights; optionally leaving one out)."""
+    from app.access.resolve import users_with_permission
 
-    stmt = (select(User.id).distinct().join(UserRole, UserRole.user_id == User.id).join(RolePermission, RolePermission.role_id == UserRole.role_id)
-            .join(Permission, Permission.id == RolePermission.permission_id).where(Permission.code == code, User.is_active.is_(True)))
-    if exclude is not None:
-        stmt = stmt.where(User.id != exclude)
-    return list((await session.execute(stmt)).scalars().all())
+    return await users_with_permission(session, code, exclude=exclude)
 
 
 async def _notify_approvers(session: AsyncSession, r: ApprovalRequest, actor_id) -> None:
-    from app.auth.models import Permission, RolePermission, User, UserRole
+    from app.access.resolve import users_with_permission
     from app.notifications.models import NotificationCategory
     from app.notifications.service import create_notification
 
-    ids = (await session.execute(
-        select(User.id).distinct().join(UserRole, UserRole.user_id == User.id).join(RolePermission, RolePermission.role_id == UserRole.role_id)
-        .join(Permission, Permission.id == RolePermission.permission_id)
-        .where(Permission.code == Permissions.APPROVALS_DECIDE, User.is_active.is_(True), User.id != actor_id))).scalars().all()
+    ids = await users_with_permission(session, Permissions.APPROVALS_DECIDE, exclude=actor_id)
     category = getattr(NotificationCategory, "TASK", None) or list(NotificationCategory)[0]
     for uid in ids:
         await create_notification(session, user_id=uid, category=category, title=f"Approval needed: {LABELS.get(r.kind, r.kind)}",
@@ -134,8 +127,19 @@ class ApprovalService:
         r = await self._get(request_id, lock=True)
         if r.status != "REQUESTED":
             raise BusinessRuleViolationError(f"This request is already {r.status.lower()}.")
-        sole = await four_eyes(self.session, actor_id, [r.requested_by], Permissions.APPROVALS_DECIDE,
-                               "You asked for this; another administrator must approve or reject it.")
+        if r.kind in HIDDEN_KINDS:
+            # an access change is confirmed only by ANOTHER administrator (never the one who asked, even if alone now)
+            from app.access.resolve import effective
+
+            _roles, rights, _extra = await effective(self.session, actor_id)
+            if Permissions.ROLE_MANAGE not in rights:
+                raise BusinessRuleViolationError("Only an administrator can confirm an access change.")
+            if str(actor_id) == str(r.requested_by):
+                raise BusinessRuleViolationError("You asked for this change; another administrator must confirm it.")
+            sole = False
+        else:
+            sole = await four_eyes(self.session, actor_id, [r.requested_by], Permissions.APPROVALS_DECIDE,
+                                   "You asked for this; another administrator must approve or reject it.")
         note = (note or "").strip() or None
         if not approve:
             if not note or len(note) < 3:
@@ -178,7 +182,7 @@ class ApprovalService:
     async def listing(self, *, status: str | None, mine_for=None) -> list[dict]:
         from app.accounts.service import AccountsService
 
-        stmt = select(ApprovalRequest).order_by(ApprovalRequest.created_at.desc()).limit(300)
+        stmt = select(ApprovalRequest).where(ApprovalRequest.kind.not_in(HIDDEN_KINDS)).order_by(ApprovalRequest.created_at.desc()).limit(300)
         if status:
             stmt = stmt.where(ApprovalRequest.status == status)
         if mine_for is not None:
@@ -190,7 +194,8 @@ class ApprovalService:
                  "decided_by": names.get(r.decided_by), "decided_at": r.decided_at, "decision_note": r.decision_note} for r in rows]
 
     async def pending_count(self) -> int:
-        return (await self.session.execute(select(func.count()).select_from(ApprovalRequest).where(ApprovalRequest.status == "REQUESTED"))).scalar_one()
+        return (await self.session.execute(select(func.count()).select_from(ApprovalRequest).where(
+            ApprovalRequest.status == "REQUESTED", ApprovalRequest.kind.not_in(HIDDEN_KINDS)))).scalar_one()
 
 
 # ====================================================================== how each kind is carried out
@@ -264,3 +269,10 @@ async def _scholarship_edit(session: AsyncSession, r: ApprovalRequest, actor_id)
     s, summary = await ScholarshipService(session).update(uuid.UUID(r.payload["scholarship_id"]), c, actor_id=r.requested_by or actor_id,
                                                           note=r.payload.get("note") or "Approved change", approved=True)
     return {"scholarship_id": s.id, **summary}
+
+
+@executor("ACCESS_CHANGE")
+async def _access_change(session: AsyncSession, r: ApprovalRequest, actor_id) -> dict:
+    from app.access.service import AccessService
+
+    return await AccessService(session).apply_confirmed(r.payload, actor_id=actor_id, approval_id=r.id, requested_by=r.requested_by)

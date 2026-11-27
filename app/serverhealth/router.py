@@ -5,16 +5,16 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
 
-from app.auth.permissions import Roles
+from app.auth.permissions import Permissions, Roles
 from app.core.database import get_db
-from app.core.dependencies import CurrentUser, require_any_role
+from app.core.dependencies import CurrentUser, require_any_role, require_permission
 from app.serverhealth.service import CERT_DAYS, DISK_PCT, latest, problems
 
 router = APIRouter(prefix="/server-health", tags=["server-health"])
 
 
 @router.get("", summary="The server's last health report and its problems (administrators)")
-async def health(current_user: CurrentUser = Depends(require_any_role(Roles.ADMIN)), db=Depends(get_db)) -> dict:
+async def health(current_user: CurrentUser = Depends(require_permission(Permissions.SYSTEM_HEALTH)), db=Depends(get_db)) -> dict:
     from app.core.background import backup_status
     from app.core.releases import version_info
 

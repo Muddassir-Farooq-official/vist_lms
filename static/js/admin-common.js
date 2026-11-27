@@ -557,9 +557,31 @@ window.VistAdmin = (function () {
     return me;
   }
 
-  function hasAllowedRole(roles) {
+  // Rights that open this page for someone given them on Settings -> Access control (a custom role, a right added to
+  // their role, or their own right): <body data-page-rights="timetable.manage,...">. The server checks every action
+  // again; this only decides whether the page is shown.
+  function pageRights() {
+    const raw = document.body.getAttribute("data-page-rights");
+    return raw ? raw.split(",").filter(Boolean) : [];
+  }
+  function hasAllowedRole(roles, me) {
     const allowed = allowedRoles();
-    return (roles || []).some(function (r) { return allowed.indexOf(r) !== -1; });
+    if ((roles || []).some(function (r) { return allowed.indexOf(r) !== -1; })) return true;
+    const extra = (me && me.extra_permissions) || [];
+    return pageRights().some(function (p) { return extra.indexOf(p) !== -1; });
+  }
+  // Someone who is not an Administrator but was given some of its pages sees only those in its menu.
+  function trimAdminMenu(me) {
+    if (!me || (me.roles || []).indexOf("ADMIN") !== -1 || !document.querySelector("[data-admin-menu]")) return;
+    const extra = me.extra_permissions || [];
+    document.querySelectorAll("[data-admin-menu] [data-nav]").forEach(function (a) {
+      const rights = (a.getAttribute("data-rights") || "").split(",").filter(Boolean);
+      const ok = a.getAttribute("data-nav") === "help" || rights.some(function (p) { return extra.indexOf(p) !== -1; });
+      if (!ok) { a.hidden = true; a.setAttribute("data-trimmed", "1"); }
+    });
+    document.querySelectorAll("[data-admin-menu] .drawer-section").forEach(function (sec) {
+      if (!sec.querySelector("[data-nav]:not([data-trimmed])")) sec.hidden = true;
+    });
   }
 
   // Staff holding several roles (e.g. Teacher + Exam Controller) get a "Switch portal" menu in the top bar.
@@ -573,6 +595,9 @@ window.VistAdmin = (function () {
     const holder = document.querySelector(".content-topbar-right");
     if (!holder || !me || document.getElementById("portal-switch")) return;
     const mine = PORTALS.filter(function (p) { return (me.roles || []).indexOf(p[0]) !== -1; });
+    if ((me.roles || []).indexOf("ADMIN") === -1 && (me.extra_permissions || []).length && me.admin_home) {
+      mine.unshift(["", "Administration (given to you)", me.admin_home]);
+    }
     if (mine.length < 2) return;
     const here = window.location.pathname;
     const sel = document.createElement("select");
@@ -592,7 +617,7 @@ window.VistAdmin = (function () {
 
     // Fast path: we know who this is from the sign-in a moment ago.
     const cached = readCachedMe();
-    if (cached && !cached.must_change_password && !cached.email_verification_required && hasAllowedRole(cached.roles)) {
+    if (cached && !cached.must_change_password && !cached.email_verification_required && hasAllowedRole(cached.roles, cached)) {
       fetchMeWithRefresh().then(function (res) {
         if (res.status === 0) return;                 // no network right now: not a reason to sign anyone out
         if (!res.ok || !res.body) {
@@ -627,7 +652,7 @@ window.VistAdmin = (function () {
       return null;
     }
 
-    if (!hasAllowedRole(me.body.roles)) {
+    if (!hasAllowedRole(me.body.roles, me.body)) {
       if (authGate) {
         authGate.textContent =
           'This account ("' + (me.body.username || "unknown") + '") does not have access to this area.';
@@ -1522,6 +1547,7 @@ window.VistAdmin = (function () {
     showTopBars(me);
 
     insertSkeletons(document.querySelector(".content-main") || document);
+    trimAdminMenu(me);
     addPortalSwitcher(me);
     document.dispatchEvent(new CustomEvent("vistadmin:ready", { detail: { me: me } }));
     // Tours, "what to do now" and the administrator's setup checklist on every page (static/js/guide.js)

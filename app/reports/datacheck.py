@@ -12,9 +12,9 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.permissions import Roles
+from app.auth.permissions import Permissions, Roles
 from app.core.database import get_db
-from app.core.dependencies import CurrentUser, require_any_role
+from app.core.dependencies import CurrentUser, require_any_role, require_permission
 
 LIMIT = 200
 
@@ -178,6 +178,6 @@ router = APIRouter(prefix="/data-check", tags=["reports"])
 
 
 @router.get("", summary="Gaps and mistakes in the records, with links to fix them (administrators)")
-async def data_check(current_user: CurrentUser = Depends(require_any_role(Roles.ADMIN)), db=Depends(get_db)) -> dict:
+async def data_check(current_user: CurrentUser = Depends(require_permission(Permissions.SYSTEM_HEALTH)), db=Depends(get_db)) -> dict:
     return await DataChecker(db).run()
 

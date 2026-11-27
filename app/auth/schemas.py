@@ -54,6 +54,11 @@ class CurrentUser(BaseModel):
     username: str
     roles: list[str]
     permissions: list[str]
+    # Rights beyond what the person's built-in roles come with (custom role, added right, own grant): these open the
+    # matching pages of the administration's portal (app/access/resolve.py).
+    extra_permissions: list[str] = []
+    # The first administration page those rights open (for the "Switch portal" menu); None when there is none.
+    admin_home: str | None = None
     must_change_password: bool
     # The administrator requires a verified email and this account has none yet: only /verify-email works until it does.
     email_verification_required: bool = False

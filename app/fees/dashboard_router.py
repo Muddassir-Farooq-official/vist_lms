@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, BackgroundTasks, Depends
 
-from app.auth.permissions import Roles
+from app.auth.permissions import Permissions, Roles
 from app.auth.schemas import CurrentUser
 from app.core.cache import get_cached, refresh_in_background, set_cached
 from app.core.database import AsyncSessionLocal, get_db
-from app.core.dependencies import require_any_role
+from app.core.dependencies import require_any_role, require_permission
 from app.fees.dashboard_service import FeeDashboardService
 from app.fees.schemas import FeeDashboardResponse
 
@@ -27,7 +27,7 @@ async def fee_dashboard(
     # NOTE — same security fix as assignment_router.py: this is
     # institution-wide financial data and must never be reachable by the
     # generic FEE_VIEW permission STUDENT also holds.
-    current_user: CurrentUser = Depends(require_any_role(Roles.ADMIN, Roles.ACCOUNTS_OFFICER)),
+    current_user: CurrentUser = Depends(require_permission(Permissions.FEE_OFFICE)),
     db=Depends(get_db),
 ) -> FeeDashboardResponse:
     cached = await get_cached(_CACHE_KEY)

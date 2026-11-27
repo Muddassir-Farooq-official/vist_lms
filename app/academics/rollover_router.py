@@ -7,12 +7,12 @@ from datetime import date
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
-from app.auth.permissions import Roles
+from app.auth.permissions import Permissions, Roles
 from app.core.database import get_db
-from app.core.dependencies import CurrentUser, require_any_role
+from app.core.dependencies import CurrentUser, require_any_role, require_permission
 
 router = APIRouter(prefix="/rollover", tags=["rollover"])
-admin = require_any_role(Roles.ADMIN)
+admin = require_permission(Permissions.SYSTEM_HEALTH)
 
 
 def _svc(db):

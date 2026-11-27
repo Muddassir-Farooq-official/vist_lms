@@ -233,15 +233,13 @@ class MentoringService:
         """Never raises."""
         try:
             async with self.session.begin_nested():
-                from app.auth.models import Permission, RolePermission, UserRole
+                from app.access.resolve import users_with_permission
                 from app.notifications.models import NotificationCategory
                 from app.notifications.service import create_notification
                 from app.students.models import Student
 
                 s = await self.session.get(Student, m.student_id)
-                users = set((await self.session.execute(select(UserRole.user_id).join(RolePermission, RolePermission.role_id == UserRole.role_id)
-                                                        .join(Permission, Permission.id == RolePermission.permission_id)
-                                                        .where(Permission.code == "mentoring.manage"))).scalars())
+                users = set(await users_with_permission(self.session, "mentoring.manage"))
                 for uid in users:
                     await create_notification(self.session, user_id=uid, category=NotificationCategory.GENERAL,
                                               title=f"Mentor referral: {s.first_name} {s.last_name} ({s.roll_number})",

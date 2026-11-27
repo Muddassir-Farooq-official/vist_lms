@@ -82,9 +82,14 @@ def _assert_directory_access(current_user: CurrentUser, *, allow_exam_department
     TEACHER / LIBRARIAN / STUDENT all hold student.view (for their own
     scoped screens) but must NOT be able to list every student: teachers
     use their offering rosters, librarians use /library/borrowers/search."""
-    # The exam department, the principal and heads of department may SEARCH (to open a profile or result card, read-only); only the office exports.
-    allowed = {Roles.ADMIN, Roles.ACCOUNTS_OFFICER} | ({Roles.EXAM_CONTROLLER, Roles.PRINCIPAL, Roles.HOD} if allow_exam_department else set())
-    if not (allowed & set(current_user.roles)):
+    # Searching: "See any student's record" (student.lookup: the administration, accounts office, exam department,
+    # principal and heads of department by default, or anyone given it on Access control), read-only. Exporting: the
+    # office (the Administrator, or someone who also edits students or handles every student's fees).
+    perms = set(current_user.permissions or [])
+    if Roles.ADMIN in current_user.roles:
+        return
+    ok = Permissions.STUDENT_LOOKUP in perms and (allow_exam_department or bool(perms & {Permissions.FEE_OFFICE, Permissions.STUDENT_UPDATE}))
+    if not ok:
         raise AuthorizationError("You do not have access to the student directory.")
 
 

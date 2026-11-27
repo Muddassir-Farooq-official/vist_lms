@@ -46,6 +46,7 @@ class Permissions:
     STUDENT_CREATE = "student.create"
     STUDENT_UPDATE = "student.update"
     STUDENT_IMPORT = "student.import"
+    STUDENT_LOOKUP = "student.lookup"   # see ANY student's record, read-only (office staff); student.view alone is scoped
 
     # Programs
     PROGRAM_VIEW = "program.view"
@@ -224,7 +225,10 @@ class Permissions:
     REPORTS_VIEW = "reports.view"
 
     # Admin / RBAC management
-    ROLE_MANAGE = "role.manage"
+    ROLE_MANAGE = "role.manage"        # Settings -> Access control and Employees -> Extra access (Administrator only, never given out)
+    FEE_OFFICE = "fee.office"          # every student's fee account and the fee office's lists (fee.view alone is a payer's own)
+    BACKUP_MANAGE = "backup.manage"    # Backups page
+    SYSTEM_HEALTH = "system.health"    # server health, data check, morning summary, semester rollover
     AUDIT_VIEW = "audit.view"
     # Change institute policy values (attendance thresholds, promotion rules, fee grace days) from Settings.
     POLICY_MANAGE = "policy.manage"
@@ -292,6 +296,8 @@ class Permissions:
 # seed script), not editing scattered `if` statements.
 ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
     Roles.ADMIN: (
+        Permissions.FEE_OFFICE,
+        Permissions.STUDENT_LOOKUP,
         Permissions.TIMETABLE_MANAGE,
         Permissions.COMMITTEE_MANAGE,
         Permissions.MENTORING_MANAGE,
@@ -347,6 +353,8 @@ ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
         Permissions.LIBRARY_ISSUE,
         Permissions.REPORTS_VIEW,
         Permissions.ROLE_MANAGE,
+        Permissions.BACKUP_MANAGE,
+        Permissions.SYSTEM_HEALTH,
         Permissions.AUDIT_VIEW,
         Permissions.AUDIT_EXPORT,
         Permissions.VIEW_AS,
@@ -429,6 +437,8 @@ ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
         Permissions.APPLICATION_SUBMIT,
     ),
     Roles.ACCOUNTS_OFFICER: (
+        Permissions.FEE_OFFICE,
+        Permissions.STUDENT_LOOKUP,
         Permissions.CHARGES_APPROVE,   # the month's hostel / mess / transport draft
         Permissions.STUDENT_VIEW,  # read-only, for billing context
         Permissions.FEE_VIEW,
@@ -479,14 +489,14 @@ ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
     ),
     # Placeholder role — Hostel module not built yet.
     Roles.HOSTEL_WARDEN: (Permissions.HOSTEL_VIEW, Permissions.HOSTEL_MANAGE, Permissions.STUDENT_VIEW, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
-    Roles.EXAM_CONTROLLER: (Permissions.TIMETABLE_MANAGE, Permissions.DOCUMENT_ISSUE, Permissions.EXAM_SCHEDULE_MANAGE, Permissions.COURSE_VIEW, Permissions.RESULT_APPROVE, Permissions.MARKS_ENTER, Permissions.STUDENT_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
+    Roles.EXAM_CONTROLLER: (Permissions.STUDENT_LOOKUP, Permissions.TIMETABLE_MANAGE, Permissions.DOCUMENT_ISSUE, Permissions.EXAM_SCHEDULE_MANAGE, Permissions.COURSE_VIEW, Permissions.RESULT_APPROVE, Permissions.MARKS_ENTER, Permissions.STUDENT_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
     Roles.PARENT: (Permissions.PARENT_VIEW,),
     Roles.CLINICAL_SUPERVISOR: (Permissions.CLINICAL_SUPERVISE,),
     Roles.ALUMNUS: (Permissions.ALUMNI_SELF,),
-    Roles.PRINCIPAL: (Permissions.INSTITUTE_OVERVIEW, Permissions.WARNING_DECIDE, Permissions.AUDIT_VIEW, Permissions.HOSTEL_VIEW, Permissions.INVENTORY_VIEW, Permissions.ASSET_VIEW, Permissions.STAFF_ATTENDANCE_VIEW, Permissions.ACADEMIC_OVERSIGHT, Permissions.ATTENDANCE_VIEW,
+    Roles.PRINCIPAL: (Permissions.STUDENT_LOOKUP, Permissions.INSTITUTE_OVERVIEW, Permissions.WARNING_DECIDE, Permissions.AUDIT_VIEW, Permissions.HOSTEL_VIEW, Permissions.INVENTORY_VIEW, Permissions.ASSET_VIEW, Permissions.STAFF_ATTENDANCE_VIEW, Permissions.ACADEMIC_OVERSIGHT, Permissions.ATTENDANCE_VIEW,
                       Permissions.COURSE_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.STUDENT_VIEW,
                       Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
-    Roles.HOD: (Permissions.ATTENDANCE_CORRECTION_DECIDE, Permissions.ACADEMIC_OVERSIGHT, Permissions.ATTENDANCE_VIEW,
+    Roles.HOD: (Permissions.STUDENT_LOOKUP, Permissions.ATTENDANCE_CORRECTION_DECIDE, Permissions.ACADEMIC_OVERSIGHT, Permissions.ATTENDANCE_VIEW,
                 Permissions.COURSE_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.STUDENT_VIEW,
                 Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
     # General staff: nothing about students, fees, marks or another office's data. Only their own applications, tasks,

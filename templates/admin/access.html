@@ -1,0 +1,76 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN{% endblock %}
+{% block title %}Access control{% endblock %}
+{% block page_title %}Access control{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Who can do what. Change what each role can do, make your own roles, and give or take single rights for one person (until a date if you like). Money and control rights wait for a second administrator. Every change is kept and can be undone.</div>{% endblock %}
+
+{% block content %}
+<div class="portal-tabs" role="tablist" data-auto-tabs>
+  <button class="portal-tab active" data-tab="roles" role="tab" aria-selected="true"><span>Roles</span></button>
+  <button class="portal-tab" data-tab="people" role="tab" aria-selected="false"><span>People</span></button>
+  <button class="portal-tab" data-tab="waiting" role="tab" aria-selected="false"><span>To confirm <b class="ac-count" id="ac-wait-count" hidden></b></span></button>
+  <button class="portal-tab" data-tab="history" role="tab" aria-selected="false"><span>History</span></button>
+</div>
+<p id="ac-msg" class="dash-alert" role="status" hidden></p>
+
+<!-- ============================================================ roles -->
+<div data-tab-panel="roles" class="ac-layout">
+  <section class="sh-card ac-list">
+    <div class="ac-list-head"><h2 class="panel-title">Roles</h2><button type="button" class="role-btn small-btn" id="ac-new-role">New role</button></div>
+    <ul class="ac-roles" id="ac-roles"></ul>
+  </section>
+  <section class="sh-card ac-editor" id="ac-role-editor">
+    <p class="empty-state">Choose a role on the left.</p>
+  </section>
+</div>
+
+<!-- ============================================================ people -->
+<div data-tab-panel="people" class="ac-layout" hidden>
+  <section class="sh-card ac-list">
+    <h2 class="panel-title">Staff</h2>
+    <input type="search" id="ac-people-q" class="text-input" placeholder="Name, code or department" aria-label="Find a staff member" />
+    <ul class="ac-roles" id="ac-people"></ul>
+  </section>
+  <section class="sh-card ac-editor" id="ac-person">
+    <p class="empty-state">Choose a person on the left. Students, parents and alumni keep their own portals; rights are given to staff.</p>
+  </section>
+</div>
+
+<!-- ============================================================ waiting -->
+<section data-tab-panel="waiting" class="sh-card" hidden>
+  <h2 class="panel-title">Waiting for a second administrator</h2>
+  <p class="panel-hint">Giving money or control rights, or the Administrator role, is saved here until another administrator confirms it. The one who asked cannot confirm their own change.</p>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Asked</th><th>Change</th><th>Gives</th><th></th></tr></thead><tbody id="ac-waiting"></tbody></table></div>
+  <p class="empty-state" id="ac-waiting-empty" hidden>Nothing is waiting.</p>
+</section>
+
+<!-- ============================================================ history -->
+<section data-tab-panel="history" class="sh-card" hidden>
+  <h2 class="panel-title">Every access change</h2>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>When</th><th>By</th><th>Change</th><th></th></tr></thead><tbody id="ac-history"></tbody></table></div>
+  <p class="empty-state" id="ac-history-empty" hidden>No changes yet.</p>
+</section>
+
+<dialog id="ac-new-dialog" class="modal" aria-labelledby="ac-new-title">
+  <form method="dialog" class="modal-body" id="ac-new-form">
+    <h2 id="ac-new-title">New role</h2>
+    <div class="form-field"><label for="ac-new-name">Name *</label><input id="ac-new-name" class="text-input" maxlength="100" required placeholder="e.g. Exam cell assistant" /></div>
+    <div class="form-field"><label for="ac-new-about">What it is for</label><input id="ac-new-about" class="text-input" maxlength="300" placeholder="e.g. Helps the exam department with datesheets and the timetable" /></div>
+    <div class="form-field"><label for="ac-new-copy">Start from</label><select id="ac-new-copy" class="select-input"><option value="">Nothing (choose rights next)</option></select></div>
+    <p class="dash-alert error" id="ac-new-err" hidden></p>
+    <div class="modal-actions"><button type="button" class="role-btn secondary-btn" data-close>Cancel</button><button type="submit" class="role-btn" value="ok">Make the role</button></div>
+  </form>
+</dialog>
+
+<dialog id="ac-preview" class="modal" aria-labelledby="ac-preview-title">
+  <div class="modal-body">
+    <h2 id="ac-preview-title">Check before saving</h2>
+    <div id="ac-preview-body"></div>
+    <div class="modal-actions"><button type="button" class="role-btn secondary-btn" data-close>Back</button><button type="button" class="role-btn" id="ac-preview-ok">Save</button></div>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/access-control.js"></script>
+{% endblock %}

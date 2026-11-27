@@ -39,13 +39,11 @@ class AuthService:
         self.repo = AuthRepository(session)
         self.audit = AuditService(session)
 
-    def _roles_and_permissions(self, user: User) -> tuple[list[str], list[str]]:
-        roles = [ur.role.code for ur in user.user_roles]
-        perms: set[str] = set()
-        for ur in user.user_roles:
-            for rp in ur.role.role_permissions:
-                perms.add(rp.permission.code)
-        return roles, sorted(perms)
+    async def _roles_and_permissions(self, user: User) -> tuple[list[str], list[str]]:
+        from app.access.resolve import effective
+
+        roles, perms, _extra = await effective(self.session, user.id)
+        return roles, perms
 
     async def _check_rate_limit(self, *, username: str, ip: str | None) -> None:
         """Only FAILED sign-ins count (counted in _count_failure). Two limits:
@@ -188,7 +186,7 @@ class AuthService:
 
     async def start_session(self, user: User, *, ip: str | None, user_agent: str | None) -> AuthTokens:
         """Access + refresh tokens for a person whose sign-in is complete."""
-        roles, perms = self._roles_and_permissions(user)
+        roles, perms = await self._roles_and_permissions(user)
         access_token = create_access_token(
             user_id=user.id,
             username=user.username,
@@ -273,7 +271,7 @@ class AuthService:
         )
         await self.repo.revoke_token(existing, replaced_by_id=new_token.id)
 
-        roles, perms = self._roles_and_permissions(user)
+        roles, perms = await self._roles_and_permissions(user)
         access_token = create_access_token(
             user_id=user.id,
             username=user.username,

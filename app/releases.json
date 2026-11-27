@@ -1,5 +1,38 @@
 [
   {
+    "version": "1.71.0",
+    "date": "2026-11-27",
+    "title": "Access control: who can do what",
+    "summary": "Change what each role can do, make your own roles, and give or take single rights for one person, with safety checks and undo.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Access control (System menu): for each role choose None, View or Edit per module, plus Approve; single rights under Advanced. See exactly what changes before saving."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Your own roles (e.g. Exam cell assistant), given to staff on the People tab or Employees → Extra access."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "One person's own rights: give or take away single rights, until a date if you like. A right taken away wins over every role."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Money and control rights, and the Administrator role, wait for a second administrator to confirm. Every change is kept in History and can be undone."
+      },
+      {
+        "kind": "improved",
+        "for": "Staff",
+        "text": "Someone given pages of the administration sees Administration (given to you) in their portal switcher, with only those pages."
+      }
+    ]
+  },
+  {
     "version": "1.70.0",
     "date": "2026-11-27",
     "title": "Ready for another institute",
