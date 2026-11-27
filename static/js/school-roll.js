@@ -60,6 +60,17 @@
       }
       const list = el("ul", "rc-list");
       d.students.forEach(function (s) {
+        if (s.suspended) {
+          // kept on the list, locked: not marked and the day does not count for them
+          const lk = el("li", "rc-row att-locked");
+          const w = el("div", "rc-who");
+          w.appendChild(el("strong", null, s.name));
+          w.appendChild(el("small", null, (s.roll_number || "") + " · suspended: not marked"));
+          lk.appendChild(w);
+          lk.appendChild(el("span", "badge badge-locked", "Suspended"));
+          list.appendChild(lk);
+          return;
+        }
         const li = el("li", "rc-row"); li.setAttribute("data-sid", s.student_id);
         const who = el("div", "rc-who");
         who.appendChild(el("strong", null, s.name));

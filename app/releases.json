@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.64.0",
+    "date": "2026-11-27",
+    "title": "Suspended and expelled students are locked",
+    "summary": "A suspended student is locked out of attendance, exams, results and certificates until the suspension is lifted; an expelled student keeps only the leaving papers.",
+    "changes": [
+      {
+        "kind": "improved",
+        "for": "Teachers",
+        "text": "A suspended student stays on the attendance sheet and marks sheet, greyed and marked Suspended. They cannot be marked, and those classes do not count for or against them."
+      },
+      {
+        "kind": "improved",
+        "for": "Exam office",
+        "text": "Suspended students get no admit card and no seat in the exam hall. Their marks are locked and their result is held, so it does not hold up the rest of the class. The result is worked out when the suspension is lifted."
+      },
+      {
+        "kind": "improved",
+        "for": "Administrators",
+        "text": "No certificates, result cards, library books, hostel or transport places for a suspended student. An expelled student gets only the migration and fee clearance certificates. Lifting the suspension removes every lock; past records are never changed."
+      },
+      {
+        "kind": "improved",
+        "for": "Parents",
+        "text": "The parent portal says when a child is suspended or no longer enrolled, and stays open to view records and fees."
+      }
+    ]
+  },
+  {
     "version": "1.63.0",
     "date": "2026-11-24",
     "title": "Timetable wizard",

@@ -30,6 +30,20 @@ The administrator sets the institute up and oversees everything. Your menu is gr
 - **Certificate requests**: certificates students asked for. Approve with the fee (or waive it); the student downloads the certificate once it is paid.
 - **Warnings**: formal warnings to students and staff. A warning counts for 12 months; the 3rd one is final and you decide the action.
 
+### Suspended and expelled students
+
+A student is **suspended** or **expelled** from the student's record (change status) or by a decision on a final warning (Discipline). While suspended:
+
+- **Attendance**: the student stays on every attendance sheet (class, substitute, cover and school roll call), greyed and marked **Suspended**. Nobody can mark them, and those classes do not count for or against their attendance.
+- **Exams**: no admit card; left out of seating plans; marks entry is locked; their result is held when the class result is published, and the result card and report card cannot be printed.
+- **Other**: no certificates or letters; no new library books, hostel room or transport seat; no assignment submissions; the student cannot sign in. The parent portal stays open to view records and fees, with a notice saying the child is suspended.
+
+When the suspension is lifted (status back to Active, or *Lift suspension* on the warning), every lock goes at once: nothing was deleted. Held results are worked out straight away if all the marks are in; a mark that is still missing is entered by the exam office as a correction.
+
+An **expelled** student (status Dropped) is withdrawn from every course still running. Completed courses, grades, attendance and fees stay on record. Only the leaving papers (migration and fee clearance certificates) can still be issued.
+
+Classes, marks and results recorded before the suspension or expulsion are never changed.
+
 ### Which details are required (field rules)
 
 On **CSV Imports**, open **Field rules** (above the template download) and tick which details must be filled when a student is added. First and last name are always required; everything else can be required or optional, including the university Reg No. Save, then download the template: required columns are red and listed on the template's *Rules* sheet, and optional columns can be left empty or left out of the file. The **Add student** form follows the same rules (required fields have a red \*).

@@ -4351,3 +4351,7 @@ details.tg-session > summary.tg-head { cursor: pointer; }
 .vt-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
 .vt-actions .vt-skip { margin-right: auto; }
 @media (prefers-reduced-motion: reduce) { .vt-ring { transition: none; } }
+
+/* A suspended student on a register: kept on the list, greyed and locked */
+.att-locked { opacity: 0.6; }
+.att-locked td, label.att-locked { font-style: italic; }

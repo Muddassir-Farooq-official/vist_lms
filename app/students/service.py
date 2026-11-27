@@ -163,6 +163,12 @@ class StudentService:
                 if enrollment.status == EnrollmentStatus.ENROLLED:
                     await enrollment_service.withdraw(enrollment.id, student_id=None, actor_id=actor_id, keep_future_fees=keep_future_fees)
 
+        if old_status == StudentStatus.SUSPENDED and new_status == StudentStatus.ACTIVE:
+            # the locks were only checks, so they are gone now; results held during the suspension are worked out
+            from app.students.standing import release_held_results
+
+            await release_held_results(self.session, student.id, actor_id=actor_id)
+
         if new_status != old_status:
             # Fees follow the status: late fees pause while suspended or after leaving; leaving cancels what is not yet due.
             from app.fees.status_rules import apply_student_status

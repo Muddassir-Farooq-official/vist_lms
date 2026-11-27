@@ -21,12 +21,13 @@
     if (!r.ok) { VA.toast("Could not load the students.", "error"); return; }
     $("ms-title").textContent = b.getAttribute("data-name");
     $("ms-students").innerHTML = r.body.students.map(function (s) {
+      if (s.status === "SUSPENDED") return '<label class="att-locked"><input type="checkbox" disabled> ' + esc(s.name) + " <small>" + esc(s.roll_number || "") + ' · suspended: not marked</small></label>';
       return '<label><input type="checkbox" value="' + s.id + '"' + (s.status === "ABSENT" ? "" : " checked") + "> " + esc(s.name) + " <small>" + esc(s.roll_number || "") + "</small></label>";
     }).join("");
     $("ms-mark").hidden = false;
   });
   $("ms-save").addEventListener("click", async function () {
-    const present = Array.prototype.map.call($("ms-students").querySelectorAll("input:checked"), function (c) { return c.value; });
+    const present = Array.prototype.map.call($("ms-students").querySelectorAll("input:checked:not(:disabled)"), function (c) { return c.value; });
     const r = await VA.fetchJson("/api/v1/attendance/sessions/" + current + "/mark", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ present_student_ids: present }) });
     if (!r.ok) { VA.toast((r.body && r.body.error && r.body.error.message) || "Not saved.", "error"); return; }
     VA.toast("Attendance saved.");

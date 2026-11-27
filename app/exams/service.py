@@ -433,6 +433,9 @@ class ExamScheduleService:
         student = await self.session.get(Student, student_id)
         if student is None:
             raise ResourceNotFoundError("Student not found.")
+        from app.students.standing import ensure_not_locked
+
+        await ensure_not_locked(self.session, student, "the admit card")
         own = await self._my_offerings(student_id)
         papers = [p for p in await self.papers(schedule_id) if p.course_offering_id in own]
         if not papers:

@@ -60,7 +60,7 @@ async def mine(current_user: CurrentUser = Depends(get_current_user), db=Depends
 async def students(class_session_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
     from app.academics.models import ClassSession, Enrollment, EnrollmentStatus
     from app.attendance.models import AttendanceRecord
-    from app.students.models import Student
+    from app.students.models import Student, StudentStatus
 
     if not await _svc(db).is_substitute(class_session_id, await _me(db, current_user)):
         raise AuthorizationError("You are not the substitute for this class.")
@@ -68,5 +68,6 @@ async def students(class_session_id: uuid.UUID, current_user: CurrentUser = Depe
     rows = (await db.execute(select(Student).join(Enrollment, Enrollment.student_id == Student.id).where(
         Enrollment.course_offering_id == cs.course_offering_id, Enrollment.status == EnrollmentStatus.ENROLLED).order_by(Student.roll_number))).scalars().all()
     marks = {r.student_id: r.status.value for r in (await db.execute(select(AttendanceRecord).where(AttendanceRecord.class_session_id == class_session_id))).scalars()}
-    return {"class_session_id": cs.id, "students": [{"id": s.id, "roll_number": s.roll_number, "name": f"{s.first_name} {s.last_name}", "status": marks.get(s.id)}
+    return {"class_session_id": cs.id, "students": [{"id": s.id, "roll_number": s.roll_number, "name": f"{s.first_name} {s.last_name}",
+                                                      "status": "SUSPENDED" if s.status == StudentStatus.SUSPENDED else marks.get(s.id)}
                                                      for s in rows]}

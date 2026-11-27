@@ -25,6 +25,7 @@ CERTIFICATE_CHECKS = {"BONAFIDE": (), "CHARACTER": ("CLEAR",), "COMPLETION": ("C
 DOCUMENTS = {"CNIC": "CNIC / B-Form", "PHOTO": "Photograph", "MATRIC": "Matric certificate", "INTERMEDIATE": "Intermediate certificate",
              "DEGREE": "Degree / transcript", "DOMICILE": "Domicile", "TRANSFER": "Transfer / leaving certificate", "CONTRACT": "Contract / appointment letter",
              "EXPERIENCE": "Experience letter", "OTHER": "Other"}
+LEAVING_CERTIFICATES = ("MIGRATION", "FEE_CLEARANCE")      # the papers a student who has left (or was expelled) still gets
 CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 OWNER = {"students": "STUDENT", "employees": "EMPLOYEE"}
 
@@ -249,6 +250,14 @@ class RecordsService:
         await self.audit.log(actor_user_id=actor_id, action=f"records.{kind.lower()}_issued", entity_type="issued_document", entity_id=doc.id, metadata={"owner": name, **details})
         return doc
 
+    async def ensure_standing(self, student_id: uuid.UUID, kind: str) -> None:
+        """No certificate while suspended; once expelled (or left), only the leaving papers (migration, fee clearance)."""
+        from app.students.models import StudentStatus
+        from app.students.standing import ensure_not_locked
+
+        leaving = kind.upper() in LEAVING_CERTIFICATES
+        await ensure_not_locked(self.session, student_id, "this certificate", allow=(StudentStatus.DROPPED,) if leaving else ())
+
     async def certificate_problems(self, student_id: uuid.UUID, kind: str) -> list[str]:
         """What stands in the way of this certificate (empty = it can be issued)."""
         problems: list[str] = []
@@ -303,6 +312,7 @@ class RecordsService:
         kind = kind.upper()
         if kind not in STUDENT_CERTIFICATES:
             raise ValidationAppError("Unknown certificate. Choose one from the list.")
+        await self.ensure_standing(student_id, kind)
         from app.programs.models import Program
 
         s = await self._student(student_id)

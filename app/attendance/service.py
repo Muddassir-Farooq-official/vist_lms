@@ -109,6 +109,16 @@ class AttendanceService:
                 "One or more students in the register are not currently enrolled in this offering."
             )
 
+        # A suspended student is kept on the sheet but locked: no record is made or changed for them, so the class does
+        # not count for or against their attendance (an expelled student is no longer enrolled at all).
+        from app.students.models import StudentStatus
+        from app.students.standing import locked_ids
+
+        suspended = set(await locked_ids(self.session, enrolled_ids, only=(StudentStatus.SUSPENDED,)))
+        if present_set & suspended:
+            raise BusinessRuleViolationError("A suspended student cannot be marked. Their attendance is locked until the suspension is lifted.")
+        enrolled_ids = [i for i in enrolled_ids if i not in suspended]
+
         now = datetime.now(timezone.utc)
         records: list[AttendanceRecord] = []
         changed: list[dict] = []
@@ -149,6 +159,7 @@ class AttendanceService:
                 "enrolled_count": len(enrolled_ids),
                 "present_count": len(present_set),
                 "absent_count": len(enrolled_ids) - len(present_set),
+                "suspended_not_marked": len(suspended),
                 "marked_late_by_admin": window_closed and actor_is_admin,
                 "late_note": late_note if (window_closed and actor_is_admin) else None,
                 "changed": changed,

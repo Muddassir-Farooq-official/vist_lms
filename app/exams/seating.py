@@ -152,8 +152,12 @@ class SeatingService:
         from app.students.models import Student
 
         group = await member_ids(self.session, paper.course_offering_id)
+        # a suspended (or expelled) student does not sit the paper: left out of the seating plan
+        from app.students.standing import LOCKED
+
         return list((await self.session.execute(select(Student.id).join(Enrollment, Enrollment.student_id == Student.id).where(
-            Enrollment.course_offering_id.in_(group), Enrollment.status == EnrollmentStatus.ENROLLED).order_by(Student.roll_number))).scalars())
+            Enrollment.course_offering_id.in_(group), Enrollment.status == EnrollmentStatus.ENROLLED, Student.status.not_in(list(LOCKED)))
+            .order_by(Student.roll_number))).scalars())
 
     async def _labels(self, papers) -> dict:
         from app.academics.models import Course, CourseOffering

@@ -37,6 +37,7 @@
     const s = r.body.students;
     box.innerHTML = (s.length ? '<div class="form-actions"><button type="button" class="role-btn small-btn" data-all="1">All present</button> <button type="button" class="role-btn small-btn" data-all="0">All absent</button></div>' +
       '<div class="table-scroll"><table class="dash-table"><thead><tr><th>Student</th><th>Present</th></tr></thead><tbody>' + s.map(function (x) {
+        if (x.status === "SUSPENDED") return '<tr class="att-locked"><td>' + esc(x.name) + ' <small class="list-sub">' + esc(x.roll_number || "") + ' · suspended: not marked</small></td><td><span class="badge badge-locked">Suspended</span></td></tr>';
         return "<tr><td>" + esc(x.name) + ' <small class="list-sub">' + esc(x.roll_number || "") + '</small></td><td><input type="checkbox" value="' + x.id + '" aria-label="' + esc(x.name) + ' present"' +
           (x.status === "PRESENT" || !x.status ? " checked" : "") + "></td></tr>";
       }).join("") + "</tbody></table></div>" : '<p class="empty-state">No students are enrolled in this class.</p>') +

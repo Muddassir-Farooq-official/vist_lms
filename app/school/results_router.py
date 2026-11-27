@@ -190,6 +190,10 @@ async def card_pdf(student_id: uuid.UUID, exam_id: uuid.UUID, current_user: Curr
     from app.school.report_pdf import render_report_card
 
     d = await ResultsService(db).report_card(exam_id, student_id, current_user)
+    from app.students.models import StudentStatus
+    from app.students.standing import ensure_not_locked
+
+    await ensure_not_locked(db, student_id, "the report card", allow=(StudentStatus.DROPPED,))       # held while suspended
     pdf = render_report_card(d, institute=brand.name())
     name = f"report-card-{d['exam']['kind'].lower()}-{(d['student']['roll_number'] or 'student')}.pdf".replace(" ", "-")
     return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="{name}"', "Cache-Control": "no-store"})

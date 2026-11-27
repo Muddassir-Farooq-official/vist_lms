@@ -125,6 +125,7 @@ class CertificateRequestService:
         kind = (kind or "").upper()
         if kind not in STUDENT_CERTIFICATES:
             raise ValidationAppError("Choose a certificate from the list.")
+        await self.records.ensure_standing(student_id, kind)
         purpose = " ".join((purpose or "").split())
         if len(purpose) < 4:
             raise ValidationAppError("Say what you need it for (for example: bank account, scholarship, visa).")
@@ -160,6 +161,7 @@ class CertificateRequestService:
         amount = float(r.fee_amount if fee is None else fee)
         if amount < 0 or amount > 1_000_000:
             raise ValidationAppError("The fee must be between Rs. 0 and Rs. 1,000,000.")
+        await self.records.ensure_standing(r.student_id, r.kind)
         problems = await self.records.certificate_problems(r.student_id, r.kind)
         override = (override_reason or "").strip() or None
         if problems and not override:
