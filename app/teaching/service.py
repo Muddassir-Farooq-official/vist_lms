@@ -303,6 +303,11 @@ class TeachingService:
     async def suggested_amount(self, absent_id: uuid.UUID | None, day: date) -> tuple[Decimal, str]:
         if absent_id is None:
             return Decimal(0), "No teacher assigned to this class"
+        from app.payroll.lectures import lecture_rates
+
+        per_lecture = (await lecture_rates(self.session, [absent_id])).get(absent_id)
+        if per_lecture:                 # a visiting teacher: the cover is worth one of their lectures
+            return q2(per_lecture), f"The absent visiting teacher's rate: Rs. {float(per_lecture):,.0f} a lecture"
         rate, how = await self.day_rate(absent_id, day)
         n = (await self.session.execute(select(func.count()).select_from(ClassSession).join(CourseOffering, CourseOffering.id == ClassSession.course_offering_id)
                                         .where(CourseOffering.assigned_teacher_id == absent_id, ClassSession.session_date == day,

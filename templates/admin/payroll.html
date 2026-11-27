@@ -11,6 +11,7 @@
   <button class="portal-tab" data-tab="items" role="tab" aria-selected="false"><span>Allowances &amp; deductions</span></button>
   <button class="portal-tab" data-tab="advances" role="tab" aria-selected="false"><span>Salary advances</span></button>
   <button class="portal-tab" data-tab="security" role="tab" aria-selected="false"><span>Security deposits</span></button>
+  <button class="portal-tab" data-tab="visiting" role="tab" aria-selected="false"><span>Visiting faculty</span></button>
 </div>
 
 <div class="portal-tab-panel" data-tab-panel="runs">
@@ -78,6 +79,17 @@
   </section>
 </div>
 
+<div class="portal-tab-panel" data-tab-panel="visiting" hidden>
+  <section class="sh-card">
+    <h2 class="panel-title">Visiting faculty: paid per lecture</h2>
+    <p class="panel-hint">A visiting teacher (employment type <em>Visiting</em> on their record) with a rate here is paid for each lecture they take, instead of a monthly salary. A lecture is taken when they mark its attendance. A lab's double period is two lectures, and a combined class taught to several batches at once is one. Extra and make-up classes count too. On the payslip every lecture held is earned, and the ones not taken or covered by another teacher are deducted with their dates. The cover is paid to the teacher who took it, at this rate. Days absent and late marks do not apply to them. Cancelled classes are neither paid nor deducted.</p>
+    <div class="toolbar"><label for="vf-month">Month</label><input id="vf-month" class="text-input small-input" type="month" /></div>
+    <p id="vf-error" class="dash-alert error" hidden></p>
+    <div class="table-scroll"><table class="tk-table"><thead><tr><th>Teacher</th><th>Rate per lecture (Rs.)</th><th class="num">Held</th><th class="num">Taken</th><th class="num">Not taken</th><th class="num">Covered</th><th class="num">By office</th><th class="num">Earned</th><th class="num">Not paid</th><th></th></tr></thead><tbody id="vf-body"></tbody></table></div>
+    <p class="cc-meta" id="vf-empty" hidden>No visiting faculty yet. Set an employee's employment type to <em>Visiting</em> (Employees &rarr; edit) and they appear here.</p>
+  </section>
+</div>
+
 <dialog id="rd-modal" class="modal modal-wide" aria-labelledby="rd-title"><div class="modal-body">
   <div class="ann-detail-badges" id="rd-badges"></div><h2 id="rd-title"></h2><p class="cc-meta" id="rd-meta"></p>
   <div id="rd-tiles"></div><div id="rd-problems"></div>
@@ -125,4 +137,5 @@
 
 {% block extra_scripts %}
 <script src="/static/js/payroll.js"></script>
+<script src="/static/js/payroll-visiting.js"></script>
 {% endblock %}

@@ -88,4 +88,29 @@
     });
     $("ps-empty").hidden = r.body.length > 0;
   });
+
+  // visiting faculty: this month's lectures and what they pay
+  (function () {
+    const box = document.getElementById("my-lectures");
+    if (!box) return;
+    const m = document.getElementById("lec-month");
+    const now = new Date();
+    m.value = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+    async function lectures() {
+      const r = await VA.fetchJson("/api/v1/payroll/me/lectures?month=" + m.value + "-01", { quiet: true });
+      if (!r.ok || !r.body.rate) { box.hidden = true; return; }
+      const c = r.body.count, rs = function (v) { return "Rs. " + Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 }); };
+      box.hidden = false;
+      document.getElementById("lec-pdf").href = "/api/v1/payroll/me/lectures.pdf?month=" + m.value + "-01";
+      document.getElementById("lec-kpis").innerHTML = [["Taken", c.TAKEN + " of " + r.body.held, rs(r.body.earned)],
+        ["Not taken", String(c.NOT_TAKEN), c.NOT_TAKEN ? rs(c.NOT_TAKEN * r.body.rate) + " not paid" : "none"],
+        ["Covered by others", String(c.COVERED), c.COVERED ? rs(c.COVERED * r.body.rate) + " not paid" : "none"],
+        ["Later this month", String(c.UPCOMING), rs(r.body.rate) + " a lecture"]].map(function (k) {
+          return '<div class="kpi"><span class="kpi-label">' + VA.escapeHtml(k[0]) + '</span><strong class="kpi-value">' + VA.escapeHtml(k[1]) +
+            '</strong><small class="kpi-sub">' + VA.escapeHtml(k[2]) + "</small></div>";
+        }).join("");
+    }
+    m.addEventListener("change", lectures);
+    lectures();
+  })();
 })();

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends
 from starlette.concurrency import run_in_threadpool
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 
 from app.accounts.models import PaymentMethod
 from app.accounts.schemas import ReasonIn
@@ -271,6 +272,78 @@ async def release_security(employee_id: uuid.UUID, payload: PayIn, current_user:
 @router.put("/settings/{employee_id}", summary="One employee's own security % and the deposit already held before this system (administration)")
 async def set_pay_setting(employee_id: uuid.UUID, payload: PaySettingIn, current_user: CurrentUser = Depends(approve), db=Depends(get_db)) -> dict:
     return await PayrollService(db).set_pay_setting(employee_id, payload.model_dump(), actor_id=current_user.id)
+
+
+# ------------------------------------------------------------------ visiting faculty: paid per lecture
+class LectureRateIn(BaseModel):
+    lecture_rate: Decimal | None = Field(default=None, gt=0, le=1_000_000)     # empty = not paid per lecture
+
+
+def _month(month: date | None) -> date:
+    from app.core.clock import institute_today
+
+    return (month or institute_today()).replace(day=1)
+
+
+@router.get("/visiting", summary="Visiting faculty: lecture rate and the month's lectures (taken, not taken, covered) for each")
+async def visiting(month: date | None = None, current_user: CurrentUser = Depends(view), db=Depends(get_db)) -> dict:
+    from app.payroll.lectures import overview
+
+    return await overview(db, _month(month))
+
+
+@router.put("/visiting/{employee_id}/rate", summary="Set a visiting teacher's pay per lecture (empty = back to a monthly salary)")
+async def set_lecture_rate(employee_id: uuid.UUID, payload: LectureRateIn, current_user: CurrentUser = Depends(approve), db=Depends(get_db)) -> dict:
+    from app.payroll.lectures import set_rate
+
+    return await set_rate(db, employee_id, payload.lecture_rate, actor_id=current_user.id)
+
+
+async def _sheet(db, employee_id: uuid.UUID, month: date | None) -> dict:
+    from app.employees.models import Employee
+    from app.payroll.lectures import lecture_sheet
+
+    e = await db.get(Employee, employee_id)
+    if e is None:
+        raise ResourceNotFoundError("Employee not found.")
+    return await lecture_sheet(db, e, _month(month))
+
+
+def _sheet_pdf(sheet: dict) -> Response:
+    from app.payroll.lectures import render_sheet_pdf
+
+    name = f"lectures-{sheet['employee']['code'] or 'staff'}-{sheet['month']:%Y-%m}.pdf"
+    return Response(content=render_sheet_pdf(sheet), media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="{name}"', "Cache-Control": "no-store"})
+
+
+@router.get("/visiting/{employee_id}/lectures", summary="One visiting teacher's lectures in a month: date, course, taken / not taken / covered by whom")
+async def visiting_lectures(employee_id: uuid.UUID, month: date | None = None, current_user: CurrentUser = Depends(view), db=Depends(get_db)) -> dict:
+    return await _sheet(db, employee_id, month)
+
+
+@router.get("/visiting/{employee_id}/lectures.pdf", summary="The lecture sheet as a PDF")
+async def visiting_lectures_pdf(employee_id: uuid.UUID, month: date | None = None, current_user: CurrentUser = Depends(view), db=Depends(get_db)) -> Response:
+    return _sheet_pdf(await _sheet(db, employee_id, month))
+
+
+async def _own_employee_id(db, current_user) -> uuid.UUID:
+    from app.employees.models import Employee
+
+    e = (await db.execute(select(Employee).where(Employee.user_id == current_user.id))).scalar_one_or_none()
+    if e is None:
+        raise ResourceNotFoundError("You are not on the staff list.")
+    return e.id
+
+
+@router.get("/me/lectures", summary="My lectures this month and what they pay (visiting faculty)")
+async def my_lectures(month: date | None = None, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    return await _sheet(db, await _own_employee_id(db, current_user), month)
+
+
+@router.get("/me/lectures.pdf", summary="My lecture sheet as a PDF (visiting faculty)")
+async def my_lectures_pdf(month: date | None = None, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> Response:
+    return _sheet_pdf(await _sheet(db, await _own_employee_id(db, current_user), month))
 
 
 @router.get("/withholdings", summary="What salaries have held back in a year (security, deductions, advance recoveries), by head and month")

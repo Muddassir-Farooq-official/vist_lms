@@ -169,3 +169,6 @@ class EmployeePayrollSetting(TimestampMixin, Base):
     security_released: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0, server_default="0")  # paid back to the person (on leaving)
     security_released_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     note: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Visiting faculty (employment type VISITING) with a rate are paid per lecture they take, not a monthly basic
+    # (app/payroll/lectures.py). Empty = not paid per lecture.
+    lecture_rate: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
