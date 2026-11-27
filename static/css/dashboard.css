@@ -4465,3 +4465,9 @@ details.tg-session > summary.tg-head { cursor: pointer; }
 .ac-count { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px; border-radius: 999px; background: var(--danger, #b91c1c); color: #fff; font-size: 0.72rem; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 .ac-adv + .panel-hint { margin-top: 10px; }
+.ac-members { margin: 10px 0 4px; }
+.ac-members summary { cursor: pointer; font-weight: 600; }
+.ac-member-list { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 4px; }
+.ac-member-list li { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--border, #e5e7eb); }
+.ac-pick { display: grid; gap: 4px; max-height: 50vh; overflow-y: auto; margin: 10px 0; }
+#ac-who-code { max-width: 420px; margin-bottom: 8px; }

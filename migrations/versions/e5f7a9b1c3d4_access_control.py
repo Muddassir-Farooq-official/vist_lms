@@ -54,6 +54,7 @@ def upgrade() -> None:
         sa.Column('effect', sa.String(8), nullable=False),
         sa.Column('until', sa.Date(), nullable=True),
         sa.Column('reason', sa.String(300), nullable=True),
+        sa.Column('reminded_on', sa.Date(), nullable=True),
         sa.Column('created_by', sa.Uuid(), sa.ForeignKey('users.id', ondelete='SET NULL', name='fk_user_access_overrides_created_by_users'), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
         sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),

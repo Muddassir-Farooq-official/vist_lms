@@ -8,6 +8,7 @@
 <div class="portal-tabs" role="tablist" data-auto-tabs>
   <button class="portal-tab active" data-tab="roles" role="tab" aria-selected="true"><span>Roles</span></button>
   <button class="portal-tab" data-tab="people" role="tab" aria-selected="false"><span>People</span></button>
+  <button class="portal-tab" data-tab="who" role="tab" aria-selected="false"><span>Who can&hellip;</span></button>
   <button class="portal-tab" data-tab="waiting" role="tab" aria-selected="false"><span>To confirm <b class="ac-count" id="ac-wait-count" hidden></b></span></button>
   <button class="portal-tab" data-tab="history" role="tab" aria-selected="false"><span>History</span></button>
 </div>
@@ -36,6 +37,15 @@
   </section>
 </div>
 
+<!-- ============================================================ who can -->
+<section data-tab-panel="who" class="sh-card" hidden>
+  <h2 class="panel-title">Who can do this?</h2>
+  <p class="panel-hint">Pick a right to see everyone who holds it now, and where it comes from (a role, or their own right). People it was taken from are listed too.</p>
+  <select id="ac-who-code" class="select-input" aria-label="Right"></select>
+  <p class="cc-meta" id="ac-who-sum"></p>
+  <div class="table-scroll"><table class="dash-table"><thead><tr><th>Person</th><th>Department</th><th>Has it?</th><th>Through</th></tr></thead><tbody id="ac-who"></tbody></table></div>
+</section>
+
 <!-- ============================================================ waiting -->
 <section data-tab-panel="waiting" class="sh-card" hidden>
   <h2 class="panel-title">Waiting for a second administrator</h2>
@@ -60,6 +70,16 @@
     <p class="dash-alert error" id="ac-new-err" hidden></p>
     <div class="modal-actions"><button type="button" class="role-btn secondary-btn" data-close>Cancel</button><button type="submit" class="role-btn" value="ok">Make the role</button></div>
   </form>
+</dialog>
+
+<dialog id="ac-add-people" class="modal modal-wide" aria-labelledby="ac-add-title">
+  <div class="modal-body">
+    <h2 id="ac-add-title">Give this role to</h2>
+    <input type="search" id="ac-add-q" class="text-input" placeholder="Name, code or department" aria-label="Find staff" />
+    <div class="ac-pick" id="ac-add-list"></div>
+    <p class="cc-meta" id="ac-add-count"></p>
+    <div class="modal-actions"><button type="button" class="role-btn secondary-btn" data-close>Cancel</button><button type="button" class="role-btn" id="ac-add-ok">Give the role</button></div>
+  </div>
 </dialog>
 
 <dialog id="ac-preview" class="modal" aria-labelledby="ac-preview-title">

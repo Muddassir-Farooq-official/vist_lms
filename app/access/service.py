@@ -42,6 +42,53 @@ def _forget(user_id=None) -> None:
         dependencies.forget_session(user_id)
 
 
+async def _tell(session: AsyncSession, user_ids, title: str, message: str, link: str | None = None) -> None:
+    """In-app notification (and phone push, where switched on). Never stops the change itself."""
+    from app.notifications.models import NotificationCategory
+    from app.notifications.service import create_notification
+
+    category = getattr(NotificationCategory, "GENERAL", None) or list(NotificationCategory)[0]
+    for uid in list(user_ids)[:300]:
+        try:
+            async with session.begin_nested():
+                await create_notification(session, user_id=uid, category=category, title=title[:200], message=message[:1000], link=link)
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _words(codes) -> str:
+    return ", ".join(catalog.label(c) for c in sorted(codes))
+
+
+async def _after_change(session: AsyncSession, before: dict, *, why: str) -> None:
+    """For each person whose rights changed: tell them what changed, and if they now hold money or control rights given
+    on Access control, end their signed-in sessions so their next sign-in asks for the two-step code."""
+    from app.auth.repository import AuthRepository
+
+    for uid, (old_rights, old_extra) in before.items():
+        roles, rights, extra = await effective(session, uid)
+        gained, lost = set(rights) - set(old_rights), set(old_rights) - set(rights)
+        if not gained and not lost:
+            continue
+        parts = []
+        if gained:
+            parts.append("You can now: " + _words(gained) + ".")
+        if lost:
+            parts.append("You can no longer: " + _words(lost) + ".")
+        await _tell(session, [uid], "Your access changed", f"{why} " + " ".join(parts))
+        if Roles.ADMIN not in roles and (set(extra) & catalog.SENSITIVE) - set(old_extra):
+            await AuthRepository(session).revoke_all_for_user(uid)
+        _forget(uid)
+
+
+async def _snapshot(session: AsyncSession, user_ids) -> dict:
+    out = {}
+    for uid in user_ids:
+        _r, rights, extra = await effective(session, uid)
+        out[uid] = (rights, extra)
+    return out
+
+
 class AccessService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -208,6 +255,7 @@ class AccessService:
         return {"done": True, "changed": True}
 
     async def _apply_role_rights(self, role: Role, target: set[str], *, actor_id, approval_id=None, undo_of=None) -> AccessChange:
+        before = await _snapshot(self.session, await self._members(role.id))
         current = await self._role_rights(role.id)
         perms = {p.code: p for p in (await self.session.execute(select(Permission).where(Permission.code.in_(target | current)))).scalars()}
         missing = sorted(target - set(perms))
@@ -235,6 +283,7 @@ class AccessService:
                                 before={"rights": sorted(current)}, after={"rights": sorted(target)}, actor_id=actor_id,
                                 approval_id=approval_id, undo_of=undo_of)
         _forget()
+        await _after_change(self.session, before, why=f"The {role.name} role was changed.")
         return ch
 
     # ------------------------------------------------------------------ one person
@@ -331,6 +380,7 @@ class AccessService:
         return {"done": True, "changed": True}
 
     async def _apply_person(self, user: User, wanted: list[dict], *, actor_id, approval_id=None, undo_of=None) -> AccessChange:
+        snap = await _snapshot(self.session, [user.id])
         existing = {o.permission_code: o for o in await self._overrides(user.id)}
         before = [self._ov_dict(o) for o in existing.values()]
         keep = {o["code"] for o in wanted}
@@ -344,6 +394,8 @@ class AccessService:
                 self.session.add(UserAccessOverride(user_id=user.id, permission_code=w["code"], effect=w["effect"], until=until,
                                                     reason=w["reason"], created_by=actor_id))
             else:
+                if o.until != until:
+                    o.reminded_on = None
                 o.effect, o.until, o.reason = w["effect"], until, w["reason"]
         await self.session.flush()
         names = await self._names([user.id])
@@ -353,6 +405,9 @@ class AccessService:
                                                                           + (f" until {o['until']}" if o["until"] else "") for o in wanted) or "cleared"),
                                 before={"overrides": before}, after={"overrides": wanted}, actor_id=actor_id, approval_id=approval_id, undo_of=undo_of)
         _forget(user.id)
+        ends = [o for o in wanted if o["until"] and o["effect"] == "GRANT"]
+        await _after_change(self.session, snap, why="An administrator changed your rights." + (
+            " Until: " + "; ".join(f"{catalog.label(o['code'])} {o['until']}" for o in ends) + "." if ends else ""))
         return ch
 
     async def set_person_roles(self, employee_id, extra_roles: list[str], *, actor_id, undo_of=None) -> dict:
@@ -393,6 +448,7 @@ class AccessService:
 
         svc = AccessRoleService(self.session)
         before = await svc.get(emp.id)
+        snap = await _snapshot(self.session, [emp.user_id])
         after = await svc.set_extra(emp.id, wanted, actor_user_id=actor_id)
         who = f"{emp.first_name} {emp.last_name}".strip()
         ch = await self._record(kind="PERSON_ROLES", target_type="USER", target_id=emp.user_id, label=who,
@@ -401,6 +457,7 @@ class AccessService:
                                 after={"employee_id": str(emp.id), "extra_roles": after["extra_roles"]}, actor_id=actor_id,
                                 approval_id=approval_id, undo_of=undo_of)
         _forget(emp.user_id)
+        await _after_change(self.session, snap, why="An administrator changed your roles.")
         return ch
 
     # ------------------------------------------------------------------ preview
@@ -539,3 +596,105 @@ class AccessService:
         ov_users = set((await self.session.execute(select(UserAccessOverride.user_id).where(UserAccessOverride.user_id.in_(ids)))).scalars().all()) if ids else set()
         return [{"user_id": e.user_id, "employee_id": e.id, "name": f"{e.first_name} {e.last_name}".strip(), "code": e.employee_code,
                  "department": e.department, "roles": by_user.get(e.user_id, []), "own_rights": e.user_id in ov_users} for e in emps]
+
+    # ------------------------------------------------------------------ who can do this?
+    async def who_can(self, code: str) -> dict:
+        from app.employees.models import Employee
+
+        code = (code or "").strip()
+        if code not in catalog.LABELS:
+            raise ValidationAppError("Unknown right.")
+        today = institute_today()
+        holders = await users_with_permission(self.session, code)
+        via_role: dict = {}
+        for uid, name in (await self.session.execute(
+                select(UserRole.user_id, Role.name).join(Role, Role.id == UserRole.role_id).join(RolePermission, RolePermission.role_id == Role.id)
+                .join(Permission, Permission.id == RolePermission.permission_id).where(Permission.code == code))).all():
+            via_role.setdefault(uid, []).append(name)
+        ovs = {o.user_id: o for o in (await self.session.execute(select(UserAccessOverride).where(
+            UserAccessOverride.permission_code == code, (UserAccessOverride.until.is_(None)) | (UserAccessOverride.until >= today)))).scalars()}
+        ids = set(holders) | {u for u, o in ovs.items() if o.effect == "DENY"}
+        names = await self._names(ids)
+        emps = {e.user_id: e for e in (await self.session.execute(select(Employee).where(Employee.user_id.in_(ids)))).scalars()} if ids else {}
+        rows = []
+        for uid in ids:
+            o = ovs.get(uid)
+            e = emps.get(uid)
+            rows.append({"user_id": uid, "name": names.get(uid, "?"), "department": e.department if e else None,
+                         "has_it": uid in holders, "roles": sorted(via_role.get(uid, [])),
+                         "own": ({"effect": o.effect, "until": o.until.isoformat() if o.until else None, "reason": o.reason} if o else None)})
+        rows.sort(key=lambda r: (not r["has_it"], r["name"].lower()))
+        return {"code": code, "label": catalog.label(code), "sensitive": code in catalog.SENSITIVE, "count": len(holders), "people": rows}
+
+    # ------------------------------------------------------------------ a role's people, and giving it to many at once
+    async def role_members(self, role_id) -> list[dict]:
+        from app.employees.models import Employee, JobRole
+
+        role = await self._role(role_id)
+        rows = (await self.session.execute(select(Employee, JobRole.default_role_code).join(UserRole, UserRole.user_id == Employee.user_id)
+                                           .outerjoin(JobRole, JobRole.id == Employee.job_role_id)
+                                           .where(UserRole.role_id == role.id).order_by(Employee.first_name, Employee.last_name))).all()
+        return [{"employee_id": e.id, "user_id": e.user_id, "name": f"{e.first_name} {e.last_name}".strip(), "code": e.employee_code,
+                 "department": e.department, "from_job_title": main == role.code} for e, main in rows]
+
+    async def set_members(self, role_id, *, add: list, remove: list, actor_id) -> dict:
+        """Give this role to several staff members, or take it from them, one by one through the usual rules (a person's
+        own access, the Administrator role and money rights are handled exactly as on their own page)."""
+        from app.employees.access_roles import AccessRoleService
+
+        role = await self._role(role_id)
+        if role.code in NOT_STAFF:
+            raise BusinessRuleViolationError("Students', parents' and alumni's roles are not given here.")
+        results = []
+        svc = AccessRoleService(self.session)
+        for emp_id, giving in [(x, True) for x in add or []] + [(x, False) for x in remove or []]:
+            name = str(emp_id)
+            try:
+                async with self.session.begin_nested():
+                    now = await svc.get(uuid.UUID(str(emp_id)))
+                    from app.employees.models import Employee
+
+                    emp = await self.session.get(Employee, uuid.UUID(str(emp_id)))
+                    name = f"{emp.first_name} {emp.last_name}".strip() if emp else name
+                    if not giving and now["main_role"] == role.code:
+                        raise BusinessRuleViolationError("it comes with their job title (change it on Employees)")
+                    extra = set(now["extra_roles"])
+                    extra = extra | {role.code} if giving else extra - {role.code}
+                    r = await self.set_person_roles(emp_id, sorted(extra), actor_id=actor_id)
+                results.append({"employee_id": str(emp_id), "name": name, "ok": True, "waiting": bool(r.get("waiting"))})
+            except Exception as exc:  # noqa: BLE001 - one person's problem must not stop the others
+                msg = getattr(exc, "message", None) or str(exc)
+                results.append({"employee_id": str(emp_id), "name": name, "ok": False, "message": msg[:200]})
+        return {"results": results, "done": sum(1 for r in results if r["ok"] and not r.get("waiting")),
+                "waiting": sum(1 for r in results if r.get("waiting")), "failed": sum(1 for r in results if not r["ok"])}
+
+
+async def end_date_round(session: AsyncSession) -> int:
+    """Daily: a right given (or taken) until a date ends in 2 days -> tell the person and the administrators, once.
+    Never raises."""
+    from datetime import timedelta
+
+    try:
+        today = institute_today()
+        rows = (await session.execute(select(UserAccessOverride).where(
+            UserAccessOverride.until.is_not(None), UserAccessOverride.until >= today, UserAccessOverride.until <= today + timedelta(days=2),
+            UserAccessOverride.reminded_on.is_(None)))).scalars().all()
+        if not rows:
+            return 0
+        admins = await users_with_permission(session, Permissions.ROLE_MANAGE)
+        svc = AccessService(session)
+        names = await svc._names({o.user_id for o in rows})
+        for o in rows:
+            what = catalog.label(o.permission_code)
+            kind = "given to" if o.effect == "GRANT" else "taken from"
+            when = o.until.strftime("%d %b %Y")
+            await _tell(session, [o.user_id], "Access ending soon",
+                        f"{what} ({'given to you' if o.effect == 'GRANT' else 'taken away from you'}) ends after {when}.")
+            await _tell(session, admins, "Access ending soon", f"{what} {kind} {names.get(o.user_id, 'someone')} ends after {when}. "
+                        "Extend it on Access control if it is still needed.", link=f"/dashboard/admin/access?user={o.user_id}")
+            o.reminded_on = today
+        await session.flush()
+        return len(rows)
+    except Exception:  # noqa: BLE001
+        return 0
+

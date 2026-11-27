@@ -69,8 +69,10 @@ async def login(
     service = AuthService(db)
     ip, ua = client_ip(request), request.headers.get("user-agent")
     user = await service.check_password(username=payload.username, password=payload.password, ip=ip, user_agent=ua)
-    roles, _perms = await service._roles_and_permissions(user)
-    if tf.required_for(roles):
+    from app.access.resolve import effective
+
+    roles, _perms, extra = await effective(db, user.id)
+    if tf.required_for(roles, extra):
         if user.totp_secret_enc is None:
             return TokenResponse(access_token="", expires_in_minutes=0, two_factor="setup", challenge=tf.challenge_for(user, "setup"),
                                  remember_days=int(settings.two_factor_remember_days))

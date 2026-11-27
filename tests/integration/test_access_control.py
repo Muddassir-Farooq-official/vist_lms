@@ -223,3 +223,59 @@ async def test_students_parents_and_alumni_roles_never_get_office_rights(app_cli
         rid = await _role_id(app_client, code)
         r = await app_client.put(f"{A}/roles/{rid}/rights", json={"rights": ["payment.record"]})
         assert r.status_code == 422 and "staff only" in r.text
+
+
+async def test_money_rights_given_here_need_the_sign_in_code_and_the_person_is_told(app_client, admin_user, db_session, monkeypatch):
+    from app.auth import two_factor as tf
+    from app.core.config import settings
+    from app.notifications.models import Notification
+
+    t = await _person(app_client, db_session, "TCH", "TEACHER", "35202-8100011-1")
+    assert tf.required_for(["TEACHER"], []) is False
+    r = await app_client.put(f"{A}/people/{t['user_id']}/rights", json={"overrides": [{"code": "payment.reverse", "effect": "GRANT"}]})
+    assert r.json()["done"] is True                                               # the only administrator: goes ahead
+    note = (await db_session.execute(select(Notification).where(Notification.user_id == uuid.UUID(t["user_id"]),
+                                                                Notification.title == "Your access changed"))).scalars().all()
+    assert note and "Reverse payments" in note[-1].message
+    monkeypatch.setattr(settings, "two_factor_required_for_admins", 1)
+    login = await app_client.post("/api/v1/auth/login", json={"username": t["username"], "password": t["pw"]})
+    assert login.json()["two_factor"] == "setup"                                   # money right given here -> code required
+    # a non-money right does not ask for the code
+    monkeypatch.setattr(settings, "two_factor_required_for_admins", 0)
+    await _login_admin(app_client)
+    await app_client.put(f"{A}/people/{t['user_id']}/rights", json={"overrides": [{"code": "timetable.manage", "effect": "GRANT"}]})
+    monkeypatch.setattr(settings, "two_factor_required_for_admins", 1)
+    login = await app_client.post("/api/v1/auth/login", json={"username": t["username"], "password": t["pw"]})
+    assert not login.json().get("two_factor")
+
+
+async def test_end_date_reminder_once_and_who_can_and_giving_a_role_to_many(app_client, admin_user, db_session):
+    from app.access.service import end_date_round
+    from app.notifications.models import Notification
+
+    a = await _person(app_client, db_session, "TCI", "TEACHER", "35202-8100012-2")
+    b = await _person(app_client, db_session, "TCJ", "TEACHER", "35202-8100013-3")
+    soon = (institute_today() + timedelta(days=2)).isoformat()
+    await app_client.put(f"{A}/people/{a['user_id']}/rights", json={"overrides": [{"code": "timetable.manage", "effect": "GRANT", "until": soon}]})
+    assert await end_date_round(db_session) == 1
+    assert await end_date_round(db_session) == 0                                  # once only
+    told = (await db_session.execute(select(Notification).where(Notification.title == "Access ending soon"))).scalars().all()
+    assert {n.user_id for n in told} >= {uuid.UUID(a["user_id"]), admin_user.id}
+
+    who = (await app_client.get(f"{A}/who", params={"code": "timetable.manage"})).json()
+    mine = next(p for p in who["people"] if p["user_id"] == a["user_id"])
+    assert mine["has_it"] and mine["own"]["until"] == soon and mine["roles"] == []
+    assert any(p["user_id"] == str(admin_user.id) and p["has_it"] and p["roles"] for p in who["people"])
+
+    r = await app_client.post(f"{A}/roles", json={"name": "Duty roster"})
+    rid = r.json()["id"]
+    res = (await app_client.post(f"{A}/roles/{rid}/members", json={"add": [a["emp"], b["emp"]], "remove": []})).json()
+    assert res["done"] == 2 and res["failed"] == 0
+    members = (await app_client.get(f"{A}/roles/{rid}/members")).json()
+    assert {m["employee_id"] for m in members} == {a["emp"], b["emp"]}
+    res = (await app_client.post(f"{A}/roles/{rid}/members", json={"add": [], "remove": [b["emp"]]})).json()
+    assert res["done"] == 1 and len((await app_client.get(f"{A}/roles/{rid}/members")).json()) == 1
+    # a role that comes with a job title is not taken away here
+    teacher = await _role_id(app_client, "TEACHER")
+    res = (await app_client.post(f"{A}/roles/{teacher}/members", json={"add": [], "remove": [a["emp"]]})).json()
+    assert res["failed"] == 1 and "job title" in res["results"][0]["message"]

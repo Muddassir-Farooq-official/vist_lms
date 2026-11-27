@@ -62,6 +62,7 @@
     if (!r.ok) { msg(errOf(r, "Could not load access control."), "error"); return; }
     data = r.body;
     drawRoles();
+    fillWho();
     const again = keepRole && data.roles.find(function (x) { return x.id === keepRole; });
     if (again) openRole(again.id);
     const copy = $("ac-new-copy");
@@ -132,8 +133,10 @@
         ' &middot; <button type="button" class="link-btn" id="ac-reset">Back to the standard</button></p>';
     }
     if (role.own_use.length) head += '<p class="panel-hint">Also comes with its own-use rights (not changed here): ' + esc(role.own_use.map(label).join(", ")) + ".</p>";
+    head += '<details class="ac-members" id="ac-members"' + (role.people && role.people <= 12 ? " open" : "") + '><summary>People with this role (' + role.people + ')</summary><div id="ac-members-body"><p class="muted">Loading...</p></div></details>';
     box.innerHTML = head + '<div class="ac-mods">' + data.modules.map(function (m) { return moduleRow(m, draft, locked); }).join("") + "</div>" +
       (locked ? "" : '<div class="ac-save"><button type="button" class="role-btn secondary-btn" id="ac-undo-draft">Discard changes</button> <button type="button" class="role-btn" id="ac-save-role">Check and save</button></div>');
+    loadMembers();
     if (locked) return;
     box.querySelectorAll(".ac-mod").forEach(function (row) { wireModule(row, draft, function () { openRoleKeep(); }); });
     $("ac-save-role").addEventListener("click", saveRole);
@@ -159,6 +162,69 @@
     });
   }
   function openRoleKeep() { redraw(); }
+
+  // ------------------------------------------------------------------ a role's people (give it to many at once)
+  async function loadMembers() {
+    const body = $("ac-members-body");
+    if (!body || !role) return;
+    const r = await VA.fetchJson(API + "/roles/" + role.id + "/members", { quiet: true });
+    if (!r.ok) { body.innerHTML = ""; return; }
+    const canGive = !role.own_portal;
+    body.innerHTML = (r.body.length ? '<ul class="ac-member-list">' + r.body.map(function (m) {
+      return "<li><span>" + esc(m.name) + ' <small class="muted">' + esc(m.code) + (m.department ? " &middot; " + esc(m.department) : "") + "</small></span>" +
+        (m.from_job_title ? '<small class="muted">from their job title</small>' : (canGive ? '<button type="button" class="link-btn" data-take="' + esc(m.employee_id) + '">Take away</button>' : "")) + "</li>";
+    }).join("") + "</ul>" : '<p class="muted">Nobody yet.</p>') +
+      (canGive ? '<button type="button" class="role-btn secondary-btn small-btn" id="ac-add-people-btn">Give it to people...</button>' : "");
+    const add = $("ac-add-people-btn");
+    if (add) add.addEventListener("click", openAddPeople);
+    body.querySelectorAll("[data-take]").forEach(function (b) {
+      b.addEventListener("click", async function () {
+        if (!(await VA.confirm("Take the " + role.name + " role from this person?", "Take it away"))) return;
+        const s = await VA.fetchJson(API + "/roles/" + role.id + "/members", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ add: [], remove: [b.getAttribute("data-take")] }) });
+        bulkDone(s);
+      });
+    });
+  }
+  let picked = new Set(), pickTimer = null;
+  function openAddPeople() {
+    picked = new Set();
+    $("ac-add-title").textContent = "Give " + role.name + " to";
+    $("ac-add-q").value = "";
+    $("ac-add-count").textContent = "";
+    $("ac-add-people").showModal();
+    searchPick();
+  }
+  $("ac-add-q").addEventListener("input", function () { clearTimeout(pickTimer); pickTimer = setTimeout(searchPick, 250); });
+  async function searchPick() {
+    const q = $("ac-add-q").value.trim();
+    const r = await VA.fetchJson(API + "/people" + (q ? "?q=" + encodeURIComponent(q) : ""), { quiet: true });
+    if (!r.ok) return;
+    $("ac-add-list").innerHTML = r.body.map(function (p) {
+      const has = p.roles.some(function (x) { return x.code === role.code; });
+      return '<label class="' + (has ? "muted" : "") + '"><input type="checkbox" data-pick="' + esc(p.employee_id) + '"' + (has ? " disabled checked" : picked.has(p.employee_id) ? " checked" : "") + "> " +
+        esc(p.name) + ' <small class="muted">' + esc(p.code) + (p.department ? " &middot; " + esc(p.department) : "") + (has ? " &middot; already has it" : "") + "</small></label>";
+    }).join("") || '<p class="muted">Nobody found.</p>';
+  }
+  $("ac-add-list").addEventListener("change", function (e) {
+    const id = e.target.getAttribute("data-pick");
+    if (!id) return;
+    if (e.target.checked) picked.add(id); else picked.delete(id);
+    $("ac-add-count").textContent = picked.size ? picked.size + " chosen" : "";
+  });
+  $("ac-add-ok").addEventListener("click", async function () {
+    if (!picked.size) return;
+    $("ac-add-people").close();
+    const s = await VA.fetchJson(API + "/roles/" + role.id + "/members", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ add: Array.from(picked), remove: [] }) });
+    bulkDone(s);
+  });
+  function bulkDone(s) {
+    if (!s.ok) { msg(errOf(s, "Could not save."), "error"); return; }
+    const b = s.body, bad = b.results.filter(function (x) { return !x.ok; });
+    msg((b.done ? b.done + " saved. " : "") + (b.waiting ? b.waiting + " waiting for a second administrator. " : "") +
+      (bad.length ? "Not changed: " + bad.map(function (x) { return x.name + " (" + x.message + ")"; }).join("; ") : ""), bad.length ? "error" : "ok");
+    load(role.id);
+    loadHistory();
+  }
   function redraw() {
     // keep the draft, redraw the module rows
     const box = $("ac-role-editor");
@@ -392,6 +458,36 @@
       if (done(s, person.name + "'s roles")) { openPerson(person.user_id); load(role && role.id); }
     });
   }
+
+  // ------------------------------------------------------------------ who can do this?
+  function fillWho() {
+    const sel = $("ac-who-code");
+    if (sel.options.length) return;
+    sel.innerHTML = '<option value="">Choose a right...</option>' + data.modules.map(function (m) {
+      const rights = [].concat(m.levels.view, m.levels.edit, m.levels.approve);
+      return '<optgroup label="' + esc(m.label) + '">' + rights.map(function (c) { return '<option value="' + esc(c.code) + '">' + esc(c.label) + "</option>"; }).join("") + "</optgroup>";
+    }).join("") + '<optgroup label="Administrator only">' + data.locked.map(function (c) { return '<option value="' + esc(c) + '">' + esc(label(c)) + "</option>"; }).join("") + "</optgroup>";
+  }
+  $("ac-who-code").addEventListener("change", async function () {
+    const code = $("ac-who-code").value;
+    if (!code) { $("ac-who").innerHTML = ""; $("ac-who-sum").textContent = ""; return; }
+    const r = await VA.fetchJson(API + "/who?code=" + encodeURIComponent(code));
+    if (!r.ok) { msg(errOf(r, "Could not look it up."), "error"); return; }
+    $("ac-who-sum").textContent = r.body.count + (r.body.count === 1 ? " person can " : " people can ") + r.body.label.toLowerCase() + "." +
+      (r.body.sensitive ? " (A money or control right.)" : "");
+    $("ac-who").innerHTML = r.body.people.map(function (p) {
+      const through = [].concat(p.roles.map(function (x) { return "role: " + x; }),
+        p.own ? [(p.own.effect === "GRANT" ? "own right" : "taken away") + (p.own.until ? " until " + p.own.until : "")] : []);
+      return "<tr" + (p.has_it ? "" : ' class="muted"') + '><td><button type="button" class="link-btn" data-open-user="' + esc(p.user_id) + '">' + esc(p.name) + "</button></td><td>" +
+        esc(p.department || "") + "</td><td>" + (p.has_it ? "Yes" : "No") + "</td><td>" + esc(through.join("; ")) + "</td></tr>";
+    }).join("") || '<tr><td colspan="4" class="muted">Nobody.</td></tr>';
+  });
+  $("ac-who").addEventListener("click", function (e) {
+    const b = e.target.closest("[data-open-user]");
+    if (!b) return;
+    VA.showTab("people");
+    openPerson(b.getAttribute("data-open-user"));
+  });
 
   // ------------------------------------------------------------------ waiting and history
   async function loadWaiting() {

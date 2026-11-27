@@ -138,6 +138,26 @@ async def decide(request_id: uuid.UUID, body: DecideIn, current_user: CurrentUse
     return await AccessService(db).decide(request_id, approve=body.approve, note=body.note, actor_id=current_user.id)
 
 
+class MembersIn(BaseModel):
+    add: list[uuid.UUID] = Field(default_factory=list, max_length=200)
+    remove: list[uuid.UUID] = Field(default_factory=list, max_length=200)
+
+
+@router.get("/who", summary="Who can do this: everyone holding a right, and where it comes from")
+async def who(code: str = Query(max_length=64), current_user: CurrentUser = Depends(admin), db=Depends(get_db)) -> dict:
+    return await AccessService(db).who_can(code)
+
+
+@router.get("/roles/{role_id}/members", summary="Staff who have this role")
+async def members(role_id: uuid.UUID, current_user: CurrentUser = Depends(admin), db=Depends(get_db)) -> list[dict]:
+    return await AccessService(db).role_members(role_id)
+
+
+@router.post("/roles/{role_id}/members", summary="Give this role to several staff members, or take it from them")
+async def set_members(role_id: uuid.UUID, body: MembersIn, current_user: CurrentUser = Depends(admin), db=Depends(get_db)) -> dict:
+    return await AccessService(db).set_members(role_id, add=body.add, remove=body.remove, actor_id=current_user.id)
+
+
 @router.get("/my-pages", summary="Pages of the administration's portal this person may open (for the menu)")
 async def my_pages(current_user: CurrentUser = Depends(get_current_user)) -> dict:
     from app.access import catalog

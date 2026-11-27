@@ -35,6 +35,7 @@ class UserAccessOverride(UUIDPKMixin, TimestampMixin, Base):
     effect: Mapped[str] = mapped_column(String(8), nullable=False)
     until: Mapped[date | None] = mapped_column(Date, nullable=True)
     reason: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    reminded_on: Mapped[date | None] = mapped_column(Date, nullable=True)   # "ends in 2 days" was sent (once)
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
 
