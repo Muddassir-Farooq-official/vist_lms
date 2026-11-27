@@ -23,11 +23,12 @@
       const li = el("li", "em-row"); li.dataset.sid = s.student_id;
       const who = el("div", "rc-who"); who.appendChild(el("strong", null, s.name)); who.appendChild(el("small", null, s.roll_number || ""));
       if (s.absent_in_roll) who.appendChild(el("small", "em-flag", "Absent in the exam roll"));
+      if (s.suspended) { li.className += " att-locked"; who.appendChild(el("small", "em-flag", "Suspended: marks locked")); }
       li.appendChild(who);
       const inp = document.createElement("input"); inp.type = "number"; inp.min = "0"; inp.max = String(d.total_marks); inp.step = "0.5";
-      inp.className = "text-input em-marks"; inp.value = s.marks == null ? "" : s.marks; inp.disabled = !d.can_edit || s.absent;
+      inp.className = "text-input em-marks"; inp.value = s.marks == null ? "" : s.marks; inp.disabled = !d.can_edit || s.absent || s.suspended;
       inp.setAttribute("aria-label", "Marks of " + s.name);
-      const ab = el("label", "em-absent"); const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!s.absent; cb.disabled = !d.can_edit;
+      const ab = el("label", "em-absent"); const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!s.absent; cb.disabled = !d.can_edit || s.suspended;
       cb.addEventListener("change", function () { inp.disabled = cb.checked; if (cb.checked) inp.value = ""; });
       ab.appendChild(cb); ab.appendChild(document.createTextNode(" Absent"));
       li.appendChild(inp); li.appendChild(ab);

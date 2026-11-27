@@ -195,10 +195,15 @@ class RollCallService:
                  "status": marks[p.id].status.value if p.id in marks else None, "note": marks[p.id].note if p.id in marks else None}
                 for p in pupils]
         counts = {k.value: sum(1 for r in rows if r["status"] == k.value) for k in DayStatus}
+        # suspended children stay on the list, locked: no mark, and the day does not count for them
+        suspended = (await self.session.execute(select(Student).where(Student.program_id == program.id, Student.status == StudentStatus.SUSPENDED,
+                                                                      func.upper(Student.section_label) == sec.label.upper())
+                                                .order_by(Student.roll_number))).scalars().all()
+        rows += [{"student_id": p.id, "name": _name(p), "roll_number": p.roll_number, "status": None, "note": None, "suspended": True} for p in suspended]
         cover = (await self.session.execute(select(RollCallCover, Employee).join(Employee, Employee.id == RollCallCover.employee_id).where(
             RollCallCover.section_id == sec.id, RollCallCover.day == day))).first()
         return {"section": {"id": sec.id, "label": sec.label, "class": program.name, "session": term.label}, "day": day, "is_today": day == today,
-                "can_mark": can_mark, "you_are": who, "students": rows, "counts": {**counts, "unmarked": sum(1 for r in rows if r["status"] is None)},
+                "can_mark": can_mark, "you_are": who, "students": rows, "counts": {**counts, "unmarked": sum(1 for r in rows if r["status"] is None and not r.get("suspended"))},
                 "cover": _name(cover[1]) if cover else None}
 
     async def mark(self, section_id: uuid.UUID, day: date, entries: list[dict], user) -> dict:

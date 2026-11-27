@@ -423,6 +423,14 @@ async def _own_student_id(db, user: CurrentUser):
     return student.id
 
 
+async def _not_held(db, student_id) -> None:
+    """A suspended student's result card is held (not issued) until the suspension is lifted."""
+    from app.students.models import StudentStatus
+    from app.students.standing import ensure_not_locked
+
+    await ensure_not_locked(db, student_id, "the result card", allow=(StudentStatus.DROPPED,))
+
+
 async def _pdf(data: dict) -> Response:
     name = (data["student"]["roll_number"] or "student").replace("/", "-")
     return Response(content=await run_in_threadpool(render_transcript_pdf, data), media_type="application/pdf",
@@ -440,6 +448,7 @@ async def my_transcript(current_user: CurrentUser = Depends(get_current_user), d
 async def my_transcript_pdf(current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> Response:
     sid = await _own_student_id(db, current_user)
     await ensure_no_attendance_hold(db, sid, action="Your result card")
+    await _not_held(db, sid)
     return await _pdf(await TranscriptService(db).build(sid))
 
 
@@ -450,6 +459,7 @@ async def student_transcript(student_id: uuid.UUID, current_user: CurrentUser = 
 
 @router.get("/students/{student_id}/transcript.pdf", summary="Any student's result card as a PDF (approver)")
 async def student_transcript_pdf(student_id: uuid.UUID, current_user: CurrentUser = Depends(transcript_reader), db=Depends(get_db)) -> Response:
+    await _not_held(db, student_id)
     return await _pdf(await TranscriptService(db).build(student_id))
 
 

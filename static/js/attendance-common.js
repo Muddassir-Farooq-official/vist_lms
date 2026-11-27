@@ -18,6 +18,15 @@
       const current = (existing && existing[s.student_id]) || "PRESENT";
       const name = "att-" + s.student_id;
       const tr = document.createElement("tr");
+      if (s.student_status === "SUSPENDED") {
+        // locked: not marked, and this class does not count for or against them
+        tr.className = "att-locked";
+        tr.innerHTML = '<td data-label="Student"><strong>' + esc(s.student_name) + '</strong><span class="roll-sub">' + esc(s.roll_number || "\u2014") +
+          " \u00b7 suspended: not marked, not counted</span></td>" +
+          '<td data-label="Attendance"><span class="badge badge-locked" title="Locked until the suspension is lifted">Suspended</span></td>';
+        tbody.appendChild(tr);
+        return;
+      }
       tr.innerHTML =
         '<td data-label="Student"><strong>' + esc(s.student_name) + "</strong>" +
         '<span class="roll-sub">' + esc(s.roll_number || "\u2014") + (s.program ? " \u00b7 " + esc(s.program) + (s.section_label ? " (" + esc(s.section_label) + ")" : "") : "") + (current === "LEAVE" ? " \u00b7 on approved leave (stays so unless you mark Present)" : "") + "</span></td>" +

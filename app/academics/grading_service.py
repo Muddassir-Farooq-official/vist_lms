@@ -297,6 +297,9 @@ class GradingService:
             raise ResourceNotFoundError("Enrollment not found.")
         if enrollment.status == EnrollmentStatus.WITHDRAWN:
             raise BusinessRuleViolationError("Can't record a mark for a withdrawn enrollment.")
+        from app.students.standing import ensure_not_locked
+
+        await ensure_not_locked(self.session, enrollment.student_id, "marks entry")
 
         offering_assessment = await self.session.get(OfferingAssessment, offering_assessment_id)
         if offering_assessment is None or offering_assessment.course_offering_id != enrollment.course_offering_id:
@@ -485,9 +488,16 @@ class GradingService:
 
     async def publish_outcomes(self, course_offering_id: uuid.UUID, *, actor_id: uuid.UUID) -> int:
         """Called when a result sheet is published: decide pass/fail for every student on the course and tell them."""
+        from app.students.models import StudentStatus
+        from app.students.standing import locked_ids
+
         stmt = select(Enrollment).where(Enrollment.course_offering_id == course_offering_id, Enrollment.status != EnrollmentStatus.WITHDRAWN)
+        rows = list((await self.session.execute(stmt)).scalars())
+        held = await locked_ids(self.session, [e.student_id for e in rows], only=(StudentStatus.SUSPENDED,))
         n = 0
-        for enrollment in (await self.session.execute(stmt)).scalars():
+        for enrollment in rows:
+            if enrollment.student_id in held:
+                continue        # a suspended student's result is held: it is worked out once the suspension is lifted
             await self._maybe_recompute_outcome(enrollment, actor_id=actor_id)
             n += 1
         return n

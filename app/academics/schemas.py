@@ -171,6 +171,8 @@ class EnrollmentOut(BaseModel):
     # Only in a combined class's roster (?combined=true): which section and program each student is from.
     section_label: str | None = None
     program: str | None = None
+    # ACTIVE | SUSPENDED | DROPPED | GRADUATED: a suspended student stays on the list but is locked (attendance, marks)
+    student_status: str | None = None
 
 
 class PeriodCreateRequest(BaseModel):

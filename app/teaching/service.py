@@ -519,7 +519,7 @@ class TeachingService:
 
     async def register(self, cover_id: uuid.UUID, user_id: uuid.UUID) -> dict:
         from app.attendance.models import AttendanceRecord
-        from app.students.models import Student
+        from app.students.models import Student, StudentStatus
 
         c, cs = await self._my_cover(cover_id, user_id)
         students = (await self.session.execute(select(Student).join(Enrollment, Enrollment.student_id == Student.id)
@@ -527,7 +527,7 @@ class TeachingService:
                                                .order_by(Student.roll_number))).scalars().all()
         marks = {r.student_id: r.status.value for r in (await self.session.execute(select(AttendanceRecord).where(AttendanceRecord.class_session_id == cs.id))).scalars()}
         return {"id": c.id, "description": c.description, "room": cs.room,
-                "students": [{"id": s.id, "name": f"{s.first_name} {s.last_name}".strip(), "roll_number": s.roll_number, "status": marks.get(s.id)} for s in students]}
+                "students": [{"id": s.id, "name": f"{s.first_name} {s.last_name}".strip(), "roll_number": s.roll_number, "status": "SUSPENDED" if s.status == StudentStatus.SUSPENDED else marks.get(s.id)} for s in students]}
 
     async def mark(self, cover_id: uuid.UUID, user_id: uuid.UUID, present_ids: list[uuid.UUID]) -> dict:
         """The substitute takes the class's attendance: the same rules as its own teacher (from the start, within the window)."""

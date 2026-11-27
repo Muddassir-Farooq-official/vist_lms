@@ -29,6 +29,18 @@
     const s = $("ch-status");
     s.textContent = String(st.status || "").charAt(0) + String(st.status || "").slice(1).toLowerCase();
     s.className = "status-pill " + String(st.status || "").toLowerCase();
+    // suspended or expelled: the portal is view-only for this child, and says why
+    let note = $("ch-standing");
+    const why = st.status === "SUSPENDED" ? "Your child is suspended. Records and fees stay visible here, but attendance, exams, results and certificates are on hold until the suspension is lifted. Please contact the office."
+      : st.status === "DROPPED" ? "Your child is no longer enrolled. Past records and fees stay visible here. For a leaving certificate, please contact the office." : "";
+    if (!note && why) {
+      note = document.createElement("p");
+      note.id = "ch-standing";
+      note.className = "dash-alert error";
+      note.setAttribute("role", "status");
+      $("ch-meta").insertAdjacentElement("afterend", note);
+    }
+    if (note) { note.textContent = why; note.hidden = !why; }
   }
 
   function kpis(d, papers) {

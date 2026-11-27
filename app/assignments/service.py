@@ -258,6 +258,9 @@ class AssignmentService:
 
     async def submit(self, assignment_id: uuid.UUID, *, user_id: uuid.UUID, drive_url: str, note: str | None, acknowledge_private: bool) -> dict:
         student = await self._student(user_id)
+        from app.students.standing import ensure_not_locked
+
+        await ensure_not_locked(self.session, student, "submitting work")
         assignment = await self._assignment(assignment_id)
         enrolled = (await self.session.execute(
             select(func.count()).select_from(Enrollment).join(CourseOffering, CourseOffering.id == Enrollment.course_offering_id)

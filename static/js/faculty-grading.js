@@ -344,7 +344,9 @@
 
       const tr = document.createElement("tr");
       tr.dataset.enrollmentId = enrollment.id;
-      const absNote = absentByName[enrollment.id] ? '<span class="mark-absent">Absent: ' + VA.escapeHtml(absentByName[enrollment.id].join(", ")) + " paper</span>" : "";
+      const locked = enrollment.student_status === "SUSPENDED";   // marks entry locked until the suspension is lifted
+      if (locked) tr.className = "att-locked";
+      const absNote = locked ? '<span class="mark-absent">Suspended: marks locked</span>' : absentByName[enrollment.id] ? '<span class="mark-absent">Absent: ' + VA.escapeHtml(absentByName[enrollment.id].join(", ")) + " paper</span>" : "";
       const from = enrollment.program ? '<span class="mark-from">' + VA.escapeHtml(enrollment.program) + (enrollment.section_label ? " (" + VA.escapeHtml(enrollment.section_label) + ")" : "") + "</span>" : "";
       let cellsHtml = "<td>" + VA.escapeHtml(enrollment.student_name) + from + absNote + "</td>" +
         "<td>" + VA.escapeHtml(enrollment.roll_number || "\u2014") + "</td>";
@@ -354,7 +356,7 @@
         const wasAbsent = absent[enrollment.id + "|" + oa];
         cellsHtml += '<td class="num"><input type="number" class="text-input mark-input' + (wasAbsent ? " is-absent" : "") + '" ' +
           'data-assessment-id="' + oa + '" data-enrollment-id="' + enrollment.id + '" ' + (wasAbsent ? 'placeholder="Absent" title="Absent in the ' + VA.escapeHtml(wasAbsent) + ' paper (exam roll)" ' : "") +
-          'min="0" max="' + c.max_marks + '" step="0.01" value="' + (existing !== undefined ? existing : "") + '"' + (sheet && !sheet.can_edit ? " disabled" : "") + " />" +
+          'min="0" max="' + c.max_marks + '" step="0.01" value="' + (existing !== undefined ? existing : "") + '"' + (locked || (sheet && !sheet.can_edit) ? " disabled" : "") + " />" +
           (wasAbsent ? '<span class="mark-absent">Absent</span>' : "") + "</td>";
       });
       const outcomeCell = enrollment.outcome ? statusPillHtml(enrollment.outcome) : "\u2014";

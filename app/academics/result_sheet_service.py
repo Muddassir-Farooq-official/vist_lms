@@ -76,6 +76,12 @@ class ResultSheetService:
         assessments = await self.grading.list_offering_assessments(offering_id)
         enrollments = list((await self.session.execute(select(Enrollment).where(
             Enrollment.course_offering_id == offering_id, Enrollment.status != EnrollmentStatus.WITHDRAWN))).scalars())
+        # a suspended student's marks are locked and their result held: they do not hold up the rest of the class
+        from app.students.models import StudentStatus
+        from app.students.standing import locked_ids
+
+        held = await locked_ids(self.session, [e.student_id for e in enrollments], only=(StudentStatus.SUSPENDED,))
+        enrollments = [e for e in enrollments if e.student_id not in held]
         marked: dict[uuid.UUID, int] = {}
         if enrollments and assessments:
             marked = {eid: n for eid, n in (await self.session.execute(
@@ -86,7 +92,7 @@ class ResultSheetService:
         if incomplete:
             for st in (await self.session.execute(select(Student).where(Student.id.in_([e.student_id for e in incomplete[:5]])))).scalars():
                 names.append(f"{st.first_name} {st.last_name}")
-        return {"students": len(enrollments), "assessments": len(assessments), "complete_students": len(enrollments) - len(incomplete),
+        return {"students": len(enrollments), "held_suspended": len(held), "assessments": len(assessments), "complete_students": len(enrollments) - len(incomplete),
                 "missing_students": len(incomplete), "missing_names": names,
                 "ready": bool(assessments) and bool(enrollments) and not incomplete}
 

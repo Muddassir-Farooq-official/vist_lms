@@ -321,6 +321,7 @@ async def _to_enrollment_out_many(db, enrollments: list) -> list[EnrollmentOut]:
             course_title=course.title if course else "Unknown", credit_hours=course.credit_hours if course else 0,
             term_label=offering.term_label if offering else "Unknown", status=e.status, outcome=e.outcome,
             is_retake=e.is_retake, enrolled_at=e.enrolled_at,
+            student_status=getattr(student.status, "value", student.status) if student else None,
         ))
     return out
 

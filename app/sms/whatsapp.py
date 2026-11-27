@@ -162,6 +162,10 @@ async def render_document(session: AsyncSession, kind: str, ident: uuid.UUID) ->
 
         try:
             await ensure_no_attendance_hold(session, ident, action="The result card")
+            from app.students.models import StudentStatus
+            from app.students.standing import ensure_not_locked
+
+            await ensure_not_locked(session, ident, "the result card", allow=(StudentStatus.DROPPED,))
         except Exception:  # noqa: BLE001 - on hold: not shared
             return None
         data = await TranscriptService(session).build(ident)

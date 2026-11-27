@@ -297,7 +297,7 @@ class ResultsService:
                 "students": [{"student_id": s.id, "name": _name(s), "roll_number": s.roll_number,
                               "marks": float(marks[s.id].marks) if s.id in marks and marks[s.id].marks is not None else None,
                               "absent": marks[s.id].absent if s.id in marks else s.id in roll_absent, "absent_in_roll": s.id in roll_absent,
-                              "saved": s.id in marks} for s in pupils]}
+                              "saved": s.id in marks, "suspended": s.status == StudentStatus.SUSPENDED} for s in pupils]}
 
     async def _roll_absent(self, ex: SchoolExam, off: CourseOffering) -> set[uuid.UUID]:
         """Students marked Absent in the exam roll of this subject's paper on a datesheet named like this exam."""
@@ -316,6 +316,7 @@ class ResultsService:
         off = await self.session.get(CourseOffering, offering_id)
         total = sheet["total_marks"]
         known = {r["student_id"] for r in sheet["students"]}
+        suspended = {r["student_id"] for r in sheet["students"] if r.get("suspended")}
         current = {m.student_id: m for m in (await self.session.execute(select(SchoolMark).where(SchoolMark.exam_id == exam_id,
                                                                                                  SchoolMark.course_id == off.course_id))).scalars()}
         changed = 0
@@ -324,6 +325,8 @@ class ResultsService:
             sid = e["student_id"]
             if sid not in known:
                 raise ValidationAppError("A student on the list is not in this class.")
+            if sid in suspended:
+                continue        # a suspended student's marks are locked until the suspension is lifted
             absent = bool(e.get("absent"))
             marks = None if absent or e.get("marks") is None else float(e["marks"])
             if marks is not None and not 0 <= marks <= total:
