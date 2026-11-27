@@ -183,12 +183,14 @@
   }
 
   async function submitDialog(e) {
+    let chosenAction = null;
     e.preventDefault();
     const note = $("wr-d-note").value.trim();
     const w = current.w;
     let r;
     if (current.mode === "decide") {
       const a = document.querySelector('input[name="wr-action"]:checked').value;
+      chosenAction = a;
       if (note.length < 10) { $("wr-d-error").textContent = "Write the decision (at least 10 characters)."; $("wr-d-error").hidden = false; return; }
       const amount = a === "FINE" ? Number($("wr-d-amount").value) : null;
       if (a === "FINE" && !(amount > 0)) { $("wr-d-error").textContent = "Enter the fine in rupees."; $("wr-d-error").hidden = false; $("wr-d-amount").focus(); return; }
@@ -207,6 +209,13 @@
     $("wr-d-ok").disabled = false;
     if (!r.ok) { $("wr-d-error").textContent = err(r, "Could not save."); $("wr-d-error").hidden = false; return; }
     $("wr-dialog").close();
+    // a member of staff suspended or terminated: their classes, duties and roles need someone else
+    if (current.mode === "decide" && w.kind === "EMPLOYEE" && (chosenAction === "SUSPEND" || chosenAction === "TERMINATE") && w.person && w.person.id &&
+        (await VA.confirm(w.person.name + (chosenAction === "SUSPEND" ? " is suspended. Hand over their classes while away (a cover for each), and their exam duties and roles?"
+          : " has been terminated. Hand over their courses to new teachers, and their exam duties and roles?")))) {
+      window.location.href = "/dashboard/admin/employees/" + w.person.id + "/handover?kind=" + (chosenAction === "SUSPEND" ? "AWAY" : "LEFT");
+      return;
+    }
     VA.toast(current.mode === "decide" ? "Decision applied. " + w.person.name + " has been told." : current.mode === "lift" ? "Suspension ended. " + w.person.name + " can sign in again."
       : "Withdrawn. It no longer counts.", "success");
     load();

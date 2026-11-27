@@ -373,6 +373,11 @@ class EmployeeService:
             user = await self.session.get(User, employee.user_id)
             if user is not None:
                 user.is_active = new_status != EmployeeStatus.TERMINATED
+        if old_status == EmployeeStatus.ON_LEAVE and new_status == EmployeeStatus.ACTIVE:
+            # back at work (a suspension lifted, or leave over): covers of their classes still to come are taken back
+            from app.employees.handover import back_at_work
+
+            await back_at_work(self.session, employee, actor_id=actor_id)
         if new_status == EmployeeStatus.TERMINATED:
             employee.left_on = institute_today()            # paid up to this day in that month's payroll
         elif old_status == EmployeeStatus.TERMINATED:

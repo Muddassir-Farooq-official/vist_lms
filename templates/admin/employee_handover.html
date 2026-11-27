@@ -1,0 +1,53 @@
+{% extends "admin/_base.html" %}
+{% from "_icons.html" import nav_icon %}
+{% block allowed_roles %}ADMIN{% endblock %}
+{% block title %}Hand over work{% endblock %}
+{% block page_title %}Hand over <span id="ho-name">work</span>{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle"><a href="/dashboard/admin/employees" class="back-link">&larr; Back to Employees</a> &middot; Give this person's classes, duties and roles to others while they are away, or when they leave. Nothing already held or recorded changes.</div>{% endblock %}
+
+{% block content %}
+<section class="sh-card" id="ho-setup">
+  <div class="form-grid two-col">
+    <fieldset class="form-field ho-kind"><legend>They are</legend>
+      <label><input type="radio" name="ho-kind" value="AWAY" checked /> <strong>Away for a while</strong> <small>suspended or on long leave: their courses stay theirs, each class gets a cover</small></label>
+      <label><input type="radio" name="ho-kind" value="LEFT" /> <strong>Leaving / has left</strong> <small>terminated or resigned: each course gets a new teacher</small></label>
+    </fieldset>
+    <div>
+      <div class="form-field"><label for="ho-from">From</label><input type="date" id="ho-from" class="text-input" /></div>
+      <div class="form-field" id="ho-until-field"><label for="ho-until">Until <small class="field-hint inline">(last day away; up to 120 days at a time)</small></label><input type="date" id="ho-until" class="text-input" /></div>
+    </div>
+  </div>
+  <p class="cc-meta" id="ho-status"></p>
+  <p id="ho-error" class="dash-alert error" role="alert" hidden></p>
+</section>
+
+<section class="sh-card" id="ho-courses-card" hidden>
+  <h2 class="panel-title">Courses: a new teacher</h2>
+  <p class="panel-hint">Each running course goes to the teacher you choose, with its timetable. Classes already held stay in the old teacher's name. Leave one on "no teacher yet" to decide later: it appears under <em>Sections without a teacher</em> in the Timetable.</p>
+  <div class="table-scroll"><table class="tk-table"><thead><tr><th>Course</th><th>Batch / section</th><th class="num">Students</th><th>New teacher</th></tr></thead><tbody id="ho-courses"></tbody></table></div>
+</section>
+
+<section class="sh-card" id="ho-classes-card" hidden>
+  <h2 class="panel-title">Classes while away: a cover for each</h2>
+  <p class="panel-hint">Their courses stay theirs. Choose who takes each class; "same for all" fills every class of that course at once. Cover pay is worked out as usual, and the substitute is told. When they are back at work, covers still to come are taken back automatically.</p>
+  <div id="ho-classes"></div>
+</section>
+
+<section class="sh-card" id="ho-other-card" hidden>
+  <h2 class="panel-title">Other duties and roles</h2>
+  <div id="ho-other"></div>
+</section>
+
+<section class="sh-card" id="ho-finish" hidden>
+  <div id="ho-leave" hidden>
+    <label class="checkbox-label"><input type="checkbox" id="ho-terminate" /> Record that they have left (status Terminated): sign-in is blocked and payroll pays up to today.</label>
+    <div class="form-field"><label for="ho-reason">Reason</label><input type="text" id="ho-reason" class="text-input" maxlength="255" placeholder="e.g. Resigned, contract ended" /></div>
+  </div>
+  <p class="cc-meta" id="ho-summary"></p>
+  <div class="form-actions"><button type="button" class="role-btn" id="ho-save">Hand over</button></div>
+  <p class="dash-alert success-text" id="ho-done" hidden></p>
+</section>
+<p class="empty-state" id="ho-nothing" hidden>Nothing to hand over for these dates: no classes, duties or roles.</p>
+{% endblock %}
+
+{% block extra_scripts %}<script src="/static/js/employee-handover.js" data-employee-id="{{ employee_id }}"></script>{% endblock %}
