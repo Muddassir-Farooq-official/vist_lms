@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import JSON, CheckConstraint, Date, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import JSON, CheckConstraint, Date, DateTime, ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base, TimestampMixin, UUIDPKMixin
@@ -41,6 +41,10 @@ class UserAccessOverride(UUIDPKMixin, TimestampMixin, Base):
 class AccessChange(UUIDPKMixin, TimestampMixin, Base):
     """One access change, with what it was before and after, so it can be shown and undone."""
     __tablename__ = "access_changes"
+    __table_args__ = (
+        Index("ix_access_changes_created_at", "created_at"),
+        Index("ix_access_changes_target", "target_type", "target_id"),
+    )
 
     kind: Mapped[str] = mapped_column(String(40), nullable=False)         # ROLE_RIGHTS, ROLE_CREATED, ROLE_DELETED, PERSON_RIGHTS, PERSON_ROLES
     target_type: Mapped[str] = mapped_column(String(10), nullable=False)  # ROLE / USER
