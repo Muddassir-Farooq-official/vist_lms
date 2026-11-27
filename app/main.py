@@ -1323,6 +1323,14 @@ async def admin_employees_page(request: Request):
     )
 
 
+@app.get("/dashboard/admin/employees/{employee_id}/handover", include_in_schema=False)
+async def admin_employee_handover_page(request: Request, employee_id: uuid.UUID):
+    """Hand over a person's work: covers while they are away, new teachers when they leave, and every other role."""
+    return templates.TemplateResponse(
+        request, "admin/employee_handover.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "employees", "employee_id": employee_id}
+    )
+
+
 @app.get("/dashboard/admin/settings", include_in_schema=False)
 async def admin_settings_page(request: Request):
     return templates.TemplateResponse(

@@ -4363,3 +4363,12 @@ details.tg-session > summary.tg-head { cursor: pointer; }
 .tw-combine-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 10px; background: var(--surface); border-radius: var(--radius); }
 .tw-combine-list small { display: block; color: var(--text-muted); }
 .co-cell small { color: var(--text-muted); }
+
+/* Employees -> Hand over work */
+.ho-kind label { display: block; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 6px; cursor: pointer; }
+.ho-kind small { display: block; color: var(--text-muted); margin-left: 22px; }
+.ho-course { border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 12px; }
+.ho-course-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.ho-course-head label { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 0.85rem; }
+.ho-block { margin-bottom: 16px; }
+.ho-block h3 { font-size: 0.95rem; margin: 0 0 6px; }

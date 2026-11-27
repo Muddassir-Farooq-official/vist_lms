@@ -31,7 +31,7 @@
     list = r.ok ? r.body : [];
     $("cm-list").innerHTML = list.map(function (c) {
       return '<article class="sh-card" data-id="' + c.id + '"><h3>' + esc(c.name) + (c.is_active ? "" : " (closed)") + (c.my_role ? " <small>you: " + esc(c.members.find(function (m) { return m.role === c.my_role; }).role_name) + "</small>" : "") + "</h3>" +
-        (c.purpose ? "<p>" + esc(c.purpose) + "</p>" : "") + '<p class="panel-hint">' + c.members.map(function (m) { return esc(m.name) + (m.role !== "MEMBER" ? " (" + esc(m.role_name) + ")" : ""); }).join(", ") +
+        (c.purpose ? "<p>" + esc(c.purpose) + "</p>" : "") + '<p class="panel-hint">' + c.members.map(function (m) { return esc(m.name) + (m.role !== "MEMBER" ? " (" + esc(m.role_name) + ")" : "") + (m.away ? " <em>(away)</em>" : ""); }).join(", ") +
         (c.next_meeting ? " · next meeting " + esc(day(c.next_meeting)) : "") + '</p><div class="decision-bar"><button type="button" class="role-btn secondary-btn cm-open">Meetings</button>' +
         (admin ? ' <button type="button" class="role-btn secondary-btn cm-edit">Change</button>' : "") + "</div></article>";
     }).join("") || '<p class="sd-dim">You are not on any committee.</p>';

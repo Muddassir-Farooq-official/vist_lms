@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.67.0",
+    "date": "2026-11-27",
+    "title": "Hand over a teacher's work when they are away or leave",
+    "summary": "When staff are suspended, on leave or leave the institute, their classes, courses, exam duties and roles are handed to others in one place.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Employees → Hand over work. Away (suspended or on long leave): a cover for each class in the dates, or one teacher for all classes of a course. Leaving: a new teacher for each running course, and its timetable goes with it."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Hand over also gives back covers they were going to take, and moves their upcoming exam duties, school class-teacher roles and mentees. When they leave, committee seats and clinical supervision end."
+      },
+      {
+        "kind": "improved",
+        "for": "Administrators",
+        "text": "Putting someone On leave, terminating them, or suspending or terminating them on a final warning now opens the hand-over. When they are back at work, covers still to come are taken back and the substitutes are told."
+      },
+      {
+        "kind": "improved",
+        "for": "Administrators",
+        "text": "Committee member lists show a member who is away."
+      }
+    ]
+  },
+  {
     "version": "1.66.0",
     "date": "2026-11-27",
     "title": "Visiting faculty paid per lecture",

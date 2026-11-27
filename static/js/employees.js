@@ -679,6 +679,13 @@
     editEmployeeSuccess.hidden = false;
   });
 
+  // Hand over work (classes, courses, duties, roles) for the person open in the sheet
+  const handoverLink = document.getElementById("handover-link");
+  if (handoverLink) handoverLink.addEventListener("click", function (e) {
+    e.preventDefault();
+    if (activeEmployeeId) window.location.href = "/dashboard/admin/employees/" + activeEmployeeId + "/handover";
+  });
+
   saveStatusBtn.addEventListener("click", async function () {
     if (!activeEmployeeId) return;
     if (newStatusSelect.value === "TERMINATED") {
@@ -692,10 +699,12 @@
           "Unpaid fines: " + b.unpaid_fines,
           "Outstanding fee balance: Rs. " + b.outstanding_fee_balance,
           "",
-          "Continue?",
+          "Next you hand over their work: a new teacher for each running course, and their exam duties, class-teacher roles and mentees. The leaving is recorded there. Continue?",
         ];
         if (!(await window.VistAdmin.confirm(lines.join("\n")))) return;
       }
+      window.location.href = "/dashboard/admin/employees/" + activeEmployeeId + "/handover?kind=LEFT&terminate=1";
+      return;
     }
     saveStatusBtn.disabled = true;
     modalError.hidden = true;
@@ -716,6 +725,11 @@
 
     VA.toast("Status updated.");
     loadEmployees();
+    if (newStatusSelect.value === "ON_LEAVE" &&
+        (await window.VistAdmin.confirm("They are now on leave. Hand over their classes while they are away (a cover for each class, and their exam duties and roles)?"))) {
+      window.location.href = "/dashboard/admin/employees/" + activeEmployeeId + "/handover?kind=AWAY";
+      return;
+    }
     openEmployeeModal(activeEmployeeId, "account");
   });
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.core.clock import institute_today
 
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends, Form, UploadFile
 from fastapi.responses import Response
@@ -401,6 +402,60 @@ async def update_employee(
 ) -> EmployeeDetail:
     employee = await EmployeeService(db).update_employee(employee_id, payload, actor_id=current_user.id)
     return await _to_detail(db, employee)
+
+
+class HandoverItemCourse(BaseModel):
+    offering_id: uuid.UUID
+    teacher_id: uuid.UUID | None = None
+
+
+class HandoverItemClass(BaseModel):
+    class_session_id: uuid.UUID
+    substitute_id: uuid.UUID | None = None
+
+
+class HandoverItemDuty(BaseModel):
+    duty_id: uuid.UUID
+    employee_id: uuid.UUID | None = None
+
+
+class HandoverItemSection(BaseModel):
+    section_id: uuid.UUID
+    employee_id: uuid.UUID | None = None
+
+
+class HandoverIn(BaseModel):
+    kind: str = Field(pattern="^(AWAY|LEFT)$")
+    from_date: date | None = None
+    until_date: date | None = None
+    courses: list[HandoverItemCourse] = Field(default_factory=list, max_length=200)
+    classes: list[HandoverItemClass] = Field(default_factory=list, max_length=1000)
+    duties: list[HandoverItemDuty] = Field(default_factory=list, max_length=200)
+    sections: list[HandoverItemSection] = Field(default_factory=list, max_length=50)
+    mentors: list[uuid.UUID] | None = None          # None = leave mentees as they are; [] = no mentor
+    release_covers: bool = True
+    end_committees: bool = True
+    terminate: bool = False
+    reason: str | None = Field(default=None, max_length=255)
+
+
+@router.get("/{employee_id}/handover", summary="What this person holds (courses, classes, covers, exam duties, class-teacher roles, mentees, committees) to hand over")
+async def handover_plan(employee_id: uuid.UUID, kind: str = "AWAY", from_date: date | None = None, until_date: date | None = None,
+                        current_user: CurrentUser = Depends(require_permission(Permissions.EMPLOYEE_UPDATE)), db=Depends(get_db)) -> dict:
+    from app.employees.handover import HandoverService
+
+    return await HandoverService(db).plan(employee_id, kind=kind, from_date=from_date, until_date=until_date)
+
+
+@router.post("/{employee_id}/handover", summary="Hand over: covers while away, new teachers when leaving, and every other role; optionally record the leaving")
+async def handover_apply(employee_id: uuid.UUID, payload: HandoverIn,
+                         current_user: CurrentUser = Depends(require_permission(Permissions.EMPLOYEE_UPDATE)), db=Depends(get_db)) -> dict:
+    from app.employees.handover import HandoverService
+
+    data = payload.model_dump()
+    if payload.mentors is None:
+        data.pop("mentors")
+    return await HandoverService(db).apply(employee_id, data, actor_id=current_user.id)
 
 
 @router.post("/{employee_id}/status", response_model=EmployeeDetail, summary="Change employee status")

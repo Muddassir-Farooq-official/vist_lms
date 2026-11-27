@@ -135,9 +135,15 @@ class CommitteeService:
 
         codes = dict((await self.session.execute(select(Employee.user_id, Employee.employee_code).where(Employee.user_id.in_([m.user_id for m in members] or [uuid.uuid4()]))))
                      .all()) if admin else {}
+        # a member who is away (suspended or on leave) keeps the seat, shown as away
+        from app.employees.models import EmployeeStatus
+
+        away = set((await self.session.execute(select(Employee.user_id).where(Employee.user_id.in_([m.user_id for m in members] or [uuid.uuid4()]),
+                                                                              Employee.status == EmployeeStatus.ON_LEAVE))).scalars())
         by_c: dict = {}
         for m in members:
             by_c.setdefault(m.committee_id, []).append({"user_id": m.user_id, "name": names.get(m.user_id), "role": m.role, "role_name": ROLES[m.role],
+                                                        "away": m.user_id in away,
                                                         **({"employee_code": codes.get(m.user_id)} if admin else {})})
         nxt = dict((await self.session.execute(select(CommitteeMeeting.committee_id, func.min(CommitteeMeeting.held_on)).where(
             CommitteeMeeting.committee_id.in_(ids or [uuid.uuid4()]), CommitteeMeeting.held_on >= institute_today(), CommitteeMeeting.status == "SCHEDULED")
