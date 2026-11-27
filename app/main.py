@@ -93,12 +93,12 @@ logger = get_logger(__name__)
 if settings.is_production:
     _problems = settings.production_problems()
     if _problems:
-        raise SystemExit("VIST LMS will not start in production until these settings are fixed in .env:\n  - " + "\n  - ".join(_problems))
+        raise SystemExit("The LMS will not start in production until these settings are fixed in .env:\n  - " + "\n  - ".join(_problems))
 
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
-    description="VIST Learning Management System API.",
+    description="Learning Management System API.",
     # The API map is a convenience for developers, and a map for attackers on a live server.
     docs_url=None if settings.is_production else "/docs",
     redoc_url=None if settings.is_production else "/redoc",
@@ -1358,6 +1358,12 @@ async def admin_employee_handover_page(request: Request, employee_id: uuid.UUID)
     return templates.TemplateResponse(
         request, "admin/employee_handover.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "employees", "employee_id": employee_id}
     )
+
+
+@app.get("/dashboard/admin/welcome", include_in_schema=False)
+async def admin_welcome_page(request: Request):
+    """First run of a new institute: its name, logo and kind, then Set up your LMS."""
+    return templates.TemplateResponse(request, "admin/welcome.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "dashboard"})
 
 
 @app.get("/dashboard/admin/settings", include_in_schema=False)

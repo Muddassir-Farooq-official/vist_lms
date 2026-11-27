@@ -85,7 +85,7 @@
     }
     const offering = result.body;
     offeringPageTitle.textContent = offering.course_code + " \u2014 " + offering.course_title + " (" + offering.term_label + ", Section " + (offering.section_label || "A") + ")";
-    document.title = offering.course_code + " \u2014 VIST LMS Admin";
+    document.title = offering.course_code + " \u2014 " + (document.title.split(" \u2014 ").pop() || "Admin");
 
     offeringSummary.innerHTML =
       "<dt>Credit Hours</dt><dd>" + offering.credit_hours + "</dd>" +

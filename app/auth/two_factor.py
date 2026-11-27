@@ -68,7 +68,7 @@ def matching_step(secret: str, code: str, at: float | None = None) -> int | None
 
 
 def otpauth_uri(secret: str, username: str) -> str:
-    issuer = settings.app_name or "VIST LMS"
+    issuer = settings.app_name or settings.institute_name or "LMS"
     return (f"otpauth://totp/{quote(issuer)}:{quote(username)}?secret={secret}&issuer={quote(issuer)}"
             f"&algorithm=SHA1&digits={DIGITS}&period={STEP}")
 

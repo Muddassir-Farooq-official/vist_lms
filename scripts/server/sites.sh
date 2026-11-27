@@ -7,6 +7,10 @@
 #   bash /opt/vist-lms/scripts/server/sites.sh add <name> <domain> "<Full institute name>"
 #                                                                         a new institute: own database + user, own secrets, own files,
 #                                                                         own port and Redis, nginx + HTTPS, first admin, backups
+#   bash /opt/vist-lms/scripts/server/sites.sh add-demo <name> "<Institute name>"
+#                                                                         a DEMO site demo-<name>.<server-ip>.sslip.io filled with
+#                                                                         sample data, to show an institute before it signs up
+#                                                                         (its own database; never mixed with a real institute)
 #   bash /opt/vist-lms/scripts/server/sites.sh https <name>               (again) get the HTTPS certificate once the domain points here
 #   bash /opt/vist-lms/scripts/server/sites.sh domain <name|vertex> <new-domain>
 #                                                                         move to its official domain; the old address redirects there
@@ -116,7 +120,8 @@ list() {
     dir="$(site_dir "$name")"
     if [ "$name" = vertex ]; then port=8000; addr="$(envget PUBLIC_URL "$dir/.env")"; proj="vist-lms"
     else port="$(envget LMS_PORT "$dir/compose.env")"; addr="https://$(envget DOMAIN "$dir/site.env")"; proj="lms-$name"
-      grep -qx 'ENABLED=0' "$dir/site.env" && addr="$addr (switched off)"; fi
+      grep -qx 'ENABLED=0' "$dir/site.env" && addr="$addr (switched off)"
+      grep -qx 'DEMO=1' "$dir/site.env" && addr="$addr (demo)"; fi
     health="down"; curl -fsS "http://127.0.0.1:$port/health/ready" >/dev/null 2>&1 && health="healthy"
     mem="$(docker stats --no-stream --format '{{.Name}} {{.MemUsage}}' 2>/dev/null | awk -v p="$proj-" '
       index($1, p) == 1 { v = $2; m = 1; if (v ~ /GiB$/) m = 1024; else if (v ~ /KiB$/) m = 1 / 1024; sub(/[KMG]iB$/, "", v); s += v * m }
@@ -167,7 +172,8 @@ add() {
   local db="lms_$name" role="lms_$name"
   [ "$(echo "SELECT count(*) FROM pg_database WHERE datname = '$db';" | pg_admin)" = "0" ] || die "A database called $db already exists. Nothing was changed."
   [ "$(echo "SELECT count(*) FROM pg_roles WHERE rolname = '$role';" | pg_admin)" = "0" ] || die "A database user called $role already exists. Nothing was changed."
-  confirm "Add institute '$title' as '$name':
+  local kind="institute"; [ "${DEMO:-0}" = 1 ] && kind="DEMO site (sample data only)"
+  confirm "Add $kind '$title' as '$name':
   address    https://$domain   (nginx site lms-$name, port $port on this server only)
   database   $db with its own user $role and a new random password (Vertex's database is not touched)
   files      $dir
@@ -202,7 +208,11 @@ It does not stop or change Vertex or any other institute."
   # its own name everywhere (pages, receipts, the installed app): without INSTITUTE_NAME it would show the built-in
   # default, Vertex's name. The administrator can change both later in Settings -> Institute.
   V="\"$title\""; setkey "$dir/.env" INSTITUTE_NAME V
-  V="\"$(printf '%s' "$name" | tr '[:lower:]' '[:upper:]') LMS\""; setkey "$dir/.env" APP_NAME V
+  V="\"${LMS_APP_NAME:-$(printf '%s' "$name" | tr '[:lower:]' '[:upper:]') LMS}\""; setkey "$dir/.env" APP_NAME V
+  # its own fixed-asset tags (ABC-IT-0001); Vertex keeps VIST, the built-in default
+  V="$(printf '%s' "${LMS_TAG_PREFIX:-$name}" | tr '[:lower:]' '[:upper:]' | cut -c1-6)"; setkey "$dir/.env" ASSET_TAG_PREFIX V
+  # A demo site: sample data may be added although APP_ENV is production, and every page shows a "Demo site" ribbon.
+  if [ "${DEMO:-0}" = 1 ]; then V=true; setkey "$dir/.env" DEMO_SITE V; fi
   V="https://$domain"; setkey "$dir/.env" PUBLIC_URL V; setkey "$dir/.env" CORS_ORIGINS V
   V="postgresql+asyncpg://$role:$dbpw@$host/$db"; setkey "$dir/.env" DATABASE_URL V
   V="postgresql+psycopg://$role:$dbpw@$host/$db"; setkey "$dir/.env" DATABASE_URL_SYNC V
@@ -226,6 +236,7 @@ DOMAIN=$domain
 TITLE="$title"
 ADDED=$(date +%F)
 ENABLED=1
+DEMO=${DEMO:-0}
 EOF
   ok "$dir"
 
@@ -265,6 +276,11 @@ asyncio.run(m())" >/dev/null 2>&1 \
   local i; for i in $(seq 1 45); do curl -fsS "http://127.0.0.1:$port/health/ready" >/dev/null 2>&1 && break; sleep 2; done
   curl -fsS "http://127.0.0.1:$port/health/ready" >/dev/null 2>&1 || { $C logs --tail=40 app; die "It did not become healthy."; }
   ok "healthy on port $port"
+  if [ "${DEMO:-0}" = 1 ]; then
+    say "Sample data (programs, courses, staff, students, timetable)"
+    $C exec -T app python scripts/seed_demo_data.py > "$dir/backups/demo-seed.log" 2>&1 || { tail -n 25 "$dir/backups/demo-seed.log"; die "Could not add the sample data (log above)."; }
+    ok "added"
+  fi
 
   say "7/8 Web address (nginx)"
   nginx_site "$name" "$domain" "$port" || die "nginx did not accept the new site."
@@ -273,7 +289,8 @@ asyncio.run(m())" >/dev/null 2>&1 \
   else warn "HTTPS skipped: when $domain points to this server run: sites.sh https $name"; fi
 
   say "8/8 Backups"
-  if [ -f "$STORE_CONF" ]; then site_backup_remote "$name" && backup_one "$name" && verify_one "$name" || warn "Backup set-up did not finish: run sites.sh backups-setup"
+  if [ "${DEMO:-0}" = 1 ]; then ok "none for a demo site (sample data only)"
+  elif [ -f "$STORE_CONF" ]; then site_backup_remote "$name" && backup_one "$name" && verify_one "$name" || warn "Backup set-up did not finish: run sites.sh backups-setup"
   else warn "No backup account yet: run   sites.sh backups-setup   (sets up backups for every institute at once)"; fi
 
   printf '\n\033[1;32m%s is ready.\033[0m\n' "$title"
@@ -281,7 +298,23 @@ asyncio.run(m())" >/dev/null 2>&1 \
   printf '    address:   https://%s\n    username:  admin\n    password:  %s\n' "$domain" "$LMS_ADMIN_PW"
   printf 'They must choose a new password at first login. Then: Settings -> institute name, logo, fee and SMS settings.\n'
   unset LMS_ADMIN_PW
+  if [ "${DEMO:-0}" = 1 ]; then
+    printf '\nSample logins for showing it around (password Demo@12345):\n'
+    sed -n '/^Sample data ready/,$p' "$dir/backups/demo-seed.log" | tail -n +2
+    printf 'The admin login above is the only one with full control: keep it to yourself.\n'
+  fi
   printf 'From now on every approved deploy updates it too (after Vertex).\n'
+}
+
+# A demo site to show a new institute before it signs up: "demo<name>" (address demo-<name>.<server-ip>.sslip.io),
+# its own database like any institute, a "Demo site" ribbon on every page, sample data, and no backups. When they sign
+# up, make their real site with "add" (it starts empty) and switch the demo off ("disable demo<name>").
+add_demo() {
+  local base="${1:-}" title="${2:-}"
+  [ -n "$base" ] && [ -n "$title" ] || die 'Use: sites.sh add-demo <name> "<Institute name>"   e.g. sites.sh add-demo abc "ABC College of Nursing"'
+  valid_name "$base" && [ ${#base} -le 16 ] || die "The short name must be 2-16 lower-case letters/digits, starting with a letter (e.g. abc)."
+  local suffix; suffix="$(temp_suffix)" || die "Could not work out this server's public IP address for the demo address."
+  DEMO=1 LMS_TAG_PREFIX="$base" LMS_APP_NAME="$(printf '%s' "$base" | tr '[:lower:]' '[:upper:]') LMS Demo" add "demo$base" "demo-$base.$suffix" "$title (Demo)"
 }
 
 # This server's public IPv4 as an sslip.io name: 187-127-220-153.sslip.io (any <x>.187-127-220-153.sslip.io reaches it).
@@ -594,7 +627,7 @@ backup_all() {
   exec 8>"/tmp/lms-backup-all.lock"; flock -n 8 || { echo "another backup-all is running"; exit 0; }
   local name failed=""
   for name in $(all_names); do
-    [ "$name" != vertex ] && grep -qx 'ENABLED=0' "$SITES_DIR/$name/site.env" && continue
+    [ "$name" != vertex ] && grep -qx 'ENABLED=0\|DEMO=1' "$SITES_DIR/$name/site.env" && continue     # demo sites: sample data, no backups
     backup_one "$name" || failed="$failed $name"
   done
   [ -z "$failed" ] || { echo "backup failed for:$failed" >&2; exit 1; }
@@ -716,7 +749,7 @@ jobs_all() {
 verify_all() {
   local name
   for name in $(all_names); do
-    [ "$name" != vertex ] && grep -qx 'ENABLED=0' "$SITES_DIR/$name/site.env" && continue
+    [ "$name" != vertex ] && grep -qx 'ENABLED=0\|DEMO=1' "$SITES_DIR/$name/site.env" && continue
     verify_one "$name" || true
   done
 }
@@ -746,6 +779,7 @@ $verify $pk verify-all >/dev/null 2>&1"
 case "${1:-}" in
   list) list ;;
   add) shift; add "$@" ;;
+  add-demo) shift; add_demo "$@" ;;
   https) need_root; https "${2:-}" || exit 1 ;;
   domain) domain "${2:-}" "${3:-}" ;;
   disable) disable "${2:-}" ;;
@@ -758,5 +792,5 @@ case "${1:-}" in
   verify-all) need_root; verify_all ;;
   jobs) need_root; jobs_all ;;
   schedule) need_root; schedule && ok "scheduled jobs are up to date (crontab -l)" ;;
-  *) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

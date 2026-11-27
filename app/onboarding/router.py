@@ -20,6 +20,13 @@ async def setup(current_user: CurrentUser = Depends(get_current_user), db=Depend
     return await OnboardingService(db).setup()
 
 
+@router.get("/first-run", summary="Whether this is a brand-new institute whose administrator should see the first-run wizard")
+async def first_run(current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    if Roles.ADMIN not in current_user.roles:
+        return {"needed": False}
+    return {"needed": await OnboardingService(db).first_run_needed()}
+
+
 @router.get("/me", summary="What I still have to do: my profile, and today's important things")
 async def me(current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
     if current_user.viewing_as_by:

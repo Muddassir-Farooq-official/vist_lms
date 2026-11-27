@@ -145,7 +145,7 @@ def tables_page(missing: list[str]) -> str:
 
 
 PAGE = """<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"><title>Update needed &mdash; VIST LMS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Update needed</title>
 <style>body{{font-family:system-ui,Segoe UI,Arial,sans-serif;background:#f4f6fb;margin:0;display:grid;place-items:center;min-height:100vh;padding:16px}}
 .c{{background:#fff;border:1px solid #dfe4ef;border-radius:16px;max-width:520px;padding:28px;box-shadow:0 8px 30px rgba(15,31,61,.08)}}
 h1{{margin:0 0 8px;font-size:1.3rem;color:#0f1f3d}}p{{color:#4a5670;line-height:1.5}}

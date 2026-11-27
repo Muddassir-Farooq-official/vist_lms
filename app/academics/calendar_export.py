@@ -37,11 +37,11 @@ def _utc(d: date, t: time) -> str:
     return local.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
-def build_calendar(events: list[dict], *, name: str = "VIST timetable") -> bytes:
+def build_calendar(events: list[dict], *, name: str = "Timetable") -> bytes:
     """events: {id, course_code, course_title, session_date, start_time, end_time, room, teacher_name, title}"""
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     lines = [
-        "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//VIST LMS//Timetable//EN", "CALSCALE:GREGORIAN",
+        "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//LMS//Timetable//EN", "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH", f"X-WR-CALNAME:{_escape(name)}",
     ]
     for e in events:

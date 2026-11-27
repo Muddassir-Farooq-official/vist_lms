@@ -94,7 +94,7 @@ def forget_cached_config() -> None:
 # ------------------------------------------------------------------ the message
 def render(title: str, message: str, link: str | None, *, footer: str | None = None) -> tuple[str, str, str]:
     """(subject, text, html) for a notification email."""
-    institute = settings.institute_name or "VIST"
+    institute = settings.institute_name or settings.app_name or "the institute"
     footer = footer or f"You get this email because you have an account at {institute}. To stop these emails, switch them off on My Profile."
     base = (settings.public_url or "").rstrip("/")
     url = (base + link) if (base and link and link.startswith("/")) else (base or None)

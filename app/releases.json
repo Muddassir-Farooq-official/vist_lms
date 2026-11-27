@@ -1,5 +1,28 @@
 [
   {
+    "version": "1.70.0",
+    "date": "2026-11-27",
+    "title": "Ready for another institute",
+    "summary": "A new institute sees only its own name everywhere, starts with a short first-run wizard, and can be shown a demo site with sample data first.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "First-run wizard for a brand-new institute: its name and contact details, logo and colour, and kind (university, affiliated college or school), then Set up your LMS."
+      },
+      {
+        "kind": "improved",
+        "for": "Everyone",
+        "text": "The institute's own name everywhere: two-factor codes, calendar feeds, asset tags, emails and messages no longer mention any other institute."
+      },
+      {
+        "kind": "new",
+        "for": "Server",
+        "text": "Demo sites: sites.sh add-demo makes a separate site filled with sample data, with a Demo ribbon on every page and no backups."
+      }
+    ]
+  },
+  {
     "version": "1.69.0",
     "date": "2026-11-27",
     "title": "Tours on every page, a To do bar, and Set up your LMS",

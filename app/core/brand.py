@@ -93,6 +93,10 @@ class BrandView:
         return short_name()
 
     @property
+    def is_demo(self) -> bool:
+        return bool(settings.demo_site)
+
+    @property
     def tagline(self) -> str:
         return settings.institute_tagline or ""
 

@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     app_env: str = Field(default="development")
     debug: bool = Field(default=False)
     app_name: str = Field(default="VIST LMS")
+    # A demo site (scripts/server/sites.sh add-demo): sample data only, so scripts/seed_demo_data.py may fill it even
+    # though APP_ENV is production, and every page shows a "Demo site" ribbon. Never set on a real institute.
+    demo_site: bool = Field(default=False)
     # Optional: an incoming-webhook URL (Slack, Discord, Google Chat, Teams...) told about unexpected server errors.
     error_alert_webhook: str = ""
     api_v1_prefix: str = Field(default="/api/v1")

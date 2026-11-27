@@ -99,7 +99,7 @@ class EmailVerificationService:
         await self._limit(f"emailverify:user:{user_id}", 5, 3600, "Too many codes for this account. Please try again in an hour.")
 
         code = f"{secrets.randbelow(10**6):06d}"
-        institute = settings.institute_name or settings.app_name or "VIST"
+        institute = settings.institute_name or settings.app_name or "the institute"
         subject, text, body = render(f"Your verification code: {code}",
                                      f"Enter this code in {institute} to confirm this email address belongs to you:\n\n{code}\n\n"
                                      f"It works for {CODE_MINUTES} minutes. If you did not ask for it, ignore this email. Never share this code.",

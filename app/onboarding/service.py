@@ -90,6 +90,20 @@ class OnboardingService:
             out[7]["text"] += f" {no_teacher} running section{'s' if no_teacher != 1 else ''} still without a teacher."
         return {"steps": out, "done": sum(1 for s in out if s["done"]), "total": len(out)}
 
+    async def first_run_needed(self) -> bool:
+        """A brand-new institute: nothing saved in Settings → Institute, and no programs or students yet. Its first
+        administrator gets the first-run wizard (name, logo, kind of institute) before anything else."""
+        from app.branding.models import InstituteProfile
+        from app.programs.models import Program
+        from app.students.models import Student
+
+        if await self.session.get(InstituteProfile, "main") is not None:
+            return False
+        for model in (Program, Student):
+            if (await self.session.execute(select(func.count()).select_from(model))).scalar_one():
+                return False
+        return True
+
     async def _branding_set(self) -> bool:
         """The institute's own name and address have been saved (Settings → Institute)."""
         from app.branding.models import InstituteProfile

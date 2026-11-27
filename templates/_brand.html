@@ -2,6 +2,8 @@
 {% macro brand_head() -%}
   <link rel="icon" type="{{ 'image/png' if brand.has_logo else 'image/svg+xml' }}" href="{{ brand.favicon_url }}" />
   {% if brand.theme_css %}<style id="brand-theme">{{ brand.theme_css }}</style>{% endif %}
+  {% if brand.is_demo %}<style id="demo-ribbon">body::after{content:"Demo site \2013  sample data";position:fixed;left:12px;bottom:12px;z-index:2147483000;pointer-events:none;
+    background:#b45309;color:#fff;font:600 12px/1.2 system-ui,sans-serif;padding:6px 10px;border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.25);opacity:.92}</style>{% endif %}
   <meta name="amount-style" content="{{ brand.amount_style }}" />
   {# Installable as an app (Add to Home Screen / Install app) with push notifications: app/push/app_shell.py #}
   <link rel="manifest" href="/manifest.webmanifest" />

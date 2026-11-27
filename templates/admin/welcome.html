@@ -1,0 +1,59 @@
+{% extends "admin/_base.html" %}
+{% block allowed_roles %}ADMIN{% endblock %}
+{% block title %}Welcome{% endblock %}
+{% block page_title %}Welcome to your LMS{% endblock %}
+{% block page_subtitle %}<div class="content-subtitle">Three quick questions before you start. Everything here can be changed later in Settings.</div>{% endblock %}
+
+{% block content %}
+<section class="sh-card wz-card" id="wz">
+  <ol class="wz-dots" aria-label="Steps"><li data-dot="1">Your institute</li><li data-dot="2">Logo &amp; colour</li><li data-dot="3">Kind of institute</li><li data-dot="4">Done</li></ol>
+
+  <div class="wz-step" data-step="1">
+    <h2 class="panel-title">Your institute</h2>
+    <p class="panel-hint">The full name goes on every document (fee challans, results, certificates). The short name shows in the menu, page titles and SMS.</p>
+    <div class="form-grid two-col">
+      <div class="form-field two-span"><label for="wz-name">Full name *</label><input id="wz-name" class="text-input" maxlength="200" data-field="name" required /></div>
+      <div class="form-field"><label for="wz-short">Short name * <small>(e.g. ABC LMS)</small></label><input id="wz-short" class="text-input" maxlength="40" data-field="short_name" required /></div>
+      <div class="form-field"><label for="wz-tagline">Motto / tagline</label><input id="wz-tagline" class="text-input" maxlength="200" data-field="tagline" /></div>
+      <div class="form-field two-span"><label for="wz-address">Address</label><input id="wz-address" class="text-input" maxlength="300" data-field="address" placeholder="Street, area" /></div>
+      <div class="form-field"><label for="wz-city">City</label><input id="wz-city" class="text-input" maxlength="80" data-field="city" /></div>
+      <div class="form-field"><label for="wz-phone">Phone</label><input id="wz-phone" class="text-input" maxlength="60" data-field="phone" inputmode="tel" /></div>
+      <div class="form-field"><label for="wz-email">Email</label><input id="wz-email" class="text-input" maxlength="150" data-field="email" type="email" /></div>
+      <div class="form-field"><label for="wz-website">Website</label><input id="wz-website" class="text-input" maxlength="150" data-field="website" placeholder="www.example.edu.pk" /></div>
+    </div>
+  </div>
+
+  <div class="wz-step" data-step="2" hidden>
+    <h2 class="panel-title">Logo &amp; colour</h2>
+    <p class="panel-hint">A PNG or JPG, at most 2 MB; a square logo on a white or clear background looks best. You can skip this and add it later.</p>
+    <div class="wz-logo"><img id="wz-logo-img" alt="Your logo" /><label class="role-btn secondary-btn">Choose logo…<input type="file" id="wz-logo" accept="image/png,image/jpeg" hidden /></label></div>
+    <p class="cc-meta" id="wz-logo-msg"></p>
+    <div class="form-field"><label for="wz-color">Main colour <small>(menu, buttons and links)</small></label>
+      <div class="wz-swatches" id="wz-swatches"></div>
+      <input id="wz-color" class="text-input small-input" maxlength="7" data-field="primary_color" placeholder="#1d4ed8" /></div>
+  </div>
+
+  <div class="wz-step" data-step="3" hidden>
+    <h2 class="panel-title">What kind of institute is it?</h2>
+    <fieldset class="form-field wz-kind"><legend class="sr-only">Kind of institute</legend>
+      <label><input type="radio" name="wz-kind" value="university" /> <strong>University / degree-awarding institute</strong> <small>Programs, semesters and credit hours; you award your own degrees.</small></label>
+      <label><input type="radio" name="wz-kind" value="college" /> <strong>Affiliated college</strong> <small>Programs and semesters like a university. When you add each program you say which university it is affiliated with, so a college can have programs under different universities.</small></label>
+      <label><input type="radio" name="wz-kind" value="school" /> <strong>School</strong> <small>Classes (Playgroup to Class 12, O / A Levels), sections and class teachers, with school words in the menus.</small></label>
+    </fieldset>
+  </div>
+
+  <div class="wz-step" data-step="4" hidden>
+    <h2 class="panel-title">You're ready to start</h2>
+    <p>Your institute's name and look are saved. The dashboard now shows <strong>Set up your LMS</strong>: the steps to get going, in order (academic term, programs, staff, students, courses, timetable). Each step has a <em>Show me how</em> tour.</p>
+  </div>
+
+  <p id="wz-error" class="dash-alert error" role="alert" hidden></p>
+  <div class="wz-actions">
+    <button type="button" class="link-btn" id="wz-skip">Skip for now</button>
+    <span class="wz-spacer"></span>
+    <button type="button" class="role-btn secondary-btn" id="wz-back" hidden>Back</button>
+    <button type="button" class="role-btn" id="wz-next">Next</button>
+  </div>
+</section>
+{% endblock %}
+{% block extra_scripts %}<script src="/static/js/welcome.js"></script>{% endblock %}

@@ -247,7 +247,7 @@ async def alert(session: AsyncSession, key: str, title: str, message: str) -> bo
         from app.core.config import settings
         from app.sms.service import SmsService
 
-        short = f"{settings.app_name or 'VIST'} security: {title.replace('Security alert: ', '')}. {message}"
+        short = f"{settings.app_name or 'LMS'} security: {title.replace('Security alert: ', '')}. {message}"
         await SmsService(session).queue_to_admins(event="SECURITY", body=short, admin_user_ids=[a[0] for a in admins])
     except Exception as exc:  # noqa: BLE001 - an SMS problem must not stop the portal and email alert
         logger.warning("security_alert_sms_failed", error=str(exc))

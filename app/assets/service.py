@@ -61,7 +61,11 @@ def _clean(v, n: int | None = None) -> str | None:
 
 
 def tag_prefix() -> str:
-    return (getattr(settings, "asset_tag_prefix", None) or "VIST").strip().upper()
+    # ASSET_TAG_PREFIX (sites.sh sets each institute's own; existing tags never change), else the short name's first word
+    import re as _re
+
+    own = _re.sub(r"[^A-Za-z0-9]", "", (settings.app_name or "").split(" ")[0])[:6]
+    return (getattr(settings, "asset_tag_prefix", None) or own or "INV").strip().upper()
 
 
 class AssetService:
@@ -184,7 +188,7 @@ class AssetService:
     async def create_category(self, data: dict, *, actor_id) -> AssetCategory:
         code = (data.get("code") or "").strip().upper()
         if not CODE_RE.match(code):
-            raise BusinessRuleViolationError("The code is 2 to 10 letters or digits (it goes in the tag numbers, e.g. IT in VIST-IT-0001).")
+            raise BusinessRuleViolationError("The code is 2 to 10 letters or digits (it goes in the tag numbers, e.g. IT in ABC-IT-0001).")
         name = _clean(data.get("name"), 100)
         if not name:
             raise BusinessRuleViolationError("Give the category a name.")
