@@ -11,12 +11,12 @@ from sqlalchemy import or_, select
 
 from app.auth.permissions import Permissions, Roles
 from app.core.database import get_db
-from app.core.dependencies import CurrentUser, require_any_role, require_permission
+from app.core.dependencies import CurrentUser, require_any_role, require_permission, require_any_permission
 from app.core.exceptions import AuthorizationError, ValidationAppError
 from app.timetabling.service import WEEK, AvailabilityService, SmartTimetableService, next_monday
 
 router = APIRouter(prefix="/academics/timetable/smart", tags=["smart-timetable"])
-manage = require_permission(Permissions.COURSE_OFFERING_MANAGE)
+manage = require_any_permission(Permissions.TIMETABLE_MANAGE, Permissions.COURSE_OFFERING_MANAGE)
 teacher_only = require_any_role(Roles.TEACHER)
 
 
@@ -135,6 +135,35 @@ async def publish(draft_id: uuid.UUID, payload: PublishIn, current_user: Current
     _no_view_as(current_user)
     notify = {x for x in payload.notify if x in ("teachers", "students", "parents")}
     return await SmartTimetableService(db).publish(draft_id, from_date=payload.from_date, notify=notify, actor_id=current_user.id)
+
+
+# ------------------------------------------------------------------ start again: clear the live timetable
+@router.get("/clear-preview", summary="What clearing the weekly timetable of these terms from a date would do (nothing is changed)")
+async def clear_preview(terms: str = Query(...), from_date: date = Query(...), current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    return await SmartTimetableService(db).clear_preview(_terms(terms), from_date)
+
+
+class ClearIn(BaseModel):
+    terms: list[str] = Field(min_length=1, max_length=30)
+    from_date: date
+    confirm: str = Field(max_length=10)
+    notify: list[str] = Field(default_factory=list, max_length=3)
+
+
+@router.post("/clear", summary="Clear the weekly timetable of these terms from a date (classes held or with attendance are kept; all or nothing)")
+async def clear(payload: ClearIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    from app.core.exceptions import ValidationAppError
+
+    _no_view_as(current_user)
+    if payload.confirm.strip().upper() != "CLEAR":
+        raise ValidationAppError('Type CLEAR to confirm.')
+    notify = {x for x in payload.notify if x in ("teachers", "students", "parents")}
+    return await SmartTimetableService(db).clear(payload.terms, from_date=payload.from_date, notify=notify, actor_id=current_user.id)
+
+
+@router.get("/readiness", summary="What is in place for these terms: periods, rooms, sections, teachers, live timetable, draft")
+async def readiness(terms: str = Query(...), current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    return await SmartTimetableService(db).readiness(_terms(terms))
 
 
 # ------------------------------------------------------------------ per-section settings

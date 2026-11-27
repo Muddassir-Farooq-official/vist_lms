@@ -18,7 +18,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.audit.service import AuditService
 from app.auth.permissions import Permissions
 from app.core.database import Base, TimestampMixin, UUIDPKMixin, get_db
-from app.core.dependencies import CurrentUser, get_current_user, require_permission
+from app.core.dependencies import CurrentUser, get_current_user, require_permission, require_any_permission
 from app.core.exceptions import BusinessRuleViolationError, DuplicateResourceError, ResourceNotFoundError
 
 KINDS = {"CLASS": "Classroom", "LAB": "Lab", "HALL": "Hall"}
@@ -103,7 +103,7 @@ class RoomService:
 
 
 router = APIRouter(prefix="/academics/rooms", tags=["rooms"])
-manage = require_permission(Permissions.COURSE_OFFERING_MANAGE)
+manage = require_any_permission(Permissions.TIMETABLE_MANAGE, Permissions.COURSE_OFFERING_MANAGE)
 
 
 class RoomIn(BaseModel):

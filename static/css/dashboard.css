@@ -4308,3 +4308,46 @@ details.tg-session > summary.tg-head { cursor: pointer; }
 .cl-days { display: flex; flex-wrap: wrap; gap: 10px; border: 0; padding: 0; margin: 0; }
 .cl-days legend { font-size: .85rem; margin-bottom: 4px; }
 .cl-wide { grid-column: 1 / -1; }
+
+/* ================= Timetable wizard (admin/timetable.html) and the guided tour (tour.js) ================= */
+.tw-steps { align-items: stretch; }
+.tw-steps .portal-tab { gap: 6px; padding: 10px 12px; }
+.tw-num { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--surface-alt); border: 1px solid var(--border); font-size: 0.74rem; color: var(--text-secondary); flex: none; }
+.portal-tab.active .tw-num { background: var(--blue-600); border-color: var(--blue-600); color: var(--white); }
+.tw-badge { display: inline-grid; place-items: center; min-width: 18px; height: 18px; border-radius: 9px; font-size: 0.7rem; font-weight: 700; line-height: 1; }
+.tw-badge:empty { display: none; }
+.tw-badge.tw-ok { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
+.tw-badge.tw-warn { background: var(--yellow-100); color: var(--yellow-600); border: 1px solid var(--yellow-400); }
+.tw-sep { flex: none; width: 1px; margin: 8px 6px; background: var(--border-strong); }
+.tw-view { font-weight: 500; }
+.tw-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 24px; padding: 12px 0; border-top: 1px solid var(--border); }
+.tw-foot-note { flex: 1; text-align: center; color: var(--text-muted); font-size: 0.82rem; }
+.tw-ready { margin-top: 14px; }
+.tw-empty { color: var(--text-muted); margin: 0; }
+.tw-check { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; counter-reset: tw; }
+.tw-check li { counter-increment: tw; display: grid; grid-template-columns: 28px 1fr; column-gap: 8px; align-items: start; padding: 8px 10px; border-radius: var(--radius); background: var(--surface-alt); }
+.tw-check li::before { content: counter(tw); grid-row: span 2; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; font-size: 0.74rem; font-weight: 700; }
+.tw-check li.ok::before { content: "✓"; background: var(--success-bg); color: var(--success); }
+.tw-check li.warn::before { background: var(--yellow-100); color: var(--yellow-600); }
+.tw-check .link-btn { text-align: left; text-decoration: none; color: var(--text-primary); }
+.tw-check .link-btn:hover { color: var(--blue-600); text-decoration: underline; }
+.tw-check small { color: var(--text-muted); font-size: 0.8rem; }
+.tw-danger { border-color: var(--danger-border); }
+.tw-danger h2 { color: var(--danger); }
+.tw-clear-table small { display: block; color: var(--text-muted); font-weight: 400; }
+.tw-clear-table .num { text-align: right; }
+@media (max-width: 640px) {
+  .tw-foot { flex-wrap: wrap; }
+  .tw-foot-note { order: -1; flex-basis: 100%; }
+  .tw-sep { display: none; }
+}
+
+.vt-ring { position: fixed; z-index: 9998; border-radius: 8px; box-shadow: 0 0 0 4px var(--blue-500), 0 0 0 9999px rgba(11, 22, 48, 0.55); pointer-events: none; transition: all 0.2s ease; }
+.vt-card { position: fixed; z-index: 9999; width: min(340px, calc(100vw - 24px)); background: var(--surface); color: var(--text-primary); border-radius: 12px; box-shadow: var(--shadow-lg); padding: 16px 18px 14px; }
+.vt-card.vt-bottom { left: 12px !important; right: 12px; bottom: 12px; top: auto !important; width: auto; }
+.vt-count { font-size: 0.74rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.vt-title { margin: 4px 0 6px; font-size: 1rem; }
+.vt-text { margin: 0 0 14px; font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5; }
+.vt-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+.vt-actions .vt-skip { margin-right: auto; }
+@media (prefers-reduced-motion: reduce) { .vt-ring { transition: none; } }

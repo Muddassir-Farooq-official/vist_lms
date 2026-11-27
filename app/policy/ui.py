@@ -15,7 +15,7 @@ SECTIONS: tuple[tuple[str, str], ...] = (
     ("Attendance", "Marking classes, alerts for teachers, and the limits that affect students."),
     ("Exams & results", "Admit cards, graduation and supplementary exams."),
     ("Promotion", "What a student needs to move to the next semester."),
-    ("Teaching load", "How many credit hours a week a teacher should teach (Smart timetable -> Teacher workload)."),
+    ("Teaching load", "How many credit hours a week a teacher should teach (Timetable -> Teachers)."),
     ("Payroll", "Leaves, late marks and deductions on monthly pay."),
     ("Purchases", "Approvals for buying."),
     ("SMS messages", "Which events send a message. With WhatsApp set up (SMS & WhatsApp page) it goes by WhatsApp, and by SMS only if WhatsApp fails."),

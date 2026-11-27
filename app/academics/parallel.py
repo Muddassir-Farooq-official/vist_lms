@@ -30,7 +30,7 @@ from app.audit.service import AuditService
 from app.core.timefmt import hm12, range12
 from app.auth.permissions import Permissions
 from app.core.database import get_db
-from app.core.dependencies import CurrentUser, require_permission
+from app.core.dependencies import CurrentUser, require_permission, require_any_permission
 from app.core.exceptions import BusinessRuleViolationError, ResourceNotFoundError, ValidationAppError
 from app.notifications.changes import silently
 
@@ -291,7 +291,7 @@ class ParallelTimetableService:
 
 # ---------------------------------------------------------------------- API
 router = APIRouter(prefix="/academics/timetable/parallel", tags=["timetable"])
-manage = require_permission(Permissions.COURSE_OFFERING_MANAGE)
+manage = require_any_permission(Permissions.TIMETABLE_MANAGE, Permissions.COURSE_OFFERING_MANAGE)
 
 
 class ParallelRequest(BaseModel):

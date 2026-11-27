@@ -255,6 +255,9 @@ class Permissions:
     MENTORING_MANAGE = "mentoring.manage"
     # Make committees and choose their members; read every committee's minutes (administration).
     COMMITTEE_MANAGE = "committee.manage"
+    # Make and change the weekly timetable: daily periods, rooms, classes a week, teachers' free times, teachers for
+    # sections, generate / publish / clear (administration and the exam department).
+    TIMETABLE_MANAGE = "timetable.manage"
     # Graduation lists, alumni directory and surveys (administration).
     ALUMNI_MANAGE = "alumni.manage"
     # Track degrees and transcripts being prepared and handed over (administration, exam office).
@@ -289,6 +292,7 @@ class Permissions:
 # seed script), not editing scattered `if` statements.
 ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
     Roles.ADMIN: (
+        Permissions.TIMETABLE_MANAGE,
         Permissions.COMMITTEE_MANAGE,
         Permissions.MENTORING_MANAGE,
         Permissions.ALUMNI_MANAGE,
@@ -475,7 +479,7 @@ ROLE_PERMISSION_SEED: dict[str, tuple[str, ...]] = {
     ),
     # Placeholder role — Hostel module not built yet.
     Roles.HOSTEL_WARDEN: (Permissions.HOSTEL_VIEW, Permissions.HOSTEL_MANAGE, Permissions.STUDENT_VIEW, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
-    Roles.EXAM_CONTROLLER: (Permissions.DOCUMENT_ISSUE, Permissions.EXAM_SCHEDULE_MANAGE, Permissions.COURSE_VIEW, Permissions.RESULT_APPROVE, Permissions.MARKS_ENTER, Permissions.STUDENT_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
+    Roles.EXAM_CONTROLLER: (Permissions.TIMETABLE_MANAGE, Permissions.DOCUMENT_ISSUE, Permissions.EXAM_SCHEDULE_MANAGE, Permissions.COURSE_VIEW, Permissions.RESULT_APPROVE, Permissions.MARKS_ENTER, Permissions.STUDENT_VIEW, Permissions.ENROLLMENT_VIEW, Permissions.APPLICATION_SUBMIT, Permissions.TASK_USE, Permissions.PURCHASE_REQUEST),
     Roles.PARENT: (Permissions.PARENT_VIEW,),
     Roles.CLINICAL_SUPERVISOR: (Permissions.CLINICAL_SUPERVISE,),
     Roles.ALUMNUS: (Permissions.ALUMNI_SELF,),
