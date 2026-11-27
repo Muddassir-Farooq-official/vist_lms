@@ -1524,6 +1524,14 @@ window.VistAdmin = (function () {
     insertSkeletons(document.querySelector(".content-main") || document);
     addPortalSwitcher(me);
     document.dispatchEvent(new CustomEvent("vistadmin:ready", { detail: { me: me } }));
+    // Tours, "what to do now" and the administrator's setup checklist on every page (static/js/guide.js)
+    if (document.querySelector(".content-main") && !document.getElementById("vist-guide-js")) {
+      const g = document.createElement("script");
+      g.id = "vist-guide-js";
+      g.src = "/static/js/guide.js";
+      g.onload = function () { if (window.VistGuide) window.VistGuide.start(me); };
+      document.head.appendChild(g);
+    }
     return me;
   }
 

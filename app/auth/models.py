@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import INET
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -36,6 +36,8 @@ class User(UUIDPKMixin, TimestampMixin, Base):
     totp_enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Language of the screens and of the SMS sent to this person: "en" or "ur" (migration d5f7b9c1e3a5).
     language: Mapped[str] = mapped_column(String(5), nullable=False, default="en", server_default="en")
+    # The day "complete your profile" reminders started for this person (app/onboarding): a 7-day grace period runs from it.
+    nudge_started_on: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     user_roles: Mapped[list["UserRole"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(

@@ -24,6 +24,17 @@ Forgot your password? Press **Forgot password** on the sign-in page and follow t
 - The **version** box in the menu shows which version you are using; **What's new** lists what changed in each version.
 - **Help & manual** (in the menu) opens this manual at your own chapter. You can download it as a PDF.
 
+## Tours, "To do" and setting up
+
+- **Tour**: every page has a **Tour** button at the top. It walks you through the page: what it is for, each of its tabs and its main buttons. The first time you open a page, its tour starts by itself; press **Skip tour** to close it.
+- **To do**: a yellow bar at the top of your pages lists what still needs you, until it is done. Each line opens the right page. Press **Later** to hide it until you sign in again.
+  - **Everyone**: your profile still to complete, and switching on phone notifications.
+  - **Teachers**: today's classes without attendance, marks still missing on courses ending soon, and work to check.
+  - **Students**: fees due or overdue, assignments due in the next 3 days, and important notices not yet read.
+  - **Parents**: their children's fees due.
+- **Complete your profile**: your profile page shows a checklist of what is missing (photo, contact details, guardian or emergency contact, blood group, copies of your CNIC and certificates). Anything you sent for the office to approve already counts. You have 7 days. After that, while it is still incomplete, your profile page opens first after you sign in; the menu still works.
+- **Set up your LMS** (administrators): the dashboard shows the steps to start, in order. They are institute details, programs, academic terms, courses and curriculum, staff, salaries, students, course sections with teachers, periods and rooms, the timetable, and fees. Each step ticks itself when it is done. **Do it** opens the page, and **Show me how** opens it with its tour. **Hide for 7 days** hides the list.
+
 ## Good habits
 
 - Sign out on shared computers.
