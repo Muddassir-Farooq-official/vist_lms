@@ -449,6 +449,10 @@ class EmployeeCreatedResponse(BaseModel):
 class EmployeeStatusChangeRequest(BaseModel):
     new_status: EmployeeStatus
     reason: str | None = None
+    # Leaving (Terminated) only: how they left, the last working day (default today) and, for a resignation, notice day
+    leaving_type: str | None = Field(default=None, pattern="^(RESIGNED|TERMINATED|CONTRACT_ENDED)$")
+    left_on: date | None = None
+    notice_given_on: date | None = None
 
 
 class EmployeePasswordResetRequest(BaseModel):

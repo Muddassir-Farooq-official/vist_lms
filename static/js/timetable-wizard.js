@@ -105,7 +105,9 @@
     box.innerHTML = '<ol class="tw-check">' + rows.map(function (x) {
       const ok = x[1];
       return '<li class="' + (ok ? "ok" : "warn") + '"><button type="button" class="link-btn tw-go" data-go="' + x[0] + '">' + esc(x[2]) + "</button>" + (x[3] ? '<small>' + esc(x[3]) + "</small>" : "") + "</li>";
-    }).join("") + "</ol>" + suggestions(d.combine || []);
+    }).join("") + "</ol>" + suggestions(d.combine || []) +
+      ((d.ungrouped || []).length > 1 ? '<p class="cc-meta tw-hint">Tip: ' + d.ungrouped.length + " of these batch terms are not grouped into a session. Grouping them (e.g. all batches of Fall 2026) " +
+        'lets you tick them together everywhere: <a href="/dashboard/admin/courses#terms">Courses &rarr; Academic terms &rarr; Suggest sessions from the term names</a>.</p>' : "");
     mark("choose", sec.total ? "ok" : "warn", rows[0][2]);
     mark("periods", d.periods["class"] ? "ok" : "warn", rows[1][2]);
     mark("workload", sec.without_teacher ? "warn" : "ok", rows[2][2]);

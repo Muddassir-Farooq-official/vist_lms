@@ -6,6 +6,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, Query, UploadFile
 from fastapi.responses import Response
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.auth.permissions import Permissions, Roles
@@ -339,9 +340,30 @@ async def change_status(
     db=Depends(get_db),
 ) -> StudentAdminDetail:
     student = await StudentService(db).change_status(
-        student_id, new_status=payload.new_status, reason=payload.reason, actor_id=current_user.id, keep_future_fees=payload.keep_future_fees
+        student_id, new_status=payload.new_status, reason=payload.reason, actor_id=current_user.id, keep_future_fees=payload.keep_future_fees,
+        may_undo=Roles.ADMIN in current_user.roles,
     )
     return await _to_admin_detail(db, student)
+
+
+class MissedFeesIn(BaseModel):
+    fee_structure_ids: list[uuid.UUID] = Field(min_length=1, max_length=50)
+
+
+@router.get("/{student_id}/missed-fees", summary="Class fees assigned while this student was suspended, which they still do not have")
+async def missed_fees(student_id: uuid.UUID, current_user: CurrentUser = Depends(require_permission(Permissions.STUDENT_UPDATE)),
+                      db=Depends(get_db)) -> list[dict]:
+    from app.fees.status_rules import missed_while_suspended
+
+    return await missed_while_suspended(db, student_id)
+
+
+@router.post("/{student_id}/missed-fees", summary="Assign the fees they missed while suspended")
+async def assign_missed_fees(student_id: uuid.UUID, payload: MissedFeesIn,
+                             current_user: CurrentUser = Depends(require_permission(Permissions.STUDENT_UPDATE)), db=Depends(get_db)) -> dict:
+    from app.fees.status_rules import assign_missed
+
+    return {"assigned": await assign_missed(db, student_id, payload.fee_structure_ids, actor_id=current_user.id)}
 
 
 @router.post("/{student_id}/reset-password", status_code=204, summary="Reset a student's password to the default")

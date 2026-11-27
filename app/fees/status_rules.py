@@ -83,3 +83,62 @@ async def cancel_course_fee_after_withdrawal(session: AsyncSession, enrollment, 
     for a, structure in rows:
         total += await cancel_future_installments(session, a, after=today, why=f"withdrew from the course on {today:%d %b %Y}", actor_id=actor_id)
     return total
+
+
+async def missed_while_suspended(session: AsyncSession, student_id: uuid.UUID) -> list[dict]:
+    """Class fees assigned in bulk while this student was suspended (bulk assignment covers active students only), that
+    they still do not have. Listed when the suspension is lifted, so the office can assign them with one click."""
+    from app.fees.models import FeeStructureProgram, FeeStructureSemester, FeeStructureStatus
+    from app.students.models import Student, StudentStatus, StudentStatusHistory
+
+    s = await session.get(Student, student_id)
+    if s is None:
+        return []
+    hist = list((await session.execute(select(StudentStatusHistory).where(StudentStatusHistory.student_id == student_id)
+                                       .order_by(StudentStatusHistory.changed_at))).scalars())
+    windows, start = [], None
+    for h in hist:
+        if h.new_status == StudentStatus.SUSPENDED:
+            start = h.changed_at
+        elif start is not None:
+            windows.append((start, h.changed_at))
+            start = None
+    if start is not None:
+        windows.append((start, datetime.now(timezone.utc)))
+    if not windows:
+        return []
+    have = set((await session.execute(select(FeeAssignment.fee_structure_id).where(FeeAssignment.payer_type == PayerType.STUDENT,
+                                                                                   FeeAssignment.payer_id == student_id))).scalars())
+    out = []
+    for fs in (await session.execute(select(FeeStructure).where(FeeStructure.status == FeeStructureStatus.ACTIVE, FeeStructure.applies_to_students.is_(True),
+                                                                 FeeStructure.course_id.is_(None), FeeStructure.activated_at.is_not(None)))).scalars():
+        if fs.id in have or not any(a <= fs.activated_at <= b for a, b in windows):
+            continue
+        progs = set((await session.execute(select(FeeStructureProgram.program_id).where(FeeStructureProgram.fee_structure_id == fs.id))).scalars())
+        sems = set((await session.execute(select(FeeStructureSemester.semester_number).where(FeeStructureSemester.fee_structure_id == fs.id))).scalars())
+        if (progs and s.program_id not in progs) or (sems and s.current_semester not in sems):
+            continue
+        out.append({"fee_structure_id": fs.id, "name": fs.name, "term": fs.term_label, "total": float(fs.total_amount), "assigned_on": fs.activated_at})
+    return out
+
+
+async def assign_missed(session: AsyncSession, student_id: uuid.UUID, structure_ids: list[uuid.UUID], *, actor_id: uuid.UUID) -> int:
+    from app.core.exceptions import ValidationAppError
+    from app.fees.service import FeeStructureService
+
+    allowed = {x["fee_structure_id"] for x in await missed_while_suspended(session, student_id)}
+    svc = FeeStructureService(session)
+    n = 0
+    for sid in dict.fromkeys(structure_ids):
+        if sid not in allowed:
+            raise ValidationAppError("A chosen fee is not one this student missed while suspended.")
+        fs = await session.get(FeeStructure, sid)
+        a = FeeAssignment(fee_structure_id=fs.id, payer_type=PayerType.STUDENT, payer_id=student_id)
+        session.add(a)
+        await session.flush()
+        await svc._generate_installments(a, fs, actor_id=actor_id)
+        n += 1
+    if n:
+        await AuditService(session).log(actor_user_id=actor_id, action="fee.missed_while_suspended_assigned", entity_type="student", entity_id=student_id,
+                                        metadata={"structures": [str(x) for x in structure_ids]})
+    return n

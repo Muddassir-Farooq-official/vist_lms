@@ -340,9 +340,16 @@ class ClinicalService:
         r = await self._own_rotation(rotation_id, user, manager=manager)
         marks = {a.student_id: a.status for a in (await self.session.execute(select(ClinicalAttendance).where(ClinicalAttendance.rotation_id == r.id,
                                                                                                              ClinicalAttendance.day == day))).scalars()}
+        from app.students.models import StudentStatus
+        from app.students.standing import locked_ids
+
         studs = await self.group_students(r.group_id)
+        locked = await locked_ids(self.session, [s["id"] for s in studs])
+        # expelled / left: off the sheet (unless already marked that day); suspended: on it, locked
+        studs = [s for s in studs if locked.get(s["id"]) != StudentStatus.DROPPED or s["id"] in marks]
         for s in studs:
             s["status"] = marks.get(s["id"])
+            s["suspended"] = locked.get(s["id"]) == StudentStatus.SUSPENDED
         return {"rotation_id": r.id, "day": day, "is_rotation_day": r.start_date <= day <= r.end_date and day.weekday() in _days(r.days), "students": studs}
 
     async def mark(self, rotation_id: uuid.UUID, day: date, entries: list[dict], user, *, manager: bool) -> dict:
@@ -355,12 +362,17 @@ class ClinicalService:
             raise BusinessRuleViolationError("Attendance cannot be marked for a day that has not come.")
         if not manager and (institute_today() - day).days > 7:
             raise BusinessRuleViolationError("Attendance older than a week is corrected by the administration.")
+        from app.students.standing import locked_ids
+
         members = {s["id"] for s in await self.group_students(r.group_id)}
+        locked = await locked_ids(self.session, members)
         n = 0
         for x in entries:
             sid, status = uuid.UUID(str(x["student_id"])), str(x["status"]).upper()
             if sid not in members:
                 raise ValidationAppError("A student is not in this group.")
+            if sid in locked:
+                continue            # suspended or expelled: not marked (their attendance is locked)
             if status not in ("PRESENT", "ABSENT", "LEAVE"):
                 raise ValidationAppError("Present, absent or leave.")
             row = (await self.session.execute(select(ClinicalAttendance).where(ClinicalAttendance.rotation_id == r.id, ClinicalAttendance.student_id == sid,

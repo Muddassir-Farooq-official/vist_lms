@@ -102,8 +102,12 @@ class ExamDutyService:
         """A combined class's paper counts the students of every section."""
         from app.academics.combined import member_ids
 
-        return (await self.session.execute(select(func.count()).select_from(Enrollment).where(
-            Enrollment.course_offering_id.in_(await member_ids(self.session, offering_id)), Enrollment.status == EnrollmentStatus.ENROLLED))).scalar_one()
+        from app.students.models import Student
+        from app.students.standing import LOCKED
+
+        return (await self.session.execute(select(func.count()).select_from(Enrollment).join(Student, Student.id == Enrollment.student_id).where(
+            Enrollment.course_offering_id.in_(await member_ids(self.session, offering_id)), Enrollment.status == EnrollmentStatus.ENROLLED,
+            Student.status.not_in(list(LOCKED))))).scalar_one()
 
     @staticmethod
     def needed(students: int) -> int:
@@ -320,9 +324,13 @@ class ExamDutyService:
         marks = {a.student_id: a for a in (await self.session.execute(select(ExamAttendance).where(ExamAttendance.paper_id == paper.id))).scalars()}
         svc = ExamScheduleService(self.session)
         allowed, barred = [], []
+        from app.students.models import StudentStatus
+
         for s in studs:
             ok, reason, _pct = await svc.course_eligibility(s.id, own[s.id])
             reasons = ([] if ok else [reason or "attendance below the minimum"]) + await svc.withheld(s.id)
+            if s.status == StudentStatus.SUSPENDED:
+                reasons = ["suspended"] + reasons
             row = {"student_id": s.id, "name": f"{s.first_name} {s.last_name}".strip(), "roll_number": s.roll_number}
             if reasons:
                 barred.append({**row, "reasons": reasons})

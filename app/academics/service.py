@@ -566,7 +566,7 @@ class EnrollmentService:
         if offering is None:
             raise ResourceNotFoundError("Course offering not found.")
         if not by_admin and not offering.is_open_for_enrollment:
-            raise BusinessRuleViolationError("This course is not currently open for enrollment.")
+            raise BusinessRuleViolationError("This course is not open for enrolment now. Ask the office to open it (Courses → the section → Edit → 'Open for student self-enrollment').")
         await self._refuse_finished_offering(offering)
 
         student = await self.session.get(Student, student_id)
@@ -1233,6 +1233,12 @@ def _hhmm(t: time) -> str:
     return hm12(t)
 
 
+def _hm(t) -> str:
+    from app.core.timefmt import hm12
+
+    return hm12(t)
+
+
 class TimetableService:
     """The recurring weekly pattern side of the timetable — creating a
     slot runs the full conflict check (room, teacher, student-batch —
@@ -1339,6 +1345,11 @@ class TimetableService:
             return False
         return not any(pa == pb and (sa is None or sb is None or sa == sb) for pa, sa in a for pb, sb in b)
 
+    async def _what(self, other: CourseOffering) -> str:
+        """How a clashing class is named in a message: "BIO101 (Fall 2026 BSN 2nd, section A)"."""
+        course = await self.session.get(Course, other.course_id)
+        return f"{course.code if course else 'a class'} ({other.term_label}, section {other.section_label})"
+
     async def _people_conflict(self, offering: CourseOffering, neighbours: list, when: str) -> str | None:
         """Everything except the room: teacher, student cohort, actual enrolled students.
         Returns the reason it cannot be placed here, or None if it can."""
@@ -1348,7 +1359,8 @@ class TimetableService:
         if offering.assigned_teacher_id is not None:
             for slot, other in neighbours:
                 if other.id != offering.id and not same_group(offering, other) and other.assigned_teacher_id == offering.assigned_teacher_id:
-                    return f"This offering's teacher already has a class on {when.format(slot.start_time, slot.end_time)}."
+                    return (f"The teacher already teaches {await self._what(other)} on {when.format(_hm(slot.start_time), _hm(slot.end_time))}. "
+                            "Choose another period, or another teacher.")
 
         # 3. Student cohort -- the SAME section of the same program+semester cannot attend two
         # different courses at once. Different sections (A vs B, Morning vs Evening) are different
@@ -1367,8 +1379,8 @@ class TimetableService:
                     continue
                 if batch_keys & await self._links_for(other.course_id):
                     return (
-                        f"Students in this program/semester (section {offering.section_label}) already have a class "
-                        f"scheduled on {when.format(slot.start_time, slot.end_time)}."
+                        f"Students of section {offering.section_label} of this batch already have {await self._what(other)} "
+                        f"on {when.format(_hm(slot.start_time), _hm(slot.end_time))}. Choose another period."
                     )
 
         # 4. Actual enrolled students -- if even ONE student is enrolled in both offerings they
@@ -1380,7 +1392,8 @@ class TimetableService:
                     continue
                 shared = my_students & await self._enrolled_for(other.id)
                 if shared:
-                    return f"{len(shared)} enrolled student(s) already have a class on {when.format(slot.start_time, slot.end_time)}."
+                    return (f"{len(shared)} enrolled student(s) of this class already have {await self._what(other)} "
+                            f"on {when.format(_hm(slot.start_time), _hm(slot.end_time))}. Choose another period.")
         return None
 
     async def _check_conflicts(
@@ -1392,7 +1405,7 @@ class TimetableService:
 
         await RoomService(self.session).check_for_class(room, len(await self._enrolled_for(course_offering_id)))
         neighbours = await self._live_neighbours(offering, day_of_week, start_time, end_time, exclude_slot_id)
-        when = f"{day_of_week.value} {{}}\u2013{{}}"
+        when = f"{day_of_week.value.title()} {{}}\u2013{{}}"
         try:
             await self._room_and_people(offering, neighbours, room, when)
         except BusinessRuleViolationError as exc:
@@ -1407,8 +1420,10 @@ class TimetableService:
                 raise
             course = await self.session.get(Course, offering.course_id)
             code = course.code if course else "This course"
+            tslot = next(sl for sl, o in neighbours if o.id == twin.id)
             raise BusinessRuleViolationError(
-                f"{code} for {twin.term_label} (section {twin.section_label}) is already at this time ({exc.message.rstrip('.')}). "
+                f"{code} for {twin.term_label} (section {twin.section_label}) is already on {when.format(_hm(tslot.start_time), _hm(tslot.end_time))} "
+                f"in room {tslot.room} ({exc.message.rstrip('.')}). "
                 f"If both batches are taught together, combine {offering.term_label} with it: one teacher, one room, one timetable.",
                 details={"combine": {"offering_id": str(offering.id), "with_offering_id": str(twin.id), "course": code,
                                      "term": offering.term_label, "with_term": twin.term_label, "with_section": twin.section_label}}) from None
@@ -1422,7 +1437,8 @@ class TimetableService:
                 continue
             if "".join((slot.room or "").split()).lower() == "".join((room or "").split()).lower():     # "Lab 1" and "lab1" are the same room
                 raise BusinessRuleViolationError(
-                    f"Room '{room}' is already booked on {when.format(slot.start_time, slot.end_time)}."
+                    f"Room {room} already has {await self._what(_other)} on {when.format(_hm(slot.start_time), _hm(slot.end_time))}. "
+                    "Pick another room or period."
                 )
         problem = await self._people_conflict(offering, neighbours, when)
         if problem:
@@ -1727,7 +1743,7 @@ class TimetableService:
                 if not period.applies_on(day):
                     continue
                 neighbours = await self._live_neighbours(offering, day, period.start_time, period.end_time)
-                when = f"{day.value} {{}}\u2013{{}}"
+                when = f"{day.value.title()} {{}}\u2013{{}}"
                 if await self._people_conflict(offering, neighbours, when) is not None:
                     continue
                 taken = {sl.room for sl, _o in neighbours}

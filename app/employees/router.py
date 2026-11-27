@@ -437,6 +437,9 @@ class HandoverIn(BaseModel):
     end_committees: bool = True
     terminate: bool = False
     reason: str | None = Field(default=None, max_length=255)
+    leaving_type: str | None = Field(default=None, pattern="^(RESIGNED|TERMINATED|CONTRACT_ENDED)$")
+    left_on: date | None = None
+    notice_given_on: date | None = None
 
 
 @router.get("/{employee_id}/handover", summary="What this person holds (courses, classes, covers, exam duties, class-teacher roles, mentees, committees) to hand over")
@@ -466,7 +469,8 @@ async def change_employee_status(
     db=Depends(get_db),
 ) -> EmployeeDetail:
     employee = await EmployeeService(db).change_status(
-        employee_id, new_status=payload.new_status, reason=payload.reason, actor_id=current_user.id
+        employee_id, new_status=payload.new_status, reason=payload.reason, actor_id=current_user.id,
+        leaving_type=payload.leaving_type, left_on=payload.left_on, notice_given_on=payload.notice_given_on,
     )
     return await _to_detail(db, employee)
 

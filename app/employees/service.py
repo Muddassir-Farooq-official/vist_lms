@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import AuditService
 from app.auth.models import Role, User, UserRole
-from app.core.exceptions import BusinessRuleViolationError, DuplicateResourceError, ResourceNotFoundError
+from app.core.exceptions import BusinessRuleViolationError, DuplicateResourceError, ResourceNotFoundError, ValidationAppError
 from app.core.pagination import PageParams, RawPage
 from app.auth.repository import AuthRepository
 from app.core.security import hash_password
@@ -306,14 +306,30 @@ class EmployeeService:
         return employee
 
     async def change_status(
-        self, employee_id: uuid.UUID, *, new_status: EmployeeStatus, reason: str | None, actor_id: uuid.UUID
+        self, employee_id: uuid.UUID, *, new_status: EmployeeStatus, reason: str | None, actor_id: uuid.UUID,
+        leaving_type: str | None = None, left_on=None, notice_given_on=None,
     ) -> Employee:
         employee = await self.get_employee(employee_id)
         allowed = _ALLOWED_TRANSITIONS.get(employee.status, set())
         if new_status not in allowed and new_status != employee.status:
+            words = {EmployeeStatus.ACTIVE: "Active", EmployeeStatus.ON_LEAVE: "On leave", EmployeeStatus.TERMINATED: "Left (terminated)"}
+            can = ", ".join(words.get(s, s.value) for s in allowed) or "nothing else"
             raise BusinessRuleViolationError(
-                f"Cannot transition employee from {employee.status.value} to {new_status.value}."
+                f"{employee.first_name} {employee.last_name} is {words.get(employee.status, employee.status.value)}; from here they can only be set to {can}."
             )
+        if new_status == EmployeeStatus.TERMINATED and employee.status != EmployeeStatus.TERMINATED:
+            today = institute_today()
+            last = left_on or today
+            if last > today + timedelta(days=90) or last < employee.hire_date:
+                raise ValidationAppError("The last working day must be after they joined and not more than 90 days ahead.")
+            kind = leaving_type or "TERMINATED"
+            if kind == "RESIGNED":
+                if notice_given_on is None:
+                    raise ValidationAppError("Enter the day they gave notice of resigning.")
+                if notice_given_on > last:
+                    raise ValidationAppError("Notice cannot be given after the last working day.")
+            employee.leaving_type = kind
+            employee.notice_given_on = notice_given_on if kind == "RESIGNED" else None
         old_status = employee.status
         employee.status = new_status
 
@@ -378,10 +394,10 @@ class EmployeeService:
             from app.employees.handover import back_at_work
 
             await back_at_work(self.session, employee, actor_id=actor_id)
-        if new_status == EmployeeStatus.TERMINATED:
-            employee.left_on = institute_today()            # paid up to this day in that month's payroll
-        elif old_status == EmployeeStatus.TERMINATED:
-            employee.left_on = None
+        if new_status == EmployeeStatus.TERMINATED and old_status != EmployeeStatus.TERMINATED:
+            employee.left_on = left_on or institute_today()     # paid up to this day in that month's payroll (see app/payroll)
+        elif old_status == EmployeeStatus.TERMINATED and new_status != EmployeeStatus.TERMINATED:
+            employee.left_on, employee.leaving_type, employee.notice_given_on = None, None, None
 
         await self.audit.log(
             actor_user_id=actor_id,
@@ -389,7 +405,9 @@ class EmployeeService:
             entity_type="employee",
             entity_id=employee.id,
             before={"status": old_status.value},
-            after={"status": new_status.value},
+            after={"status": new_status.value, **({"leaving_type": employee.leaving_type, "left_on": str(employee.left_on),
+                                                    "notice_given_on": str(employee.notice_given_on) if employee.notice_given_on else None}
+                                                   if new_status == EmployeeStatus.TERMINATED else {})},
             metadata={"reason": reason} if reason else None,
         )
         return employee

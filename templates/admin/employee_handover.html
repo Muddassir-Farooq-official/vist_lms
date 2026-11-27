@@ -40,8 +40,20 @@
 
 <section class="sh-card" id="ho-finish" hidden>
   <div id="ho-leave" hidden>
-    <label class="checkbox-label"><input type="checkbox" id="ho-terminate" /> Record that they have left (status Terminated): sign-in is blocked and payroll pays up to today.</label>
-    <div class="form-field"><label for="ho-reason">Reason</label><input type="text" id="ho-reason" class="text-input" maxlength="255" placeholder="e.g. Resigned, contract ended" /></div>
+    <label class="checkbox-label"><input type="checkbox" id="ho-terminate" /> Record that they have left (status Terminated): sign-in is blocked from now.</label>
+    <div class="form-grid two-col" id="ho-leave-fields">
+      <fieldset class="form-field ho-kind"><legend>How they left</legend>
+        <label><input type="radio" name="ho-leaving" value="RESIGNED" checked /> <strong>Resigned</strong> <small>needs <span id="ho-notice-days">30</span> days' notice, or the last month's worked days are not paid</small></label>
+        <label><input type="radio" name="ho-leaving" value="TERMINATED" /> <strong>Terminated by the institute</strong> <small>paid for the days worked</small></label>
+        <label><input type="radio" name="ho-leaving" value="CONTRACT_ENDED" /> <strong>Contract ended</strong> <small>paid for the days worked</small></label>
+      </fieldset>
+      <div>
+        <div class="form-field"><label for="ho-last">Last working day</label><input type="date" id="ho-last" class="text-input" /></div>
+        <div class="form-field" id="ho-notice-field"><label for="ho-notice">Notice given on</label><input type="date" id="ho-notice" class="text-input" /></div>
+        <p class="cc-meta" id="ho-notice-check"></p>
+      </div>
+    </div>
+    <div class="form-field"><label for="ho-reason">Reason</label><input type="text" id="ho-reason" class="text-input" maxlength="255" placeholder="e.g. Moved to another city, contract ended" /></div>
   </div>
   <p class="cc-meta" id="ho-summary"></p>
   <div class="form-actions"><button type="button" class="role-btn" id="ho-save">Hand over</button></div>

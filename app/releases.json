@@ -1,5 +1,53 @@
 [
   {
+    "version": "1.68.0",
+    "date": "2026-11-27",
+    "title": "Audit fixes: leavers' pay, students who leave, clearer messages",
+    "summary": "Fixes from the November audit: leavers are paid for the days worked (not after resigning without 30 days' notice), and students who leave stop being charged hostel and transport. Several messages now say how to fix the problem.",
+    "changes": [
+      {
+        "kind": "improved",
+        "for": "Accounts office",
+        "text": "Someone who left during the month gets a payslip for the days they worked; before, they were left out of that month altogether. A resignation with less than 30 days' notice has that month's worked days withheld, and the payslip says why."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Leaving asks how they left (resigned with the day notice was given, terminated by the institute, or contract ended) and the last working day."
+      },
+      {
+        "kind": "improved",
+        "for": "Administrators",
+        "text": "A student who leaves, is expelled or graduates: hostel stay, transport seat and mentor end that day, and the warden is told. Before, hostel rent and transport kept being charged every month."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "A Dropped or Graduated student set by mistake can be put back to Active by an administrator within 30 days, with a reason."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Lifting a suspension lists the fees given to the student's class meanwhile, with one click to assign them."
+      },
+      {
+        "kind": "improved",
+        "for": "Teachers",
+        "text": "Clinical rotation sheets show suspended students locked and leave out expelled ones. The exam-hall roll lists a suspended student as not allowed and leaves them out of the invigilator count."
+      },
+      {
+        "kind": "improved",
+        "for": "Administrators",
+        "text": "Timetable clash messages name the class that is already there and show normal times (Monday 9:00 AM). Two people saving the same thing at once get a plain message instead of 'An unexpected error occurred'."
+      },
+      {
+        "kind": "improved",
+        "for": "Administrators",
+        "text": "Each class in the Timetable's weekly view has links to change it from a date or to cover a class. Step 1 suggests grouping batch terms into a session when they are not grouped."
+      }
+    ]
+  },
+  {
     "version": "1.67.0",
     "date": "2026-11-27",
     "title": "Hand over a teacher's work when they are away or leave",

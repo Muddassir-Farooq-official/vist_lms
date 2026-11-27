@@ -21,7 +21,9 @@ The administrator sets the institute up and oversees everything. Your menu is gr
 - **Hand over work** (Employees → a person): opens when you put someone *On leave*, terminate them, or suspend or terminate them on a final warning. You can also open it any time from the person's page.
   - **Away for a while** (suspended or on long leave): their courses stay theirs. Every class from a date until a date is listed, up to 120 days at a time. Choose a cover for each class, or one teacher for all classes of a course. Cover pay works as usual and the substitute is told.
   - **When they are back** (status *Active* again): covers still to come are taken back and the substitutes are told.
-  - **Leaving / has left**: each running course gets a new teacher, or "no teacher yet" to decide later. The timetable goes with the course, and classes already held stay in the old teacher's name. Tick *Record that they have left* to terminate them in the same step.
+  - **Leaving / has left**: each running course gets a new teacher, or "no teacher yet" to decide later. The timetable goes with the course, and classes already held stay in the old teacher's name. Tick *Record that they have left* to terminate them in the same step. Choose how they left and their last working day:
+    - **Resigned**: also enter the day they gave notice. With fewer than 30 days between notice and the last day, the salary for the days worked in their last month is not paid, and the payslip says why. Earlier months and their security deposit are not touched.
+    - **Terminated by the institute** or **Contract ended**: they are paid for the days worked in their last month.
   - **Both cases**: covers they were going to take are given back. Upcoming exam duties, school class-teacher roles and mentees go to whoever you choose.
   - **Also when they leave**: committee seats end and clinical supervision stops. While away they keep their committee seat, shown as *away*.
   - Everything is in the activity log, and nothing already held or recorded changes.
@@ -47,7 +49,11 @@ A student is **suspended** or **expelled** from the student's record (change sta
 
 When the suspension is lifted (status back to Active, or *Lift suspension* on the warning), every lock goes at once: nothing was deleted. Held results are worked out straight away if all the marks are in; a mark that is still missing is entered by the exam office as a correction.
 
-An **expelled** student (status Dropped) is withdrawn from every course still running. Completed courses, grades, attendance and fees stay on record. Only the leaving papers (migration and fee clearance certificates) can still be issued.
+An **expelled** student (status Dropped) is withdrawn from every course still running. Completed courses, grades, attendance and fees stay on record. Only the leaving papers (migration and fee clearance certificates) can still be issued. When a student leaves, is expelled or graduates, their hostel stay and transport seat end that day (charged up to then; the warden is told) and their mentor assignment ends.
+
+**Undo by mistake**: an administrator can put a Dropped or Graduated student back to *Active* within 30 days, with a reason (at least 10 characters). Courses they were withdrawn from are not re-enrolled automatically: enrol them again from the student's page. Hostel, transport and cancelled future fees are not restored either.
+
+**Fees while suspended**: fees assigned in bulk only reach active students. When a suspension is lifted, the fees given to their class in the meantime are listed, with one click to assign them.
 
 Classes, marks and results recorded before the suspension or expulsion are never changed.
 
@@ -175,6 +181,7 @@ Teachers book make-up classes (for a missed class) and extra classes (for a cour
 - **Fixed assets**: furniture, computers, equipment, vehicles and buildings, with tag numbers, holders and depreciation.
 - **Approvals**: actions that need a second person: waiving or cancelling a fee, waiving a fine, writing off previous dues, moving a payment to the right fee, reopening closed books, new scholarships or discounts, and make-up or extra classes. Approving carries the action out exactly as asked; nobody can approve their own request.
 - **Payroll**: pay staff each month: salary, allowances, bonuses and deductions, with a payslip for everyone.
+- **Payroll and leavers**: someone who left during the month gets a payslip for the days they worked, from the 1st to their last working day, unless they resigned with less than 30 days' notice (see *Hand over work*). Attendance after their last day is not counted against them, and no security deposit is held from their last payslip.
 - **Payroll → Visiting faculty**: a visiting teacher is paid per lecture instead of a monthly salary.
   - **Setting it up**: set their employment type to *Visiting* (Employees → edit), then enter their **rate per lecture** here.
   - **What counts as a lecture**: a lecture is taken when they mark its attendance. A lab's double period is two lectures; a combined class taught to several batches at once is one; extra and make-up classes count too. Cancelled classes are neither paid nor deducted.

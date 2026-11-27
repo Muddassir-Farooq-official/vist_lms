@@ -4372,3 +4372,6 @@ details.tg-session > summary.tg-head { cursor: pointer; }
 .ho-course-head label { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 0.85rem; }
 .ho-block { margin-bottom: 16px; }
 .ho-block h3 { font-size: 0.95rem; margin: 0 0 6px; }
+.tt-links { margin-top: 3px; font-size: 0.72rem; }
+.tt-links a { color: var(--blue-600); text-decoration: none; }
+.tt-links a:hover { text-decoration: underline; }

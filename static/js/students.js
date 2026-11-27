@@ -360,6 +360,7 @@
 
     VA.toast("Status updated.");
     loadStudents();
+    if (newStatusSelect.value === "ACTIVE" && window.VistMissedFees) await window.VistMissedFees(activeStudentId);
     Sheet.open(activeStudentId, "account");
   });
 

@@ -285,7 +285,9 @@ class HandoverService:
                 reason = (data.get("reason") or "").strip()
                 if len(reason) < 5:
                     raise ValidationAppError("Say why they are leaving (at least 5 characters).")
-                await EmployeeService(self.session).change_status(e.id, new_status=EmployeeStatus.TERMINATED, reason=reason, actor_id=actor_id)
+                await EmployeeService(self.session).change_status(e.id, new_status=EmployeeStatus.TERMINATED, reason=reason, actor_id=actor_id,
+                                                                  leaving_type=data.get("leaving_type"), left_on=data.get("left_on"),
+                                                                  notice_given_on=data.get("notice_given_on"))
         await self.audit.log(actor_user_id=actor_id, action="employee.handover", entity_type="employee", entity_id=e.id,
                              after={"kind": kind, "from": str(start), "until": str(until) if until else None, **done})
         return {"done": done, "plan": await self.plan(employee_id, kind=kind, from_date=start, until_date=until)}

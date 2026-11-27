@@ -216,6 +216,7 @@
       window.location.href = "/dashboard/admin/employees/" + w.person.id + "/handover?kind=" + (chosenAction === "SUSPEND" ? "AWAY" : "LEFT");
       return;
     }
+    if (current.mode === "lift" && w.kind === "STUDENT" && w.person && window.VistMissedFees) await window.VistMissedFees(w.person.id, w.person.name);
     VA.toast(current.mode === "decide" ? "Decision applied. " + w.person.name + " has been told." : current.mode === "lift" ? "Suspension ended. " + w.person.name + " can sign in again."
       : "Withdrawn. It no longer counts.", "success");
     load();

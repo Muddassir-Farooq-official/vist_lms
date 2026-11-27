@@ -27,6 +27,7 @@
     $("cv-att-save").disabled = !r.body.is_rotation_day;
     $("cv-att-body").innerHTML = r.body.students.map(function (s) {
       const st = s.status || "PRESENT";
+      if (s.suspended) return '<tr class="att-locked"><td>' + esc(s.roll_number) + "</td><td>" + esc(s.name) + ' <small>suspended: not marked</small></td><td colspan="3"><span class="badge badge-locked">Suspended</span></td></tr>';
       return '<tr data-id="' + s.id + '"><td>' + esc(s.roll_number) + "</td><td>" + esc(s.name) + "</td>" + ["PRESENT", "ABSENT", "LEAVE"].map(function (v) {
         return '<td><input type="radio" name="a-' + s.id + '" value="' + v + '"' + (st === v ? " checked" : "") + ' aria-label="' + v.toLowerCase() + '"></td>';
       }).join("") + "</tr>";
