@@ -22,14 +22,23 @@ def days_in(d: date) -> int:
     return calendar.monthrange(d.year, d.month)[1]
 
 
-def payable_days(hire_date: date | None, month: date) -> int:
-    """Days of the month they are employed for: the whole month, or from the day they joined. 0 if they join after it."""
-    start, dim = month_start(month), days_in(month)
-    if hire_date is None or hire_date <= start:
-        return dim
-    if hire_date > month_end(month):
+def payable_days(hire_date: date | None, month: date, left_on: date | None = None) -> int:
+    """Days of the month they are employed for: from the 1st (or the day they joined) to the last day of the month (or
+    their last working day, when they left during it). 0 if they join after it or left before it."""
+    start, end = month_start(month), month_end(month)
+    first = max(start, hire_date) if hire_date else start
+    last = min(end, left_on) if left_on else end
+    if last < first:
         return 0
-    return dim - (hire_date - start).days
+    return (last - first).days + 1
+
+
+def notice_short(leaving_type: str | None, notice_given_on: date | None, left_on: date | None, notice_days: int) -> int:
+    """Days of notice short of the notice period for a resignation (0 = enough notice, or not a resignation)."""
+    if leaving_type != "RESIGNED" or left_on is None or notice_days <= 0:
+        return 0
+    given = (left_on - notice_given_on).days if notice_given_on else 0
+    return max(0, notice_days - given)
 
 
 def prorate(amount, payable: int, dim: int) -> Decimal:

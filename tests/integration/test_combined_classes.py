@@ -68,7 +68,7 @@ async def test_combining_shares_the_teacher_the_timetable_and_the_marks_scheme(a
                                   json={"day_of_week": SLOT_DAY_OF_WEEK, "period_id": p9, "room": "Hall 1"})).status_code == 201
     # not combined yet: the same room at the same time is a clash
     clash = await app_client.post(f"{A}/offerings/{ob}/timetable-slots", json={"day_of_week": SLOT_DAY_OF_WEEK, "period_id": p9, "room": "Hall 1"})
-    assert clash.status_code == 422 and "already booked" in clash.text
+    assert clash.status_code == 422 and "already" in clash.text and "combine" in clash.text.lower()
 
     view = (await app_client.get(f"{A}/offerings/{oa}/combined")).json()
     assert view["combined"] is False and [m["section_label"] for m in view["can_join"]] == ["B"]

@@ -64,14 +64,23 @@ class StudentService:
         return RawPage[Student](items=items, total=total, page=page.page, page_size=page.page_size)
 
     async def change_status(
-        self, student_id: uuid.UUID, *, new_status: StudentStatus, reason: str | None, actor_id: uuid.UUID, keep_future_fees: bool = False
+        self, student_id: uuid.UUID, *, new_status: StudentStatus, reason: str | None, actor_id: uuid.UUID, keep_future_fees: bool = False,
+        may_undo: bool = False,
     ) -> Student:
         student = await self.get_student(student_id)
         allowed = _ALLOWED_TRANSITIONS.get(student.status, set())
-        if new_status not in allowed and new_status != student.status:
-            raise BusinessRuleViolationError(
-                f"Cannot transition student from {student.status.value} to {new_status.value}."
-            )
+        undoing = student.status in (StudentStatus.DROPPED, StudentStatus.GRADUATED) and new_status == StudentStatus.ACTIVE
+        if undoing:
+            await self._check_undo(student, reason, may_undo)
+        elif new_status not in allowed and new_status != student.status:
+            words = {StudentStatus.ACTIVE: "Active", StudentStatus.SUSPENDED: "Suspended", StudentStatus.GRADUATED: "Graduated", StudentStatus.DROPPED: "Dropped"}
+            if student.status == StudentStatus.SUSPENDED and new_status == StudentStatus.GRADUATED:
+                hint = "Lift the suspension first (make them Active), then graduate them."
+            elif student.status in (StudentStatus.DROPPED, StudentStatus.GRADUATED):
+                hint = "An administrator can undo it (back to Active) within 30 days, with a reason."
+            else:
+                hint = "From here they can be set to " + (", ".join(words[s] for s in allowed) or "nothing else") + "."
+            raise BusinessRuleViolationError(f"{student.first_name} {student.last_name} is {words[student.status]}. {hint}")
 
         # Real gap fix: this method never touched anything outside the
         # students table — a student's Enrollment rows (academics
@@ -163,6 +172,13 @@ class StudentService:
                 if enrollment.status == EnrollmentStatus.ENROLLED:
                     await enrollment_service.withdraw(enrollment.id, student_id=None, actor_id=actor_id, keep_future_fees=keep_future_fees)
 
+        if new_status in (StudentStatus.DROPPED, StudentStatus.GRADUATED) and new_status != old_status:
+            # hostel, transport and mentor end with the student's time here (they were still being charged every month)
+            from app.students.standing import end_places_on_leaving
+
+            await end_places_on_leaving(self.session, student, actor_id=actor_id,
+                                        why="Graduated" if new_status == StudentStatus.GRADUATED else "Left the institute" + (f": {reason}" if reason else ""))
+
         if old_status == StudentStatus.SUSPENDED and new_status == StudentStatus.ACTIVE:
             # the locks were only checks, so they are gone now; results held during the suspension are worked out
             from app.students.standing import release_held_results
@@ -177,6 +193,23 @@ class StudentService:
                                        keep_future_fees=keep_future_fees, reason=reason)
 
         return student
+
+    UNDO_DAYS = 30
+
+    async def _check_undo(self, student: Student, reason: str | None, may_undo: bool) -> None:
+        """Dropped / expelled or Graduated by mistake: an administrator may put the student back to Active within 30 days,
+        with a reason. Courses they were withdrawn from are not re-enrolled automatically (the office re-enrols them)."""
+        from sqlalchemy import select
+
+        if not may_undo:
+            raise BusinessRuleViolationError("Only an administrator can undo a student's leaving or graduation.")
+        if len((reason or "").strip()) < 10:
+            raise BusinessRuleViolationError("Say why this is being undone (at least 10 characters).")
+        last = (await self.session.execute(select(StudentStatusHistory).where(StudentStatusHistory.student_id == student.id,
+                                                                               StudentStatusHistory.new_status == student.status)
+                                           .order_by(StudentStatusHistory.changed_at.desc()))).scalars().first()
+        if last is None or (datetime.now(timezone.utc) - last.changed_at).days > self.UNDO_DAYS:
+            raise BusinessRuleViolationError(f"This can only be undone within {self.UNDO_DAYS} days of the change. Create a new admission instead.")
 
     async def check_duplicate(self, *, cnic: str) -> None:
         """Used both by manual creation and the CSV importer's pre-check.

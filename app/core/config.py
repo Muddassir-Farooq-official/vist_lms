@@ -324,6 +324,7 @@ class Settings(BaseSettings):
     payroll_late_marks_per_day: int = 4             # this many late arrivals / early leavings = one day's pay
     payroll_missing_checkout_counts: int = 1        # 1 = a day with no leaving mark counts as leaving early
     payroll_advance_max_salary_multiple: float = 1.0   # an employee may owe at most this many months' basic salary in advances
+    payroll_notice_days: int = 30                   # a resignation needs this many days' notice, or the last month's worked days are not paid
     payroll_security_percent: float = 0.0           # % of basic held back each month as a security deposit, until it equals one basic salary
     graduation_min_cgpa: float = 2.0                # degree audit: the lowest CGPA that can graduate
     teacher_load_min_credit_hours: int = 12         # a teacher below this (credit hours a week) shows as under-loaded

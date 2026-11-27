@@ -437,7 +437,8 @@ class TimekeepingService:
             t, mine = timing[e.id], rows.get(e.id, {})
             s = {"scheduled": 0, "present": 0, "excused": 0, "absent_dates": [], "late": 0, "early": 0, "missing_out": 0, "recorded": len(mine), "timing": t.out()}
             d = max(first, e.hire_date or first, started or first)
-            while d <= end:
+            stop = min(end, e.left_on) if getattr(e, "left_on", None) else end      # nothing after their last working day
+            while d <= stop:
                 r = mine.get(d)
                 working = r.is_working_day if r is not None else d.weekday() in t.days
                 if working:

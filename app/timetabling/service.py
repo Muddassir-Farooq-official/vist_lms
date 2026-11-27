@@ -760,7 +760,11 @@ class SmartTimetableService:
                                                   .order_by(TimetableDraft.created_at.desc()).limit(20))).scalars())
         tl = {t.lower() for t in terms}
         draft = next((d for d in drafts if {x.lower() for x in (d.terms or [])} & tl), None)
-        return {"terms": terms, "combine": await self.combine_suggestions(terms),
+        from app.academics.terms import AcademicTerm
+
+        ungrouped = list((await self.session.execute(select(AcademicTerm.label).where(
+            func.lower(AcademicTerm.label).in_([t.lower() for t in terms]), AcademicTerm.session_id.is_(None)))).scalars())
+        return {"terms": terms, "combine": await self.combine_suggestions(terms), "ungrouped": ungrouped,
                 "periods": {"class": sum(1 for x in periods if x.holds_class), "breaks": sum(1 for x in periods if not x.holds_class)},
                 "rooms": rooms,
                 "sections": {"total": len(rows), "without_teacher": sum(1 for o, _c in rows if not o.assigned_teacher_id),

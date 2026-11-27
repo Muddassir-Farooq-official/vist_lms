@@ -722,6 +722,32 @@ async def http_error_handler(request: Request, exc: StarletteHTTPException):
     return await default_http_exception_handler(request, exc)
 
 
+from sqlalchemy.exc import IntegrityError as _IntegrityError  # noqa: E402
+
+
+@app.exception_handler(_IntegrityError)
+async def integrity_error_handler(request: Request, exc: _IntegrityError) -> JSONResponse:
+    """A save that breaks a database rule (usually two people saving the same thing at once, or a double click) gets a
+    message that says what happened, not "An unexpected error occurred". Nothing was saved."""
+    orig = getattr(exc, "orig", None)
+    code = getattr(orig, "sqlstate", None) or getattr(orig, "pgcode", None) or ""
+    name = getattr(getattr(orig, "diag", None), "constraint_name", None) or ""
+    if not name:
+        import re as _re
+
+        found = _re.search(r'constraint "([^"]+)"', str(orig or exc))
+        name = found.group(1) if found else ""
+    what = " ".join(w for w in name.split("_") if w not in ("uq", "fk", "ix", "ck", "pk")) if name else ""
+    logger.warning("integrity_error", path=str(request.url.path), constraint=name, sqlstate=code)
+    if code == "23505" or "unique" in str(orig or exc).lower() or "duplicate key" in str(orig or exc).lower():
+        msg = "This already exists" + (f" ({what})" if what else "") + ", probably saved a moment ago. Refresh the page and check before trying again. Nothing was changed."
+        return JSONResponse(status_code=409, content={"error": {"code": "DUPLICATE", "message": msg, "details": {"constraint": name} if name else None}})
+    if code == "23503" or "foreign key" in str(orig or exc).lower():
+        msg = "This is still used by other records (" + (what or "linked data") + "), so it cannot be removed or changed this way. Nothing was changed."
+        return JSONResponse(status_code=409, content={"error": {"code": "IN_USE", "message": msg, "details": {"constraint": name} if name else None}})
+    return await unhandled_exception_handler(request, exc)
+
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     logger.error("unhandled_exception", path=str(request.url.path), exc_info=exc)

@@ -73,3 +73,44 @@ async def release_held_results(session: AsyncSession, student_id: uuid.UUID, *, 
         await grading._maybe_recompute_outcome(e, actor_id=actor_id)
         done += e.outcome is not None
     return done
+
+
+async def end_places_on_leaving(session: AsyncSession, student: Student, *, actor_id: uuid.UUID, why: str) -> dict:
+    """A student who left, was expelled or graduated: their hostel stay and transport seat end today (charged up to today,
+    unused days credited as the hostel does on any check-out), and their mentor assignment ends (notes kept). The warden
+    is told who left. Nothing already charged or recorded is changed."""
+    from app.core.clock import institute_today
+    from app.hostel.models import HostelStay
+    from app.hostel.service import HostelService
+    from app.mentoring.models import MentorAssignment
+    from app.transport.models import TransportRider
+    from app.transport.service import TransportService
+
+    today = institute_today()
+    out = {"hostel": False, "transport": False, "mentor": False}
+    stay = (await session.execute(select(HostelStay).where(HostelStay.student_id == student.id, HostelStay.end_date.is_(None)))).scalar_one_or_none()
+    if stay is not None:
+        await HostelService(session).check_out(stay.id, end_date=max(today, stay.start_date), reason=why, actor_id=actor_id)
+        out["hostel"] = True
+        await _tell_role(session, "WARDEN", "Resident has left", f"{student.first_name} {student.last_name} ({student.roll_number}): {why}. "
+                         "Their stay was ended today; please clear the room.", "/dashboard/warden/home")
+    seat = (await session.execute(select(TransportRider).where(TransportRider.student_id == student.id, TransportRider.end_date.is_(None)))).scalar_one_or_none()
+    if seat is not None:
+        await TransportService(session).end_rider(seat.id, end_date=max(today, seat.start_date), actor_id=actor_id)
+        out["transport"] = True
+    m = (await session.execute(select(MentorAssignment).where(MentorAssignment.student_id == student.id, MentorAssignment.end_date.is_(None)))).scalar_one_or_none()
+    if m is not None:
+        m.end_date = today
+        out["mentor"] = True
+    await session.flush()
+    return out
+
+
+async def _tell_role(session: AsyncSession, role_code: str, title: str, message: str, link: str | None) -> None:
+    from app.auth.models import Role, User, UserRole
+    from app.notifications.models import Notification, NotificationCategory
+
+    users = (await session.execute(select(User.id).join(UserRole, UserRole.user_id == User.id).join(Role, Role.id == UserRole.role_id).where(
+        Role.code == role_code, User.is_active.is_(True)))).scalars().all()
+    for uid in users:
+        session.add(Notification(user_id=uid, category=NotificationCategory.TASK, title=title, message=message[:500], link=link))

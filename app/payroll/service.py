@@ -387,7 +387,7 @@ class PayrollService:
             unpaid_on_leave = 0
         month, dim = run.month, rules.days_in(run.month)
         wd = int(slip.working_days or run.working_days or settings.payroll_default_working_days or rules.days_in(run.month))
-        payable = rules.payable_days(emp.hire_date, month)
+        payable = rules.payable_days(emp.hire_date, month, emp.left_on)
         slip.base_salary, slip.days_in_month, slip.days_payable = base, dim, payable
         lines: list[tuple[LineKind, str, str, Decimal, uuid.UUID | None]] = []
         earn, ded = [], []
@@ -433,9 +433,22 @@ class PayrollService:
                         rules.unpaid_deduction(base, wd, Decimal(unpaid_on_leave)), None))
         if adj < 0:
             ded.append((LineKind.DEDUCTION, "ADJUSTMENT", slip.adjustment_note or "Adjustment", -adj, None))
+        # Left during this month after resigning with less notice than the notice period: the month's salary for the days
+        # worked is not paid (institute rule). Covers, bonuses and adjustments are still paid; earlier months are untouched.
+        withheld = Decimal(0)
+        leaving_here = emp.left_on is not None and rules.month_start(month) <= emp.left_on <= rules.month_end(month)
+        short = rules.notice_short(emp.leaving_type, emp.notice_given_on, emp.left_on, int(settings.payroll_notice_days)) if leaving_here else 0
+        if short:
+            salary = sum((l[3] for l in earn if l[1] in ("BASE", "ALLOWANCE", "LECTURES")), Decimal(0)) - \
+                sum((l[3] for l in ded if l[1] in ("ABSENT", "LATE", "UNPAID", "UNPAID_LEAVE", "LECTURE_MISSED", "LECTURE_COVERED", "LECTURE_OFFICE")), Decimal(0))
+            withheld = rules.q2(max(Decimal(0), salary))
+            if withheld > 0:
+                notice = f"notice given {emp.notice_given_on:%d %b %Y}" if emp.notice_given_on else "no notice given"
+                ded.append((LineKind.DEDUCTION, "NOTICE", f"Not paid: resigned without {int(settings.payroll_notice_days)} days' notice ({notice}, "
+                            f"last day {emp.left_on:%d %b %Y}, {short} days short)"[:160], withheld, None))
         setting = await self.session.get(EmployeePayrollSetting, emp.id)
         pct = Decimal(str(setting.security_percent)) if setting is not None and setting.security_percent is not None else Decimal(str(settings.payroll_security_percent))
-        if pct > 0:
+        if pct > 0 and not withheld and not leaving_here:     # nothing more is held from a leaver's last payslip
             held = await self._security_held(emp.id, run.id)
             take = min(rules.q2(Decimal(str(base)) * pct / 100), rules.q2(base) - held)
             if take > 0:
@@ -462,7 +475,11 @@ class PayrollService:
 
     async def _eligible(self, month: date) -> tuple[list[tuple[Employee, str | None]], dict]:
         end = rules.month_end(month)
-        rows = (await self.session.execute(select(Employee, JobRole.title).join(JobRole, JobRole.id == Employee.job_role_id).where(Employee.status.in_(ACTIVE), Employee.hire_date <= end).order_by(Employee.first_name, Employee.last_name))).all()
+        # everyone on the staff, and anyone who left during this month (paid for the days they worked, see _fill)
+        rows = (await self.session.execute(select(Employee, JobRole.title).join(JobRole, JobRole.id == Employee.job_role_id).where(
+            Employee.hire_date <= end,
+            Employee.status.in_(ACTIVE) | ((Employee.status == EmployeeStatus.TERMINATED) & (Employee.left_on >= rules.month_start(month))))
+            .order_by(Employee.first_name, Employee.last_name))).all()
         return [(e, t) for e, t in rows], await self._salaries([e.id for e, _ in rows], month)
 
     # ------------------------------------------------------------------ the run
@@ -503,7 +520,7 @@ class PayrollService:
                 skipped.append(f"{emp.first_name} {emp.last_name} (no salary on record" + (", and no lecture rate" if emp.employment_type == "VISITING" else "") + ")")
                 continue
             slip = Payslip(run_id=run.id, employee_id=emp.id, employee_name=f"{emp.first_name} {emp.last_name}", employee_code=emp.employee_code, job_title=title, department=emp.department,
-                           base_salary=base, days_in_month=rules.days_in(month), days_payable=rules.payable_days(emp.hire_date, month),
+                           base_salary=base, days_in_month=rules.days_in(month), days_payable=rules.payable_days(emp.hire_date, month, emp.left_on),
                            working_days=working_days or own.get(emp.id) or rules.days_in(month), gross=0, deductions=0, net=0)
             self.session.add(slip)
             await self.session.flush()
@@ -535,7 +552,7 @@ class PayrollService:
             slip = have.get(emp.id)
             if slip is None:
                 slip = Payslip(run_id=run.id, employee_id=emp.id, employee_name=f"{emp.first_name} {emp.last_name}", employee_code=emp.employee_code, job_title=title, department=emp.department,
-                               base_salary=base, days_in_month=rules.days_in(run.month), days_payable=rules.payable_days(emp.hire_date, run.month),
+                               base_salary=base, days_in_month=rules.days_in(run.month), days_payable=rules.payable_days(emp.hire_date, run.month, emp.left_on),
                                working_days=run.working_days or own.get(emp.id) or rules.days_in(run.month),
                                gross=0, deductions=0, net=0)
                 self.session.add(slip)

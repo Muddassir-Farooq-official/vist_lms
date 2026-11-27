@@ -157,8 +157,12 @@
     return '<div class="tt-entry" style="--h:' + hue(e.course_code) + '">' +
       '<div class="tt-code">' + esc(e.course_code) + section + programs + "</div>" +
       '<div class="tt-name">' + esc(e.course_title) + "</div>" +
-      (who ? '<div class="tt-meta">' + who + "</div>" : "") + "</div>";
+      (who ? '<div class="tt-meta">' + who + "</div>" : "") +
+      // the administration's Timetable: change this weekly class from a date, or cover one of its classes
+      (MANAGE && e.offering_id ? '<div class="tt-links"><a href="/dashboard/admin/courses/offering/' + esc(e.offering_id) + '#timetable" title="Change its day, period or room from a date (classes already held stay)">Change from a date</a>' +
+        ' \u00b7 <a href="/dashboard/admin/attendance#teachers" title="Give one class to another teacher">Cover a class</a></div>' : "") + "</div>";
   }
+  const MANAGE = location.pathname.indexOf("/dashboard/admin/timetable") === 0;
 
   function render(data) {
     lastData = data;

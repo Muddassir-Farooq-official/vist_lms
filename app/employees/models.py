@@ -71,6 +71,11 @@ class Employee(UUIDPKMixin, TimestampMixin, Base):
     gender: Mapped[str] = mapped_column(String(20), nullable=False)
     hire_date: Mapped[date] = mapped_column(Date, nullable=False)
     left_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # How they left (set with the Terminated status): RESIGNED | TERMINATED (by the institute) | CONTRACT_ENDED, and for a
+    # resignation the day notice was given. Payroll pays the last month's worked days, unless a resignation gave less than
+    # the notice period (settings.payroll_notice_days, 30), when those days are withheld (app/payroll/service.py).
+    leaving_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    notice_given_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     # Where the salary goes (the payroll bank-transfer sheet)
     bank_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     bank_account_title: Mapped[str | None] = mapped_column(String(150), nullable=True)

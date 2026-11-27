@@ -118,7 +118,11 @@
     if (m && m.value !== "keep") body.mentors = m.value === "none" ? [] : [m.value];
     body.release_covers = $("ho-release") ? $("ho-release").checked : true;
     body.end_committees = $("ho-committees") ? $("ho-committees").checked : false;
-    if (left && $("ho-terminate").checked) { body.terminate = true; body.reason = $("ho-reason").value.trim(); }
+    if (left && $("ho-terminate").checked) {
+      body.terminate = true; body.reason = $("ho-reason").value.trim();
+      body.leaving_type = leaving(); body.left_on = $("ho-last").value || null;
+      body.notice_given_on = leaving() === "RESIGNED" ? ($("ho-notice").value || null) : null;
+    }
     const n = body.duties.filter(function (d) { return !d.employee_id; }).length;
     if (n && !window.confirm(n + " exam dut" + (n === 1 ? "y has" : "ies have") + " no replacement and will be removed. Go on?")) return;
     $("ho-save").disabled = true;
@@ -137,9 +141,30 @@
     $("ho-done").hidden = false;
   });
 
+  // how they left: a resignation needs the notice period, or the last month's worked days are not paid
+  const NOTICE = 30;
+  $("ho-notice-days").textContent = NOTICE;
+  $("ho-last").value = iso(today);
+  const leaving = function () { return document.querySelector('input[name="ho-leaving"]:checked').value; };
+  function noticeCheck() {
+    const resigned = leaving() === "RESIGNED";
+    $("ho-notice-field").hidden = !resigned;
+    const out = $("ho-notice-check");
+    if (!resigned) { out.textContent = "Paid for the days worked in their last month."; return; }
+    if (!$("ho-notice").value || !$("ho-last").value) { out.textContent = "Enter the day notice was given."; return; }
+    const days = Math.round((new Date($("ho-last").value) - new Date($("ho-notice").value)) / 86400000);
+    out.textContent = days >= NOTICE ? days + " days' notice: paid for the days worked in their last month."
+      : "Only " + Math.max(0, days) + " days' notice (" + (NOTICE - Math.max(0, days)) + " short): the last month's worked days will NOT be paid.";
+  }
+  document.querySelectorAll('input[name="ho-leaving"]').forEach(function (r) { r.addEventListener("change", noticeCheck); });
+  $("ho-notice").addEventListener("change", noticeCheck);
+  $("ho-last").addEventListener("change", noticeCheck);
+  $("ho-terminate").addEventListener("change", function () { $("ho-leave-fields").hidden = !$("ho-terminate").checked; });
+  noticeCheck();
   if (params.get("terminate") === "1") {
     const t = $("ho-terminate");
     if (t) t.checked = true;
   }
+  $("ho-leave-fields").hidden = !$("ho-terminate").checked;
   load();
 })();
