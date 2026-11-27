@@ -158,6 +158,39 @@ async def set_members(role_id: uuid.UUID, body: MembersIn, current_user: Current
     return await AccessService(db).set_members(role_id, add=body.add, remove=body.remove, actor_id=current_user.id)
 
 
+class RuleIn(BaseModel):
+    requester_role: str | None = Field(default=None, max_length=32)
+    min_amount: float | None = Field(default=None, ge=0, le=1_000_000_000)
+    mode: str = Field(pattern="^(NONE|APPROVE)$")
+    approver_type: str | None = Field(default=None, pattern="^(DEFAULT|ROLE|USER|HOD|COURSE_TEACHER)$")
+    approver_value: str | None = Field(default=None, max_length=64)
+    note: str | None = Field(default=None, max_length=200)
+
+
+class RulesIn(BaseModel):
+    rules: list[RuleIn] = Field(default_factory=list, max_length=30)
+
+
+class TryIn(BaseModel):
+    user_id: uuid.UUID
+    amount: float | None = Field(default=None, ge=0)
+
+
+@router.get("/approval-rules", summary="Who approves each kind of action, and the rules set")
+async def approval_rules(current_user: CurrentUser = Depends(admin), db=Depends(get_db)) -> dict:
+    return await AccessService(db).rules_overview()
+
+
+@router.put("/approval-rules/{action}", summary="Set the rules for one kind of action (rules for money wait for a second administrator)")
+async def set_approval_rules(action: str, body: RulesIn, current_user: CurrentUser = Depends(admin), db=Depends(get_db)) -> dict:
+    return await AccessService(db).set_rules(action, [r.model_dump() for r in body.rules], actor_id=current_user.id)
+
+
+@router.post("/approval-rules/{action}/try", summary="Who would decide this person's request (with this amount)?")
+async def try_rule(action: str, body: TryIn, current_user: CurrentUser = Depends(admin), db=Depends(get_db)) -> dict:
+    return await AccessService(db).try_rule(action, user_id=body.user_id, amount=body.amount)
+
+
 @router.get("/my-pages", summary="Pages of the administration's portal this person may open (for the menu)")
 async def my_pages(current_user: CurrentUser = Depends(get_current_user)) -> dict:
     from app.access import catalog

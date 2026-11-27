@@ -95,6 +95,8 @@ async def mark_session(
 
     service = AttendanceService(db)
     is_admin = Permissions.ATTENDANCE_LOCK in current_user.permissions
+    if is_admin:
+        await _office_change_needs_approval(db, service, class_session, payload, current_user)
     if payload.combined:
         records = []
         present = set(payload.present_student_ids)
@@ -114,6 +116,29 @@ async def mark_session(
         actor_is_admin=is_admin, late_note=payload.late_note,
     )
     return [await _to_record_detail(db, r) for r in records]
+
+
+async def _office_change_needs_approval(db, service, class_session, payload, current_user) -> None:
+    """Someone other than the class's teacher changes a past day's attendance: if an approval rule says who approves
+    that (e.g. the course's own teacher), it becomes a correction request for them instead, and nothing changes yet.
+    Without such a rule the office marks it at once, as always."""
+    from app.approvals import rules
+    from app.approvals.inbox import _teacher_ctx
+    from app.core.clock import institute_today
+
+    if class_session.session_date >= institute_today():
+        return
+    ctx = await _teacher_ctx(db, class_session.course_offering_id)
+    if ctx.get("course_teacher_user_id") and str(ctx["course_teacher_user_id"]) == str(current_user.id):
+        return
+    res = await rules.effective(db, "ATTENDANCE_CORRECTION", requester_id=current_user.id, ctx=ctx)
+    if res.default or res.no_approval:
+        return
+    reason = (payload.late_note or "").strip() or "Attendance changed by the office."
+    await service.create_correction_request(class_session.id, reason=reason if len(reason) >= 5 else reason + " (office)",
+                                            present_student_ids=payload.present_student_ids, actor_id=current_user.id)
+    await db.commit()
+    raise BusinessRuleViolationError(f"Sent for approval: {res.text}. Nothing has changed yet; it is applied when they approve.")
 
 
 async def _combined_sessions(db, class_session) -> list:
@@ -472,22 +497,14 @@ async def _offerings_by_ids(db, ids):
 async def decide_correction_request(
     request_id: uuid.UUID,
     payload: CorrectionDecision,
-    current_user: CurrentUser = Depends(require_any_permission(Permissions.ATTENDANCE_LOCK, Permissions.ATTENDANCE_CORRECTION_DECIDE)),
+    current_user: CurrentUser = Depends(get_current_user),
     db=Depends(get_db),
 ) -> CorrectionRequestOut:
-    from app.core.scope import hod_department, teacher_ids_in
+    # The attendance office or a HOD of the teacher's department, as always -- or whoever an approval rule names
+    # (app/approvals/inbox.py; never the one who asked).
+    from app.approvals.inbox import check
 
-    dept = await hod_department(db, current_user)
-    if dept:
-        from app.attendance.models import AttendanceCorrectionRequest as _ACR
-        from app.core.exceptions import AuthorizationError
-
-        pending = await db.get(_ACR, request_id)
-        if pending is not None:
-            cs = await ClassSessionRepository(db).get_by_id(pending.class_session_id)
-            offering = await CourseOfferingRepository(db).get_by_id(cs.course_offering_id)
-            if offering.assigned_teacher_id not in await teacher_ids_in(db, dept):
-                raise AuthorizationError("This class belongs to another department.")
+    await check(db, "ATTENDANCE_CORRECTION", current_user, request_id)
     req = await AttendanceService(db).decide_correction_request(
         request_id, approve=payload.approve, note=payload.note, actor_id=current_user.id
     )

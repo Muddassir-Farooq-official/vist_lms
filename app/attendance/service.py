@@ -538,6 +538,19 @@ class AttendanceService:
             actor_user_id=actor_id, action="attendance.correction_requested", entity_type="class_session",
             entity_id=class_session_id, after={"request_id": str(request.id), "reason": reason},
         )
+        # Approval rules (Access control -> Approvals): no approval needed -> applied now; named approvers are told.
+        from app.approvals import rules
+        from app.approvals.inbox import _teacher_ctx
+
+        ctx = await _teacher_ctx(self.session, offering.id)
+        res = await rules.effective(self.session, "ATTENDANCE_CORRECTION", requester_id=actor_id, ctx=ctx)
+        if res.no_approval:
+            await rules.log_no_approval(self.session, "ATTENDANCE_CORRECTION", actor_id=actor_id, entity_type="class_session",
+                                        entity_id=class_session_id, summary=reason)
+            return await self.decide_correction_request(request.id, approve=True, note="No approval needed (approval rule).", actor_id=actor_id)
+        if not res.default:
+            await rules.tell_approvers(self.session, res, requester_id=actor_id, ctx=ctx, title="Attendance correction to decide",
+                                       message=f"{class_session.session_date:%d %b %Y}: {reason}")
         return request
 
     async def decide_correction_request(

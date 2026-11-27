@@ -186,13 +186,22 @@ class LeaveService:
             await self._store_note(r, note)
         await self.audit.log(actor_user_id=user_id, action="leave.requested", entity_type="leave_request", entity_id=r.id,
                              after={"kind": kind, "from": str(first), "to": str(last), "days": len(days)})
+        from app.approvals import rules
         from app.approvals.service import _users_with_permission
         from app.auth.permissions import Permissions
 
+        what = f"{emp.first_name} {emp.last_name}: {KINDS[kind].lower()}, {first:%d %b} to {last:%d %b} ({len(days)} day(s))."
+        ctx = {"department": emp.department}
+        res = await rules.effective(self.session, "STAFF_LEAVE", requester_id=user_id, ctx=ctx)
+        if res.no_approval:                               # approval rule: no approval needed -> approved now
+            await rules.log_no_approval(self.session, "STAFF_LEAVE", actor_id=user_id, entity_type="leave_request", entity_id=r.id, summary=what)
+            return await self.decide(r.id, approve=True, note="No approval needed (approval rule).", as_kind=None, actor_id=user_id)
+        if not res.default:
+            await rules.tell_approvers(self.session, res, requester_id=user_id, ctx=ctx, title="Leave application", message=what)
+            return self.out(r, emp)
         for uid in await _users_with_permission(self.session, Permissions.STAFF_ATTENDANCE_MANAGE, exclude=user_id):
             await create_notification(self.session, user_id=uid, category=NotificationCategory.GENERAL, title="Leave application",
-                                      message=f"{emp.first_name} {emp.last_name}: {KINDS[kind].lower()}, {first:%d %b} to {last:%d %b} ({len(days)} day(s)).",
-                                      link="/dashboard/admin/staff-attendance#leave")
+                                      message=what, link="/dashboard/admin/staff-attendance#leave")
         return self.out(r, emp)
 
     async def _store_note(self, r, note: tuple[str, bytes, str | None]) -> None:

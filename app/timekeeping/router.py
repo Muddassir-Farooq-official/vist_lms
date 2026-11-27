@@ -191,9 +191,11 @@ async def list_leave(status: str | None = None, current_user: CurrentUser = Depe
 
 
 @router.post("/leave/{request_id}/decide", summary="Approve (optionally as another kind) or refuse a leave application -- administration")
-async def decide_leave(request_id: uuid.UUID, payload: LeaveDecideIn, current_user: CurrentUser = Depends(manage_perm), db=Depends(get_db)) -> dict:
+async def decide_leave(request_id: uuid.UUID, payload: LeaveDecideIn, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    from app.approvals.inbox import check
     from app.timekeeping.leave import LeaveService
 
+    await check(db, "STAFF_LEAVE", current_user, request_id)      # the staff attendance office as always, or whom a rule names
     return await LeaveService(db).decide(request_id, approve=payload.approve, note=payload.note, as_kind=payload.as_kind, actor_id=current_user.id)
 
 

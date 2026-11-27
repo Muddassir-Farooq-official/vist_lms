@@ -4471,3 +4471,9 @@ details.tg-session > summary.tg-head { cursor: pointer; }
 .ac-member-list li { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--border, #e5e7eb); }
 .ac-pick { display: grid; gap: 4px; max-height: 50vh; overflow-y: auto; margin: 10px 0; }
 #ac-who-code { max-width: 420px; margin-bottom: 8px; }
+.decisions-chip { white-space: nowrap; }
+.ac-try { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+.ap-actions { display: grid; gap: 10px; margin-top: 10px; }
+.ap-card small { display: inline; }
+.ap-rules td { vertical-align: middle; }
+.ap-none { margin: 4px 0 0; }

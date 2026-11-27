@@ -1,5 +1,28 @@
 [
   {
+    "version": "1.72.0",
+    "date": "2026-11-27",
+    "title": "Who approves what",
+    "summary": "Choose who approves each kind of request, or that no approval is needed, by who asks and how much. Approvers decide from My decisions.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Access control → Approvals: for attendance after the window, staff leave, course results, publishing a timetable, refunds, fines, fee waivers, scholarships, write-offs and more, choose no approval, or approval by a role, one person, the head of the department or the course's teacher. Rules can depend on who asks and on the amount; Try it shows who would decide."
+      },
+      {
+        "kind": "new",
+        "for": "Staff",
+        "text": "My decisions: whoever is named as an approver sees the requests waiting for them at the top of their portal, with Approve and Reject."
+      },
+      {
+        "kind": "improved",
+        "for": "Everyone",
+        "text": "Nothing changes until a rule is added. Nobody approves their own request, an Administrator can always decide, and rules about money wait for a second administrator."
+      }
+    ]
+  },
+  {
     "version": "1.71.0",
     "date": "2026-11-27",
     "title": "Access control: who can do what",

@@ -612,6 +612,25 @@ window.VistAdmin = (function () {
     holder.insertBefore(sel, holder.firstChild);
   }
 
+  // "My decisions (N)" in the top bar when something waits for this person's approval (app/approvals/inbox.py).
+  const DECISION_PORTALS = ["admin", "accounts", "library", "gate", "exam", "warden", "faculty", "principal", "hod", "staff", "clinical"];
+  function addDecisionsChip(me) {
+    const holder = document.querySelector(".content-topbar-right");
+    if (!holder || !me || me.viewing_as_by || document.getElementById("decisions-chip")) return;
+    if ((me.roles || []).every(function (r) { return ["STUDENT", "PARENT", "ALUMNUS"].indexOf(r) !== -1; })) return;
+    fetchJson("/api/v1/decisions/count", { quiet: true }).then(function (r) {
+      if (!r.ok || !r.body || !r.body.waiting) return;
+      const seg = window.location.pathname.split("/")[2] || "";
+      const a = document.createElement("a");
+      a.id = "decisions-chip";
+      a.className = "role-btn small-btn decisions-chip";
+      a.href = DECISION_PORTALS.indexOf(seg) !== -1 ? "/dashboard/" + seg + "/decisions" : "/dashboard/decisions";
+      a.textContent = "My decisions (" + r.body.waiting + ")";
+      a.title = "Requests waiting for your approval";
+      holder.insertBefore(a, holder.firstChild);
+    });
+  }
+
   async function requireAdminSession() {
     const authGate = document.getElementById("auth-gate");
 
@@ -1549,6 +1568,7 @@ window.VistAdmin = (function () {
     insertSkeletons(document.querySelector(".content-main") || document);
     trimAdminMenu(me);
     addPortalSwitcher(me);
+    addDecisionsChip(me);
     document.dispatchEvent(new CustomEvent("vistadmin:ready", { detail: { me: me } }));
     // Tours, "what to do now" and the administrator's setup checklist on every page (static/js/guide.js)
     if (document.querySelector(".content-main") && !document.getElementById("vist-guide-js")) {

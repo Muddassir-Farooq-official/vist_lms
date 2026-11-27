@@ -9,7 +9,7 @@ from app.auth.permissions import Permissions
 from app.auth.repository import AuthRepository
 from app.auth.schemas import CurrentUser
 from app.core.database import get_db
-from app.core.dependencies import require_permission
+from app.core.dependencies import get_current_user, require_permission
 from app.core.exceptions import AuthorizationError
 from app.core.pagination import PageParams
 from app.employees.repository import EmployeeRepository
@@ -159,9 +159,12 @@ async def my_requests(
 async def approve_fine(
     fine_id: uuid.UUID,
     payload: FineResolveRequest,
-    current_user: CurrentUser = Depends(require_permission(Permissions.FINE_ISSUE)),
+    current_user: CurrentUser = Depends(get_current_user),
     db=Depends(get_db),
 ) -> FineDetail:
+    from app.approvals.inbox import check
+
+    await check(db, "FINE_REQUEST", current_user, fine_id)       # fine.issue as always, or whom a rule names
     fine = await FineService(db).approve(fine_id, actor_id=current_user.id, note=payload.note)
     return await _to_detail(db, fine)
 
@@ -170,9 +173,12 @@ async def approve_fine(
 async def reject_fine(
     fine_id: uuid.UUID,
     payload: FineRejectRequest,
-    current_user: CurrentUser = Depends(require_permission(Permissions.FINE_ISSUE)),
+    current_user: CurrentUser = Depends(get_current_user),
     db=Depends(get_db),
 ) -> FineDetail:
+    from app.approvals.inbox import check
+
+    await check(db, "FINE_REQUEST", current_user, fine_id)
     fine = await FineService(db).reject(fine_id, actor_id=current_user.id, note=payload.note)
     return await _to_detail(db, fine)
 

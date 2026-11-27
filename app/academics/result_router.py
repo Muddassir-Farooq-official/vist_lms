@@ -103,14 +103,20 @@ async def review(offering_id: uuid.UUID, current_user: CurrentUser = Depends(app
 
 
 @router.post("/sheets/{offering_id}/approve", summary="Approve a submitted sheet (approver)")
-async def approve(offering_id: uuid.UUID, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
+async def approve(offering_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    from app.approvals.inbox import check
+
+    await check(db, "RESULT_APPROVE", current_user, offering_id)   # result.approve as always, or whom a rule names
     service = ResultSheetService(db)
     await service.approve(offering_id, actor_id=current_user.id)
     return await service.detail(offering_id)
 
 
 @router.post("/sheets/{offering_id}/return", summary="Send a sheet back to the teacher with a reason (approver)")
-async def return_sheet(offering_id: uuid.UUID, payload: ReturnIn, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
+async def return_sheet(offering_id: uuid.UUID, payload: ReturnIn, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    from app.approvals.inbox import check
+
+    await check(db, "RESULT_APPROVE", current_user, offering_id)
     service = ResultSheetService(db)
     await service.return_sheet(offering_id, actor_id=current_user.id, reason=payload.reason)
     return await service.detail(offering_id)

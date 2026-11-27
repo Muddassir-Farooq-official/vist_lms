@@ -8,6 +8,7 @@
 <div class="portal-tabs" role="tablist" data-auto-tabs>
   <button class="portal-tab active" data-tab="roles" role="tab" aria-selected="true"><span>Roles</span></button>
   <button class="portal-tab" data-tab="people" role="tab" aria-selected="false"><span>People</span></button>
+  <button class="portal-tab" data-tab="approvals" role="tab" aria-selected="false"><span>Approvals</span></button>
   <button class="portal-tab" data-tab="who" role="tab" aria-selected="false"><span>Who can&hellip;</span></button>
   <button class="portal-tab" data-tab="waiting" role="tab" aria-selected="false"><span>To confirm <b class="ac-count" id="ac-wait-count" hidden></b></span></button>
   <button class="portal-tab" data-tab="history" role="tab" aria-selected="false"><span>History</span></button>
@@ -36,6 +37,23 @@
     <p class="empty-state">Choose a person on the left. Students, parents and alumni keep their own portals; rights are given to staff.</p>
   </section>
 </div>
+
+<!-- ============================================================ approval rules -->
+<section data-tab-panel="approvals" hidden>
+  <div class="sh-card">
+    <h2 class="panel-title">Who approves what</h2>
+    <p class="panel-hint">For each kind of request, choose whether it needs approval and who gives it: as the system does now, anyone with a role (e.g. Principal), one person, the head of the department concerned, or the course's own teacher. A rule can be only for people with one role (e.g. Accounts Officer) and from an amount (e.g. Rs. 5,000 and above). The most specific rule wins. Nobody approves their own request, and an Administrator can always decide so nothing gets stuck. Rules about money wait for a second administrator.</p>
+    <div class="ac-try">
+      <strong>Try it:</strong>
+      <select id="ap-try-action" class="select-input small-input" aria-label="Kind of request"></select>
+      <select id="ap-try-user" class="select-input small-input" aria-label="Who asks"></select>
+      <input id="ap-try-amount" class="text-input small-input" type="number" min="0" placeholder="Amount (Rs.)" aria-label="Amount" />
+      <button type="button" class="role-btn secondary-btn small-btn" id="ap-try-btn">Who decides?</button>
+      <span id="ap-try-out" class="cc-meta"></span>
+    </div>
+  </div>
+  <div id="ap-actions" class="ap-actions"></div>
+</section>
 
 <!-- ============================================================ who can -->
 <section data-tab-panel="who" class="sh-card" hidden>

@@ -459,6 +459,90 @@
     });
   }
 
+  // ------------------------------------------------------------------ approval rules
+  let ap = null, staff = [];
+  async function loadRules() {
+    const [r, p] = await Promise.all([VA.fetchJson(API + "/approval-rules", { quiet: true }), VA.fetchJson(API + "/people", { quiet: true })]);
+    if (!r.ok) return;
+    ap = r.body;
+    staff = p.ok ? p.body : [];
+    $("ap-try-action").innerHTML = ap.actions.map(function (a) { return '<option value="' + a.key + '">' + esc(a.label) + "</option>"; }).join("");
+    $("ap-try-user").innerHTML = staff.map(function (x) { return '<option value="' + esc(x.user_id) + '">' + esc(x.name) + "</option>"; }).join("");
+    drawRules();
+  }
+  function roleOpts(sel, anyLabel) {
+    return (anyLabel ? '<option value="">' + esc(anyLabel) + "</option>" : "") + ap.roles.map(function (r) {
+      return '<option value="' + esc(r.code) + '"' + (sel === r.code ? " selected" : "") + ">" + esc(r.name) + "</option>";
+    }).join("");
+  }
+  function ruleRow(a, r, i) {
+    const t = r.mode === "NONE" ? "NONE" : (r.approver_type || "DEFAULT");
+    const val = t === "ROLE" ? '<select class="select-input small-input" data-k="role_value">' + roleOpts(r.approver_value) + "</select>" :
+      t === "USER" ? '<select class="select-input small-input" data-k="user_value">' + staff.map(function (x) {
+        return '<option value="' + esc(x.user_id) + '"' + (String(r.approver_value) === String(x.user_id) ? " selected" : "") + ">" + esc(x.name) + "</option>"; }).join("") + "</select>" : "";
+    return '<tr data-i="' + i + '"><td><select class="select-input small-input" data-k="requester_role">' + roleOpts(r.requester_role, "Anyone") + "</select></td>" +
+      (a.amount ? '<td><input class="text-input small-input" type="number" min="0" step="1" data-k="min_amount" value="' + (r.min_amount == null ? "" : r.min_amount) + '" placeholder="any amount"></td>' : "") +
+      '<td><select class="select-input small-input" data-k="type">' +
+      (a.allow_none ? '<option value="NONE"' + (t === "NONE" ? " selected" : "") + ">No approval needed</option>" : "") +
+      a.approvers.map(function (x) { return '<option value="' + x + '"' + (t === x ? " selected" : "") + ">" + esc(x === "DEFAULT" ? "Approved as now (" + a.default_text + ")" : ap.approver_labels[x]) + "</option>"; }).join("") +
+      "</select> " + val + '</td><td><button type="button" class="link-btn" data-del>Remove</button></td></tr>';
+  }
+  function drawRules() {
+    const groups = {};
+    ap.actions.forEach(function (a) { (groups[a.group] = groups[a.group] || []).push(a); });
+    $("ap-actions").innerHTML = Object.keys(groups).map(function (g) {
+      return '<h3 class="ac-h3">' + esc(g) + "</h3>" + groups[g].map(function (a) {
+        return '<div class="sh-card ap-card" data-action="' + a.key + '"><div class="ac-ed-head"><div><strong>' + esc(a.label) + "</strong><small class=\"muted\"> " + esc(a.about) +
+          "</small><p class=\"panel-hint\">Without rules: " + esc(a.default_text) + ".</p></div>" + (a.amount ? '<span class="ac-tag" title="Rules about money wait for a second administrator">2nd admin</span>' : "") + "</div>" +
+          '<div class="table-scroll"><table class="dash-table ap-rules"><thead><tr><th>When asked by</th>' + (a.amount ? "<th>From amount (Rs.)</th>" : "") +
+          "<th>Then</th><th></th></tr></thead><tbody>" + a.rules.map(function (r, i) { return ruleRow(a, r, i); }).join("") + "</tbody></table></div>" +
+          (a.rules.length ? "" : '<p class="muted ap-none">No rules: works as the system does now.</p>') +
+          '<div class="ac-save"><button type="button" class="role-btn secondary-btn small-btn" data-add>Add a rule</button> <button type="button" class="role-btn small-btn" data-save>Save</button></div></div>';
+      }).join("");
+    }).join("");
+  }
+  function readCard(card) {
+    const a = ap.actions.find(function (x) { return x.key === card.getAttribute("data-action"); });
+    return Array.prototype.map.call(card.querySelectorAll("tbody tr"), function (tr) {
+      const get = function (k) { const el = tr.querySelector('[data-k="' + k + '"]'); return el ? el.value : null; };
+      const t = get("type");
+      return { requester_role: get("requester_role") || null, min_amount: a.amount && get("min_amount") !== "" ? Number(get("min_amount")) : null,
+        mode: t === "NONE" ? "NONE" : "APPROVE", approver_type: t === "NONE" ? null : t,
+        approver_value: t === "ROLE" ? get("role_value") : t === "USER" ? get("user_value") : null };
+    });
+  }
+  $("ap-actions").addEventListener("change", function (e) {
+    if (e.target.getAttribute("data-k") !== "type") return;
+    const card = e.target.closest("[data-action]"), a = ap.actions.find(function (x) { return x.key === card.getAttribute("data-action"); });
+    a.rules = readCard(card);
+    drawRules();
+  });
+  $("ap-actions").addEventListener("click", async function (e) {
+    const card = e.target.closest("[data-action]");
+    if (!card) return;
+    const a = ap.actions.find(function (x) { return x.key === card.getAttribute("data-action"); });
+    if (e.target.closest("[data-add]")) {
+      a.rules = readCard(card).concat([{ requester_role: null, min_amount: null, mode: "APPROVE", approver_type: "ROLE", approver_value: (ap.roles[0] || {}).code }]);
+      drawRules();
+    } else if (e.target.closest("[data-del]")) {
+      const i = +e.target.closest("tr").getAttribute("data-i");
+      a.rules = readCard(card); a.rules.splice(i, 1);
+      drawRules();
+    } else if (e.target.closest("[data-save]")) {
+      const rules = readCard(card);
+      if (!(await VA.confirm("Save who approves " + a.label + "? It applies to new requests and to those still waiting.", "Save"))) return;
+      const r = await VA.fetchJson(API + "/approval-rules/" + a.key, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rules: rules }) });
+      if (done(r, "Approvals for " + a.label)) { loadRules(); loadHistory(); loadWaiting(); }
+    }
+  });
+  $("ap-try-btn").addEventListener("click", async function () {
+    const amt = $("ap-try-amount").value;
+    const r = await VA.fetchJson(API + "/approval-rules/" + $("ap-try-action").value + "/try", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: $("ap-try-user").value, amount: amt === "" ? null : Number(amt) }) });
+    $("ap-try-out").textContent = r.ok ? (r.body.no_approval ? "No approval needed." : "Decided by: " + r.body.text + (r.body.people.length ? " (" + r.body.people.join(", ") + ")" : "") +
+      (r.body.note ? " " + r.body.note : "")) : errOf(r, "Could not check.");
+  });
+
   // ------------------------------------------------------------------ who can do this?
   function fillWho() {
     const sel = $("ac-who-code");
@@ -539,6 +623,7 @@
     load();
     loadPeople();
     loadHistory();
+    loadRules();
     const want = new URLSearchParams(location.search).get("user");
     if (want) { VA.showTab("people"); openPerson(want); }
   }, { once: true });

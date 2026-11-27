@@ -32,8 +32,9 @@ async def count(current_user: CurrentUser = Depends(decide_perm), db=Depends(get
 
 
 @router.post("/{request_id}/decide", summary="Approve (carries the action out) or reject a request; never your own")
-async def decide(request_id: uuid.UUID, body: DecisionIn, current_user: CurrentUser = Depends(decide_perm), db=Depends(get_db)) -> dict:
-    r = await ApprovalService(db).decide(request_id, approve=body.approve, note=body.note, actor_id=current_user.id)
+async def decide(request_id: uuid.UUID, body: DecisionIn, current_user: CurrentUser = Depends(get_current_user), db=Depends(get_db)) -> dict:
+    # approvals.decide as always; or the person an approval rule names (checked in the service)
+    r = await ApprovalService(db).decide(request_id, approve=body.approve, note=body.note, actor_id=current_user.id, user=current_user)
     return {"id": r.id, "status": r.status, "result": r.result}
 
 

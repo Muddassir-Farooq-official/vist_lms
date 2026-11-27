@@ -507,7 +507,7 @@ class AccessService:
         return [{"id": r.id, "kind": r.kind, "target": r.target_label, "target_type": r.target_type, "summary": r.summary,
                  "by": names.get(r.actor_id), "at": r.created_at, "undone_at": r.undone_at, "undone_by": names.get(r.undone_by),
                  "undo_of": r.undo_of, "confirmed_by_second_admin": r.approval_request_id is not None,
-                 "can_undo": r.undone_at is None and r.kind in ("ROLE_RIGHTS", "PERSON_RIGHTS", "PERSON_ROLES", "ROLE_CREATED")} for r in rows]
+                 "can_undo": r.undone_at is None and r.kind in ("ROLE_RIGHTS", "PERSON_RIGHTS", "PERSON_ROLES", "ROLE_CREATED", "APPROVAL_RULES")} for r in rows]
 
     async def undo(self, change_id, *, actor_id) -> dict:
         ch = await self.session.get(AccessChange, uuid.UUID(str(change_id)))
@@ -522,6 +522,8 @@ class AccessService:
         elif ch.kind == "PERSON_ROLES":
             result = await self.set_person_roles((ch.before or {})["employee_id"], (ch.before or {}).get("extra_roles", []),
                                                  actor_id=actor_id, undo_of=ch.id)
+        elif ch.kind == "APPROVAL_RULES":
+            result = await self.set_rules((ch.before or {})["action"], (ch.before or {}).get("rules", []), actor_id=actor_id, undo_of=ch.id)
         elif ch.kind == "ROLE_CREATED":
             role = await self.session.get(Role, ch.target_id)
             if role is None:
@@ -562,6 +564,8 @@ class AccessService:
         elif op == "person":
             user = await self._staff_user(payload["user_id"])
             ch = await self._apply_person(user, self._clean_overrides(payload["overrides"]), actor_id=who, approval_id=approval_id, undo_of=undo_of)
+        elif op == "approval_rules":
+            ch = await self._apply_rules(payload["action"], payload["rules"], actor_id=who, approval_id=approval_id, undo_of=undo_of)
         elif op == "person_roles":
             from app.employees.models import Employee
 
@@ -667,6 +671,143 @@ class AccessService:
                 results.append({"employee_id": str(emp_id), "name": name, "ok": False, "message": msg[:200]})
         return {"results": results, "done": sum(1 for r in results if r["ok"] and not r.get("waiting")),
                 "waiting": sum(1 for r in results if r.get("waiting")), "failed": sum(1 for r in results if not r["ok"])}
+
+    # ------------------------------------------------------------------ approval rules (who approves what)
+    async def rules_overview(self) -> dict:
+        from app.access.models import ApprovalRule
+        from app.approvals import rules as R
+
+        rows = (await self.session.execute(select(ApprovalRule).order_by(ApprovalRule.action, ApprovalRule.requester_role, ApprovalRule.min_amount))).scalars().all()
+        role_names = dict((await self.session.execute(select(Role.code, Role.name))).all())
+        names = await self._names({uuid.UUID(r.approver_value) for r in rows if r.approver_type == "USER" and r.approver_value})
+        by: dict = {}
+        for r in rows:
+            by.setdefault(r.action, []).append({
+                "id": r.id, "requester_role": r.requester_role, "requester_name": role_names.get(r.requester_role) if r.requester_role else "Anyone",
+                "min_amount": float(r.min_amount) if r.min_amount is not None else None, "mode": r.mode, "approver_type": r.approver_type,
+                "approver_value": r.approver_value, "note": r.note, "text": await R.describe(self.session, r),
+                "approver_name": (role_names.get(r.approver_value) if r.approver_type == "ROLE" else
+                                  names.get(uuid.UUID(r.approver_value)) if r.approver_type == "USER" and r.approver_value else None)})
+        return {"actions": [{"key": a.key, "label": a.label, "group": a.group, "about": a.about, "amount": a.amount, "approvers": list(a.approvers),
+                             "allow_none": a.allow_none, "default_text": a.default_text, "rules": by.get(a.key, [])} for a in R.ACTIONS],
+                "approver_labels": R.APPROVER_LABELS,
+                "roles": [{"code": c, "name": n} for c, n in sorted(role_names.items(), key=lambda x: x[1]) if c not in NOT_STAFF]}
+
+    async def _clean_rules(self, action: str, items: list[dict]) -> list[dict]:
+        from decimal import Decimal, InvalidOperation
+
+        from app.approvals import rules as R
+
+        a = R.BY_KEY.get(action)
+        if a is None:
+            raise ValidationAppError("Unknown kind of action.")
+        roles = set((await self.session.execute(select(Role.code))).scalars())
+        out, seen = [], set()
+        for it in items or []:
+            role = (it.get("requester_role") or None)
+            if role and (role not in roles or role in NOT_STAFF):
+                raise ValidationAppError(f"Unknown or non-staff role: {role}.")
+            amt = it.get("min_amount")
+            if amt in ("", None):
+                amt = None
+            else:
+                if not a.amount:
+                    raise ValidationAppError(f"{a.label} has no amount, so a rule cannot depend on one.")
+                try:
+                    amt = Decimal(str(amt)).quantize(Decimal("0.01"))
+                except (InvalidOperation, ValueError) as exc:
+                    raise ValidationAppError("The amount is not a number.") from exc
+                if amt < 0:
+                    raise ValidationAppError("The amount cannot be negative.")
+            mode = (it.get("mode") or "APPROVE").upper()
+            if mode not in ("NONE", "APPROVE"):
+                raise ValidationAppError("A rule either needs no approval or names who approves.")
+            if mode == "NONE" and not a.allow_none:
+                raise ValidationAppError(f"{a.label} always needs approval.")
+            atype = None if mode == "NONE" else (it.get("approver_type") or "DEFAULT").upper()
+            value = None
+            if atype is not None:
+                if atype not in a.approvers:
+                    raise ValidationAppError(f"{a.label} cannot be approved by: {R.APPROVER_LABELS.get(atype, atype)}.")
+                if atype == "ROLE":
+                    value = (it.get("approver_value") or "").strip().upper()
+                    if value not in roles or value in NOT_STAFF:
+                        raise ValidationAppError("Choose the role that approves.")
+                elif atype == "USER":
+                    value = str(it.get("approver_value") or "").strip()
+                    await self._staff_user(value)                         # a staff account
+            key = (role, str(amt) if amt is not None else None)
+            if key in seen:
+                raise ValidationAppError("Two rules are for the same people and amount; keep one.")
+            seen.add(key)
+            out.append({"requester_role": role, "min_amount": str(amt) if amt is not None else None, "mode": mode, "approver_type": atype,
+                        "approver_value": value, "note": (it.get("note") or "").strip()[:200] or None})
+        return sorted(out, key=lambda r: (r["requester_role"] or "", float(r["min_amount"] or 0)))
+
+    async def _current_rules(self, action: str) -> list[dict]:
+        from app.access.models import ApprovalRule
+
+        rows = (await self.session.execute(select(ApprovalRule).where(ApprovalRule.action == action))).scalars().all()
+        return sorted([{"requester_role": r.requester_role, "min_amount": str(r.min_amount) if r.min_amount is not None else None, "mode": r.mode,
+                        "approver_type": r.approver_type, "approver_value": r.approver_value, "note": r.note} for r in rows],
+                      key=lambda r: (r["requester_role"] or "", float(r["min_amount"] or 0)))
+
+    async def set_rules(self, action: str, items: list[dict], *, actor_id, undo_of=None) -> dict:
+        from app.approvals import rules as R
+
+        wanted = await self._clean_rules(action, items)
+        current = await self._current_rules(action)
+        if wanted == current:
+            return {"done": True, "changed": False}
+        a = R.BY_KEY[action]
+        summary = f"Approvals for {a.label}: " + (f"{len(wanted)} rule(s)" if wanted else "back to the standard")
+        sensitive = [a.label] if a.amount else []                 # who approves money waits for a second administrator
+        payload = {"op": "approval_rules", "action": action, "rules": wanted, "undo_of": str(undo_of) if undo_of else None}
+        waiting = await self._wait_or_go(actor_id=actor_id, payload=payload, summary=summary, sensitive=sensitive)
+        if waiting is not None:
+            return {"done": False, "waiting": True, "approval_request_id": waiting.id, "message": "Saved for a second administrator to confirm."}
+        await self._apply_rules(action, wanted, actor_id=actor_id, undo_of=undo_of)
+        return {"done": True, "changed": True}
+
+    async def _apply_rules(self, action: str, wanted: list[dict], *, actor_id, approval_id=None, undo_of=None) -> AccessChange:
+        from decimal import Decimal
+
+        from app.access.models import ApprovalRule
+        from app.approvals import rules as R
+
+        before = await self._current_rules(action)
+        for r in (await self.session.execute(select(ApprovalRule).where(ApprovalRule.action == action))).scalars().all():
+            await self.session.delete(r)
+        await self.session.flush()
+        for w in wanted:
+            self.session.add(ApprovalRule(action=action, requester_role=w["requester_role"],
+                                          min_amount=Decimal(w["min_amount"]) if w["min_amount"] is not None else None, mode=w["mode"],
+                                          approver_type=w["approver_type"], approver_value=w["approver_value"], note=w["note"], created_by=actor_id))
+        await self.session.flush()
+        R.forget()
+        a = R.BY_KEY[action]
+        lines = []
+        for r in (await self.session.execute(select(ApprovalRule).where(ApprovalRule.action == action))).scalars().all():
+            who = "anyone" if not r.requester_role else r.requester_role
+            lines.append(f"{who}{' from Rs. ' + format(float(r.min_amount), ',.0f') if r.min_amount is not None else ''}: {await R.describe(self.session, r)}")
+        return await self._record(kind="APPROVAL_RULES", target_type="RULES", target_id=None, label=a.label,
+                                  summary=f"Approvals for {a.label}: " + ("; ".join(lines) if lines else "back to the standard"),
+                                  before={"action": action, "rules": before}, after={"action": action, "rules": wanted}, actor_id=actor_id,
+                                  approval_id=approval_id, undo_of=undo_of)
+
+    async def try_rule(self, action: str, *, user_id, amount=None) -> dict:
+        from app.approvals import rules as R
+
+        if action not in R.BY_KEY:
+            raise ValidationAppError("Unknown kind of action.")
+        uid = uuid.UUID(str(user_id))
+        res = await R.effective(self.session, action, requester_id=uid, amount=amount,
+                                ctx={"department": await R.department_of(self.session, uid)})
+        ids = await R.approvers(self.session, res, requester_id=uid, ctx={"department": await R.department_of(self.session, uid)})
+        names = await self._names(ids)
+        return {"no_approval": res.no_approval, "text": res.text, "people": sorted(names.get(i, "?") for i in ids),
+                "note": "Course-teacher rules depend on the class, so they are shown when a real request is made." if res.approver_type == "COURSE_TEACHER" else None}
+
 
 
 async def end_date_round(session: AsyncSession) -> int:

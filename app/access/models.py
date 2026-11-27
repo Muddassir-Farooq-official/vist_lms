@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
+from decimal import Decimal
 
-from sqlalchemy import JSON, CheckConstraint, Date, DateTime, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import JSON, CheckConstraint, Date, DateTime, ForeignKey, Index, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base, TimestampMixin, UUIDPKMixin
@@ -59,3 +60,23 @@ class AccessChange(UUIDPKMixin, TimestampMixin, Base):
     undo_of: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     undone_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     undone_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ApprovalRule(UUIDPKMixin, TimestampMixin, Base):
+    """Who approves one kind of action (app/approvals/rules.py). requester_role None = anyone; min_amount None = any
+    amount. mode NONE = no approval needed; APPROVE = approver_type decides: DEFAULT (as the system does without rules),
+    ROLE (anyone holding approver_value), USER (that person), HOD (head of the department concerned) or COURSE_TEACHER."""
+    __tablename__ = "approval_rules"
+    __table_args__ = (
+        CheckConstraint("mode IN ('NONE', 'APPROVE')", name="ck_approval_rules_mode"),
+        Index("ix_approval_rules_action", "action"),
+    )
+
+    action: Mapped[str] = mapped_column(String(40), nullable=False)
+    requester_role: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    min_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    mode: Mapped[str] = mapped_column(String(10), nullable=False)
+    approver_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    approver_value: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    note: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

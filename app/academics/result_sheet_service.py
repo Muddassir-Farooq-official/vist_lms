@@ -124,6 +124,19 @@ class ResultSheetService:
         self._need_complete(await self.completeness(offering_id), "submit")
         sheet.status, sheet.submitted_by, sheet.submitted_at, sheet.return_reason = ResultSheetStatus.SUBMITTED, actor_id, _now(), None
         await self.audit.log(actor_user_id=actor_id, action="result_sheet.submitted", entity_type="result_sheet", entity_id=sheet.id)
+        from app.approvals import rules
+        from app.approvals.inbox import _teacher_ctx
+
+        ctx = await _teacher_ctx(self.session, offering_id)
+        res = await rules.effective(self.session, "RESULT_APPROVE", requester_id=actor_id, ctx=ctx)
+        if res.no_approval:                               # approval rule: no approval needed -> approved now (publishing stays separate)
+            await rules.log_no_approval(self.session, "RESULT_APPROVE", actor_id=actor_id, entity_type="result_sheet", entity_id=sheet.id,
+                                        summary=f"{course.code} {offering.term_label}")
+            return await self.approve(offering_id, actor_id=actor_id, by_rule=True)
+        if not res.default:
+            await rules.tell_approvers(self.session, res, requester_id=actor_id, ctx=ctx, title=f"Marks submitted for approval: {course.code}",
+                                       message=f"{course.title} \u2014 Section {offering.section_label}, {offering.term_label}.")
+            return sheet
         exam_controllers = set((await self.session.execute(select(UserRole.user_id).join(Role, Role.id == UserRole.role_id).where(Role.code == Roles.EXAM_CONTROLLER))).scalars())
         for user, link in [(a, "/dashboard/admin/result-sheets") for a in await self._admin_ids()] + [(u, "/dashboard/exam") for u in exam_controllers]:
             if user != actor_id:
@@ -151,7 +164,7 @@ class ResultSheetService:
                                       message=f"{reason.strip()}", link="/dashboard/faculty/grading")
         return sheet
 
-    async def approve(self, offering_id: uuid.UUID, *, actor_id: uuid.UUID) -> ResultSheet:
+    async def approve(self, offering_id: uuid.UUID, *, actor_id: uuid.UUID, by_rule: bool = False) -> ResultSheet:
         offering, course = await self._offering(offering_id)
         sheet = await self._sheet(offering_id, (ResultSheetStatus.SUBMITTED,), "approved")
         # Separation of duties: the person who entered and submitted the marks (or teaches the
@@ -160,8 +173,9 @@ class ResultSheetService:
         from app.core.controls import four_eyes
 
         teacher_user = await self._teacher_user(offering)
-        alone = await four_eyes(self.session, actor_id, [sheet.submitted_by, teacher_user], Permissions.RESULT_APPROVE,
-                                "You submitted or teach these marks, so another approver (exam office or administration) must approve them.")
+        alone = False if by_rule else await four_eyes(
+            self.session, actor_id, [sheet.submitted_by, teacher_user], Permissions.RESULT_APPROVE,
+            "You submitted or teach these marks, so another approver (exam office or administration) must approve them.")
         self._need_complete(await self.completeness(offering_id), "approve")
         sheet.status, sheet.approved_by, sheet.approved_at = ResultSheetStatus.APPROVED, actor_id, _now()
         await self.audit.log(actor_user_id=actor_id, action="result_sheet.approved", entity_type="result_sheet", entity_id=sheet.id,

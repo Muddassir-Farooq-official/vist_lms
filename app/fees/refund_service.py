@@ -80,6 +80,17 @@ class RefundService:
         self.session.add(r)
         await self.session.flush()
         await self._audit(actor_id, "fee_refund.requested", r, {"amount": amount, "write_off": write_off, "kind": kind.value})
+        from app.approvals import rules
+
+        ctx = {"department": await rules.department_of(self.session, actor_id)}
+        res = await rules.effective(self.session, "REFUND", requester_id=actor_id, amount=amount, ctx=ctx)
+        if res.no_approval:                               # approval rule: no approval needed for this amount -> approved now
+            await rules.log_no_approval(self.session, "REFUND", actor_id=actor_id, entity_type="fee_refund", entity_id=r.id,
+                                        summary=f"Refund Rs. {amount:,.2f}")
+            return await self.decide(r.id, approve=True, note="No approval needed (approval rule).", actor_id=actor_id, by_rule=True)
+        if not res.default:
+            await rules.tell_approvers(self.session, res, requester_id=actor_id, ctx=ctx, title="Refund to approve",
+                                       message=f"Rs. {amount:,.2f}: {reason.strip()}")
         return r
 
     async def _check_amounts(self, assignment_id: uuid.UUID, amount: float, write_off: float) -> None:
@@ -101,11 +112,11 @@ class RefundService:
                 details={k: v for k, v in p.items() if k != "fee_assignment_id"} | {"refundable": refundable})
 
     # ---------------------------------------------------------------- 2. decide
-    async def decide(self, refund_id: uuid.UUID, *, approve: bool, note: str | None, actor_id: uuid.UUID) -> FeeRefund:
+    async def decide(self, refund_id: uuid.UUID, *, approve: bool, note: str | None, actor_id: uuid.UUID, by_rule: bool = False) -> FeeRefund:
         r = await self._get(refund_id)
         if r.status != RefundStatus.REQUESTED:
             raise BusinessRuleViolationError("This refund has already been decided.")
-        if r.requested_by == actor_id:
+        if r.requested_by == actor_id and not by_rule:
             raise AuthorizationError("The person who requested a refund cannot approve or reject it. Ask another administrator.")
         if not approve:
             if not (note or "").strip():
