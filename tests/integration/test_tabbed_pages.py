@@ -39,8 +39,8 @@ TABBED = {
     "/dashboard/admin/courses/offering/00000000-0000-0000-0000-000000000000": ["overview", "syllabus", "timetable", "sessions", "students"],
     "/dashboard/library/issue-return": ["issue", "issued"],
     "/dashboard/library/journals": ["journals", "eres"],
-    "/dashboard/admin/timetable": ["weekly", "slots", "periods", "rooms", "parallel"],
-    "/dashboard/admin/timetable/smart": ["draft", "sections", "teachers", "workload", "free"],
+    "/dashboard/admin/timetable": ["choose", "periods", "workload", "sections", "teachers", "draft", "weekly", "parallel", "free", "slots"],
+    "/dashboard/exam/timetable": ["choose", "periods", "workload", "sections", "teachers", "draft", "weekly", "parallel", "free", "slots"],
     "/dashboard/student/timetable": ["weekly", "upcoming"],
     "/dashboard/faculty/timetable": ["weekly", "upcoming", "extra", "avail"],
 }

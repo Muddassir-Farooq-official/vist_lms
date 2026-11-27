@@ -1,5 +1,28 @@
 [
   {
+    "version": "1.63.0",
+    "date": "2026-11-24",
+    "title": "Timetable wizard",
+    "summary": "One step-by-step Timetable page with a guided tour, a safe way to clear a timetable and remake it, and the exam department can run it.",
+    "changes": [
+      {
+        "kind": "improved",
+        "for": "Administrators",
+        "text": "Timetable and Smart timetable are now one page with six numbered steps, a ✓ / ! on each step, a readiness checklist, Back / Next and a guided tour. The batches you choose are carried into every step."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Timetable → Start again: clear the timetable of chosen batches from a date, to remake it from scratch. Each batch from its own start until its own end; classes before the date and classes with attendance are never touched. Preview first, then type CLEAR."
+      },
+      {
+        "kind": "new",
+        "for": "Exam office",
+        "text": "Timetable: make, clear and publish the weekly class timetable, with periods, rooms, teachers' free times and workload, the same as the administration."
+      }
+    ]
+  },
+  {
     "version": "1.62.0",
     "date": "2026-11-22",
     "title": "Regulator returns",

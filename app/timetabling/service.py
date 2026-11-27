@@ -558,7 +558,8 @@ class SmartTimetableService:
         return {"published_from": from_date, "slots_replaced": len(live), "draft_classes": len(rows), "class_sessions_created": created,
                 "told": told, "skipped_ended_sections": len(ending)}
 
-    async def _notify(self, offerings, notify: set[str], draft: TimetableDraft, from_date: date) -> dict:
+    async def _notify(self, offerings, notify: set[str], draft: TimetableDraft | None, from_date: date, *, terms_text: str | None = None,
+                      cleared: bool = False) -> dict:
         from app.academics.models import Enrollment, EnrollmentStatus
         from app.employees.models import Employee
         from app.notifications.models import NotificationCategory
@@ -567,15 +568,24 @@ class SmartTimetableService:
         from app.students.models import Student
 
         ids = [o.id for o in offerings]
-        terms = ", ".join(draft.terms)
+        terms = terms_text or ", ".join(draft.terms if draft else [])
         when = from_date.strftime("%d %b %Y")
+        if cleared:
+            title = "Timetable being remade"
+            teacher_msg = f"The weekly timetable for {terms} is cleared from {when} while a new one is made. You will be told when it is ready."
+            student_msg = f"Your weekly timetable for {terms} is being remade from {when}. You will be told when the new one is ready."
+            parent_msg = f"Your child's weekly timetable for {terms} is being remade from {when}."
+        else:
+            title = "New timetable"
+            teacher_msg = f"The timetable for {terms} has been updated from {when}. Open My Timetable to see your classes."
+            student_msg = f"Your timetable for {terms} has changed from {when}. Open My Timetable to see it."
+            parent_msg = f"Your child's timetable for {terms} has changed from {when}."
         out = {}
         if "teachers" in notify:
             users = set((await self.session.execute(select(Employee.user_id).where(
                 Employee.id.in_({o.assigned_teacher_id for o in offerings if o.assigned_teacher_id}), Employee.user_id.is_not(None)))).scalars())
             for uid in users:
-                await create_notification(self.session, user_id=uid, category=NotificationCategory.GENERAL, title="New timetable",
-                                          message=f"The timetable for {terms} has been updated from {when}. Open My Timetable to see your classes.",
+                await create_notification(self.session, user_id=uid, category=NotificationCategory.GENERAL, title=title, message=teacher_msg,
                                           link="/dashboard/faculty/timetable")
             out["teachers"] = len(users)
         student_ids = set((await self.session.execute(select(Enrollment.student_id).where(
@@ -583,18 +593,135 @@ class SmartTimetableService:
         if "students" in notify and student_ids:
             users = set((await self.session.execute(select(Student.user_id).where(Student.id.in_(student_ids), Student.user_id.is_not(None)))).scalars())
             for uid in users:
-                await create_notification(self.session, user_id=uid, category=NotificationCategory.GENERAL, title="New timetable",
-                                          message=f"Your timetable for {terms} has changed from {when}. Open My Timetable to see it.",
+                await create_notification(self.session, user_id=uid, category=NotificationCategory.GENERAL, title=title, message=student_msg,
                                           link="/dashboard/student/timetable")
             out["students"] = len(users)
         if "parents" in notify and student_ids:
             users = set((await self.session.execute(select(ParentStudentLink.user_id).where(ParentStudentLink.student_id.in_(student_ids)))).scalars())
             for uid in users:
-                await create_notification(self.session, user_id=uid, category=NotificationCategory.GENERAL, title="New timetable",
-                                          message=f"Your child's timetable for {terms} has changed from {when}.",
+                await create_notification(self.session, user_id=uid, category=NotificationCategory.GENERAL, title=title, message=parent_msg,
                                           link="/dashboard/parent/timetable")
             out["parents"] = len(users)
         return out
+
+    # ================================================================== clearing the live timetable to start again
+    async def _clear_plan(self, terms: list[str], from_date: date) -> dict:
+        """Which sections are cleared and from which day. Every batch term has its own dates, so each section is cleared
+        from the later of the chosen date and its own term start, and a section whose term has ended is left alone.
+        A combined class is cleared in all its sections (it is one class), even when another section is in a term that
+        was not chosen; the plan says so."""
+        from app.academics.combined import members
+
+        terms = await self._terms(terms)
+        today = institute_today()
+        if from_date < today:
+            raise ValidationAppError("Clearing can start today or later. Classes that already happened are never changed.")
+        chosen = list((await self.session.execute(select(CourseOffering).where(
+            func.lower(CourseOffering.term_label).in_([t.lower() for t in terms])))).scalars())
+        offerings: dict = {o.id: o for o in chosen}
+        extra: dict = {}
+        for o in chosen:
+            for m in await members(self.session, o):
+                if m.id not in offerings:
+                    offerings[m.id] = m
+                    extra[m.id] = o
+        plan, ended = [], []
+        for o in offerings.values():
+            start = max(from_date, o.term_start_date or from_date)
+            if o.term_end_date is not None and o.term_end_date < start:
+                ended.append(o)
+                continue
+            plan.append((o, start))
+        return {"terms": terms, "plan": plan, "ended": ended, "extra": extra}
+
+    async def clear_preview(self, terms: list[str], from_date: date) -> dict:
+        """What clearing would do, per batch term. Nothing is changed."""
+        p = await self._clear_plan(terms, from_date)
+        keep = self.tt._KEEP_SQL
+        by_term: dict = {}
+        for o, start in p["plan"]:
+            slots = [x for x, in (await self.session.execute(select(TimetableSlot.id).where(TimetableSlot.course_offering_id == o.id))).all()]
+            row = {"slots": len(slots), "removed": 0, "kept_attendance": 0, "kept_cancelled": 0, "before": 0}
+            if slots:
+                r = (await self.session.execute(text(
+                    "SELECT count(*) FILTER (WHERE cs.session_date >= :d AND NOT " + keep + ") AS removed,"
+                    " count(*) FILTER (WHERE cs.session_date >= :d AND cs.attendance_taken_at IS NOT NULL) AS kept_attendance,"
+                    " count(*) FILTER (WHERE cs.session_date >= :d AND cs.status = 'SCHEDULED' AND cs.attendance_taken_at IS NULL AND " + keep + ") AS kept_cancelled,"
+                    " count(*) FILTER (WHERE cs.session_date < :d) AS before"
+                    " FROM class_sessions cs WHERE cs.timetable_slot_id = ANY(:slots)"), {"d": start, "slots": slots})).mappings().one()
+                row.update({k: int(r[k]) for k in row if k != "slots"})
+            t = by_term.setdefault(o.term_label, {"term": o.term_label, "from": start, "until": o.term_end_date, "sections": 0, "slots": 0, "removed": 0,
+                                                  "kept_attendance": 0, "kept_cancelled": 0, "before": 0, "combined_from": set()})
+            t["from"] = min(t["from"], start)
+            t["sections"] += 1
+            for k in ("slots", "removed", "kept_attendance", "kept_cancelled", "before"):
+                t[k] += row[k]
+            if o.id in p["extra"]:
+                t["combined_from"].add(p["extra"][o.id].term_label)
+        rows = sorted(by_term.values(), key=lambda x: x["term"])
+        for r in rows:
+            r["combined_from"] = sorted(r["combined_from"])
+            r["chosen"] = r["term"].lower() in {t.lower() for t in p["terms"]}
+        totals = {k: sum(r[k] for r in rows) for k in ("sections", "slots", "removed", "kept_attendance", "kept_cancelled", "before")}
+        return {"from_date": from_date, "terms": rows, "totals": totals,
+                "ended": sorted({o.term_label for o in p["ended"]}), "confirm_word": "CLEAR"}
+
+    async def clear(self, terms: list[str], *, from_date: date, notify: set[str], actor_id: uuid.UUID) -> dict:
+        """Take every weekly class pattern of the chosen terms off from the date (per section: from the later of the date
+        and its term start; finished terms untouched). Kept exactly as they are: every class before that day, and every
+        class that has attendance; a later class with a topic, files or marks is cancelled, never deleted; empty later
+        classes are removed. One-off extra and make-up classes are not touched. All or nothing; recorded."""
+        from app.notifications.changes import quiet
+
+        preview = await self.clear_preview(terms, from_date)
+        p = await self._clear_plan(terms, from_date)
+        removed_slots = 0
+        with quiet():
+            async with self.session.begin_nested():
+                for o, start in p["plan"]:
+                    for slot in list((await self.session.execute(select(TimetableSlot).where(TimetableSlot.course_offering_id == o.id))).scalars()):
+                        await self._retire(slot, start)
+                        removed_slots += 1
+                await self.session.flush()
+                self.tt._day_memo.clear()
+        offerings = [o for o, _start in p["plan"]]
+        told = await self._notify(offerings, notify, None, from_date, terms_text=", ".join(p["terms"]), cleared=True) if notify and offerings else {}
+        await self.audit.log(actor_user_id=actor_id, action="timetable.cleared", entity_type="timetable", entity_id=None,
+                             after={"terms": p["terms"], "from_date": str(from_date), "weekly_patterns_removed": removed_slots,
+                                    "classes_removed": preview["totals"]["removed"], "kept_with_attendance": preview["totals"]["kept_attendance"],
+                                    "kept_cancelled": preview["totals"]["kept_cancelled"], "ended_terms_untouched": preview["ended"], "told": told})
+        await self.session.flush()
+        return {**preview, "weekly_patterns_removed": removed_slots, "told": told}
+
+    # ================================================================== where the wizard stands
+    async def readiness(self, terms: list[str]) -> dict:
+        """What is in place for the chosen terms, for the wizard's step badges. Read only."""
+        terms = await self._terms(terms)
+        rows = (await self.session.execute(select(CourseOffering, Course).join(Course, Course.id == CourseOffering.course_id).where(
+            func.lower(CourseOffering.term_label).in_([t.lower() for t in terms])))).all()
+        ids = [o.id for o, _c in rows]
+        periods = list((await self.session.execute(select(Period))).scalars())
+        rooms = int((await self.session.execute(select(func.count()).select_from(Room).where(Room.is_active.is_(True)))).scalar_one())
+        teachers = {o.assigned_teacher_id for o, _c in rows if o.assigned_teacher_id}
+        avail = int((await self.session.execute(select(func.count()).select_from(TeacherAvailability).where(
+            TeacherAvailability.employee_id.in_(teachers or {uuid.uuid4()})))).scalar_one())
+        live = int((await self.session.execute(select(func.count()).select_from(TimetableSlot).where(
+            TimetableSlot.course_offering_id.in_(ids or [uuid.uuid4()])))).scalar_one())
+        with_slots = int((await self.session.execute(select(func.count(func.distinct(TimetableSlot.course_offering_id))).where(
+            TimetableSlot.course_offering_id.in_(ids or [uuid.uuid4()])))).scalar_one())
+        drafts = list((await self.session.execute(select(TimetableDraft).where(TimetableDraft.status != "DISCARDED")
+                                                  .order_by(TimetableDraft.created_at.desc()).limit(20))).scalars())
+        tl = {t.lower() for t in terms}
+        draft = next((d for d in drafts if {x.lower() for x in (d.terms or [])} & tl), None)
+        return {"terms": terms,
+                "periods": {"class": sum(1 for x in periods if x.holds_class), "breaks": sum(1 for x in periods if not x.holds_class)},
+                "rooms": rooms,
+                "sections": {"total": len(rows), "without_teacher": sum(1 for o, _c in rows if not o.assigned_teacher_id),
+                             "labs": sum(1 for o, _c in rows if o.double_period), "with_timetable": with_slots},
+                "teachers": {"total": len(teachers), "with_times": avail},
+                "live_weekly_patterns": live,
+                "draft": {"id": draft.id, "status": draft.status, "terms": draft.terms, "created_at": draft.created_at,
+                          "published_from": draft.published_from} if draft else None}
 
     # ================================================================== per-section settings
     async def sections(self, terms: list[str]) -> list[dict]:

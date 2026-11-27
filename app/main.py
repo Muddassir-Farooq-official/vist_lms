@@ -240,8 +240,8 @@ ADMIN_NAV_ITEMS = [
     _nav("transport", "Transport", "students", "/dashboard/admin/transport", group="Students", keywords="bus van route pick drop"),
     _nav("programs", "Programs", "programs", "/dashboard/admin/programs", group="Teaching & exams", keywords="degrees"),
     _nav("courses", "Courses", "graduation-cap", "/dashboard/admin/courses", group="Teaching & exams", mobile=True, keywords="subjects offerings sections terms sessions"),
-    _nav("timetable", "Timetable", "clock", "/dashboard/admin/timetable", group="Teaching & exams", keywords="periods rooms"),
-    _nav("smart-timetable", "Smart timetable", "grid", "/dashboard/admin/timetable/smart", group="Teaching & exams", keywords="workload free slots"),
+    _nav("timetable", "Timetable", "clock", "/dashboard/admin/timetable", group="Teaching & exams",
+         keywords="periods rooms smart generate draft publish clear workload free slots wizard"),
     _nav("substitutes", "Substitute teachers", "employees", "/dashboard/admin/substitutes", group="Teaching & exams", keywords="cover absent teacher"),
     _nav("clinical", "Clinical rotations", "students", "/dashboard/admin/clinical", group="Teaching & exams",
          keywords="hospital ward placement logbook nursing supervisor"),
@@ -412,6 +412,7 @@ EXAM_NAV_ITEMS = [
     _nav("result-types", "Result types", "exams", "/dashboard/exam/result-types", group="Exams"),
     _nav("datesheets", "Datesheets & admit cards", "clock", "/dashboard/exam/datesheets", group="Exams"),
     _nav("seating", "Seating & invigilation", "grid", "/dashboard/exam/seating", group="Exams"),
+    _nav("timetable", "Timetable", "clock", "/dashboard/exam/timetable", group="Exams", keywords="weekly classes periods rooms generate publish"),
     _nav("paper-files", "Exam paper files", "file", "/dashboard/exam/paper-files", group="Exams", keywords="question paper printing"),
     _nav("degrees", "Degrees & transcripts", "graduation-cap", "/dashboard/exam/degrees", group="Exams"),
     _nav("obe", "Outcomes (OBE)", "check-circle", "/dashboard/exam/obe", group="Exams"),
@@ -1248,7 +1249,8 @@ async def admin_courses_page(request: Request):
 
 @app.get("/dashboard/admin/timetable/smart", include_in_schema=False)
 async def admin_smart_timetable_page(request: Request):
-    return templates.TemplateResponse(request, "admin/smart_timetable.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "smart-timetable"})
+    """The old Smart timetable page is now step 6 of the Timetable wizard (old links and bookmarks keep working)."""
+    return RedirectResponse("/dashboard/admin/timetable#draft", status_code=302)
 
 
 @app.get("/dashboard/admin/timetable", include_in_schema=False)
@@ -1256,6 +1258,11 @@ async def admin_timetable_page(request: Request):
     return templates.TemplateResponse(
         request, "admin/timetable.html", {"nav_items": ADMIN_NAV_ITEMS, "active_nav": "timetable"}
     )
+
+
+@app.get("/dashboard/exam/timetable", include_in_schema=False)
+async def exam_timetable_page(request: Request):
+    return templates.TemplateResponse(request, "admin/timetable.html", {"nav_items": EXAM_NAV_ITEMS, "active_nav": "timetable"})
 
 
 @app.get("/dashboard/admin/attendance", include_in_schema=False)

@@ -46,8 +46,7 @@ From a student's or employee's record (or many at once from the list) print **ID
 
 - **Programs**: each program with its students and curriculum. (A school has **Classes & sections** here instead: classes, sections, class teachers and who teaches which subject.)
 - **Courses**: the course catalogue, curriculum placement, term offerings and materials. Academic terms are on the Academic terms tab.
-- **Timetable**: the weekly timetable for any class, semester, section or teacher, with PDF download. Tabs: weekly view, slots, **Daily periods**, **Rooms** and **Batches side by side**. Once rooms are listed, the timetable only accepts listed rooms big enough for the class.
-- **Smart timetable**: makes a whole term's timetable in one go as a draft, which you check, adjust and publish. See *Smart timetable* below.
+- **Timetable**: a step-by-step wizard that makes the weekly timetable of one or more batch terms (batches, periods & rooms, teachers, classes & labs, free times, make & publish), with a guided tour and a safe **Start again** that clears a timetable from a date. The tabs on the right show any timetable: weekly view (with PDF download), batches side by side, what is free, and all classes. Once rooms are listed, the timetable only accepts listed rooms big enough for the class. See *Timetable wizard* below. The exam department has the same Timetable page.
 - **Attendance**: classes nobody marked, teachers' correction requests, marking a register yourself, locking a course at the end of term, and holidays or approved leave. Students below the attendance minimum are barred from the final exam.
 - **Teacher Progress**: how far each teacher actually is through their course versus where they should be, from topics marked complete.
 - **Course feedback**: students' anonymous feedback on each course and teacher.
@@ -100,14 +99,18 @@ When every batch has its own term (*BSN 6th Fall 2026*, *BSN 4th Fall 2026*, *ML
 
 **Session report** (a session's **Report** on Courses → Academic terms → Sessions): one row per batch term with its sections, courses and students, attendance (average, and students below the minimum in at least one course), results (published, approved, with the approver, not sent yet) and fees for that term (charged, paid, still owed, of which overdue), and the session's totals. **Download as CSV** for Excel.
 
-### Smart timetable
+### Timetable wizard
 
-**Smart timetable** makes the timetable of one or more whole terms in one go. It never changes the live timetable by itself: you get a **draft**, and only **Publish** makes it live.
+**Timetable** makes the timetable of one or more batch terms, step by step. The steps are numbered along the top; each shows **✓** when it is ready and **!** when something needs a look, and every step ends with **Back** and **Next**. **Take the tour** (under the page title) walks you through the page; it starts by itself the first time.
 
-**Before the first run**
-1. Timetable → **Daily periods** and **Rooms**: the periods of the day, and every classroom, lab and hall with its seats. The smart timetable picks rooms from this list.
-2. Smart timetable → **Classes a week & labs**: each section gets as many classes a week as its credit hours; change that where needed. Tick **Lab (double)** for a lab or practical: each class is two back-to-back periods in a lab room. A **home room** is used whenever it is free. A combined class keeps the same settings in all its sections.
-3. Smart timetable → **Teachers' available times**: tick the periods a teacher cannot teach (visiting faculty, other duties) and, if needed, that teacher's own limits. Teachers can mark their own times under *My Timetable → My available times*. Tick **Fixed by the administration** to stop a teacher changing them.
+1. **Batches**: tick the batch terms you are making the timetable for (usually every batch of one session, which share teachers and rooms). Each batch keeps its own start and end dates, so semesters that do not run in parallel work too. Your choice is remembered and carried into every step. The checklist under it says what is in place for those batches; click a line to go to that step.
+2. **Periods & rooms**: the periods of the day, and every classroom, lab and hall with its seats. The timetable picks rooms from this list.
+3. **Teachers**: each teacher's weekly load, and the sections without a teacher (see *Teacher workload* below).
+4. **Classes & labs**: each section gets as many classes a week as its credit hours; change that where needed. Tick **Lab (double)** for a lab or practical: each class is two back-to-back periods in a lab room. A **home room** is used whenever it is free. A combined class keeps the same settings in all its sections.
+5. **Free times**: tick the periods a teacher cannot teach (visiting faculty, other duties) and, if needed, that teacher's own limits. Teachers can mark their own times under *My Timetable → My available times*. Tick **Fixed by the administration** to stop a teacher changing them.
+6. **Make & publish**: generate a draft, check and adjust it, and publish it from a date (below).
+
+**Start again: clear the current timetable** (on step 1). To remake a timetable from scratch, choose the date to clear from (today by default) and press **Show what will be cleared**. For every batch term you see the dates it is cleared from and until, its weekly classes, the empty classes that will be removed, the classes kept because they have attendance, the classes with a topic or files that are kept as cancelled, and the classes before the date (never touched). Each batch is cleared from the later of your date and its own start, and only up to its own end; a batch that has already finished is listed and left alone. A combined class is one class, so it is cleared in all its sections, also in a batch you did not tick (the table says so). Press **Clear…**, choose whom to tell (nobody by default: usually you tell them when you publish the new timetable) and type **CLEAR** to confirm. It is all or nothing and recorded in the activity log. One-off extra and make-up classes stay. Then go through steps 2–6.
 
 **Make the draft**
 1. On **Make & publish**, tick the term(s) to plan together and the teaching days (tick Saturday if you teach Saturdays). Set the teachers' limits: at most so many classes a day and so many periods in a row.
@@ -120,14 +123,14 @@ Press **Publish…**, choose the date the new timetable starts (next Monday by d
 
 ### Teacher workload and what is free
 
-**Teacher workload** (a tab on Smart timetable): tick the term(s) and press **Show workload**. For every teacher you see the credit hours a week they teach while those terms run (every section whose term dates overlap counts, so batch terms running together add up; a combined class counts once), their periods a week on the timetable, and whether they are **Over**, **OK** or **Under** their range.
+**Teacher workload** (step 3, *Teachers*, of the Timetable): tick the term(s) and press **Show workload**. For every teacher you see the credit hours a week they teach while those terms run (every section whose term dates overlap counts, so batch terms running together add up; a combined class counts once), their periods a week on the timetable, and whether they are **Over**, **OK** or **Under** their range.
 
 - The range is 12 to 18 credit hours a week by default: change it under Settings → **Teaching load**. A teacher can have their own range (e.g. a head of department 6–9, a visiting teacher 3–6): type it in their row; leave it empty for the institute's.
 - Giving a teacher a section that takes them **above their most** is refused, both when you create the section and when you change its teacher. If it really must happen, type a reason and press **Allow and save**; the reason is kept in the activity log. Being under the least is only shown, never blocked.
 - When you choose a teacher for a section, the list shows the **suggested** teachers first: those who taught the course before or teach in its program, those under their least, then the least busy. Each shows their credit hours now → with this section, and their most. Teachers who would go over, or who are busy (or unavailable) at the section's times, are greyed.
 - **Propose teachers for them…** suggests a teacher for every section without one, keeping everyone within their most and free at the section's times. Untick any you don't want and press **Assign the ticked teachers** (all or nothing).
 
-**What is free** (a tab on Smart timetable): tick the term(s) and press **Show**. Each period shows how many rooms and teachers are free. Click it to see which rooms (with seats) and which teachers (least busy first; teachers who marked that period unavailable are left out) are free, e.g. to find a cover teacher or a room for an extra class. Choose **a class's free periods** to see one class's free periods in the week.
+**What is free** (a tab on the Timetable): tick the term(s) and press **Show**. Each period shows how many rooms and teachers are free. Click it to see which rooms (with seats) and which teachers (least busy first; teachers who marked that period unavailable are left out) are free, e.g. to find a cover teacher or a room for an extra class. Choose **a class's free periods** to see one class's free periods in the week.
 
 Not used in School mode: a school's subjects are not counted in credit hours.
 

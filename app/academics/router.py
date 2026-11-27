@@ -132,6 +132,12 @@ async def _can_manage_offering(db, offering: CourseOffering, current_user: Curre
     return Permissions.LECTURE_MANAGE in current_user.permissions
 
 
+async def _can_manage_timetable(current_user: CurrentUser) -> bool:
+    """Who may add, move or remove a section's weekly classes: the administration (LECTURE_MANAGE, as before) and
+    anyone given the timetable (TIMETABLE_MANAGE, e.g. the exam department). Content and single classes stay admin."""
+    return Permissions.LECTURE_MANAGE in current_user.permissions or Permissions.TIMETABLE_MANAGE in current_user.permissions
+
+
 async def _can_edit_content(db, offering: CourseOffering, current_user: CurrentUser) -> bool:
     """Who may change a course's CONTENT: syllabus, each class's topic, files
     and links. The admin, and the teacher assigned to this offering -- so the
@@ -1513,7 +1519,7 @@ async def remove_syllabus(
 async def _timetable_scope(db, current_user: CurrentUser) -> dict:
     """Who is asking decides what the weekly timetable shows: the admin sees the whole
     institute, a teacher only their own courses, a student only what they are enrolled in."""
-    if Permissions.ENROLLMENT_MANAGE in current_user.permissions:
+    if Permissions.ENROLLMENT_MANAGE in current_user.permissions or Permissions.TIMETABLE_MANAGE in current_user.permissions:
         return {"scope": "admin"}
     student = await StudentRepository(db).get_by_user_id(current_user.id)
     if student is not None:
@@ -1678,7 +1684,7 @@ async def timetable_book_pdf(
     summary="Every recurring timetable slot in the institute, in one list — admin only",
 )
 async def list_institute_timetable(
-    current_user: CurrentUser = Depends(require_permission(Permissions.ENROLLMENT_MANAGE)),
+    current_user: CurrentUser = Depends(require_any_permission(Permissions.TIMETABLE_MANAGE, Permissions.ENROLLMENT_MANAGE)),
     db=Depends(get_db),
 ) -> list[InstituteTimetableSlotOut]:
     slots = await TimetableService(db).slot_repo.list_all()
@@ -1718,7 +1724,7 @@ async def list_periods(
 @router.post("/periods", response_model=PeriodOut, status_code=201, summary="Define a new daily period — admin only")
 async def create_period(
     payload: PeriodCreateRequest,
-    current_user: CurrentUser = Depends(require_permission(Permissions.ENROLLMENT_MANAGE)),
+    current_user: CurrentUser = Depends(require_any_permission(Permissions.TIMETABLE_MANAGE, Permissions.ENROLLMENT_MANAGE)),
     db=Depends(get_db),
 ) -> PeriodOut:
     period = await PeriodService(db).create(
@@ -1733,7 +1739,7 @@ async def create_period(
 async def change_period(
     period_id: uuid.UUID,
     payload: PeriodChangeRequest,
-    current_user: CurrentUser = Depends(require_permission(Permissions.ENROLLMENT_MANAGE)),
+    current_user: CurrentUser = Depends(require_any_permission(Permissions.TIMETABLE_MANAGE, Permissions.ENROLLMENT_MANAGE)),
     db=Depends(get_db),
 ) -> dict:
     return await PeriodService(db).change(
@@ -1745,7 +1751,7 @@ async def change_period(
 @router.delete("/periods/{period_id}", status_code=204, summary="Remove a period — admin only")
 async def delete_period(
     period_id: uuid.UUID,
-    current_user: CurrentUser = Depends(require_permission(Permissions.ENROLLMENT_MANAGE)),
+    current_user: CurrentUser = Depends(require_any_permission(Permissions.TIMETABLE_MANAGE, Permissions.ENROLLMENT_MANAGE)),
     db=Depends(get_db),
 ) -> None:
     await PeriodService(db).delete(period_id, actor_id=current_user.id)
@@ -1762,8 +1768,8 @@ async def create_timetable_slot(
     db=Depends(get_db),
 ) -> TimetableSlotCreatedOut:
     offering = await CourseOfferingService(db).get(offering_id)
-    if not await _can_manage_offering(db, offering, current_user):
-        raise AuthorizationError("You are not the assigned teacher for this offering.")
+    if not await _can_manage_timetable(current_user):
+        raise AuthorizationError("Only the administration or the exam department can change the timetable.")
     slot, generated_count = await TimetableService(db).create_slot(
         course_offering_id=offering_id, period_id=payload.period_id, day_of_week=payload.day_of_week,
         room=payload.room, actor_id=current_user.id, starts_from=payload.starts_from,
@@ -1782,8 +1788,8 @@ async def auto_assign_timetable(
     db=Depends(get_db),
 ) -> AutoAssignResultOut:
     offering = await CourseOfferingService(db).get(offering_id)
-    if not await _can_manage_offering(db, offering, current_user):
-        raise AuthorizationError("You are not the assigned teacher for this offering.")
+    if not await _can_manage_timetable(current_user):
+        raise AuthorizationError("Only the administration or the exam department can change the timetable.")
     slots, generated_count = await TimetableService(db).auto_assign(
         course_offering_id=offering_id, sessions_per_week=payload.sessions_per_week,
         room=payload.room, actor_id=current_user.id, starts_from=payload.starts_from,
@@ -1823,8 +1829,8 @@ async def delete_timetable_slot(
     if slot is None:
         raise ResourceNotFoundError("Timetable slot not found.")
     offering = await CourseOfferingService(db).get(slot.course_offering_id)
-    if not await _can_manage_offering(db, offering, current_user):
-        raise AuthorizationError("You are not the assigned teacher for this offering.")
+    if not await _can_manage_timetable(current_user):
+        raise AuthorizationError("Only the administration or the exam department can change the timetable.")
     cancelled_count = await service.delete_slot(slot_id, actor_id=current_user.id)
     return {"future_sessions_cancelled": cancelled_count}
 
@@ -1835,8 +1841,8 @@ async def _slot_for_manager(db, slot_id: uuid.UUID, current_user: CurrentUser):
     if slot is None:
         raise ResourceNotFoundError("Timetable slot not found.")
     offering = await CourseOfferingService(db).get(slot.course_offering_id)
-    if not await _can_manage_offering(db, offering, current_user):
-        raise AuthorizationError("You are not the assigned teacher for this offering.")
+    if not await _can_manage_timetable(current_user):
+        raise AuthorizationError("Only the administration or the exam department can change the timetable.")
     return service, slot
 
 
