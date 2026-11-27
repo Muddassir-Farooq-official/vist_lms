@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.66.0",
+    "date": "2026-11-27",
+    "title": "Visiting faculty paid per lecture",
+    "summary": "Visiting faculty are paid for each lecture they take. The payslip shows every lecture not taken or covered by another teacher, with its date.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Accounts office",
+        "text": "Payroll → Visiting faculty: set a rate per lecture for each visiting teacher. A lecture counts when they mark its attendance. A lab double period counts as two lectures and a combined class as one; extra and make-up classes count too."
+      },
+      {
+        "kind": "new",
+        "for": "Accounts office",
+        "text": "The payslip earns every lecture held, then deducts the ones not taken, covered by another teacher or marked by the office, with their dates. Days absent and late marks do not apply. A lecture sheet PDF lists every lecture."
+      },
+      {
+        "kind": "improved",
+        "for": "Administrators",
+        "text": "The suggested pay for covering a visiting teacher's class is one of their lectures."
+      },
+      {
+        "kind": "new",
+        "for": "Teachers",
+        "text": "Visiting faculty see My lectures under My payslips: taken, not taken, covered, and the lecture sheet PDF."
+      }
+    ]
+  },
+  {
     "version": "1.65.0",
     "date": "2026-11-27",
     "title": "One class for the same subject in several batches",

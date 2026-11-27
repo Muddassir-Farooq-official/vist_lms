@@ -24,7 +24,7 @@ Ask for something to be bought, and follow it from approval to delivery.
 
 ## My pay & attendance
 
-Your monthly salary slips, with every allowance and deduction, and your own attendance record. Download any payslip as a PDF.
+Your monthly salary slips, with every allowance and deduction, and your own attendance record. Download any payslip as a PDF. Visiting faculty paid per lecture also see **My lectures**: how many lectures this month were taken, not taken or covered by others, and a lecture sheet PDF.
 
 ## Calendar
 

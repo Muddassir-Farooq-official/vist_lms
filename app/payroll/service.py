@@ -372,16 +372,30 @@ class PayrollService:
             att = (await self._attendance(run.month, [emp])).get(emp.id)
         from app.timekeeping.leave import approved_days_in_month
 
+        from app.payroll.lectures import lecture_rates, lecture_sheet, payslip_lines
+
+        rate = (await lecture_rates(self.session, [emp.id])).get(emp.id)
         casual_on_leave = await approved_days_in_month(self.session, emp.id, "CASUAL", run.month)
         unpaid_on_leave = await approved_days_in_month(self.session, emp.id, "UNPAID", run.month)
         self._apply_attendance(slip, att, teacher, casual_on_leave)
+        if rate:
+            # visiting faculty: paid per lecture taken; days absent and late marks do not apply (their lectures say it all)
+            base = Decimal(0)
+            sheet = await lecture_sheet(self.session, emp, run.month, rate=rate)
+            lec_earn, lec_ded, slip.attendance_note = payslip_lines(sheet)
+            slip.absent_days, slip.late_marks, slip.casual_leaves, slip.unpaid_days = Decimal(0), 0, Decimal(0), Decimal(0)
+            unpaid_on_leave = 0
         month, dim = run.month, rules.days_in(run.month)
         wd = int(slip.working_days or run.working_days or settings.payroll_default_working_days or rules.days_in(run.month))
         payable = rules.payable_days(emp.hire_date, month)
         slip.base_salary, slip.days_in_month, slip.days_payable = base, dim, payable
         lines: list[tuple[LineKind, str, str, Decimal, uuid.UUID | None]] = []
         earn, ded = [], []
-        earn.append((LineKind.EARNING, "BASE", "Basic salary" + (f" ({payable} of {dim} days)" if payable < dim else ""), rules.prorate(base, payable, dim), None))
+        if rate:
+            earn += [(LineKind.EARNING, src, label, amt, None) for src, label, amt in lec_earn]
+            ded += [(LineKind.DEDUCTION, src, label, amt, None) for src, label, amt in lec_ded]
+        else:
+            earn.append((LineKind.EARNING, "BASE", "Basic salary" + (f" ({payable} of {dim} days)" if payable < dim else ""), rules.prorate(base, payable, dim), None))
         items = (await self.session.execute(select(EmployeePayItem).where(EmployeePayItem.employee_id == emp.id, EmployeePayItem.is_active.is_(True)).order_by(EmployeePayItem.name))).scalars().all()
         for it in items:
             if (it.valid_from and it.valid_from > rules.month_end(month)) or (it.valid_until and it.valid_until < rules.month_start(month)):
@@ -409,7 +423,7 @@ class PayrollService:
         if late_days > 0:
             ded.append((LineKind.DEDUCTION, "LATE", f"{slip.late_marks} late arrivals / early leavings (every {per_day} = 1 day): {late_days} day{'s' if late_days != 1 else ''}",
                         rules.unpaid_deduction(base, wd, late_days), None))
-        carried = await self._late_absences(emp, run, teacher)
+        carried = None if rate else await self._late_absences(emp, run, teacher)
         if carried is not None:
             ded.append((LineKind.DEDUCTION, "LATE_ABSENT", carried[0], carried[1], carried[2]))
         if Decimal(str(slip.unpaid_days)) > 0:
@@ -480,10 +494,13 @@ class PayrollService:
         att = await self._attendance(month, [e for e, _ in people])
         teachers = await self._teachers([e for e, _ in people])
         own = {} if working_days else await self._schedule_days(month, [e for e, _ in people])
+        from app.payroll.lectures import lecture_rates
+
+        per_lecture = await lecture_rates(self.session, [e.id for e, _ in people])
         for emp, title in people:
-            base = salaries.get(emp.id)
-            if base is None or base <= 0:
-                skipped.append(f"{emp.first_name} {emp.last_name} (no salary on record)")
+            base = Decimal(0) if emp.id in per_lecture else salaries.get(emp.id)       # visiting faculty: paid per lecture
+            if base is None or (base <= 0 and emp.id not in per_lecture):
+                skipped.append(f"{emp.first_name} {emp.last_name} (no salary on record" + (", and no lecture rate" if emp.employment_type == "VISITING" else "") + ")")
                 continue
             slip = Payslip(run_id=run.id, employee_id=emp.id, employee_name=f"{emp.first_name} {emp.last_name}", employee_code=emp.employee_code, job_title=title, department=emp.department,
                            base_salary=base, days_in_month=rules.days_in(month), days_payable=rules.payable_days(emp.hire_date, month),
@@ -508,9 +525,12 @@ class PayrollService:
         # Someone added since the payroll was prepared gets their own working days too. Existing payslips keep theirs
         # (set when prepared, or changed by hand with Adjust), so a recalculation never undoes a person's decision.
         own = {} if run.working_days else await self._schedule_days(run.month, [e for e, _ in people if e.id not in have])
+        from app.payroll.lectures import lecture_rates
+
+        per_lecture = await lecture_rates(self.session, [e.id for e, _ in people])
         for emp, title in people:
-            base = salaries.get(emp.id)
-            if base is None or base <= 0:
+            base = Decimal(0) if emp.id in per_lecture else salaries.get(emp.id)
+            if base is None or (base <= 0 and emp.id not in per_lecture):
                 continue
             slip = have.get(emp.id)
             if slip is None:

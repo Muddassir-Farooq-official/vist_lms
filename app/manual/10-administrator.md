@@ -168,6 +168,13 @@ Teachers book make-up classes (for a missed class) and extra classes (for a cour
 - **Fixed assets**: furniture, computers, equipment, vehicles and buildings, with tag numbers, holders and depreciation.
 - **Approvals**: actions that need a second person: waiving or cancelling a fee, waiving a fine, writing off previous dues, moving a payment to the right fee, reopening closed books, new scholarships or discounts, and make-up or extra classes. Approving carries the action out exactly as asked; nobody can approve their own request.
 - **Payroll**: pay staff each month: salary, allowances, bonuses and deductions, with a payslip for everyone.
+- **Payroll → Visiting faculty**: a visiting teacher is paid per lecture instead of a monthly salary.
+  - **Setting it up**: set their employment type to *Visiting* (Employees → edit), then enter their **rate per lecture** here.
+  - **What counts as a lecture**: a lecture is taken when they mark its attendance. A lab's double period is two lectures; a combined class taught to several batches at once is one; extra and make-up classes count too. Cancelled classes are neither paid nor deducted.
+  - **The payslip**: every lecture held is earned. Lectures not taken, covered by another teacher, or marked by the office are deducted, with their dates. Days absent and late marks do not apply to them, but fixed allowances do.
+  - **Covers**: when another teacher covers their class, the suggested cover pay is one of their lectures.
+  - **Lecture sheet (PDF)**: lists every lecture of the month and what happened to it. The teacher sees the same sheet under *My payslips*.
+  - **If the office marked a lecture**: if attendance was marked by the office but the teacher did teach, add the lecture back as an adjustment on the payslip.
 - **Staff attendance**: when each member of staff arrives and leaves, against the timing of their job. Payroll uses it for absences and late marks.
 
 ## Reports

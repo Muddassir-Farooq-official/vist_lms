@@ -18,7 +18,7 @@ TABBED = {
     "/dashboard/student/assignments": ["todo", "done", "closed"],
     "/dashboard/admin/applications": ["queue", "all", "overview", "types"],
     "/dashboard/admin/staff-attendance": ["daily", "month", "timings", "leave", "tools"],
-    "/dashboard/admin/payroll": ["runs", "items", "advances", "security"],
+    "/dashboard/admin/payroll": ["runs", "items", "advances", "security", "visiting"],
     "/dashboard/admin/finance": ["overview", "book", "expenses", "purchasing", "income", "vendors", "categories"],
     "/dashboard/admin/result-sheets": ["SUBMITTED", "APPROVED", "PUBLISHED", "RETURNED", "OUTSTANDING", "CARDS", "SCALE", "CLASS", "TABLES", "UNIVERSITY"],
     "/dashboard/faculty/tasks": ["inbox", "todo", "sent", "new", "mine", "map", "covers"],
