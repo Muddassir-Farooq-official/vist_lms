@@ -44,6 +44,7 @@ class StudentRepository:
         page: PageParams,
         query: str | None = None,
         program_id: uuid.UUID | None = None,
+        programs: set | None = None,                  # limited to these programs (Access control); None = all
         status: StudentStatus | None = None,
         semester: int | None = None,
         section: str | None = None,
@@ -78,6 +79,9 @@ class StudentRepository:
         if program_id:
             stmt = stmt.where(Student.program_id == program_id)
             count_stmt = count_stmt.where(Student.program_id == program_id)
+        if programs is not None:
+            stmt = stmt.where(Student.program_id.in_(list(programs)))
+            count_stmt = count_stmt.where(Student.program_id.in_(list(programs)))
 
         if status:
             stmt = stmt.where(Student.status == status)

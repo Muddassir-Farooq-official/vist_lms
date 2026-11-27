@@ -64,13 +64,13 @@
 <section class="sh-card">
   <h2>Holiday / closure</h2>
   <p class="panel-hint">Excuses the whole day for every member of staff, so nobody is counted absent (arrivals already marked are kept).</p>
-  <div class="toolbar"><input id="hd-day" class="text-input" type="date" aria-label="Day" /><input id="hd-reason" class="text-input" maxlength="200" placeholder="e.g. Eid ul Adha, Kashmir Day" aria-label="Reason" /><button type="button" class="role-btn" id="hd-save">Excuse the day</button></div>
+  <div class="toolbar"><input id="hd-day" class="text-input" type="date" aria-label="Day" /><input id="hd-reason" class="text-input" maxlength="200" placeholder="e.g. Eid ul Adha, Kashmir Day" aria-label="Reason" /><button type="button" class="role-btn" id="hd-save" data-need="staff_attendance.manage">Excuse the day</button></div>
 </section>
 <section class="sh-card">
   <h2>Import from a biometric machine</h2>
   <p class="panel-hint">A CSV with the columns <code>employee_code,date,check_in,check_out</code> (date as 2026-10-01, times as 08:55). Check first, then import. Existing times on the same day are replaced.</p>
   <div class="toolbar"><a class="role-btn secondary-btn" id="im-template" download="staff-attendance-template.csv" href="data:text/csv;charset=utf-8,employee_code%2Cdate%2Ccheck_in%2Ccheck_out%0AEMP-0001%2C2026-10-01%2C08%3A55%2C17%3A05%0A">Download template</a>
-    <input type="file" id="im-file" accept=".csv" /><button type="button" class="role-btn secondary-btn" id="im-check">Check</button><button type="button" class="role-btn" id="im-go">Import</button></div>
+    <input type="file" id="im-file" accept=".csv" /><button type="button" class="role-btn secondary-btn" id="im-check">Check</button><button type="button" class="role-btn" id="im-go" data-need="staff_attendance.manage">Import</button></div>
   <p id="im-result" class="panel-hint" hidden></p>
 </section>
 </div>
@@ -98,7 +98,7 @@
     <div class="form-field two-span" id="dc-reason-wrap" hidden><label for="dc-reason">Why is it excused?</label><input id="dc-reason" class="text-input" maxlength="200" /></div>
     <div class="form-field two-span"><label for="dc-note">Note (kept in the history)</label><input id="dc-note" class="text-input" maxlength="300" /></div>
     <p id="dc-error" class="dash-alert error two-span" hidden></p>
-    <div class="form-actions two-span"><button type="submit" class="role-btn">Save</button><button type="button" class="danger-btn" id="dc-clear">Clear the day</button></div>
+    <div class="form-actions two-span"><button type="submit" class="role-btn">Save</button><button type="button" class="danger-btn" id="dc-clear" data-need="staff_attendance.manage">Clear the day</button></div>
   </form>
   <button id="dc-close" class="back-link modal-close-btn" type="button">Cancel</button>
 </div></dialog>

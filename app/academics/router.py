@@ -132,10 +132,20 @@ async def _can_manage_offering(db, offering: CourseOffering, current_user: Curre
     return Permissions.LECTURE_MANAGE in current_user.permissions
 
 
-async def _can_manage_timetable(current_user: CurrentUser) -> bool:
+async def _can_manage_timetable(current_user: CurrentUser, db=None, offering=None) -> bool:
     """Who may add, move or remove a section's weekly classes: the administration (LECTURE_MANAGE, as before) and
-    anyone given the timetable (TIMETABLE_MANAGE, e.g. the exam department). Content and single classes stay admin."""
-    return Permissions.LECTURE_MANAGE in current_user.permissions or Permissions.TIMETABLE_MANAGE in current_user.permissions
+    anyone given the timetable (TIMETABLE_MANAGE, e.g. the exam department). Content and single classes stay admin.
+    Someone limited to departments / programs (Access control) only within them."""
+    if not (Permissions.LECTURE_MANAGE in current_user.permissions or Permissions.TIMETABLE_MANAGE in current_user.permissions):
+        return False
+    if db is not None and offering is not None:
+        from app.access.scope import allows_offering, allows_terms, get_scope
+
+        scope = await get_scope(db, current_user)
+        if scope is not None and scope.programs:
+            return await allows_terms(db, scope, [offering.term_label])
+        return await allows_offering(db, scope, offering.id)
+    return True
 
 
 async def _can_edit_content(db, offering: CourseOffering, current_user: CurrentUser) -> bool:
@@ -1775,7 +1785,7 @@ async def create_timetable_slot(
     db=Depends(get_db),
 ) -> TimetableSlotCreatedOut:
     offering = await CourseOfferingService(db).get(offering_id)
-    if not await _can_manage_timetable(current_user):
+    if not await _can_manage_timetable(current_user, db, offering):
         raise AuthorizationError("Only the administration or the exam department can change the timetable.")
     slot, generated_count = await TimetableService(db).create_slot(
         course_offering_id=offering_id, period_id=payload.period_id, day_of_week=payload.day_of_week,
@@ -1795,7 +1805,7 @@ async def auto_assign_timetable(
     db=Depends(get_db),
 ) -> AutoAssignResultOut:
     offering = await CourseOfferingService(db).get(offering_id)
-    if not await _can_manage_timetable(current_user):
+    if not await _can_manage_timetable(current_user, db, offering):
         raise AuthorizationError("Only the administration or the exam department can change the timetable.")
     slots, generated_count = await TimetableService(db).auto_assign(
         course_offering_id=offering_id, sessions_per_week=payload.sessions_per_week,
@@ -1836,7 +1846,7 @@ async def delete_timetable_slot(
     if slot is None:
         raise ResourceNotFoundError("Timetable slot not found.")
     offering = await CourseOfferingService(db).get(slot.course_offering_id)
-    if not await _can_manage_timetable(current_user):
+    if not await _can_manage_timetable(current_user, db, offering):
         raise AuthorizationError("Only the administration or the exam department can change the timetable.")
     cancelled_count = await service.delete_slot(slot_id, actor_id=current_user.id)
     return {"future_sessions_cancelled": cancelled_count}
@@ -1848,7 +1858,7 @@ async def _slot_for_manager(db, slot_id: uuid.UUID, current_user: CurrentUser):
     if slot is None:
         raise ResourceNotFoundError("Timetable slot not found.")
     offering = await CourseOfferingService(db).get(slot.course_offering_id)
-    if not await _can_manage_timetable(current_user):
+    if not await _can_manage_timetable(current_user, db, offering):
         raise AuthorizationError("Only the administration or the exam department can change the timetable.")
     return service, slot
 
@@ -2045,11 +2055,10 @@ async def teacher_progress(
         select(CourseOffering.assigned_teacher_id).where(CourseOffering.assigned_teacher_id.is_not(None)).distinct()
     )
     teacher_ids = list(teacher_ids_result.scalars())
-    from app.core.scope import hod_department, teacher_ids_in
+    from app.access.scope import get_scope, teacher_ids_in_scope
 
-    dept = await hod_department(db, current_user)
-    if dept:
-        mine = await teacher_ids_in(db, dept)
+    mine = await teacher_ids_in_scope(db, await get_scope(db, current_user))
+    if mine is not None:
         teacher_ids = [t for t in teacher_ids if t in mine]
 
     entries = []
@@ -2195,7 +2204,14 @@ async def list_terms(
     db=Depends(get_db),
 ) -> list[str]:
     registered = [t.label for t in await AcademicTermService(db).all()]
-    return registered + [t for t in await CourseOfferingRepository(db).list_distinct_terms() if t not in registered]
+    labels = registered + [t for t in await CourseOfferingRepository(db).list_distinct_terms() if t not in registered]
+    from app.access.scope import get_scope, term_programs
+
+    scope = await get_scope(db, current_user)
+    if scope is not None and scope.programs:                  # limited to some programs: only their batch terms
+        progs = await term_programs(db, labels)
+        labels = [lbl for lbl in labels if progs.get(lbl) in scope.programs]
+    return labels
 
 
 class AcademicTermIn(BaseModel):

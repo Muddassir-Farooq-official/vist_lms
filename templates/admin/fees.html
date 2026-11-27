@@ -58,8 +58,8 @@
     <div class="table-scroll"><table class="dash-table"><thead><tr><th>Date</th><th>Fee</th><th>Receipt</th><th>Method</th><th class="num">Amount</th></tr></thead><tbody id="sa-payments"></tbody></table></div>
     <h3 class="modal-subhead">Scholarships and discounts</h3>
     <div class="table-scroll"><table class="dash-table"><thead><tr><th>Name</th><th>Covers</th><th class="num">Given so far</th><th>Status</th></tr></thead><tbody id="sa-scholarships"></tbody></table></div>
-    <p class="form-actions"><button type="button" class="role-btn secondary-btn can-propose" id="sa-grant">Give this student a scholarship or discount</button>
-      <button type="button" class="role-btn secondary-btn can-add-dues" id="sa-prev" hidden>Add previous dues for this student</button></p>
+    <p class="form-actions"><button type="button" class="role-btn secondary-btn can-propose" id="sa-grant" data-need="scholarship.propose,scholarship.manage">Give this student a scholarship or discount</button>
+      <button type="button" class="role-btn secondary-btn can-add-dues" id="sa-prev" data-need="fee.opening_balance.add" hidden>Add previous dues for this student</button></p>
   </div>
 </section>
 </div>
@@ -99,7 +99,7 @@
 <section class="panel admin-only" id="sc-reset-panel">
   <div class="panel-header"><div class="panel-header-left"><h2>Start again: remove all discounts</h2></div></div>
   <p class="panel-hint">Ends every scholarship and discount at once, so you can give them again (for example on tuition only). Installments not yet paid in full go back to the full amount; installments already paid keep the discount they were paid at. Nothing is deleted, and you see exactly what will change before anything is saved.</p>
-  <div class="form-actions"><button type="button" class="role-btn danger-btn" id="sc-reset-open">Remove all discounts&hellip;</button></div>
+  <div class="form-actions"><button type="button" class="role-btn danger-btn" id="sc-reset-open" data-need="scholarship.manage">Remove all discounts&hellip;</button></div>
 </section>
 </div>
 

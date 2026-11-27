@@ -191,6 +191,27 @@ async def try_rule(action: str, body: TryIn, current_user: CurrentUser = Depends
     return await AccessService(db).try_rule(action, user_id=body.user_id, amount=body.amount)
 
 
+class ScopeIn(BaseModel):
+    departments: list[str] = Field(default_factory=list, max_length=50)
+    programs: list[uuid.UUID] = Field(default_factory=list, max_length=100)
+
+
+@router.get("/scope-choices", summary="Departments and programs a person can be limited to")
+async def scope_choices(current_user: CurrentUser = Depends(admin), db=Depends(get_db)) -> dict:
+    return await AccessService(db).scope_choices()
+
+
+@router.get("/people/{user_id}/scope", summary="This person's department / program limits")
+async def get_scope(user_id: uuid.UUID, current_user: CurrentUser = Depends(admin), db=Depends(get_db)) -> dict:
+    return await AccessService(db).get_person_scope(user_id)
+
+
+@router.put("/people/{user_id}/scope", summary="Limit this person to some departments and/or programs (empty = no limits)")
+async def set_scope(user_id: uuid.UUID, body: ScopeIn, current_user: CurrentUser = Depends(admin), db=Depends(get_db)) -> dict:
+    return await AccessService(db).set_person_scope(user_id, departments=body.departments, programs=[str(p) for p in body.programs],
+                                                    actor_id=current_user.id)
+
+
 @router.get("/my-pages", summary="Pages of the administration's portal this person may open (for the menu)")
 async def my_pages(current_user: CurrentUser = Depends(get_current_user)) -> dict:
     from app.access import catalog

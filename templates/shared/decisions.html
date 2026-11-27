@@ -5,13 +5,9 @@
 {% block page_subtitle %}<div class="content-subtitle">Requests waiting for your approval: attendance corrections, leave, results, refunds, fines, fee waivers, timetables and more. Who decides each kind is set by the administration (Access control &rarr; Approvals).</div>{% endblock %}
 
 {% block content %}
-<section class="sh-card">
-  <p id="dc-msg" class="dash-alert" role="status" hidden></p>
-  <div class="table-scroll"><table class="dash-table">
-    <thead><tr><th>Asked</th><th>What</th><th class="num">Amount</th><th>Decided by</th><th></th></tr></thead>
-    <tbody id="dc-rows"></tbody>
-  </table></div>
-  <p class="empty-state" id="dc-empty" hidden>Nothing is waiting for you.</p>
-</section>
+<p id="dc-msg" class="dash-alert" role="status" hidden></p>
+<div class="dc-filter" id="dc-filter" hidden></div>
+<div class="dc-list" id="dc-rows"></div>
+<p class="empty-state" id="dc-empty" hidden>Nothing is waiting for you.</p>
 {% endblock %}
 {% block extra_scripts %}<script src="/static/js/decisions.js"></script>{% endblock %}

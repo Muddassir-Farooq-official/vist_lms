@@ -8,7 +8,7 @@
   const API = "/api/v1/access";
   const $ = function (id) { return document.getElementById(id); };
   const esc = function (v) { return VA.escapeHtml(v == null ? "" : String(v)); };
-  let data = null, role = null, draft = null, person = null, personRoles = null, ovDraft = null, onConfirm = null;
+  let data = null, role = null, draft = null, person = null, personRoles = null, ovDraft = null, onConfirm = null, scopeChoices = null;
 
   function msg(text, tone) {
     const el = $("ac-msg");
@@ -346,6 +346,9 @@
       if (ar.ok) personRoles = ar.body;
     }
     ovDraft = person.overrides.filter(function (o) { return !o.expired; }).map(function (o) { return Object.assign({}, o); });
+    const sc = await VA.fetchJson(API + "/people/" + uid + "/scope", { quiet: true });
+    person.scope = sc.ok ? sc.body : null;
+    if (!scopeChoices) { const c = await VA.fetchJson(API + "/scope-choices", { quiet: true }); scopeChoices = c.ok ? c.body : { departments: [], programs: [] }; }
     loadPeople();
     drawPerson();
   }
@@ -372,11 +375,30 @@
         '<div class="ac-add"><select id="ac-ov-add" class="select-input" aria-label="Add a right"></select> <button type="button" class="role-btn secondary-btn small-btn" id="ac-ov-add-btn">Add</button></div>' +
         '<div class="ac-save"><button type="button" class="role-btn" id="ac-save-ov">Check and save</button></div>';
     }
+    if (!p.is_admin && p.scope) {
+      const sc = p.scope;
+      h += '<h3 class="ac-h3">Limit to</h3><p class="panel-hint">Leave everything unticked for no limits. Ticked programs: only those programs&rsquo; batches, classes, timetables, results and students. Ticked departments: only classes taught by those departments&rsquo; teachers, and their staff&rsquo;s requests. Now: <strong>' +
+        esc(sc.now) + "</strong>" + (sc.hod_default ? " (as Head of Department: their own department)" : "") + ".</p>" +
+        '<div class="ac-scope"><div><strong>Programs</strong><div class="ac-rights">' + scopeChoices.programs.map(function (x) {
+          return '<label><input type="checkbox" data-scope-prog="' + esc(x.id) + '"' + (sc.programs.indexOf(String(x.id)) !== -1 ? " checked" : "") + "> " + esc(x.code) + ' <small class="muted">' + esc(x.name) + "</small></label>";
+        }).join("") + '</div></div><div><strong>Departments</strong><div class="ac-rights">' + scopeChoices.departments.map(function (d) {
+          return '<label><input type="checkbox" data-scope-dep="' + esc(d) + '"' + (sc.departments.some(function (x) { return x.toLowerCase() === d.toLowerCase(); }) ? " checked" : "") + "> " + esc(d) + "</label>";
+        }).join("") + '</div></div></div><div class="ac-save"><button type="button" class="role-btn" id="ac-save-scope">Save limits</button></div>';
+    }
     h += '<details class="ac-adv"><summary>Everything they can do now (' + p.rights.length + ")</summary>" + whatTheyCan(p) + "</details>";
     if (!p.is_admin && p.pages.length) h += '<p class="panel-hint">Administration pages they can open: ' + esc(p.pages.join(", ")) + ".</p>";
     box.innerHTML = h;
     if (!p.is_admin) { drawOverrides(); wirePerson(); }
     if (personRoles) $("ac-save-roles").addEventListener("click", saveRoles);
+    const ss = $("ac-save-scope");
+    if (ss) ss.addEventListener("click", async function () {
+      const body = { programs: Array.prototype.map.call(document.querySelectorAll("[data-scope-prog]:checked"), function (c) { return c.getAttribute("data-scope-prog"); }),
+        departments: Array.prototype.map.call(document.querySelectorAll("[data-scope-dep]:checked"), function (c) { return c.getAttribute("data-scope-dep"); }) };
+      const what = body.programs.length + body.departments.length ? "only the ticked programs / departments" : "no limits";
+      if (!(await VA.confirm("Limit " + p.name + " to " + what + "?", "Save"))) return;
+      const r = await VA.fetchJson(API + "/people/" + p.user_id + "/scope", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (done(r, p.name + "'s limits")) { openPerson(p.user_id); loadHistory(); }
+    });
     const va = $("ac-view-as");
     if (va) va.addEventListener("click", async function () {
       if (!(await VA.confirm("Open " + p.name + "'s screens, read-only, for 30 minutes? You can come back any time.", "Open their screens"))) return;
@@ -492,8 +514,8 @@
     ap.actions.forEach(function (a) { (groups[a.group] = groups[a.group] || []).push(a); });
     $("ap-actions").innerHTML = Object.keys(groups).map(function (g) {
       return '<h3 class="ac-h3">' + esc(g) + "</h3>" + groups[g].map(function (a) {
-        return '<div class="sh-card ap-card" data-action="' + a.key + '"><div class="ac-ed-head"><div><strong>' + esc(a.label) + "</strong><small class=\"muted\"> " + esc(a.about) +
-          "</small><p class=\"panel-hint\">Without rules: " + esc(a.default_text) + ".</p></div>" + (a.amount ? '<span class="ac-tag" title="Rules about money wait for a second administrator">2nd admin</span>' : "") + "</div>" +
+        return '<div class="sh-card ap-card" data-action="' + a.key + '"><div class="ac-ed-head"><div><strong>' + esc(a.label) + '</strong><div class="muted ap-about">' + esc(a.about) +
+          '</div><div class="panel-hint">Without rules: ' + esc(a.default_text) + ".</div></div>" + (a.amount ? '<span class="ac-tag" title="Rules about money wait for a second administrator">2nd admin</span>' : "") + "</div>" +
           '<div class="table-scroll"><table class="dash-table ap-rules"><thead><tr><th>When asked by</th>' + (a.amount ? "<th>From amount (Rs.)</th>" : "") +
           "<th>Then</th><th></th></tr></thead><tbody>" + a.rules.map(function (r, i) { return ruleRow(a, r, i); }).join("") + "</tbody></table></div>" +
           (a.rules.length ? "" : '<p class="muted ap-none">No rules: works as the system does now.</p>') +

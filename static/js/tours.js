@@ -83,7 +83,7 @@ window.VIST_TOURS = {
   "/dashboard/admin/access": {
     tabs: {
       roles: "What each role can do. Pick a role, then for each module choose None, View or Edit, and tick Approve. Advanced shows single rights. New role makes your own (e.g. Exam cell assistant); start it from an existing role to save time.",
-      people: "One staff member: their extra roles (built-in or your own), and single rights given or taken away, until a date if you like. A right taken away wins over every role.",
+      people: "One staff member: their extra roles (built-in or your own), single rights given or taken away (until a date if you like; taken away wins over every role), and Limit to: only some programs and/or departments.",
       approvals: "Who approves each kind of request: attendance after the window, leave, results, refunds, fines, fee waivers, timetables. Add a rule to say no approval is needed, or who approves (a role, one person, the head of the department, the course's teacher), optionally only for one role and from an amount. Try it shows who would decide.",
       who: "Pick a right to see everyone who can do it, and whether it comes from a role or their own right. Good for checking who can reverse payments or publish results.",
       waiting: "Money and control changes made by another administrator wait here for you to confirm or reject. Nobody confirms their own change.",

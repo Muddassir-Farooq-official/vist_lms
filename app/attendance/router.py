@@ -54,7 +54,11 @@ async def _assert_can_mark_or_view_offering(db, offering_id: uuid.UUID, current_
     ownership-check pattern used everywhere else offering content is
     gated (see app/academics/router.py::_can_view_offering_content)."""
     if Permissions.ATTENDANCE_LOCK in current_user.permissions:
-        return  # ADMIN holds this; nobody else does
+        from app.access.scope import allows_offering, get_scope
+
+        if not await allows_offering(db, await get_scope(db, current_user), offering_id):
+            raise AuthorizationError("This class is outside the departments / programs you are limited to.")
+        return  # the attendance office (limited to its departments / programs when set)
     offering = await CourseOfferingRepository(db).get_by_id(offering_id)
     if offering is None:
         raise ResourceNotFoundError("Course offering not found.")
@@ -174,15 +178,14 @@ async def needs_attention(
     from app.academics.models import Course, CourseOffering
     from app.employees.models import Employee
 
-    from app.core.scope import hod_department, teacher_ids_in
+    from app.access.scope import allowed_offering_ids, get_scope
 
     limit = max(1, min(limit, 1000))
     sessions = await AttendanceService(db).list_overdue_unmarked_sessions()
-    dept = await hod_department(db, current_user)
-    if dept:
-        mine = await teacher_ids_in(db, dept)
-        offs = await load_by_ids(db, CourseOffering, [cs.course_offering_id for cs in sessions])
-        sessions = [cs for cs in sessions if offs.get(cs.course_offering_id) is not None and offs[cs.course_offering_id].assigned_teacher_id in mine]
+    scope = await get_scope(db, current_user)          # a HOD: their department; anyone limited on Access control: their limits
+    if scope is not None:
+        ok = await allowed_offering_ids(db, scope, {cs.course_offering_id for cs in sessions})
+        sessions = [cs for cs in sessions if cs.course_offering_id in ok]
     response.headers["X-Total-Count"] = str(len(sessions))
     sessions = sessions[:limit]
     offerings = await load_by_ids(db, CourseOffering, [cs.course_offering_id for cs in sessions])
@@ -470,13 +473,12 @@ async def list_correction_requests(
     )
     out = [await _to_request_out(db, r) for r in requests]
     if is_admin:
-        from app.core.scope import hod_department, teacher_ids_in
+        from app.access.scope import allowed_offering_ids, get_scope
 
-        dept = await hod_department(db, current_user)
-        if dept:
-            mine = await teacher_ids_in(db, dept)
-            teacher_of = {o.id: o.assigned_teacher_id for o in await _offerings_by_ids(db, {r.course_offering_id for r in out})}
-            out = [r for r in out if teacher_of.get(r.course_offering_id) in mine]
+        scope = await get_scope(db, current_user)
+        if scope is not None:
+            ok = await allowed_offering_ids(db, scope, {r.course_offering_id for r in out})
+            out = [r for r in out if r.course_offering_id in ok]
     return out
 
 

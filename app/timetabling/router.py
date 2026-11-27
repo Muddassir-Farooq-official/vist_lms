@@ -24,6 +24,41 @@ def _terms(raw: str) -> list[str]:
     return [t for t in (raw or "").split("||") if t.strip()]
 
 
+async def _scoped(db, user, labels) -> list[str]:
+    """The batch terms, refused if any is outside this person's program limits (Access control -> People)."""
+    from app.access.scope import allows_terms, get_scope
+
+    labels = list(labels)
+    if not await allows_terms(db, await get_scope(db, user), labels):
+        raise AuthorizationError("Some of these batches are outside the programs you are limited to.")
+    return labels
+
+
+async def _offering_scoped(db, user, offering_ids) -> None:
+    from app.academics.models import CourseOffering
+    from app.access.scope import get_scope
+
+    scope = await get_scope(db, user)
+    if scope is None or not scope.programs:
+        return
+    from sqlalchemy import select as _select
+
+    labels = (await db.execute(_select(CourseOffering.term_label).where(CourseOffering.id.in_(list(offering_ids))))).scalars().all()
+    await _scoped(db, user, set(labels))
+
+
+async def _draft_scoped(db, user, draft_id) -> None:
+    from app.access.scope import get_scope
+    from app.timetabling.models import TimetableDraft
+
+    scope = await get_scope(db, user)
+    if scope is None or not scope.programs:
+        return
+    draft = await db.get(TimetableDraft, draft_id)
+    if draft is not None:
+        await _scoped(db, user, draft.terms or [])
+
+
 def _no_view_as(user: CurrentUser) -> None:
     if getattr(user, "viewing_as_by_id", None) is not None:
         raise AuthorizationError("Not while viewing someone else's screens.")
@@ -74,6 +109,11 @@ def _day(v: str) -> str:
 @router.get("/latest", summary="The newest draft (or the last published one), if any")
 async def latest(current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
     d = await SmartTimetableService(db).latest()
+    if d is not None:
+        from app.access.scope import allows_terms, get_scope
+
+        if not await allows_terms(db, await get_scope(db, current_user), d.terms or []):
+            d = None                                  # someone else's programs: start a new draft for their own
     return {"id": d.id if d else None, "status": d.status if d else None, "next_monday": next_monday()}
 
 
@@ -81,18 +121,20 @@ async def latest(current_user: CurrentUser = Depends(manage), db=Depends(get_db)
 async def generate(payload: GenerateIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
     _no_view_as(current_user)
     svc = SmartTimetableService(db)
-    draft = await svc.generate(terms=payload.terms, days=[_day(x) for x in payload.days], max_per_day=payload.max_per_day,
+    draft = await svc.generate(terms=await _scoped(db, current_user, payload.terms), days=[_day(x) for x in payload.days], max_per_day=payload.max_per_day,
                                max_in_row=payload.max_in_row, actor_id=current_user.id, keep_from=payload.keep_pinned_from)
     return await svc.view(draft.id)
 
 
 @router.get("/drafts/{draft_id}", summary="A draft: its classes, what could not be placed, and the choices for each view")
 async def view(draft_id: uuid.UUID, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    await _draft_scoped(db, current_user, draft_id)
     return await SmartTimetableService(db).view(draft_id)
 
 
 @router.post("/drafts/{draft_id}/slots", summary="Place a class by hand (checked; kept when the draft is generated again)")
 async def add(draft_id: uuid.UUID, payload: PlaceIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    await _draft_scoped(db, current_user, draft_id)
     _no_view_as(current_user)
     if payload.offering_id is None:
         raise ValidationAppError("Choose the course.")
@@ -104,6 +146,7 @@ async def add(draft_id: uuid.UUID, payload: PlaceIn, current_user: CurrentUser =
 
 @router.patch("/drafts/{draft_id}/slots/{slot_id}", summary="Move a class in the draft (checked; it becomes pinned)")
 async def move(draft_id: uuid.UUID, slot_id: uuid.UUID, payload: PlaceIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    await _draft_scoped(db, current_user, draft_id)
     _no_view_as(current_user)
     svc = SmartTimetableService(db)
     await svc.move(draft_id, slot_id, day=_day(payload.day), period_id=payload.period_id, room=payload.room, actor_id=current_user.id)
@@ -112,6 +155,7 @@ async def move(draft_id: uuid.UUID, slot_id: uuid.UUID, payload: PlaceIn, curren
 
 @router.delete("/drafts/{draft_id}/slots/{slot_id}", summary="Take a class out of the draft")
 async def remove(draft_id: uuid.UUID, slot_id: uuid.UUID, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    await _draft_scoped(db, current_user, draft_id)
     _no_view_as(current_user)
     svc = SmartTimetableService(db)
     await svc.remove(draft_id, slot_id, actor_id=current_user.id)
@@ -120,6 +164,7 @@ async def remove(draft_id: uuid.UUID, slot_id: uuid.UUID, current_user: CurrentU
 
 @router.post("/drafts/{draft_id}/discard", summary="Throw the draft away (the live timetable is not touched)")
 async def discard(draft_id: uuid.UUID, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    await _draft_scoped(db, current_user, draft_id)
     _no_view_as(current_user)
     await SmartTimetableService(db).discard(draft_id, actor_id=current_user.id)
     return {"ok": True}
@@ -127,11 +172,13 @@ async def discard(draft_id: uuid.UUID, current_user: CurrentUser = Depends(manag
 
 @router.get("/drafts/{draft_id}/publish-preview", summary="What publishing from a date would do (nothing is changed)")
 async def publish_preview(draft_id: uuid.UUID, from_date: date = Query(...), current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    await _draft_scoped(db, current_user, draft_id)
     return await SmartTimetableService(db).publish_preview(draft_id, from_date)
 
 
 @router.post("/drafts/{draft_id}/publish", summary="Make the draft the live timetable from a date (all or nothing)")
 async def publish(draft_id: uuid.UUID, payload: PublishIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
+    await _draft_scoped(db, current_user, draft_id)
     _no_view_as(current_user)
     notify = {x for x in payload.notify if x in ("teachers", "students", "parents")}
     # Approval rule (Access control -> Approvals): if publishing needs someone's approval, it waits for them
@@ -155,7 +202,7 @@ async def publish(draft_id: uuid.UUID, payload: PublishIn, current_user: Current
 # ------------------------------------------------------------------ start again: clear the live timetable
 @router.get("/clear-preview", summary="What clearing the weekly timetable of these terms from a date would do (nothing is changed)")
 async def clear_preview(terms: str = Query(...), from_date: date = Query(...), current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
-    return await SmartTimetableService(db).clear_preview(_terms(terms), from_date)
+    return await SmartTimetableService(db).clear_preview(await _scoped(db, current_user, _terms(terms)), from_date)
 
 
 class ClearIn(BaseModel):
@@ -173,23 +220,24 @@ async def clear(payload: ClearIn, current_user: CurrentUser = Depends(manage), d
     if payload.confirm.strip().upper() != "CLEAR":
         raise ValidationAppError('Type CLEAR to confirm.')
     notify = {x for x in payload.notify if x in ("teachers", "students", "parents")}
-    return await SmartTimetableService(db).clear(payload.terms, from_date=payload.from_date, notify=notify, actor_id=current_user.id)
+    return await SmartTimetableService(db).clear(await _scoped(db, current_user, payload.terms), from_date=payload.from_date, notify=notify, actor_id=current_user.id)
 
 
 @router.get("/readiness", summary="What is in place for these terms: periods, rooms, sections, teachers, live timetable, draft")
 async def readiness(terms: str = Query(...), current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
-    return await SmartTimetableService(db).readiness(_terms(terms))
+    return await SmartTimetableService(db).readiness(await _scoped(db, current_user, _terms(terms)))
 
 
 # ------------------------------------------------------------------ per-section settings
 @router.get("/sections", summary="Classes a week, double period and home room of every section in the terms")
 async def sections(terms: str = Query(...), current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> list[dict]:
-    return await SmartTimetableService(db).sections(_terms(terms))
+    return await SmartTimetableService(db).sections(await _scoped(db, current_user, _terms(terms)))
 
 
 @router.patch("/sections/{offering_id}", summary="Change a section's timetable settings (a combined class: all its sections)")
 async def update_section(offering_id: uuid.UUID, payload: SectionIn, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
     _no_view_as(current_user)
+    await _offering_scoped(db, current_user, [offering_id])
     o = await SmartTimetableService(db).update_section(offering_id, classes_per_week=payload.classes_per_week, double_period=payload.double_period,
                                                        home_room=payload.home_room, actor_id=current_user.id)
     return {"id": o.id, "classes_per_week": o.classes_per_week, "double_period": o.double_period, "home_room": o.home_room}
@@ -272,7 +320,7 @@ class AssignIn(BaseModel):
 async def workload(terms: str = Query(...), current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
     from app.timetabling.workload import WorkloadService
 
-    return await WorkloadService(db).report(_terms(terms))
+    return await WorkloadService(db).report(await _scoped(db, current_user, _terms(terms)))
 
 
 @router.put("/workload/teachers/{employee_id}/range", summary="A teacher's own load range (empty = the institute's)")
@@ -294,7 +342,7 @@ async def candidates(offering_id: uuid.UUID, current_user: CurrentUser = Depends
 async def proposals(terms: str = Query(...), current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
     from app.timetabling.workload import WorkloadService
 
-    return await WorkloadService(db).propose(_terms(terms))
+    return await WorkloadService(db).propose(await _scoped(db, current_user, _terms(terms)))
 
 
 @router.post("/workload/assign", summary="Assign the chosen teachers (all or nothing, every normal check)")
@@ -302,6 +350,7 @@ async def assign(payload: AssignIn, current_user: CurrentUser = Depends(manage),
     from app.timetabling.workload import WorkloadService
 
     _no_view_as(current_user)
+    await _offering_scoped(db, current_user, [i.offering_id for i in payload.items])
     n = await WorkloadService(db).apply([(i.offering_id, i.teacher_id) for i in payload.items], actor_id=current_user.id)
     return {"assigned": n}
 
@@ -310,4 +359,4 @@ async def assign(payload: AssignIn, current_user: CurrentUser = Depends(manage),
 async def free(terms: str = Query(...), days: str | None = Query(default=None), current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
     from app.timetabling.workload import WorkloadService
 
-    return await WorkloadService(db).free_map(_terms(terms), [_day(d) for d in days.split(",")] if days else None)
+    return await WorkloadService(db).free_map(await _scoped(db, current_user, _terms(terms)), [_day(d) for d in days.split(",")] if days else None)

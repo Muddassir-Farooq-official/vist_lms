@@ -49,7 +49,7 @@
 <!-- ============ EXPENSES ============ -->
 <div class="portal-tab-panel" data-tab-panel="expenses" hidden>
   <section class="sh-card">
-    <div class="ann-toolbar"><input id="ex-q" class="text-input" type="search" placeholder="Search title or reference&hellip;" aria-label="Search" /><button type="button" class="role-btn" id="ex-new">+ Record an expense</button></div>
+    <div class="ann-toolbar"><input id="ex-q" class="text-input" type="search" placeholder="Search title or reference&hellip;" aria-label="Search" /><button type="button" class="role-btn" id="ex-new" data-need="account.record">+ Record an expense</button></div>
     <div class="rv-chips" id="ex-status"><button type="button" class="chip active" data-s="">All</button><button type="button" class="chip" data-s="PENDING_APPROVAL">Waiting for approval</button><button type="button" class="chip" data-s="APPROVED">Approved</button><button type="button" class="chip" data-s="REJECTED">Rejected</button><button type="button" class="chip" data-s="VOIDED">Voided</button></div>
     <p class="panel-hint" id="ex-limit"></p>
     <div class="table-scroll"><table class="tk-table"><thead><tr><th>Date</th><th>Reference</th><th>Expense</th><th>Category</th><th>Vendor</th><th class="num">Amount</th><th>Status</th></tr></thead><tbody id="ex-body"></tbody></table></div>
@@ -77,7 +77,7 @@
 <!-- ============ OTHER INCOME ============ -->
 <div class="portal-tab-panel" data-tab-panel="income" hidden>
   <section class="sh-card">
-    <div class="ann-toolbar"><input id="in-q" class="text-input" type="search" placeholder="Search name or reference&hellip;" aria-label="Search" /><button type="button" class="role-btn" id="in-new">+ Record income</button></div>
+    <div class="ann-toolbar"><input id="in-q" class="text-input" type="search" placeholder="Search name or reference&hellip;" aria-label="Search" /><button type="button" class="role-btn" id="in-new" data-need="account.record">+ Record income</button></div>
     <p class="panel-hint">Money received other than student fees (those are recorded as students pay their challans): donations, the canteen, rent, hostel and so on.</p>
     <div class="table-scroll"><table class="tk-table"><thead><tr><th>Date</th><th>Reference</th><th>Received from</th><th>Category</th><th class="num">Amount</th><th></th></tr></thead><tbody id="in-body"></tbody></table></div>
     <p class="empty-state" id="in-empty" hidden>No income recorded yet.</p>
@@ -87,7 +87,7 @@
 <!-- ============ VENDORS ============ -->
 <div class="portal-tab-panel" data-tab-panel="vendors" hidden>
   <section class="sh-card">
-    <div class="ann-toolbar"><input id="vn-q" class="text-input" type="search" placeholder="Search vendors&hellip;" aria-label="Search" /><button type="button" class="role-btn" id="vn-new">+ Add a vendor</button></div>
+    <div class="ann-toolbar"><input id="vn-q" class="text-input" type="search" placeholder="Search vendors&hellip;" aria-label="Search" /><button type="button" class="role-btn" id="vn-new" data-need="account.record">+ Add a vendor</button></div>
     <div id="vn-list" class="auth-list"></div><p class="empty-state" id="vn-empty" hidden>No vendors yet.</p>
   </section>
 </div>
