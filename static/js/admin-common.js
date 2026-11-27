@@ -570,6 +570,16 @@ window.VistAdmin = (function () {
     const extra = (me && me.extra_permissions) || [];
     return pageRights().some(function (p) { return extra.indexOf(p) !== -1; });
   }
+  // Buttons marked data-need="right,..." are hidden from someone holding none of those rights (e.g. given a page as
+  // View only). The server refuses the action anyway; this only spares them a button that cannot work.
+  function hideWhatTheyCannotDo(me) {
+    if (!me || (me.roles || []).indexOf("ADMIN") !== -1) return;
+    const mine = me.permissions || [];
+    document.querySelectorAll("[data-need]").forEach(function (el) {
+      const need = el.getAttribute("data-need").split(",").filter(Boolean);
+      if (need.length && !need.some(function (p) { return mine.indexOf(p) !== -1; })) { el.hidden = true; el.setAttribute("data-no-right", "1"); }
+    });
+  }
   // Someone who is not an Administrator but was given some of its pages sees only those in its menu.
   function trimAdminMenu(me) {
     if (!me || (me.roles || []).indexOf("ADMIN") !== -1 || !document.querySelector("[data-admin-menu]")) return;
@@ -1567,6 +1577,7 @@ window.VistAdmin = (function () {
 
     insertSkeletons(document.querySelector(".content-main") || document);
     trimAdminMenu(me);
+    hideWhatTheyCannotDo(me);
     addPortalSwitcher(me);
     addDecisionsChip(me);
     document.dispatchEvent(new CustomEvent("vistadmin:ready", { detail: { me: me } }));

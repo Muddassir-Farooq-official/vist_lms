@@ -17,7 +17,7 @@
 <div class="portal-tab-panel" data-tab-panel="runs">
   <section class="sh-card">
     <div class="ann-toolbar"><p class="panel-hint" style="margin:0;flex:1">The accounts office prepares a month, adjusts anything that needs it (unpaid days, extras) and sends it for approval. The administration approves it (or sends it back with a note), then the accounts office pays the salaries and marks it paid. Everyone gets their payslip when it is paid.</p>
-      <input id="pr-month" class="text-input" type="month" aria-label="Month" /><input id="pr-wd" class="text-input small-input" type="number" min="1" max="31" placeholder="Working days" aria-label="Working days in the month" title="A day's pay = basic / working days. Empty = each person's own working days (or the number in Settings). Type a number to use it for everyone." /><button type="button" class="role-btn" id="pr-prepare">Prepare payroll</button></div>
+      <input id="pr-month" class="text-input" type="month" aria-label="Month" /><input id="pr-wd" class="text-input small-input" type="number" min="1" max="31" placeholder="Working days" aria-label="Working days in the month" title="A day's pay = basic / working days. Empty = each person's own working days (or the number in Settings). Type a number to use it for everyone." /><button type="button" class="role-btn" id="pr-prepare" data-need="payroll.manage">Prepare payroll</button></div>
     <p class="panel-hint">Absences and late arrivals / early leavings come from staff attendance. The rules (casual leaves, how many late marks make a day, security %) are in Settings &rarr; Payroll and can be changed any time; press Recalculate on a draft to apply them.</p>
     <p id="pr-prep-error" class="dash-alert error" hidden></p>
     <div class="table-scroll"><table class="tk-table"><thead><tr><th>Month</th><th>Status</th><th class="num">Employees</th><th class="num">Gross</th><th class="num">Deductions</th><th class="num">Net pay</th></tr></thead><tbody id="rn-body"></tbody></table></div>
@@ -38,7 +38,7 @@
         <div class="form-field"><label for="it-calc">Worked out as</label><select id="it-calc" class="select-input"><option value="FIXED">A fixed amount (Rs.)</option><option value="PERCENT_OF_BASE">A percentage of basic salary (%)</option></select></div>
         <div class="form-field"><label for="it-value">Value</label><input id="it-value" class="text-input" type="number" min="0.01" step="0.01" /></div>
         <p id="it-error" class="dash-alert error two-span" hidden></p>
-        <div class="form-actions two-span"><button type="button" class="role-btn" id="it-add">Add to this employee's pay</button></div>
+        <div class="form-actions two-span"><button type="button" class="role-btn" id="it-add" data-need="payroll.manage">Add to this employee's pay</button></div>
       </form>
     </div>
   </section>

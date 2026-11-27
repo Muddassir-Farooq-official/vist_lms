@@ -205,10 +205,9 @@ class ReportCenter:
     # ------------------------------------------------------------ shared lookups
     async def _hod_teacher_ids(self, user) -> set | None:
         """A Head of Department sees only their department's classes (None = not limited)."""
-        from app.core.scope import hod_department, teacher_ids_in
+        from app.access.scope import get_scope, teacher_ids_in_scope
 
-        dept = await hod_department(self.session, user)
-        return None if dept is None else await teacher_ids_in(self.session, dept)
+        return await teacher_ids_in_scope(self.session, await get_scope(self.session, user))
 
     async def _names(self, user_ids: set) -> dict:
         from app.accounts.service import AccountsService

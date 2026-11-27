@@ -21,12 +21,12 @@
       {% for n in range(1, 13) %}<option value="{{ n }}">Semester {{ n }}</option>{% endfor %}</select>
     <input type="text" id="section-filter" class="text-input small-input" maxlength="30" placeholder="Section" aria-label="Section" style="max-width:110px" />
     <div class="sd-tools">
-      <button id="open-add-student" class="role-btn" type="button">{{ nav_icon("plus") }}<span>Add student</span></button>
+      <button id="open-add-student" data-need="student.create" class="role-btn" type="button">{{ nav_icon("plus") }}<span>Add student</span></button>
       <details class="sd-menu">
         <summary class="role-btn secondary-btn" aria-label="More actions">{{ nav_icon("more") }}<span>More</span></summary>
         <div class="sd-menu-list" role="menu">
           <button type="button" role="menuitem" data-incomplete="students">{{ nav_icon("file") }}<span>Incomplete profiles &amp; reminders&hellip;</span></button>
-          <button id="open-advance-semester" type="button" role="menuitem">{{ nav_icon("graduation-cap") }}<span>Advance semester&hellip;</span></button>
+          <button id="open-advance-semester" data-need="student.update" type="button" role="menuitem">{{ nav_icon("graduation-cap") }}<span>Advance semester&hellip;</span></button>
           <a id="export-students-link" href="/api/v1/students/export" download role="menuitem">{{ nav_icon("download") }}<span>Export list (CSV)</span></a>
           <button id="print-cards" type="button" role="menuitem">{{ nav_icon("printer") }}<span>Print ID cards (this page)</span></button>
         </div>

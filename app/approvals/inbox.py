@@ -47,6 +47,13 @@ async def _teacher_ctx(session: AsyncSession, offering_id) -> dict:
     return {"course_teacher_user_id": emp.user_id if emp else None, "department": emp.department if emp else None}
 
 
+async def _student_program(session: AsyncSession, student_id):
+    from app.students.models import Student
+
+    s = await session.get(Student, student_id)
+    return s.program_id if s else None
+
+
 # ====================================================================== adapters
 class _Gate:
     """The Approvals page's kinds (fees, scholarships, write-offs, books, make-up classes, timetable publishing)."""
@@ -106,12 +113,8 @@ class _AttendanceCorrection:
         return await self._item(session, r)
 
     async def default_ok(self, session, user, item):
-        if not ({Permissions.ATTENDANCE_LOCK, Permissions.ATTENDANCE_CORRECTION_DECIDE} & _perms(user)):
-            return False
-        from app.core.scope import hod_department
-
-        dept = await hod_department(session, user)
-        return dept is None or rules._norm((item.ctx or {}).get("department")) == dept
+        # the attendance office or whoever decides corrections (a HOD: their department; limits: checked in can())
+        return bool({Permissions.ATTENDANCE_LOCK, Permissions.ATTENDANCE_CORRECTION_DECIDE} & _perms(user))
 
     async def decide(self, session, item, *, approve, note, user):
         from app.attendance.service import AttendanceService
@@ -157,8 +160,12 @@ class _Refund:
     actions = ("REFUND",)
 
     async def _item(self, session, r):
+        from app.fees.models import FeeAssignment
+
+        a = await session.get(FeeAssignment, r.fee_assignment_id)
+        prog = await _student_program(session, a.payer_id) if a is not None and getattr(a.payer_type, "value", a.payer_type) == "STUDENT" else None
         return Item("REFUND", r.id, r.requested_by, f"Refund Rs. {float(r.amount):,.0f}: {r.reason}", r.requested_at, float(r.amount),
-                    {"department": await rules.department_of(session, r.requested_by)}, "/dashboard/admin/refunds")
+                    {"department": await rules.department_of(session, r.requested_by), "student_program": prog}, "/dashboard/admin/refunds")
 
     async def pending(self, session):
         from app.fees.refund_models import FeeRefund, RefundStatus
@@ -187,8 +194,9 @@ class _FineRequest:
     actions = ("FINE_REQUEST",)
 
     async def _item(self, session, f):
+        prog = await _student_program(session, f.payer_id) if getattr(f.payer_type, "value", f.payer_type) == "STUDENT" else None
         return Item("FINE_REQUEST", f.id, f.issued_by, f"Fine Rs. {float(f.amount):,.0f}: {f.reason}", f.issued_at, float(f.amount),
-                    {"department": await rules.department_of(session, f.issued_by)}, "/dashboard/admin/fines")
+                    {"department": await rules.department_of(session, f.issued_by), "student_program": prog}, "/dashboard/admin/fines")
 
     async def pending(self, session):
         from app.fines.models import Fine, FineStatus
@@ -228,7 +236,7 @@ class _ResultSheet:
         name = f"{course.code} {course.title}" if course else "a course"
         sec = f" ({off.term_label}{', section ' + off.section_label if off and off.section_label else ''})" if off else ""
         return Item("RESULT_APPROVE", s.course_offering_id, s.submitted_by, f"Result sheet: {name}{sec}", s.submitted_at, None,
-                    await _teacher_ctx(session, s.course_offering_id), "/dashboard/admin/result-sheets")
+                    await _teacher_ctx(session, s.course_offering_id) | {"offering_id": s.course_offering_id}, "/dashboard/admin/result-sheets")
 
     async def pending(self, session):
         from app.academics.models import ResultSheet, ResultSheetStatus
@@ -262,16 +270,40 @@ BY_ACTION = {a: ad for ad in ADAPTERS for a in ad.actions}
 
 
 # ====================================================================== used everywhere
-async def can(session: AsyncSession, user, item: Item) -> bool:
+async def in_scope(session: AsyncSession, user, item: Item) -> bool:
+    """Inside this person's department / program limits (Access control; a HOD: their department)? Administrators and
+    people without limits: always."""
+    from app.access import scope as S
+
+    sc = await S.get_scope(session, user)
+    if sc is None or sc.empty:
+        return True
+    ctx = item.ctx or {}
+    if ctx.get("offering_id"):
+        return await S.allows_offering(session, sc, ctx["offering_id"])
+    if ctx.get("student_program"):
+        return S.allows_student_program(sc, ctx["student_program"])
+    if item.action == "STAFF_LEAVE":
+        return S.allows_department(sc, ctx.get("department"))
+    return True
+
+
+async def can(session: AsyncSession, user, item: Item, *, admin_fallback: bool = True) -> bool:
+    if not await in_scope(session, user, item):
+        return False
     ad = BY_ACTION[item.action]
     return await rules.may_decide(session, item.action, user, requester_id=item.requester_id, amount=item.amount, ctx=item.ctx,
-                                  default_ok=await ad.default_ok(session, user, item))
+                                  default_ok=await ad.default_ok(session, user, item), admin_fallback=admin_fallback)
 
 
 async def check(session: AsyncSession, action: str, user, item_id) -> Item:
     """For a module's own decide endpoint: may this person decide this request (rules included)? Raises if not."""
     ad = BY_ACTION[action]
     item = await ad.item(session, item_id)
+    if not await in_scope(session, user, item):
+        from app.core.exceptions import AuthorizationError
+
+        raise AuthorizationError("This is outside the departments / programs you are limited to.")
     await rules.check_decider(session, item.action, user, requester_id=item.requester_id, amount=item.amount, ctx=item.ctx,
                               default_ok=await ad.default_ok(session, user, item))
     return item
@@ -284,7 +316,8 @@ async def mine(session: AsyncSession, user) -> list[dict]:
         for item in await ad.pending(session):
             if item.requester_id is not None and str(item.requester_id) == str(user.id):
                 continue
-            if await can(session, user, item):
+            # an Administrator CAN decide anything, but their list shows only what is theirs (named, or theirs without rules)
+            if await can(session, user, item, admin_fallback=False):
                 res = await rules.effective(session, item.action, requester_id=item.requester_id, amount=item.amount, ctx=item.ctx)
                 out.append({"action": item.action, "label": rules.BY_KEY[item.action].label if item.action in rules.BY_KEY else item.action,
                             "id": item.id, "summary": item.summary, "amount": item.amount, "at": item.at, "link": item.link,

@@ -507,7 +507,7 @@ class AccessService:
         return [{"id": r.id, "kind": r.kind, "target": r.target_label, "target_type": r.target_type, "summary": r.summary,
                  "by": names.get(r.actor_id), "at": r.created_at, "undone_at": r.undone_at, "undone_by": names.get(r.undone_by),
                  "undo_of": r.undo_of, "confirmed_by_second_admin": r.approval_request_id is not None,
-                 "can_undo": r.undone_at is None and r.kind in ("ROLE_RIGHTS", "PERSON_RIGHTS", "PERSON_ROLES", "ROLE_CREATED", "APPROVAL_RULES")} for r in rows]
+                 "can_undo": r.undone_at is None and r.kind in ("ROLE_RIGHTS", "PERSON_RIGHTS", "PERSON_ROLES", "ROLE_CREATED", "APPROVAL_RULES", "PERSON_SCOPE")} for r in rows]
 
     async def undo(self, change_id, *, actor_id) -> dict:
         ch = await self.session.get(AccessChange, uuid.UUID(str(change_id)))
@@ -521,6 +521,10 @@ class AccessService:
             result = await self.set_person(ch.target_id, overrides=(ch.before or {}).get("overrides", []), actor_id=actor_id, undo_of=ch.id)
         elif ch.kind == "PERSON_ROLES":
             result = await self.set_person_roles((ch.before or {})["employee_id"], (ch.before or {}).get("extra_roles", []),
+                                                 actor_id=actor_id, undo_of=ch.id)
+        elif ch.kind == "PERSON_SCOPE":
+            b = ch.before or {}
+            result = await self.set_person_scope(ch.target_id, departments=b.get("departments", []), programs=b.get("programs", []),
                                                  actor_id=actor_id, undo_of=ch.id)
         elif ch.kind == "APPROVAL_RULES":
             result = await self.set_rules((ch.before or {})["action"], (ch.before or {}).get("rules", []), actor_id=actor_id, undo_of=ch.id)
@@ -808,6 +812,77 @@ class AccessService:
         return {"no_approval": res.no_approval, "text": res.text, "people": sorted(names.get(i, "?") for i in ids),
                 "note": "Course-teacher rules depend on the class, so they are shown when a real request is made." if res.approver_type == "COURSE_TEACHER" else None}
 
+
+
+    # ------------------------------------------------------------------ department / program limits
+    async def scope_choices(self) -> dict:
+        from app.employees.models import Employee
+        from app.programs.models import Program
+
+        deps = sorted({" ".join(d.split()) for (d,) in (await self.session.execute(select(Employee.department).where(Employee.department.is_not(None)))).all()
+                       if d and d.strip()}, key=str.lower)
+        progs = (await self.session.execute(select(Program).order_by(Program.code))).scalars().all()
+        return {"departments": deps, "programs": [{"id": p.id, "code": p.code, "name": p.name} for p in progs]}
+
+    async def _scope_rows(self, user_id) -> dict:
+        from app.access.scope_models import AccessScope
+
+        rows = (await self.session.execute(select(AccessScope).where(AccessScope.user_id == user_id))).scalars().all()
+        return {"departments": sorted({r.value for r in rows if r.kind == "DEPARTMENT"}, key=str.lower),
+                "programs": sorted({r.value for r in rows if r.kind == "PROGRAM"})}
+
+    async def get_person_scope(self, user_id) -> dict:
+        from app.access.scope import describe, get_scope
+        from app.auth.schemas import CurrentUser
+
+        user = await self._staff_user(user_id)
+        roles, rights, _e = await effective(self.session, user.id)
+        cu = CurrentUser(id=user.id, username=user.username, roles=roles, permissions=rights, must_change_password=False)
+        sc = await get_scope(self.session, cu)
+        return {**await self._scope_rows(user.id), "now": await describe(self.session, sc), "hod_default": bool(sc and sc.source == "hod"),
+                "is_admin": Roles.ADMIN in roles}
+
+    async def set_person_scope(self, user_id, *, departments: list[str], programs: list[str], actor_id, undo_of=None) -> dict:
+        from app.access.scope_models import AccessScope
+        from app.programs.models import Program
+
+        user = await self._staff_user(user_id)
+        if str(user.id) == str(actor_id):
+            raise BusinessRuleViolationError("You cannot change your own access. Ask another administrator.")
+        roles, _r, _e = await effective(self.session, user.id)
+        if Roles.ADMIN in roles:
+            raise BusinessRuleViolationError("Administrators are never limited; take the Administrator role away first.")
+        deps = sorted({" ".join((d or "").split()) for d in departments if d and d.strip()}, key=str.lower)
+        if any(len(d) > 120 for d in deps):
+            raise ValidationAppError("A department name is too long.")
+        progs = sorted({str(p) for p in programs if p})
+        if progs:
+            found = {str(i) for i in (await self.session.execute(select(Program.id).where(Program.id.in_([uuid.UUID(p) for p in progs])))).scalars()}
+            if set(progs) - found:
+                raise ValidationAppError("Unknown program.")
+        before = await self._scope_rows(user.id)
+        after = {"departments": deps, "programs": progs}
+        if before == after:
+            return {"done": True, "changed": False}
+        for r in (await self.session.execute(select(AccessScope).where(AccessScope.user_id == user.id))).scalars().all():
+            await self.session.delete(r)
+        await self.session.flush()
+        for d in deps:
+            self.session.add(AccessScope(user_id=user.id, kind="DEPARTMENT", value=d, created_by=actor_id))
+        for p in progs:
+            self.session.add(AccessScope(user_id=user.id, kind="PROGRAM", value=p, created_by=actor_id))
+        await self.session.flush()
+        names = await self._names([user.id])
+        who = names.get(user.id) or user.username
+        codes = dict((await self.session.execute(select(Program.id, Program.code))).all())
+        words = [codes.get(uuid.UUID(p), p) for p in progs] + deps
+        await self._record(kind="PERSON_SCOPE", target_type="USER", target_id=user.id, label=who,
+                           summary=f"{who}: limited to " + (", ".join(words) if words else "nothing (no limits)"),
+                           before=before, after=after, actor_id=actor_id, undo_of=undo_of)
+        await _tell(self.session, [user.id], "Your access changed",
+                    "You now work within: " + ", ".join(words) + "." if words else "Your department / program limits were removed.")
+        _forget(user.id)
+        return {"done": True, "changed": True}
 
 
 async def end_date_round(session: AsyncSession) -> int:

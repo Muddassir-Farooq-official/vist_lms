@@ -79,18 +79,53 @@ async def submit(offering_id: uuid.UUID, current_user: CurrentUser = Depends(get
 
 
 # ============================================================ the approver
+async def _in_scope(db, user, rows: list[dict], key: str = "course_offering_id") -> list[dict]:
+    """Only the classes inside this person's department / program limits (Access control); everything when not limited."""
+    from app.access.scope import allowed_offering_ids, get_scope
+
+    scope = await get_scope(db, user)
+    if scope is None or scope.empty:
+        return rows
+    ok = await allowed_offering_ids(db, scope, {r.get(key) for r in rows})
+    return [r for r in rows if r.get(key) in ok]
+
+
+async def _offering_in_scope(db, user, offering_id) -> None:
+    from app.access.scope import allows_offering, get_scope
+
+    if not await allows_offering(db, await get_scope(db, user), offering_id):
+        raise AuthorizationError("This class is outside the departments / programs you are limited to.")
+
+
+async def _program_in_scope(db, user, program_id) -> None:
+    from app.access.scope import allows_student_program, get_scope
+
+    if not allows_student_program(await get_scope(db, user), program_id):
+        raise AuthorizationError("This program is outside the programs you are limited to.")
+
+
+async def _student_in_scope(db, user, student_id) -> None:
+    from app.students.models import Student
+
+    s = await db.get(Student, student_id)
+    if s is not None:
+        await _program_in_scope(db, user, s.program_id)
+
+
 @router.get("/sheets", summary="Result sheets by status (approver)")
 async def sheets(status: ResultSheetStatus | None = None, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> list[dict]:
-    return await ResultSheetService(db).listing(status)
+    return await _in_scope(db, current_user, await ResultSheetService(db).listing(status))
 
 
 @router.get("/sheets-outstanding", summary="Courses whose marks have not been submitted yet (draft, sent back or not started) -- who to chase (approver)")
 async def sheets_outstanding(current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> list[dict]:
-    return await ResultSheetService(db).outstanding()
+    rows = await ResultSheetService(db).outstanding()
+    return await _in_scope(db, current_user, rows, "course_offering_id" if rows and "course_offering_id" in rows[0] else "offering_id")
 
 
 @router.get("/sheets/{offering_id}", summary="One subject's marks for the whole class, with each student's projected result (approver)")
 async def review(offering_id: uuid.UUID, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
+    await _offering_in_scope(db, current_user, offering_id)
     from app.academics.affiliation import university_parts_for_offering
     from app.academics.grading_schemes import COMPONENT_LABELS
 
@@ -124,6 +159,7 @@ async def return_sheet(offering_id: uuid.UUID, payload: ReturnIn, current_user: 
 
 @router.post("/sheets/{offering_id}/publish", summary="Publish an approved sheet: students see their marks and pass/fail is decided (approver)")
 async def publish(offering_id: uuid.UUID, payload: PublishIn | None = None, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
+    await _offering_in_scope(db, current_user, offering_id)
     service = ResultSheetService(db)
     await service.publish(offering_id, actor_id=current_user.id, override_reason=payload.override_reason if payload else None,
                           actor_is_admin=Roles.ADMIN in current_user.roles)
@@ -132,7 +168,16 @@ async def publish(offering_id: uuid.UUID, payload: PublishIn | None = None, curr
 
 @router.post("/publish-approved", summary="Publish every approved sheet at once -- for result day (approver)")
 async def publish_all(current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
-    return await ResultSheetService(db).publish_all_approved(actor_id=current_user.id)
+    from app.access.scope import allowed_offering_ids, get_scope
+    from app.academics.models import ResultSheet
+
+    scope = await get_scope(db, current_user)
+    only = None
+    if scope is not None and not scope.empty:
+        from sqlalchemy import select as _select
+
+        only = await allowed_offering_ids(db, scope, set((await db.execute(_select(ResultSheet.course_offering_id))).scalars()))
+    return await ResultSheetService(db).publish_all_approved(actor_id=current_user.id, only=only)
 
 
 # ============================================================ the grading scale
@@ -384,6 +429,7 @@ class UndoIn(BaseModel):
 
 @router.get("/class", summary="A class's results for a term: GPA (or total/%/division), status and position (approver)")
 async def class_results(program_id: uuid.UUID, semester: int, term_label: str, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
+    await _program_in_scope(db, current_user, program_id)
     from app.academics.promotion import ClassResultService
 
     return await ClassResultService(db).build(program_id=program_id, semester=semester, term_label=term_label)
@@ -391,6 +437,7 @@ async def class_results(program_id: uuid.UUID, semester: int, term_label: str, c
 
 @router.get("/class/result-cards.pdf", summary="Semester (year) result cards, one page per student (approver)")
 async def class_result_cards(program_id: uuid.UUID, semester: int, term_label: str, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> Response:
+    await _program_in_scope(db, current_user, program_id)
     from app.academics.promotion import ClassResultService
     from app.academics.result_documents_pdf import render_result_cards
 
@@ -400,6 +447,7 @@ async def class_result_cards(program_id: uuid.UUID, semester: int, term_label: s
 
 @router.get("/class/gazette.pdf", summary="Result gazette / notification for a program, semester and term (approver)")
 async def class_gazette(program_id: uuid.UUID, semester: int, term_label: str, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> Response:
+    await _program_in_scope(db, current_user, program_id)
     from app.academics.promotion import ClassResultService
     from app.academics.result_documents_pdf import render_gazette
 
@@ -409,6 +457,7 @@ async def class_gazette(program_id: uuid.UUID, semester: int, term_label: str, c
 
 @router.post("/class/promote", summary="Move the chosen students to the next semester (year) (approver; can be undone)")
 async def promote(payload: PromoteIn, current_user: CurrentUser = Depends(approver), db=Depends(get_db)) -> dict:
+    await _program_in_scope(db, current_user, payload.program_id)
     from app.academics.promotion import ClassResultService
 
     return await ClassResultService(db).promote(program_id=payload.program_id, semester=payload.semester, student_ids=payload.student_ids, actor_id=current_user.id)
@@ -460,11 +509,13 @@ async def my_transcript_pdf(current_user: CurrentUser = Depends(get_current_user
 
 @router.get("/students/{student_id}/transcript", summary="Any student's result card (approver)")
 async def student_transcript(student_id: uuid.UUID, current_user: CurrentUser = Depends(transcript_reader), db=Depends(get_db)) -> dict:
+    await _student_in_scope(db, current_user, student_id)
     return await TranscriptService(db).build(student_id)
 
 
 @router.get("/students/{student_id}/transcript.pdf", summary="Any student's result card as a PDF (approver)")
 async def student_transcript_pdf(student_id: uuid.UUID, current_user: CurrentUser = Depends(transcript_reader), db=Depends(get_db)) -> Response:
+    await _student_in_scope(db, current_user, student_id)
     await _not_held(db, student_id)
     return await _pdf(await TranscriptService(db).build(student_id))
 

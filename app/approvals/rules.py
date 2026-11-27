@@ -244,7 +244,7 @@ async def effective(session: AsyncSession, action: str, *, requester_id, amount=
 
 
 async def may_decide(session: AsyncSession, action: str, user, *, requester_id, amount=None, ctx: dict | None = None,
-                     default_ok: bool) -> bool:
+                     default_ok: bool, admin_fallback: bool = True) -> bool:
     """Whether this signed-in person may approve or reject this request now. Without a rule naming someone, exactly the
     module's own check (which keeps its own rules about deciding your own request)."""
     res = await effective(session, action, requester_id=requester_id, amount=amount, ctx=ctx)
@@ -252,7 +252,7 @@ async def may_decide(session: AsyncSession, action: str, user, *, requester_id, 
         return default_ok
     if requester_id is not None and str(user.id) == str(requester_id):
         return False
-    if Roles.ADMIN in (user.roles or []):
+    if admin_fallback and Roles.ADMIN in (user.roles or []):
         return True
     return uuid.UUID(str(user.id)) in set(await approvers(session, res, requester_id=requester_id, ctx=ctx))
 

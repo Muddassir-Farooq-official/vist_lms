@@ -162,12 +162,24 @@ async def get_current_user(
     return current_user
 
 
+def _missing(*codes: str) -> str:
+    """'You do not have the right to: Set salaries. Ask an administrator (Access control).' -- plain words, with the
+    code kept at the end for support."""
+    try:
+        from app.access.catalog import label
+
+        words = " or ".join(label(c) for c in codes)
+    except Exception:  # noqa: BLE001
+        words = " or ".join(codes)
+    return f"You do not have the right to: {words}. Ask an administrator to give it to you (Access control). [Missing required permission: {codes[0]}]"
+
+
 def require_permission(permission_code: str):
     """Dependency factory: `Depends(require_permission(Permissions.STUDENT_IMPORT))`."""
 
     async def _check(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
         if permission_code not in current_user.permissions:
-            raise AuthorizationError(f"Missing required permission: {permission_code}")
+            raise AuthorizationError(_missing(permission_code))
         return current_user
 
     return _check
@@ -178,7 +190,7 @@ def require_any_permission(*permission_codes: str):
 
     async def _check(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
         if not set(permission_codes) & set(current_user.permissions):
-            raise AuthorizationError(f"Missing required permission: {permission_codes[0]}")
+            raise AuthorizationError(_missing(*permission_codes))
         return current_user
 
     return _check

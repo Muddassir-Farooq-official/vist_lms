@@ -1,5 +1,23 @@
 [
   {
+    "version": "1.73.0",
+    "date": "2026-11-27",
+    "title": "Limit people to their programs and departments",
+    "summary": "A staff member can be limited to some programs and/or departments: they then see and work only on those.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Access control → People → Limit to: tick programs and/or departments. Timetables, attendance, results, students and requests to decide then show only what is inside."
+      },
+      {
+        "kind": "improved",
+        "for": "Heads of Department",
+        "text": "The own-department rule now also applies to My decisions, results and the reports, consistently."
+      }
+    ]
+  },
+  {
     "version": "1.72.0",
     "date": "2026-11-27",
     "title": "Who approves what",

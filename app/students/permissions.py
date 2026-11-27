@@ -27,3 +27,13 @@ def assert_can_view_student(current_user: CurrentUser, student: Student) -> None
         # what's explicitly wired through an assigned-section endpoint.
         raise AuthorizationError("Teacher access to student records is scoped by course section.")
     raise AuthorizationError("You do not have access to this student record.")
+
+async def assert_student_in_scope(db, current_user: CurrentUser, student: Student) -> None:
+    """Someone limited to some programs (Access control -> People) only opens their programs' students. A student
+    opening their own record is never limited."""
+    if student.user_id is not None and str(student.user_id) == str(current_user.id):
+        return
+    from app.access.scope import allows_student_program, get_scope
+
+    if not allows_student_program(await get_scope(db, current_user), student.program_id):
+        raise AuthorizationError("This student is outside the programs you are limited to.")

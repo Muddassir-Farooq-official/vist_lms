@@ -1009,7 +1009,8 @@
   const performanceEmpty = document.getElementById("performance-empty");
 
   async function loadTeacherPerformance() {
-    const result = await VA.fetchJson("/api/v1/academics/teacher-performance");
+    const result = await VA.fetchJson("/api/v1/academics/teacher-performance", { quiet: true });
+    if (result.status === 403) return;              // not this person's right: the tab is hidden (data-need)
     if (!result.ok) {
       VA.showError(extractErrorMessage(result.body, "Could not load teacher performance."));
       return;

@@ -48,6 +48,7 @@ from app.inventory import models as _inventory_models  # noqa: F401
 from app.assets import models as _assets_models  # noqa: F401
 from app.approvals import models as _approvals_models  # noqa: F401
 from app.access import models as _access_models  # noqa: F401
+from app.access import scope_models as _access_scope_models  # noqa: F401
 from app.branding import models as _branding_models  # noqa: F401
 from app.selfservice import models as _selfservice_models  # noqa: F401
 from app.timekeeping import models as _timekeeping_models  # noqa: F401

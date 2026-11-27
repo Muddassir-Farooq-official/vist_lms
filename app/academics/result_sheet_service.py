@@ -235,8 +235,10 @@ class ResultSheetService:
                                       message=f"{decided} students can now see their results.", link="/dashboard/faculty/grading")
         return sheet
 
-    async def publish_all_approved(self, *, actor_id: uuid.UUID) -> dict:
+    async def publish_all_approved(self, *, actor_id: uuid.UUID, only: set | None = None) -> dict:
         ids = list((await self.session.execute(select(ResultSheet.course_offering_id).where(ResultSheet.status == ResultSheetStatus.APPROVED))).scalars())
+        if only is not None:                                   # limited to some departments / programs (Access control)
+            ids = [i for i in ids if i in only]
         done, failed = [], []
         for oid in ids:
             try:

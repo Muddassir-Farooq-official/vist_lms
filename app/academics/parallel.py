@@ -301,9 +301,13 @@ class ParallelRequest(BaseModel):
 
 @router.get("", summary="Several batch terms side by side, with the free periods of each group of students -- admin")
 async def parallel_view(terms: str, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
-    return await ParallelTimetableService(db).view([t for t in terms.split("||") if t.strip()])
+    from app.timetabling.router import _scoped
+
+    return await ParallelTimetableService(db).view(await _scoped(db, current_user, [t for t in terms.split("||") if t.strip()]))
 
 
 @router.post("/auto-fill", summary="Propose (preview) or add classes in the free periods of the chosen batch terms -- admin")
 async def parallel_auto_fill(payload: ParallelRequest, current_user: CurrentUser = Depends(manage), db=Depends(get_db)) -> dict:
-    return await ParallelTimetableService(db).auto_fill(payload.terms, preview=payload.preview, actor_id=current_user.id)
+    from app.timetabling.router import _scoped
+
+    return await ParallelTimetableService(db).auto_fill(await _scoped(db, current_user, payload.terms), preview=payload.preview, actor_id=current_user.id)

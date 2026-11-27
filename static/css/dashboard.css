@@ -4477,3 +4477,5 @@ details.tg-session > summary.tg-head { cursor: pointer; }
 .ap-card small { display: inline; }
 .ap-rules td { vertical-align: middle; }
 .ap-none { margin: 4px 0 0; }
+.ac-scope { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.ap-about { font-size: 0.9rem; margin: 2px 0; }

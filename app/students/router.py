@@ -30,7 +30,7 @@ from app.core.storage import (
     save_uploaded_file,
 )
 from app.students.models import Student, StudentStatus
-from app.students.permissions import assert_can_view_student
+from app.students.permissions import assert_can_view_student, assert_student_in_scope
 from app.students.repository import StudentRepository
 from app.students.schemas import (
     AdvanceSemesterRequest,
@@ -119,8 +119,11 @@ async def list_students(
     from app.students.family import guardian_labels, sees_guardians
 
     fees_office = sees_guardians(current_user)
+    from app.access.scope import get_scope
+
+    scope = await get_scope(db, current_user)              # limited to some programs (Access control): only their students
     result = await StudentService(db).search_students(page=page, query=q, program_id=program_id, status=status, semester=semester, section=section,
-                                                      guardians=fees_office)
+                                                      guardians=fees_office, programs=set(scope.programs) if scope and scope.programs else None)
     family = await guardian_labels(db, [s.id for s in result.items]) if fees_office else {}
     ids = {s.program_id for s in result.items if s.program_id}
     programs = {p.id: p for p in (await db.execute(select(Program).where(Program.id.in_(ids)))).scalars()} if ids else {}
@@ -311,6 +314,7 @@ async def get_student(
 ) -> StudentAdminDetail:
     student = await StudentService(db).get_student(student_id)
     assert_can_view_student(current_user, student)
+    await assert_student_in_scope(db, current_user, student)
     return await _to_admin_detail(db, student)
 
 
@@ -532,6 +536,7 @@ async def admin_get_photo(
 ) -> Response:
     student = await StudentService(db).get_student(student_id)
     assert_can_view_student(current_user, student)
+    await assert_student_in_scope(db, current_user, student)
     return _serve_file(student.photo_storage_key, student.photo_original_name, "image/jpeg")
 
 
@@ -560,6 +565,7 @@ async def admin_get_certificate(
 ) -> Response:
     student = await StudentService(db).get_student(student_id)
     assert_can_view_student(current_user, student)
+    await assert_student_in_scope(db, current_user, student)
     return _serve_file(student.certificate_storage_key, student.certificate_original_name, "application/pdf")
 
 
@@ -592,6 +598,7 @@ async def get_student_full_profile(
 ) -> StudentFullProfileResponse:
     student = await StudentService(db).get_student(student_id)
     assert_can_view_student(current_user, student)
+    await assert_student_in_scope(db, current_user, student)
 
     address_fields = await _address_fields(db, student_id)
 
