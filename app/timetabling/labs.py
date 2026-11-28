@@ -72,7 +72,7 @@ def suggestion(course, offering) -> dict | None:
     if have == (theory, lab):
         return None
     def n(x, word):
-        return f"{x} {word}" + ("" if x == 1 else "s")
+        return f"{x} {word}" + ("" if x == 1 else ("es" if word.endswith("s") else "s"))
     total_t = (course.credit_hours or 0) - (course.lab_credit_hours or 0)
     return {"classes_per_week": theory + lab, "labs": lab, "theory": theory,
             "text": f"{course.code} is {total_t}+{course.lab_credit_hours} in the course catalog: {n(theory, 'theory class')} and "

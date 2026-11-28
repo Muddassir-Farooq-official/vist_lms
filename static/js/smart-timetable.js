@@ -254,7 +254,7 @@
           ? '<small>Same course in ' + esc(s.can_combine.with.join(", ")) + "</small><br>" + window.VistCombine.controls(s.can_combine)
           : '<span class="sd-dim">—</span>';
       return '<tr data-id="' + esc(s.id) + '"><td><strong>' + esc(s.code) + "</strong> " + esc(s.title) + "</td><td>" + esc(s.section) +
-        "</td><td>" + esc(s.term) + '</td><td class="co-cell">' + together + '</td><td class="num">' + esc(s.credit_hours) + "</td>" +
+        "</td><td>" + esc(s.term) + '</td><td class="co-cell">' + together + '</td><td class="num">' + esc(s.credit_hours) + (s.lab_credit_hours ? '<small class="crs-split">' + esc(s.credit_hours - s.lab_credit_hours) + "+" + esc(s.lab_credit_hours) + "</small>" : "") + "</td>" +
         '<td><input type="number" class="text-input stt-num" min="1" max="7" data-f="classes_per_week" value="' + esc(s.classes_per_week || "") + '" placeholder="' + esc(s.per_week) + '" aria-label="Classes a week" /></td>' +
         '<td>' + labsSelect(s) + '</td>' +
         '<td><select class="select-input" data-f="home_room" aria-label="Home room"><option value="">(any)</option>' + rooms.map(function (x) {
