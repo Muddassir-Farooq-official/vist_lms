@@ -70,7 +70,7 @@
     $("class-list").innerHTML = list.map(function (e) {
       const live = e.session_date === today && e.start_time.slice(0, 5) <= now && e.end_time.slice(0, 5) > now;
       return '<li class="' + (live ? "live" : "") + '"><span class="ag-time"><b>' + esc(dayName(e.session_date)) + "</b>" + esc(t(e.start_time)).replace(/\s?[AP]M$/i, "") +
-        '</span><span class="ag-body"><strong>' + esc(e.course_code) + " · " + esc(e.course_title) + (live ? ' <span class="ev-kind kind-holiday">Now</span>' : "") +
+        '</span><span class="ag-body"><strong>' + esc(e.course_code) + " · " + esc(e.course_title) + (e.is_lab ? ' <span class="tt-lab">Lab</span>' : "") + (live ? ' <span class="ev-kind kind-holiday">Now</span>' : "") +
         "</strong><small>" + esc(t(e.start_time)) + "–" + esc(t(e.end_time)) + " · Room " + esc(e.room) + (e.teacher_name ? " · " + esc(e.teacher_name) : "") + (e.title ? " · " + esc(e.title) : "") + "</small></span>" +
         '<button type="button" class="icon-btn ag-ics" data-ics="' + esc(e.id) + '" data-name="' + esc(e.course_code + "-" + e.session_date) + '" aria-label="Add to calendar" title="Add to calendar">' +
         '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M12 14v4M10 16h4"/></svg></button></li>';
@@ -226,7 +226,7 @@
     const todays = (d.schedule || []).filter(function (e) { return e.session_date === today; }).sort(function (a, b) { return a.start_time.localeCompare(b.start_time); });
     let html = todays.map(function (e) {
       const live = e.start_time.slice(0, 5) <= now && e.end_time.slice(0, 5) > now, past = e.end_time.slice(0, 5) <= now;
-      return li(esc(t(e.start_time)) + " · " + esc(e.course_code) + (live ? ' <span class="ev-kind kind-holiday">Now</span>' : ""), "Room " + esc(e.room) + (e.teacher_name ? " · " + esc(e.teacher_name) : ""), live ? "live" : past ? "past" : "", "/dashboard/student/timetable");
+      return li(esc(t(e.start_time)) + " · " + esc(e.course_code) + (e.is_lab ? ' <span class="tt-lab">Lab</span>' : "") + (live ? ' <span class="ev-kind kind-holiday">Now</span>' : ""), "Room " + esc(e.room) + (e.teacher_name ? " · " + esc(e.teacher_name) : ""), live ? "live" : past ? "past" : "", "/dashboard/student/timetable");
     }).join("");
     if (!html) {
       const nxt = upcomingClasses(d.schedule)[0];

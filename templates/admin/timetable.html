@@ -119,14 +119,15 @@
 <div class="portal-tab-panel" data-tab-panel="sections" hidden>
 <section class="panel">
   <div class="panel-header"><div class="panel-header-left"><div class="panel-icon-badge">{{ nav_icon("dashboard") }}</div><h2>4. Classes a week &amp; labs</h2></div></div>
-  <p class="panel-hint">Classes a week start at the course's credit hours; change them where needed. Tick <strong>Lab (double)</strong> for a lab or practical:
-    each class is two back-to-back periods in a lab room. The <strong>home room</strong> is used when it is free. A combined class keeps the same settings in all its sections.
+  <p class="panel-hint">Classes a week start at the course's credit hours; change them where needed. Under <strong>Labs</strong>, say how many of those classes are labs or practicals:
+    a lab is two back-to-back periods in a lab room. For example, 3 classes a week with <em>1 lab</em> gives two single theory periods and one lab double period;
+    <em>All</em> makes every class a lab. Labs show with a <strong>Lab</strong> label on everyone's timetable. The <strong>home room</strong> is used when it is free. A combined class keeps the same settings in all its sections.
     Changes are saved straight away. The batch terms chosen in step 1 are loaded for you.</p>
   <div class="pt-terms" id="ss-terms"><span class="sd-dim">Loading terms…</span></div>
   <div class="stt-actions"><button type="button" class="role-btn" id="ss-show">Show sections</button></div>
   <p id="ss-error" class="dash-alert error" role="alert" hidden></p>
   <table class="dash-table" id="ss-table" hidden>
-    <thead><tr><th>Course</th><th>Section</th><th>Term</th><th>Taught together</th><th class="num">Credit hrs</th><th>Classes a week</th><th>Lab (double)</th><th>Home room</th><th></th></tr></thead>
+    <thead><tr><th>Course</th><th>Section</th><th>Term</th><th>Taught together</th><th class="num">Credit hrs</th><th>Classes a week</th><th>Labs</th><th>Home room</th><th></th></tr></thead>
     <tbody id="ss-tbody"></tbody>
   </table>
 </section>

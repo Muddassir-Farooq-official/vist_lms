@@ -86,7 +86,9 @@ class PublishIn(BaseModel):
 
 class SectionIn(BaseModel):
     classes_per_week: int | None = Field(default=None, ge=1, le=7)
-    double_period: bool = False
+    double_period: bool = False              # every class is a lab (double period)
+    lab_classes_per_week: int | None = Field(default=None, ge=0, le=7)   # some classes are labs; empty = leave as it is
+    labs_as_catalog: bool = False            # labs as the course catalog says (its lab credit hours)
     home_room: str | None = Field(default=None, max_length=50)
 
 
@@ -239,8 +241,10 @@ async def update_section(offering_id: uuid.UUID, payload: SectionIn, current_use
     _no_view_as(current_user)
     await _offering_scoped(db, current_user, [offering_id])
     o = await SmartTimetableService(db).update_section(offering_id, classes_per_week=payload.classes_per_week, double_period=payload.double_period,
-                                                       home_room=payload.home_room, actor_id=current_user.id)
-    return {"id": o.id, "classes_per_week": o.classes_per_week, "double_period": o.double_period, "home_room": o.home_room}
+                                                       home_room=payload.home_room, actor_id=current_user.id,
+                                                       lab_classes_per_week=payload.lab_classes_per_week, labs_as_catalog=payload.labs_as_catalog)
+    return {"id": o.id, "classes_per_week": o.classes_per_week, "double_period": o.double_period,
+            "lab_classes_per_week": o.lab_classes_per_week, "home_room": o.home_room}
 
 
 # ------------------------------------------------------------------ teachers' unavailable times

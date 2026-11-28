@@ -227,6 +227,18 @@
 
   // ================================================================== sections
   let rooms = [];
+  // Labs a week: none, some (that many of the classes are double periods, the rest single theory periods) or all
+  function labsSelect(s) {
+    const cat = s.lab_credit_hours || 0;
+    const cur = s.double_period ? "all" : s.lab_classes_per_week === null || s.lab_classes_per_week === undefined ? "" : String(s.lab_classes_per_week);
+    const opts = [["", "As catalog (" + (cat ? cat + (cat === 1 ? " lab" : " labs") : "none") + ")"], ["0", "None"]];
+    for (let i = 1; i <= 6; i++) opts.push([String(i), i + (i === 1 ? " lab" : " labs")]);
+    opts.push(["all", "All (every class)"]);
+    return '<select class="select-input stt-labs" data-f="labs" aria-label="Labs a week (double periods)" title="How many of the weekly classes are labs: two back-to-back periods in a lab">' +
+      opts.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === cur ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select>" +
+      (s.suggest ? '<small class="stt-suggest">' + esc(s.suggest.text) + ' <button type="button" class="link-btn stt-use-catalog">Use the catalog</button></small>' : "");
+  }
+
   async function showSections() {
     const t = checked($("ss-terms"));
     const err = $("ss-error");
@@ -244,7 +256,7 @@
       return '<tr data-id="' + esc(s.id) + '"><td><strong>' + esc(s.code) + "</strong> " + esc(s.title) + "</td><td>" + esc(s.section) +
         "</td><td>" + esc(s.term) + '</td><td class="co-cell">' + together + '</td><td class="num">' + esc(s.credit_hours) + "</td>" +
         '<td><input type="number" class="text-input stt-num" min="1" max="7" data-f="classes_per_week" value="' + esc(s.classes_per_week || "") + '" placeholder="' + esc(s.per_week) + '" aria-label="Classes a week" /></td>' +
-        '<td><input type="checkbox" data-f="double_period"' + (s.double_period ? " checked" : "") + ' aria-label="Lab, double period" /></td>' +
+        '<td>' + labsSelect(s) + '</td>' +
         '<td><select class="select-input" data-f="home_room" aria-label="Home room"><option value="">(any)</option>' + rooms.map(function (x) {
           return '<option' + (x.name === s.home_room ? " selected" : "") + ">" + esc(x.name) + "</option>";
         }).join("") + "</select></td><td class=\"sd-dim\" data-status></td></tr>";
@@ -266,11 +278,31 @@
     if (!tr || e.target.classList.contains("co-teacher")) return;
     const get = function (f) { return tr.querySelector('[data-f="' + f + '"]'); };
     const n = get("classes_per_week").value.trim();
-    const body = { classes_per_week: n ? parseInt(n, 10) : null, double_period: get("double_period").checked, home_room: get("home_room").value || null };
+    const labs = get("labs").value;
+    const body = { classes_per_week: n ? parseInt(n, 10) : null, double_period: labs === "all", labs_as_catalog: labs === "",
+                   lab_classes_per_week: labs === "all" || labs === "" ? null : parseInt(labs, 10), home_room: get("home_room").value || null };
     const st = tr.querySelector("[data-status]");
     st.textContent = "Saving…";
     const r = await VA.fetchJson(API + "/sections/" + tr.dataset.id, json("PATCH", body));
     st.textContent = r.ok ? "Saved" : msg(r, "Not saved");
+    if (r.ok) await refreshRow(tr.dataset.id);          // the suggestion (if any) follows the new setting
+  });
+  async function refreshRow(id) {
+    await showSections();
+    const row = $("ss-tbody").querySelector('tr[data-id="' + id + '"] [data-status]');
+    if (row) row.textContent = "Saved";
+  }
+  // the course catalog says e.g. 3+1 and this section differs: one tap sets it as the catalog says
+  $("ss-tbody").addEventListener("click", async function (e) {
+    const b = e.target.closest(".stt-use-catalog");
+    if (!b) return;
+    const tr = b.closest("tr[data-id]");
+    const st = tr.querySelector("[data-status]");
+    st.textContent = "Saving…";
+    const r = await VA.fetchJson(API + "/sections/" + tr.dataset.id, json("PATCH", { classes_per_week: null, double_period: false, labs_as_catalog: true,
+      home_room: tr.querySelector('[data-f="home_room"]').value || null }));
+    st.textContent = r.ok ? "Saved" : msg(r, "Not saved");
+    if (r.ok) await refreshRow(tr.dataset.id);
   });
 
   // ================================================================== teachers

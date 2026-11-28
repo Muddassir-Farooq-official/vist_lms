@@ -1,5 +1,28 @@
 [
   {
+    "version": "1.74.0",
+    "date": "2026-11-28",
+    "title": "Theory and lab in one subject",
+    "summary": "Courses say their theory and lab credit hours (e.g. 3+1). The timetable gives such a subject its theory classes and its lab double periods, and labs show a Lab label on everyone's timetable.",
+    "changes": [
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Courses → Add / Edit: Theory credit hours and Lab / skills credit hours (0 by default). A 3+1 course has 4 credit hours in total and gets 3 theory classes and 1 lab (two back-to-back periods in a lab) a week on the smart timetable."
+      },
+      {
+        "kind": "new",
+        "for": "Administrators",
+        "text": "Timetable → Smart timetable → step 4: Labs is now a number (As catalog, None, 1, 2 … or All), so one section can have single theory periods and lab double periods. When a section is set differently from the catalog, it says so with a one-tap 'Use the catalog', and generating a draft warns about it."
+      },
+      {
+        "kind": "improved",
+        "for": "Everyone",
+        "text": "Lab periods show a Lab label on the weekly timetable, the printed timetable, class lists and home pages, and in calendar files."
+      }
+    ]
+  },
+  {
     "version": "1.73.0",
     "date": "2026-11-27",
     "title": "Limit people to their programs and departments",

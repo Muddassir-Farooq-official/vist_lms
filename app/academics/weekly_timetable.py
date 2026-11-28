@@ -29,6 +29,7 @@ from app.academics.repository import (
 from app.core.clock import institute_today
 from app.employees.models import Employee
 from app.programs.repository import ProgramRepository
+from app.timetabling.labs import lab_slot_ids
 
 WEEK_ORDER = [
     DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY,
@@ -162,6 +163,7 @@ class WeeklyTimetableService:
             if semester_number is not None and semester_number not in course_semesters:
                 continue
 
+            labs = lab_slot_ids(o, slots_by_offering.get(o.id, []), course)
             for slot in slots:
                 key = _row_key(slot.start_time, slot.end_time)
                 row_times[key] = (slot.start_time, slot.end_time)
@@ -170,7 +172,7 @@ class WeeklyTimetableService:
                     "offering_id": o.id, "course_code": course.code if course else "?",
                     "course_title": course.title if course else "?", "teacher_name": teacher_name,
                     "room": slot.room, "section_label": o.section_label, "program_codes": codes,
-                    "placements": placements,
+                    "placements": placements, "is_lab": slot.id in labs,
                 })
                 count += 1
 
@@ -388,7 +390,8 @@ def _render_pdf(data: dict, institute_name: str, density: int) -> bytes:
                 styles.append(("BACKGROUND", (c_i, r_i), (c_i, r_i), colors.HexColor("#eef1f5")))
             if density == 0:
                 for e in entries:
-                    flow.append(Paragraph(escape(e["course_code"]) + (f" ({escape(e['section_label'])})" if e["section_label"] not in ("", "A") else ""), code_style))
+                    flow.append(Paragraph(escape(e["course_code"]) + (f" ({escape(e['section_label'])})" if e["section_label"] not in ("", "A") else "")
+                                          + (" - Lab" if e.get("is_lab") else ""), code_style))
                     flow.append(Paragraph(escape(e["course_title"]), small))
                     extra = " - ".join(x for x in (f"Room {escape(e['room'])}" if e["room"] else "", escape(e["teacher_name"]) if e["teacher_name"] else "") if x)
                     flow.append(Paragraph(extra, small))
@@ -397,9 +400,11 @@ def _render_pdf(data: dict, institute_name: str, density: int) -> bytes:
                 for e in entries:
                     sec = f" ({escape(e['section_label'])})" if e["section_label"] not in ("", "A") else ""
                     room = f" - {escape(e['room'])}" if e["room"] else ""
-                    flow.append(Paragraph(f"<b>{escape(e['course_code'])}</b>{sec} {escape(e['course_title'][:26])}{room}", tiny))
+                    lab = " <b>Lab</b>" if e.get("is_lab") else ""
+                    flow.append(Paragraph(f"<b>{escape(e['course_code'])}</b>{sec}{lab} {escape(e['course_title'][:26])}{room}", tiny))
             else:
-                names = ", ".join(escape(e["course_code"]) + (f" ({escape(e['section_label'])})" if e["section_label"] not in ("", "A") else "") for e in entries)
+                names = ", ".join(escape(e["course_code"]) + (f" ({escape(e['section_label'])})" if e["section_label"] not in ("", "A") else "")
+                                  + (" Lab" if e.get("is_lab") else "") for e in entries)
                 flow.append(Paragraph(names, tiny))
             line_cells.append(flow or "")
             if entries:

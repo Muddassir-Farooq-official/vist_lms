@@ -1461,6 +1461,7 @@
 .tt-code { font-weight: 800; color: hsl(var(--h) 55% 22%); }
 .tt-name { color: var(--text-primary); }
 .tt-meta { margin-top: 2px; color: var(--text-secondary); font-size: 0.72rem; }
+.tt-lab { display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 999px; background: #1f6f54; color: #fff; font-size: 0.68rem; font-weight: 700; letter-spacing: .02em; vertical-align: middle; line-height: 1.5; }
 .tt-chip { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px; background: rgba(255,255,255,.75); font-size: 0.66rem; font-weight: 700; }
 
 /* Phones: the time column plus ONE day (chosen with the day buttons) */
@@ -3304,6 +3305,9 @@ form + .dt-scroll, .form-grid + .dt-scroll, .inline-form + .dt-scroll, .toolbar 
 .crs-title small { font-size: 0.78rem; color: var(--text-secondary); }
 .crs-now { font-style: normal; margin-left: 6px; padding: 1px 7px; border-radius: 99px; background: var(--success-bg); color: var(--success); font-size: 0.7rem; font-weight: 700; vertical-align: middle; }
 .crs-ch { font-variant-numeric: tabular-nums; }
+.crs-split { display: block; font-size: 0.72rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.stt-suggest { display: block; margin-top: 4px; font-size: 0.78rem; color: var(--warning, #9a6700); max-width: 34ch; }
+.stt-suggest .link-btn { font-size: 0.78rem; }
 .crs-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .crs-chip { display: inline-flex; gap: 4px; align-items: baseline; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--border); background: var(--surface); font-size: 0.8rem; color: var(--text-secondary); white-space: nowrap; }
 .crs-chip b { color: var(--text-primary); }

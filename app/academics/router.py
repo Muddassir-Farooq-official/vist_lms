@@ -88,6 +88,7 @@ from app.academics.schemas import (
 from app.academics.calendar_export import build_calendar
 from app.academics.weekly_timetable import WeeklyTimetableService, render_pdf
 from app.academics.service import AllocationService, ClassSessionService, CourseOfferingService, CourseProgressService, CourseService, EnrollmentService, PeriodService, TimetableService
+from app.timetabling.labs import lab_session_ids
 from app.auth.permissions import Permissions
 from app.auth.schemas import CurrentUser
 from app.core.clock import institute_today
@@ -377,7 +378,7 @@ async def create_course(
     db=Depends(get_db),
 ) -> CourseOut:
     course = await CourseService(db).create(
-        code=payload.code, title=payload.title, credit_hours=payload.credit_hours,
+        code=payload.code, title=payload.title, credit_hours=payload.credit_hours, lab_credit_hours=payload.lab_credit_hours,
         description=payload.description, actor_id=current_user.id,
     )
     return CourseOut.model_validate(course)
@@ -405,6 +406,8 @@ async def update_course(
         kwargs["title"] = payload.title
     if payload.credit_hours is not None:
         kwargs["credit_hours"] = payload.credit_hours
+    if payload.lab_credit_hours is not None:
+        kwargs["lab_credit_hours"] = payload.lab_credit_hours
     if "description" in payload.model_fields_set:
         kwargs["description"] = payload.description
     if payload.is_active is not None:
@@ -758,10 +761,9 @@ async def my_schedule(
     entries = []
     for offering in offerings:
         course = await CourseRepository(db).get_by_id(offering.course_id)
-        sessions = await session_service.list_for_offering(offering.id)
+        sessions = [x for x in await session_service.list_for_offering(offering.id) if x.status != ClassSessionStatus.CANCELLED]
+        labs = lab_session_ids(offering, sessions, course)
         for class_session in sessions:
-            if class_session.status == ClassSessionStatus.CANCELLED:
-                continue
             entries.append(
                 MyScheduleEntryOut(
                     id=class_session.id, course_offering_id=offering.id,
@@ -769,6 +771,7 @@ async def my_schedule(
                     term_label=offering.term_label, session_date=class_session.session_date,
                     start_time=class_session.start_time,
                     end_time=class_session.end_time, room=class_session.room, title=class_session.title,
+                    is_lab=class_session.id in labs,
                 )
             )
     entries.sort(key=lambda e: (e.session_date, e.start_time))
@@ -882,10 +885,9 @@ async def my_enrollments_schedule(
         course = await CourseRepository(db).get_by_id(offering.course_id)
         teacher = await db.get(Employee, offering.assigned_teacher_id) if offering.assigned_teacher_id else None
         teacher_name = f"{teacher.first_name} {teacher.last_name}" if teacher else None
-        sessions = await session_service.list_for_offering(offering.id)
+        sessions = [x for x in await session_service.list_for_offering(offering.id) if x.status != ClassSessionStatus.CANCELLED]
+        labs = lab_session_ids(offering, sessions, course)
         for class_session in sessions:
-            if class_session.status == ClassSessionStatus.CANCELLED:
-                continue
             entries.append(
                 MyScheduleEntryOut(
                     id=class_session.id, course_offering_id=offering.id,
@@ -893,7 +895,7 @@ async def my_enrollments_schedule(
                     term_label=offering.term_label, session_date=class_session.session_date,
                     start_time=class_session.start_time,
                     end_time=class_session.end_time, room=class_session.room, title=class_session.title,
-                    teacher_name=teacher_name, section_label=offering.section_label,
+                    teacher_name=teacher_name, section_label=offering.section_label, is_lab=class_session.id in labs,
                 )
             )
     entries.sort(key=lambda e: (e.session_date, e.start_time))
@@ -1561,7 +1563,8 @@ def _ics_response(events: list[dict], filename: str, name: str) -> Response:
 
 
 def _event_from_entry(e) -> dict:
-    return {"id": e.id, "course_code": e.course_code, "course_title": e.course_title, "session_date": e.session_date,
+    return {"id": e.id, "course_code": e.course_code, "course_title": e.course_title + (" (Lab)" if getattr(e, "is_lab", False) else ""),
+            "session_date": e.session_date,
             "start_time": e.start_time, "end_time": e.end_time, "room": e.room, "teacher_name": e.teacher_name, "title": e.title}
 
 

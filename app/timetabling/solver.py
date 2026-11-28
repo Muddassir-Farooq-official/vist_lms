@@ -3,7 +3,8 @@
 What it is given (built from the database by app/timetabling/service.py):
   * the week: for each day the class periods in order (breaks, assembly and self-study periods are left out);
   * units: one per course section, or one per COMBINED class (several sections taught together, placed once);
-    each needs `need` meetings a week, each meeting `span` periods long (2 = a double period / lab);
+    each needs `need` meetings a week, each meeting `span` periods long (2 = a double period / lab); a section with
+    some labs (theory + lab) has span 1 and `labs` = how many of its meetings are double periods in a lab room;
   * teachers: unavailable cells, at most N classes a day, at most M periods in a row;
   * rooms: name, kind (CLASS / LAB / HALL) and seats;
   * fixed: what is already busy and not being planned (other terms' classes at the same time of year,
@@ -49,8 +50,22 @@ class Unit:
     avoid: frozenset = frozenset()        # other unit keys that share enrolled students
     students: int = 0
     lab: bool = False
+    labs: int = 0                 # span 1 units only: this many of the `need` meetings are double periods (labs)
     home_room: str | None = None
-    pinned: list = field(default_factory=list)   # [(day, period index, room)] kept exactly as they are
+    pinned: list = field(default_factory=list)   # [(day, period index, room[, span])] kept exactly as they are
+
+    def spans(self) -> list[int]:
+        """The length of each weekly meeting, labs first."""
+        if self.span > 1:
+            return [self.span] * self.need
+        n = max(0, min(self.labs, self.need))
+        return [2] * n + [1] * (self.need - n)
+
+    def periods(self) -> int:
+        return sum(self.spans())
+
+    def has_double(self) -> bool:
+        return self.span > 1 or self.labs > 0
 
 
 @dataclass
@@ -152,32 +167,47 @@ class Solver:
             prev = c
         return best
 
-    def _room_fits(self, u: Unit, r: Room) -> bool:
+    @staticmethod
+    def _is_lab(u: Unit, span: int) -> bool:
+        return span > 1 or (u.lab and u.labs == 0)
+
+    def _room_fits(self, u: Unit, r: Room, span: int | None = None) -> bool:
+        span = u.span if span is None else span
         if r.seats is not None and u.students > r.seats:
             return False
         if self.labs_listed:
-            return (r.kind == "LAB") == bool(u.lab or u.span > 1) or (not (u.lab or u.span > 1) and r.kind == "HALL")
+            lab = self._is_lab(u, span)
+            return (r.kind == "LAB") == lab or (not lab and r.kind == "HALL")
         return True
 
-    def _free_room(self, u: Unit, day: str, idx: int, prefer: str | None = None):
-        cells = self._cells(day, idx, u.span)
+    def next_span(self, u: Unit) -> int:
+        """The length of the next meeting to place: the labs first, then the single periods."""
+        if u.span > 1:
+            return u.span
+        doubles = sum(1 for p in self.unit_days[u.key].values() if p.span > 1)
+        return 2 if doubles < min(u.labs, u.need) else 1
+
+    def _free_room(self, u: Unit, day: str, idx: int, prefer: str | None = None, span: int | None = None):
+        span = u.span if span is None else span
+        cells = self._cells(day, idx, span)
         order = self.rooms
-        if prefer:
+        if prefer and not (u.labs and span > 1):          # a theory + lab section's home room is for its theory classes
             order = sorted(self.rooms, key=lambda r: r.key != prefer)
         for r in order:
-            if not self._room_fits(u, r):
+            if not self._room_fits(u, r, span):
                 continue
             if all((r.key, day, c) not in self.r_occ and (r.key, day, c) not in self.fixed_room for c in cells):
                 return r
         return None
 
-    def blockers(self, u: Unit, day: str, idx: int) -> set | None:
+    def blockers(self, u: Unit, day: str, idx: int, span: int | None = None) -> set | None:
         """None when the meeting can never go there (no such periods, unavailable, already a meeting that day by
         itself...). Otherwise the set of OTHER units in the way (empty = free), ignoring rooms."""
+        span = u.span if span is None else span
         ps = self.periods[day]
-        if idx + u.span > len(ps) or any(not self.joined[day][c] for c in range(idx, idx + u.span - 1)):
+        if idx + span > len(ps) or any(not self.joined[day][c] for c in range(idx, idx + span - 1)):
             return None
-        cells = self._cells(day, idx, u.span)
+        cells = self._cells(day, idx, span)
         t = u.teacher
         out: set = set()
         for c in cells:
@@ -202,29 +232,31 @@ class Solver:
         out.discard(u.key)
         return out
 
-    def feasible(self, u: Unit, day: str, idx: int):
+    def feasible(self, u: Unit, day: str, idx: int, span: int | None = None):
         """The room it would get, or None."""
+        span = u.span if span is None else span
         if day in self.unit_days[u.key]:
             return None
-        b = self.blockers(u, day, idx)
+        b = self.blockers(u, day, idx, span)
         if b is None or b:
             return None
         t = u.teacher
         if t is not None:
             have = self.t_day.get((t, day), set())
             m = self._max_day(t)
-            if m and len(have) + u.span > m:
+            if m and len(have) + span > m:
                 return None
             r = self._max_row(t)
-            if r and self._run_after(have, self._cells(day, idx, u.span), day) > r:
+            if r and self._run_after(have, self._cells(day, idx, span), day) > r:
                 return None
-        return self._free_room(u, day, idx, u.home_room)
+        return self._free_room(u, day, idx, u.home_room, span)
 
-    def _place(self, u: Unit, day: str, idx: int, room: Room | str, pinned: bool = False) -> Placement:
+    def _place(self, u: Unit, day: str, idx: int, room: Room | str, pinned: bool = False, span: int | None = None) -> Placement:
+        span = u.span if span is None else span
         name = room.name if isinstance(room, Room) else room
         rkey = room.key if isinstance(room, Room) else "".join(room.split()).lower()
-        p = Placement(u.key, day, idx, u.span, name, pinned)
-        for c in self._cells(day, idx, u.span):
+        p = Placement(u.key, day, idx, span, name, pinned)
+        for c in self._cells(day, idx, span):
             if u.teacher is not None:
                 self.t_occ[(u.teacher, day, c)] = u.key
                 self.t_day.setdefault((u.teacher, day), set()).add(c)
@@ -253,7 +285,8 @@ class Solver:
         self.placed.remove(p)
 
     # ------------------------------------------------------------------ cost of a placement (soft rules)
-    def cost(self, u: Unit, day: str, idx: int, room: Room) -> float:
+    def cost(self, u: Unit, day: str, idx: int, room: Room, span: int | None = None) -> float:
+        span = u.span if span is None else span
         c = 0.0
         mine = self.unit_days[u.key]
         pos = self.day_pos[day]
@@ -261,11 +294,11 @@ class Solver:
             apart = abs(self.day_pos[d2] - pos)
             if apart <= DAY_GAP_OK:
                 c += self.W_SPREAD                                # neighbouring days
-            if p2.idx != idx:
-                c += self.W_SAME                                  # not the same period as its other days
+            if p2.idx != idx and p2.span == span:
+                c += self.W_SAME                                  # not the same period as its other days (labs aside)
         if not mine and len(self.days) and u.need >= 2:
             c += 0.2 * pos                                       # first meeting early in the week leaves room to spread
-        cells = set(self._cells(day, idx, u.span))
+        cells = set(self._cells(day, idx, span))
         for g in u.groups:
             have = self.g_day.get((g, day), set())
             c += self.W_GAP * (self._gaps(have | cells) - self._gaps(have))  # empty periods between a group's classes
@@ -273,7 +306,7 @@ class Solver:
             have = self.t_day.get((u.teacher, day), set())
             c += self.W_TGAP * (self._gaps(have | cells) - self._gaps(have))
         c += 0.05 * idx                                          # a little earlier is better
-        if u.home_room and room.key != u.home_room:
+        if u.home_room and room.key != u.home_room and not (u.labs and span > 1):
             c += self.W_HOME
         return c
 
@@ -292,9 +325,9 @@ class Solver:
                 for b in ps[i + 1:]:
                     if abs(self.day_pos[a.day] - self.day_pos[b.day]) <= DAY_GAP_OK:
                         total += self.W_SPREAD
-                    if a.idx != b.idx:
+                    if a.idx != b.idx and a.span == b.span:
                         total += self.W_SAME
-                if u.home_room and "".join(a.room.split()).lower() != u.home_room:
+                if u.home_room and "".join(a.room.split()).lower() != u.home_room and not (u.labs and a.span > 1):
                     total += self.W_HOME
         for cells in self.g_day.values():
             total += self.W_GAP * self._gaps(cells)
@@ -303,15 +336,34 @@ class Solver:
         return round(total, 2)
 
     # ------------------------------------------------------------------ search
-    def _options(self, u: Unit):
+    def _options(self, u: Unit, span: int | None = None):
+        span = self.next_span(u) if span is None else span
         out = []
         for day in self.days:
             for idx in range(len(self.periods[day])):
-                room = self.feasible(u, day, idx)
+                room = self.feasible(u, day, idx, span)
                 if room is not None:
-                    out.append((self.cost(u, day, idx, room), day, idx, room))
+                    out.append((self.cost(u, day, idx, room, span), day, idx, room, span))
         out.sort(key=lambda x: (x[0], self.day_pos[x[1]], x[2]))
         return out
+
+    def remaining(self, u: Unit) -> list[int]:
+        """The lengths of the meetings still to place (labs first)."""
+        left = list(u.spans())
+        for p in self.unit_days[u.key].values():
+            if p.span in left:
+                left.remove(p.span)
+            elif left:
+                left.pop()
+        return left
+
+    def _place_span(self, u: Unit, span: int, rnd: random.Random, noise: float) -> bool:
+        opts = self._options(u, span)
+        if not opts:
+            return False
+        pick = opts[rnd.randrange(min(3, len(opts)))] if noise and len(opts) > 1 and rnd.random() < noise else opts[0]
+        self._place(u, pick[1], pick[2], pick[3], span=pick[4])
+        return True
 
     def _place_best(self, u: Unit, rnd: random.Random, noise: float) -> bool:
         opts = self._options(u)
@@ -321,22 +373,23 @@ class Solver:
             pick = opts[rnd.randrange(min(3, len(opts)))]
         else:
             pick = opts[0]
-        self._place(u, pick[1], pick[2], pick[3])
+        self._place(u, pick[1], pick[2], pick[3], span=pick[4])
         return True
 
-    def _repair(self, u: Unit, rnd: random.Random) -> bool:
+    def _repair(self, u: Unit, rnd: random.Random, span: int | None = None) -> bool:
         """Put one meeting of u in a cell where exactly ONE other (not pinned) meeting is in the way, then find that
         meeting another place. Undone when the other meeting cannot be placed again."""
+        span = self.next_span(u) if span is None else span
         cands = []
         for day in self.days:
             if day in self.unit_days[u.key]:
                 continue
             for idx in range(len(self.periods[day])):
-                b = self.blockers(u, day, idx)
+                b = self.blockers(u, day, idx, span)
                 if b is None or len(b) != 1:
                     continue
                 other = next(iter(b))
-                cells = set(self._cells(day, idx, u.span))
+                cells = set(self._cells(day, idx, span))
                 hit = [p for p in self.unit_days[other].values() if p.day == day and cells & set(self._cells(p.day, p.idx, p.span))]
                 if len(hit) != 1 or hit[0].pinned:
                     continue
@@ -344,38 +397,41 @@ class Solver:
         rnd.shuffle(cands)
         for day, idx, victim in cands[:12]:
             self._remove(victim)
-            room = self.feasible(u, day, idx)
+            vu = self.units[victim.unit]
+            room = self.feasible(u, day, idx, span)
             if room is None:
-                self._place(self.units[victim.unit], victim.day, victim.idx, victim.room)
+                self._place(vu, victim.day, victim.idx, victim.room, span=victim.span)
                 continue
-            mine = self._place(u, day, idx, room)
-            if self._place_best(self.units[victim.unit], rnd, 0.0):
+            mine = self._place(u, day, idx, room, span=span)
+            opts = self._options(vu, victim.span)
+            if opts:
+                self._place(vu, opts[0][1], opts[0][2], opts[0][3], span=victim.span)
                 return True
             self._remove(mine)
-            self._place(self.units[victim.unit], victim.day, victim.idx, victim.room)
+            self._place(vu, victim.day, victim.idx, victim.room, span=victim.span)
         return False
 
     def _difficulty(self, u: Unit) -> float:
         free = 0
         for day in self.days:
             for idx in range(len(self.periods[day])):
-                if self.blockers(u, day, idx) is not None:
+                if self.blockers(u, day, idx, max(u.spans() or [1])) is not None:
                     free += 1
         load = 0
         if u.teacher is not None:
-            load = sum(x.need * x.span for x in self.units.values() if x.teacher == u.teacher)
-        return (u.need * u.span) / max(1, free) * 10 + len(u.groups) + (3 if u.span > 1 else 0) + load / 20
+            load = sum(x.periods() for x in self.units.values() if x.teacher == u.teacher)
+        return u.periods() / max(1, free) * 10 + len(u.groups) + (3 if u.has_double() else 0) + load / 20
 
     def _one_round(self, rnd: random.Random, noise: float) -> tuple[list, float]:
         self._reset()
         for u in self.units.values():
-            for day, idx, room in u.pinned:
-                self._place(u, day, idx, room, pinned=True)
+            for pin in u.pinned:
+                self._place(u, pin[0], pin[1], pin[2], pinned=True, span=pin[3] if len(pin) > 3 else None)
         order = sorted(self.units.values(), key=lambda u: -(self.base_difficulty[u.key] + (rnd.random() * 2 if noise else 0)))
         short = []
         for u in order:
-            for _ in range(u.need - len(self.unit_days[u.key])):
-                if not self._place_best(u, rnd, noise) and not self._repair(u, rnd):
+            for span in self.remaining(u):
+                if not self._place_span(u, span, rnd, noise) and not self._repair(u, rnd, span):
                     short.append(u.key)
         self._improve()
         return short, self.total_penalty()
@@ -390,13 +446,13 @@ class Solver:
                 u = self.units[p.unit]
                 self._remove(p)
                 room_back = next((r for r in self.rooms if r.key == "".join(p.room.split()).lower()), None)
-                here = self.cost(u, p.day, p.idx, room_back) if room_back else None
-                opts = self._options(u)
+                here = self.cost(u, p.day, p.idx, room_back, p.span) if room_back else None
+                opts = self._options(u, p.span)
                 if opts and (here is None or opts[0][0] < here - 0.01):
-                    self._place(u, opts[0][1], opts[0][2], opts[0][3])
+                    self._place(u, opts[0][1], opts[0][2], opts[0][3], span=p.span)
                     moved += 1
                 else:
-                    self._place(u, p.day, p.idx, p.room)
+                    self._place(u, p.day, p.idx, p.room, span=p.span)
             if not moved:
                 break
 
@@ -422,7 +478,7 @@ class Solver:
         # put the best week back, so explain() sees it
         self._reset()
         for p in placed:
-            self._place(self.units[p.unit], p.day, p.idx, p.room, pinned=p.pinned)
+            self._place(self.units[p.unit], p.day, p.idx, p.room, pinned=p.pinned, span=p.span)
         unplaced = []
         for key in dict.fromkeys(short):
             u = self.units[key]
@@ -434,16 +490,17 @@ class Solver:
 
     # ------------------------------------------------------------------ why something did not fit
     def explain(self, u: Unit) -> str:
-        if not any(self._room_fits(u, r) for r in self.rooms):
-            if u.students and all(r.seats is not None and r.seats < u.students for r in self.rooms):
-                return f"No room has {u.students} seats."
-            return "No lab is listed for this lab course." if (u.lab or u.span > 1) else "No suitable room is listed."
+        for sp in sorted(set(u.spans()), reverse=True):
+            if not any(self._room_fits(u, r, sp) for r in self.rooms):
+                if u.students and all(r.seats is not None and r.seats < u.students for r in self.rooms):
+                    return f"No room has {u.students} seats."
+                return "No lab is listed for this lab course." if self._is_lab(u, sp) else "No suitable room is listed."
         if u.need > len(self.days):
             return f"It needs {u.need} classes a week but only {len(self.days)} days are chosen (one class of a course a day)."
         week = sum(len(ps) for ps in self.periods.values())
         if u.teacher is not None:
             tb = self.teachers.get(u.teacher)
-            load = sum(x.need * x.span for x in self.units.values() if x.teacher == u.teacher)
+            load = sum(x.periods() for x in self.units.values() if x.teacher == u.teacher)
             free = week - len(tb.blocked if tb else ())
             m = self._max_day(u.teacher)
             if m:
@@ -452,9 +509,9 @@ class Solver:
                 who = tb.name if tb and tb.name else "The teacher"
                 return f"{who} has {load} periods to teach but only {free} free periods a week (unavailable times / classes-a-day limit)."
         for g in u.groups:
-            load = sum(x.need * x.span for x in self.units.values() if g in x.groups)
+            load = sum(x.periods() for x in self.units.values() if g in x.groups)
             if load > week:
                 return f"These students have {load} periods of classes but the week has only {week} class periods."
-        if u.span > 1 and not any(any(self.joined[d][:-1] or [False]) for d in self.days):
+        if u.has_double() and not any(any(self.joined[d][:-1] or [False]) for d in self.days):
             return "No two class periods are back to back, so a double period cannot be placed."
         return "No time is free for the teacher, the students and a room together. Try fewer classes a week, another day, or ease the teacher's limits."
