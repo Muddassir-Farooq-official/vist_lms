@@ -203,7 +203,9 @@
     <form id="add-course-form" class="form-grid">
       <div class="form-field"><label for="ac-code">Code</label><input type="text" id="ac-code" class="text-input" required maxlength="20" placeholder="e.g. NUR201" /></div>
       <div class="form-field"><label for="ac-title">Title</label><input type="text" id="ac-title" class="text-input" required maxlength="200" /></div>
-      <div class="form-field"><label for="ac-credit-hours">Credit Hours</label><input type="number" id="ac-credit-hours" class="text-input" min="1" max="10" required /></div>
+      <div class="form-field"><label for="ac-credit-hours">Theory credit hours</label><input type="number" id="ac-credit-hours" class="text-input" min="0" max="10" required /></div>
+      <div class="form-field"><label for="ac-lab-hours">Lab / skills credit hours</label><input type="number" id="ac-lab-hours" class="text-input" min="0" max="6" value="0" />
+        <small class="list-sub" id="ac-split">Total credit hours: theory + lab. A 3+1 course gets 3 theory classes and 1 lab (a double period) a week on the timetable.</small></div>
       <div class="form-field two-span"><label for="ac-description">Description (optional)</label><input type="text" id="ac-description" class="text-input" maxlength="1000" /></div>
       <div class="form-actions two-span"><button type="submit" class="role-btn" id="add-course-submit">Add Course</button></div>
     </form>
@@ -220,7 +222,9 @@
       <div class="form-field"><label for="ec-code">Code</label><input type="text" id="ec-code" class="text-input" maxlength="20" />
         <small class="list-sub">Can be fixed only while the course has never been offered.</small></div>
       <div class="form-field"><label for="ec-title">Title</label><input type="text" id="ec-title" class="text-input" required maxlength="200" /></div>
-      <div class="form-field"><label for="ec-credit-hours">Credit Hours</label><input type="number" id="ec-credit-hours" class="text-input" min="1" max="10" required /></div>
+      <div class="form-field"><label for="ec-credit-hours">Theory credit hours</label><input type="number" id="ec-credit-hours" class="text-input" min="0" max="10" required /></div>
+      <div class="form-field"><label for="ec-lab-hours">Lab / skills credit hours</label><input type="number" id="ec-lab-hours" class="text-input" min="0" max="6" value="0" />
+        <small class="list-sub" id="ec-split">Total credit hours: theory + lab. A 3+1 course gets 3 theory classes and 1 lab (a double period) a week on the timetable.</small></div>
       <div class="form-field two-span"><label for="ec-description">Description (optional)</label><input type="text" id="ec-description" class="text-input" maxlength="1000" /></div>
       <div class="form-field">
         <label for="ec-active">Status</label>

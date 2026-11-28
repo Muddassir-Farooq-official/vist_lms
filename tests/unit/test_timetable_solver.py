@@ -136,3 +136,53 @@ def test_same_input_same_result():
         s = Solver(days=DAYS, periods=week(), units=units, teachers={}, rooms=ROOMS)
         return [(p.unit, p.day, p.idx, p.room) for p in s.solve(seconds=60, max_rounds=30).placements]
     assert run() == run()
+
+
+# ---------------------------------------------------------------- theory + lab in one section (1.74.0)
+def test_section_with_some_labs_gets_singles_in_classrooms_and_doubles_in_the_lab():
+    g = frozenset({"bsn1"})
+    units = [
+        Unit("phy", "PHY101 A", need=3, labs=1, teacher="t1", groups=g, students=30, home_room="r1"),
+        Unit("chem", "CHE101 A", need=4, labs=2, teacher="t2", groups=g, students=30),
+        Unit("eng", "ENG101 A", need=3, teacher="t3", groups=g, students=30),
+    ]
+    s = Solver(days=DAYS, periods=week(), units=units, teachers={}, rooms=ROOMS)
+    res = s.solve(seconds=2)
+    assert not res.unplaced, res.unplaced
+    check_hard(s, res)
+    for key, singles, doubles in (("phy", 2, 1), ("chem", 2, 2), ("eng", 3, 0)):
+        mine = [p for p in res.placements if p.unit == key]
+        assert sorted(p.span for p in mine) == [1] * singles + [2] * doubles, (key, mine)
+        for p in mine:
+            assert (p.room == "Lab") == (p.span == 2), (key, p)          # labs in the lab, theory in classrooms
+            if p.span == 2:
+                assert s.joined[p.day][p.idx]                             # truly back to back
+    assert len({p.day for p in res.placements if p.unit == "chem"}) == 4  # still one class of a course a day
+
+
+def test_lab_count_never_exceeds_the_classes_and_explains_a_missing_lab():
+    u = Unit("x", "X", need=2, labs=5)
+    assert u.spans() == [2, 2] and u.periods() == 4
+    no_lab = [Room("R1", "r1", "CLASS", 50), Room("Lab", "lab", "LAB", 40)][:1] + [Room("L2", "l2", "LAB", 5)]
+    s = Solver(days=DAYS, periods=week(), units=[Unit("y", "Y 101", need=2, labs=1, students=30)], teachers={}, rooms=no_lab)
+    res = s.solve(seconds=1)
+    assert res.unplaced and res.unplaced[0]["missing"] == 1
+    assert "seats" in res.unplaced[0]["reason"] or "lab" in res.unplaced[0]["reason"].lower()
+    assert [p.span for p in res.placements] == [1]                       # the theory class still goes in
+
+
+def test_lab_ids_marks_only_the_joined_periods():
+    from datetime import time
+    from types import SimpleNamespace as NS
+
+    from app.timetabling.labs import lab_slot_ids, labs_for
+
+    off = NS(double_period=False, lab_classes_per_week=1)
+    slots = [NS(id=1, day_of_week="MON", start_time=time(8), end_time=time(8, 50)),
+             NS(id=2, day_of_week="WED", start_time=time(9), end_time=time(9, 50)),
+             NS(id=3, day_of_week="WED", start_time=time(9, 50), end_time=time(10, 40)),
+             NS(id=4, day_of_week="FRI", start_time=time(8), end_time=time(8, 50))]
+    assert lab_slot_ids(off, slots) == {2, 3}
+    assert lab_slot_ids(NS(double_period=True, lab_classes_per_week=None), slots) == {1, 2, 3, 4}
+    assert lab_slot_ids(NS(double_period=False, lab_classes_per_week=None), slots) == set()
+    assert labs_for(off, 3) == 1 and labs_for(NS(double_period=True, lab_classes_per_week=None), 3) == 3

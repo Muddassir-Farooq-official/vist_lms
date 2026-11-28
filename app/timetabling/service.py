@@ -29,6 +29,7 @@ from app.core.clock import institute_today
 from app.core.exceptions import BusinessRuleViolationError, ResourceNotFoundError, ValidationAppError
 from app.core.timefmt import hm12
 from app.timetabling import solver as S
+from app.timetabling.labs import catalog_split, default_per_week, has_labs, labs_for, suggestion
 from app.timetabling.models import TeacherAvailability, TimetableDraft, TimetableDraftSlot
 
 WEEK = [d.value for d in DayOfWeek]
@@ -42,12 +43,6 @@ def _minutes(t) -> int:
 
 def _overlap(s1, e1, s2, e2) -> bool:
     return s1 < e2 and s2 < e1
-
-
-def default_per_week(course: Course | None, offering: CourseOffering) -> int:
-    if offering.classes_per_week:
-        return offering.classes_per_week
-    return max(1, min(5, (course.credit_hours if course and course.credit_hours else 3)))
 
 
 class SmartTimetableService:
@@ -169,6 +164,7 @@ class SmartTimetableService:
                 continue
             need = default_per_week(course, lead)
             span = 2 if lead.double_period else 1
+            labs = 0 if lead.double_period else labs_for(lead, need, course)
             if need > len(days):
                 problems.append({"offering_id": str(lead.id), "label": label, "missing": need - len(days),
                                  "reason": f"It needs {need} classes a week but only {len(days)} days are chosen (one class of a course a day)."})
@@ -181,7 +177,7 @@ class SmartTimetableService:
             if not students:
                 students = sum(m.capacity or 0 for m in group)
             unit = S.Unit(key=lead.id, label=label, need=need, span=span, teacher=lead.assigned_teacher_id,
-                          groups=frozenset(groups), students=students, lab=bool(lead.double_period),
+                          groups=frozenset(groups), students=students, lab=bool(lead.double_period), labs=labs,
                           home_room=room_key(lead.home_room) if lead.home_room else None)
             units.append(unit)
             info[lead.id] = {"lead": lead, "group": group, "course": course, "label": label}
@@ -244,7 +240,7 @@ class SmartTimetableService:
             u = by_unit.get(ps.course_offering_id)
             i = idx_of.get((ps.day, ps.period_id))
             if u is not None and i is not None and len(u.pinned) < u.need:
-                u.pinned.append((ps.day, i, ps.room))
+                u.pinned.append((ps.day, i, ps.room, ps.span or 1))
         solver = S.Solver(days=days, periods=slots_by_day, units=units, teachers=teachers, rooms=rooms,
                           fixed_teacher=fixed_teacher, fixed_room=fixed_room, fixed_unit=fixed_unit,
                           default_max_per_day=settings.get("max_per_day"), default_max_in_row=settings.get("max_in_row"))
@@ -281,6 +277,10 @@ class SmartTimetableService:
                                            "separate classes, so they are placed at different times. If they are taught together, combine them "
                                            "(step 4, Classes & labs) and generate again."})
         for k, inf in meta["info"].items():
+            sug = suggestion(inf["course"], inf["lead"])
+            if sug:
+                problems.append({"offering_id": str(k), "label": inf["label"], "missing": 0, "warning": True,
+                                 "reason": sug["text"] + " Change it in step 4 (Classes a week & labs) if the catalog is right, and generate again."})
             if inf["lead"].assigned_teacher_id is None:
                 problems.append({"offering_id": str(k), "label": inf["label"], "missing": 0, "warning": True,
                                  "reason": "No teacher is assigned yet, so teacher clashes and limits could not be checked for it."})
@@ -331,7 +331,8 @@ class SmartTimetableService:
                              "term": lead.term_label, "teacher": d["teachers"].get(lead.assigned_teacher_id),
                              "teacher_id": lead.assigned_teacher_id,
                              "combined": sorted({f"{m.term_label} {m.section_label}" for m in group}) if len(group) > 1 else [],
-                             "per_week": default_per_week(c, lead), "double": lead.double_period, "cohorts": cohorts}
+                             "per_week": default_per_week(c, lead), "double": lead.double_period,
+                             "labs": labs_for(lead, default_per_week(c, lead), c), "cohorts": cohorts}
         progs = {p.id: p.name for p in (await self.session.execute(select(Program).where(
             Program.id.in_({c[0] for i in info.values() for c in i["cohorts"]})))).scalars()} if info else {}
 
@@ -354,7 +355,7 @@ class SmartTimetableService:
                           "section": i["section"], "term": i["term"], "teacher": i["teacher"], "teacher_id": i["teacher_id"],
                           "combined": i["combined"], "classes": sorted(cohort_label(c) for c in i["cohorts"])})
         courses = [{"offering_id": k, "code": i["code"], "title": i["title"], "section": i["section"], "term": i["term"],
-                    "teacher": i["teacher"], "per_week": i["per_week"], "double": i["double"], "have": have[k],
+                    "teacher": i["teacher"], "per_week": i["per_week"], "double": i["double"], "labs": i["labs"], "have": have[k],
                     "missing": max(0, i["per_week"] - have[k]), "combined": i["combined"],
                     "classes": sorted(cohort_label(c) for c in i["cohorts"])}
                    for k, i in info.items()]
@@ -374,15 +375,15 @@ class SmartTimetableService:
 
     # ================================================================== editing a draft
     async def _check_and_pin(self, draft: TimetableDraft, *, offering_id: uuid.UUID, day: str, period_id: uuid.UUID,
-                             room: str, exclude: uuid.UUID | None) -> tuple:
+                             room: str, exclude: uuid.UUID | None, span: int | None = None) -> tuple:
         d = await self._load(draft.terms, draft.days)
         rows = list((await self.session.execute(select(TimetableDraftSlot).where(TimetableDraftSlot.draft_id == draft.id))).scalars())
         others = [r for r in rows if r.id != exclude]     # the whole draft, as it is, is the background for this one check
         solver, meta = await self._solver(d, draft.settings or {}, others)
         solver._reset()
         for u in solver.units.values():
-            for pday, pidx, proom in u.pinned:
-                solver._place(u, pday, pidx, proom, pinned=True)
+            for pin in u.pinned:
+                solver._place(u, pin[0], pin[1], pin[2], pinned=True, span=pin[3] if len(pin) > 3 else None)
         unit = solver.units.get(offering_id)
         if unit is None:
             raise ValidationAppError("That course is not part of this draft.")
@@ -393,7 +394,10 @@ class SmartTimetableService:
             raise BusinessRuleViolationError("This course already has a class that day (one class of a course a day).")
         if len(solver.unit_days[unit.key]) >= unit.need and exclude is None:
             raise BusinessRuleViolationError(f"This course already has all its {unit.need} classes a week. Move one instead.")
-        blockers = solver.blockers(unit, day, i)
+        if span is None:                                  # a new class: the next one it is missing (its labs first)
+            left = solver.remaining(unit)
+            span = left[0] if left else unit.span
+        blockers = solver.blockers(unit, day, i, span)
         if blockers is None:
             raise BusinessRuleViolationError("It cannot go there: the teacher is unavailable, the period is not long enough for a double period, "
                                              "or the students already have another class then (outside this draft).")
@@ -404,10 +408,10 @@ class SmartTimetableService:
         if t is not None:
             have = solver.t_day.get((t, day), set())
             m = solver._max_day(t)
-            if m and len(have) + unit.span > m:
+            if m and len(have) + span > m:
                 raise BusinessRuleViolationError(f"The teacher would have more than {m} classes that day.")
             mr = solver._max_row(t)
-            if mr and solver._run_after(have, range(i, i + unit.span), day) > mr:
+            if mr and solver._run_after(have, range(i, i + span), day) > mr:
                 raise BusinessRuleViolationError(f"The teacher would teach more than {mr} periods in a row.")
         rk = room_key(room)
         r = next((x for x in solver.rooms if x.key == rk), None)
@@ -415,17 +419,21 @@ class SmartTimetableService:
             raise ValidationAppError(f"Room '{room}' is not on the room list.")
         if r.seats is not None and unit.students > r.seats:
             raise BusinessRuleViolationError(f"{r.name} has {r.seats} seats; this class has {unit.students} students.")
-        for c in range(i, i + unit.span):
+        if unit.labs and solver.labs_listed and not solver._room_fits(unit, r, span):
+            raise BusinessRuleViolationError(f"{r.name} is not a lab. Choose a lab for this lab class." if span > 1
+                                             else f"{r.name} is a lab. Choose a classroom for this theory class.")
+        for c in range(i, i + span):
             if (rk, day, c) in solver.r_occ or (rk, day, c) in solver.fixed_room:
                 raise BusinessRuleViolationError(f"{r.name} is already in use then.")
-        return unit, r
+        return unit, r, span
 
     async def move(self, draft_id: uuid.UUID, slot_id: uuid.UUID, *, day: str, period_id: uuid.UUID, room: str, actor_id: uuid.UUID) -> TimetableDraftSlot:
         draft = await self._draft(draft_id, editable=True)
         row = await self.session.get(TimetableDraftSlot, slot_id)
         if row is None or row.draft_id != draft.id:
             raise ResourceNotFoundError("That class is not in this draft.")
-        _unit, r = await self._check_and_pin(draft, offering_id=row.course_offering_id, day=day, period_id=period_id, room=room, exclude=row.id)
+        _unit, r, _span = await self._check_and_pin(draft, offering_id=row.course_offering_id, day=day, period_id=period_id, room=room,
+                                                    exclude=row.id, span=row.span or 1)
         before = {"day": row.day, "period_id": str(row.period_id), "room": row.room}
         row.day, row.period_id, row.room, row.pinned = day, period_id, r.name, True
         await self.audit.log(actor_user_id=actor_id, action="timetable_draft.class_moved", entity_type="timetable_draft", entity_id=draft.id,
@@ -435,8 +443,8 @@ class SmartTimetableService:
 
     async def add(self, draft_id: uuid.UUID, *, offering_id: uuid.UUID, day: str, period_id: uuid.UUID, room: str, actor_id: uuid.UUID) -> TimetableDraftSlot:
         draft = await self._draft(draft_id, editable=True)
-        unit, r = await self._check_and_pin(draft, offering_id=offering_id, day=day, period_id=period_id, room=room, exclude=None)
-        row = TimetableDraftSlot(draft_id=draft.id, course_offering_id=offering_id, day=day, period_id=period_id, span=unit.span, room=r.name, pinned=True)
+        unit, r, span = await self._check_and_pin(draft, offering_id=offering_id, day=day, period_id=period_id, room=room, exclude=None)
+        row = TimetableDraftSlot(draft_id=draft.id, course_offering_id=offering_id, day=day, period_id=period_id, span=span, room=r.name, pinned=True)
         self.session.add(row)
         draft.problems = [p for p in (draft.problems or []) if not (p.get("offering_id") == str(offering_id) and p.get("missing", 0) <= 1 and not p.get("warning"))] \
             + [{**p, "missing": p["missing"] - 1} for p in (draft.problems or []) if p.get("offering_id") == str(offering_id) and p.get("missing", 0) > 1]
@@ -768,7 +776,7 @@ class SmartTimetableService:
                 "periods": {"class": sum(1 for x in periods if x.holds_class), "breaks": sum(1 for x in periods if not x.holds_class)},
                 "rooms": rooms,
                 "sections": {"total": len(rows), "without_teacher": sum(1 for o, _c in rows if not o.assigned_teacher_id),
-                             "labs": sum(1 for o, _c in rows if o.double_period), "with_timetable": with_slots},
+                             "labs": sum(1 for o, c in rows if has_labs(o, c)), "with_timetable": with_slots},
                 "teachers": {"total": len(teachers), "with_times": avail},
                 "live_weekly_patterns": live,
                 "draft": {"id": draft.id, "status": draft.status, "terms": draft.terms, "created_at": draft.created_at,
@@ -791,7 +799,8 @@ class SmartTimetableService:
                 could[x["id"]] = s
         return [{"id": o.id, "code": c.code, "title": c.title, "section": o.section_label, "term": o.term_label,
                  "credit_hours": c.credit_hours, "classes_per_week": o.classes_per_week, "per_week": default_per_week(c, o),
-                 "double_period": o.double_period, "home_room": o.home_room, "combined": o.combined_group_id is not None,
+                 "double_period": o.double_period, "lab_classes_per_week": o.lab_classes_per_week, "home_room": o.home_room,
+                 "lab_credit_hours": c.lab_credit_hours or 0, "labs": labs_for(o, default_per_week(c, o), c), "suggest": suggestion(c, o), "combined": o.combined_group_id is not None,
                  "combined_with": [f"{m.term_label} ({m.section_label})" for m in mates.get(o.combined_group_id, []) if m.id != o.id],
                  "can_combine": ({"lead_id": could[o.id]["lead_id"], "join_ids": could[o.id]["join_ids"], "same_teacher": could[o.id]["same_teacher"],
                                   "teachers": could[o.id]["teachers"],
@@ -800,7 +809,7 @@ class SmartTimetableService:
                 for o, c in rows]
 
     async def update_section(self, offering_id: uuid.UUID, *, classes_per_week: int | None, double_period: bool, home_room: str | None,
-                             actor_id: uuid.UUID) -> CourseOffering:
+                             actor_id: uuid.UUID, lab_classes_per_week: int | None = None, labs_as_catalog: bool = False) -> CourseOffering:
         from app.academics.combined import members
 
         o = await self.session.get(CourseOffering, offering_id)
@@ -808,6 +817,9 @@ class SmartTimetableService:
             raise ResourceNotFoundError("Course section not found.")
         if classes_per_week is not None and not 1 <= classes_per_week <= 7:
             raise ValidationAppError("Classes a week must be between 1 and 7.")
+        # lab_classes_per_week: None = leave as it is (older screens do not send it), 0 = no labs, n = n labs a week
+        if lab_classes_per_week is not None and not 0 <= lab_classes_per_week <= 7:
+            raise ValidationAppError("Labs a week must be between 0 and 7.")
         home = " ".join((home_room or "").split()) or None
         if home:
             r = (await self.session.execute(select(Room).where(Room.key == room_key(home)))).scalar_one_or_none()
@@ -816,10 +828,22 @@ class SmartTimetableService:
             home = r.name
         group = await members(self.session, o)            # a combined class is one class: the same settings in every section
         for m in group:
-            before = {"classes_per_week": m.classes_per_week, "double_period": m.double_period, "home_room": m.home_room}
-            m.classes_per_week, m.double_period, m.home_room = classes_per_week, bool(double_period), home
+            # None = as the course catalog says (its lab credit hours); 0 = no labs in this section; n = n labs a week
+            labs = None if labs_as_catalog else (m.lab_classes_per_week if lab_classes_per_week is None else lab_classes_per_week)
+            if double_period:
+                labs = None                                # every class is a lab already
+            if labs:
+                c = await self.session.get(Course, m.course_id)
+                per_week = classes_per_week or sum(catalog_split(c))
+                if labs >= per_week:
+                    raise ValidationAppError(f"Labs a week ({labs}) must be fewer than the classes a week ({per_week}). "
+                                             "If every class is a lab, choose 'All' instead.")
+            before = {"classes_per_week": m.classes_per_week, "double_period": m.double_period, "lab_classes_per_week": m.lab_classes_per_week,
+                      "home_room": m.home_room}
+            m.classes_per_week, m.double_period, m.lab_classes_per_week, m.home_room = classes_per_week, bool(double_period), labs, home
             await self.audit.log(actor_user_id=actor_id, action="course_offering.timetable_settings", entity_type="course_offering",
-                                 entity_id=m.id, before=before, after={"classes_per_week": classes_per_week, "double_period": bool(double_period), "home_room": home})
+                                 entity_id=m.id, before=before, after={"classes_per_week": classes_per_week, "double_period": bool(double_period),
+                                                                       "lab_classes_per_week": labs, "home_room": home})
         await self.session.flush()
         return o
 

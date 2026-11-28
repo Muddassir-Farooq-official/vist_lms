@@ -58,7 +58,7 @@ window.StudentUI = (function () {
     card.innerHTML =
       '<div class="sh-class-top"><span class="pill' + (label === "Today" ? " pill-now" : "") + '">' + esc(label) + "</span>" +
       (isNext ? '<span class="sh-next">Next up</span>' : "") + "</div>" +
-      "<h3>" + esc(e.course_code) + " \u2014 " + esc(e.course_title) + "</h3>" +
+      "<h3>" + esc(e.course_code) + " \u2014 " + esc(e.course_title) + (e.is_lab ? ' <span class="tt-lab">Lab</span>' : "") + "</h3>" +
       '<p class="sh-when">' + esc(VA.formatDateLong(e.session_date)) + " \u00b7 " + esc(VA.formatTimeShort(e.start_time)) + "\u2013" + esc(VA.formatTimeShort(e.end_time)) + "</p>" +
       '<p class="sh-where">Room ' + esc(e.room) + (e.section_label && e.section_label !== "A" ? " \u00b7 Section " + esc(e.section_label) : "") + "</p>" +
       (e.title ? '<p class="sh-topic">Topic: ' + esc(e.title) + "</p>" : "") +
@@ -89,7 +89,7 @@ window.StudentUI = (function () {
     card.innerHTML =
       '<div class="sh-class-top"><span class="pill' + (label === "Today" ? " pill-now" : "") + '">' + esc(label) + "</span>" +
       (isNext ? '<span class="sh-next">Next up</span>' : "") + "</div>" +
-      "<h3>" + esc(e.course_code) + " \u2014 " + esc(e.course_title) + "</h3>" +
+      "<h3>" + esc(e.course_code) + " \u2014 " + esc(e.course_title) + (e.is_lab ? ' <span class="tt-lab">Lab</span>' : "") + "</h3>" +
       '<p class="sh-when">' + esc(VA.formatDateLong(e.session_date)) + " \u00b7 " + esc(VA.formatTimeShort(e.start_time)) + "\u2013" + esc(VA.formatTimeShort(e.end_time)) + "</p>" +
       '<p class="sh-where">Room ' + esc(e.room) + (e.section_label && e.section_label !== "A" ? " \u00b7 Section " + esc(e.section_label) : "") + "</p>" + students +
       (e.title ? '<p class="sh-topic">Topic: ' + esc(e.title) + "</p>" : '<p class="sh-notopic">No topic added yet</p>') +

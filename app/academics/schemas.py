@@ -11,7 +11,8 @@ from app.academics.models import ClassSessionStatus, DayOfWeek, EnrollmentOutcom
 class CourseCreateRequest(BaseModel):
     code: str = Field(min_length=1, max_length=20)
     title: str = Field(min_length=1, max_length=200)
-    credit_hours: int = Field(gt=0, le=10)
+    credit_hours: int = Field(gt=0, le=10)                    # the total, theory + lab
+    lab_credit_hours: int = Field(default=0, ge=0, le=6)       # how many of them are lab / practical / skills
     description: str | None = Field(default=None, max_length=1000)
 
 
@@ -19,6 +20,7 @@ class CourseUpdateRequest(BaseModel):
     code: str | None = Field(default=None, min_length=2, max_length=20)        # only while the course has never been offered
     title: str | None = Field(default=None, min_length=1, max_length=200)
     credit_hours: int | None = Field(default=None, gt=0, le=10)
+    lab_credit_hours: int | None = Field(default=None, ge=0, le=6)
     description: str | None = Field(default=None, max_length=1000)
     is_active: bool | None = None
 
@@ -30,6 +32,7 @@ class CourseOut(BaseModel):
     code: str
     title: str
     credit_hours: int
+    lab_credit_hours: int = 0
     description: str | None
     is_active: bool
 
@@ -263,6 +266,7 @@ class MyScheduleEntryOut(BaseModel):
     title: str | None
     teacher_name: str | None = None
     section_label: str = "A"
+    is_lab: bool = False             # one period of a lab (two back-to-back periods in a lab)
 
 
 class TeacherCourseOverviewOut(BaseModel):
@@ -340,6 +344,7 @@ class WeeklyEntryOut(BaseModel):
     room: str
     section_label: str
     program_codes: list[str]
+    is_lab: bool = False             # a lab period (a lab is two back-to-back periods)
     # Where the course sits in the curriculum, e.g. BSN semester 3. This is what the Semester filter matches.
     placements: list["WeeklyPlacementOut"] = []
 

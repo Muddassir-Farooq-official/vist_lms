@@ -50,7 +50,7 @@
     const href = started ? "/dashboard/faculty/attendance?offering=" + e.course_offering_id + "&session=" + e.id : "/dashboard/faculty/courses?offering=" + e.course_offering_id;
     const btn = opts.compact ? "" : '<a class="role-btn small-btn' + (started ? "" : " secondary-btn") + '" href="' + href + '">' + (started ? "Take attendance" : e.title ? "Lesson plan" : "Add topic") + "</a>";
     return '<li class="' + (live ? "live" : done ? "done" : "") + '"><span class="ag-time"><b>' + esc(opts.compact ? dayName(e.session_date) : t(e.start_time)) + "</b>" +
-      esc(opts.compact ? t(e.start_time) : t(e.end_time)) + '</span><span class="ag-body"><strong>' + esc(e.course_code) + " · " + esc(e.course_title) +
+      esc(opts.compact ? t(e.start_time) : t(e.end_time)) + '</span><span class="ag-body"><strong>' + esc(e.course_code) + " · " + esc(e.course_title) + (e.is_lab ? ' <span class="tt-lab">Lab</span>' : "") +
       (live ? ' <span class="ev-kind kind-holiday">Now</span>' : "") + "</strong><small>Room " + esc(e.room) +
       (e.section_label && e.section_label !== "A" ? " · Section " + esc(e.section_label) : "") + " · " +
       (e.title ? esc(e.title) : '<span class="ag-missing">No topic yet</span>') + "</small></span>" + btn + "</li>";

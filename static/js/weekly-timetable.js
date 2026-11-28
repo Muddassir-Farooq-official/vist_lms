@@ -155,7 +155,7 @@
     const programs = scope !== "student" && placed.length ? '<span class="tt-chip">' + esc(placed.join(" \u00b7 ")) + "</span>" : "";
     const who = [e.room ? "Room " + esc(e.room) : "", scope !== "teacher" && e.teacher_name ? esc(e.teacher_name) : ""].filter(Boolean).join(" \u00b7 ");
     return '<div class="tt-entry" style="--h:' + hue(e.course_code) + '">' +
-      '<div class="tt-code">' + esc(e.course_code) + section + programs + "</div>" +
+      '<div class="tt-code">' + esc(e.course_code) + section + (e.is_lab ? ' <span class="tt-lab">Lab</span>' : "") + programs + "</div>" +
       '<div class="tt-name">' + esc(e.course_title) + "</div>" +
       (who ? '<div class="tt-meta">' + who + "</div>" : "") +
       // the administration's Timetable: change this weekly class from a date, or cover one of its classes

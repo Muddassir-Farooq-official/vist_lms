@@ -254,3 +254,87 @@ async def test_combined_class_across_batch_terms_is_placed_once_and_published_in
         return                                                                       # the fixed test term is over: publish is covered above
     pub = await app_client.post(f"{S}/drafts/{v['id']}/publish", json={"from_date": str(start), "notify": []})
     assert pub.status_code == 200, pub.text
+
+
+async def test_theory_and_lab_in_one_section_shows_lab_on_everyones_timetable(app_client, admin_user, db_session):
+    """1.74.0: 3 classes a week with 1 lab = two single theory periods + one lab double period, and the lab periods
+    carry a Lab label on the weekly timetable and in the class lists."""
+    offs, teachers, logins, periods = await _setup(app_client, db_session)
+    r = await app_client.patch(f"{S}/sections/{offs['101A']}", json={"classes_per_week": 3, "double_period": False, "lab_classes_per_week": 1})
+    assert r.status_code == 200 and r.json()["lab_classes_per_week"] == 1, r.text
+    bad = await app_client.patch(f"{S}/sections/{offs['101B']}", json={"classes_per_week": 3, "lab_classes_per_week": 3})
+    assert bad.status_code == 422 and "All" in bad.json()["error"]["message"]
+    # an older screen that does not send the labs field leaves them as they are
+    assert (await app_client.patch(f"{S}/sections/{offs['101A']}", json={"classes_per_week": 3, "home_room": "SR1"})).json()["lab_classes_per_week"] == 1
+    secs = {s["id"]: s for s in (await app_client.get(f"{S}/sections", params={"terms": TERM})).json()}
+    assert secs[offs["101A"]]["lab_classes_per_week"] == 1 and not secs[offs["101A"]]["double_period"]
+
+    g = await app_client.post(f"{S}/drafts", json={"terms": [TERM], "days": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"]})
+    assert g.status_code == 200, g.text
+    v = g.json()
+    _no_clash(v)
+    mine = [s for s in v["slots"] if s["offering_id"] == offs["101A"]]
+    assert sorted(s["span"] for s in mine) == [1, 1, 2]
+    for s in mine:
+        assert (s["room"] == "SLab") == (s["span"] == 2), s
+    assert next(c for c in v["courses"] if c["offering_id"] == offs["101A"])["labs"] == 1
+
+    start = TODAY + timedelta(days=(7 - TODAY.weekday()) % 7 or 7)
+    assert (await app_client.post(f"{S}/drafts/{v['id']}/publish", json={"from_date": str(start), "notify": []})).status_code == 200
+    week = (await app_client.get(f"{A}/timetable/weekly", params={"term_label": TERM})).json()
+    entries = [e for c in week["cells"] for e in c["entries"] if e["offering_id"] == offs["101A"]]
+    assert len(entries) == 4 and sum(e["is_lab"] for e in entries) == 2                 # the lab's two periods
+    assert all(not e["is_lab"] for c in week["cells"] for e in c["entries"] if e["offering_id"] != offs["101A"])
+    pdf = await app_client.get(f"{A}/timetable/weekly.pdf", params={"term_label": TERM})
+    assert pdf.status_code == 200 and pdf.content[:4] == b"%PDF"
+
+    # the teacher's class list marks the lab periods too (two of every week's four classes)
+    user, pw = logins["STA"]
+    await app_client.post("/api/v1/auth/logout")
+    await _login(app_client, user, pw)
+    assert (await app_client.post("/api/v1/auth/change-password", json={"current_password": pw, "new_password": "Teacher#Smart2026"})).status_code == 204
+    mine = [e for e in (await app_client.get(f"{A}/offerings/me/schedule")).json() if e["course_offering_id"] == offs["101A"]]
+    first_week = [e for e in mine if start <= __import__("datetime").date.fromisoformat(e["session_date"]) < start + timedelta(days=7)]
+    assert len(first_week) == 4 and sum(e["is_lab"] for e in first_week) == 2
+    labs = sorted((e["session_date"], e["start_time"]) for e in first_week if e["is_lab"])
+    assert labs[0][0] == labs[1][0]                                                        # the same day, back to back
+
+
+async def test_catalog_three_plus_one_gives_three_theory_and_one_lab_and_suggests_when_a_section_differs(app_client, admin_user, db_session):
+    """1.74.0: the course catalog says theory + lab credit hours (3+1 = 4 credit hours with 1 lab). Its sections get
+    3 theory classes and 1 lab a week by default; a section set otherwise gets a suggestion and a warning."""
+    offs, teachers, logins, periods = await _setup(app_client, db_session)
+    bad = await app_client.post(f"{A}/courses", json={"code": "LB100", "title": "Too much lab", "credit_hours": 2, "lab_credit_hours": 3})
+    assert bad.status_code == 422 and "3+1" in bad.json()["error"]["message"]
+    r = await app_client.post(f"{A}/courses", json={"code": "LB101", "title": "Physiology", "credit_hours": 4, "lab_credit_hours": 1})
+    assert r.status_code == 201 and r.json()["lab_credit_hours"] == 1, r.text
+    cid = r.json()["id"]
+    o = await app_client.post(f"{A}/offerings", json={"course_id": cid, "term_label": TERM, "section_label": "A",
+                                                     "term_start_date": str(START), "term_end_date": str(END)})
+    oid = o.json()["id"]
+    assert (await app_client.patch(f"{A}/offerings/{oid}", json={"assigned_teacher_id": teachers["STC"]})).status_code == 200
+
+    secs = {s["id"]: s for s in (await app_client.get(f"{S}/sections", params={"terms": TERM})).json()}
+    assert secs[oid]["per_week"] == 4 and secs[oid]["labs"] == 1 and secs[oid]["suggest"] is None
+    assert secs[offs["101A"]]["labs"] == 0 and secs[offs["101A"]]["suggest"] is None       # no lab in the catalog: nothing to say
+
+    # someone sets the section to 4 classes with no labs: the screen and the draft both point at the catalog
+    assert (await app_client.patch(f"{S}/sections/{oid}", json={"classes_per_week": 4, "lab_classes_per_week": 0})).status_code == 200
+    sec = next(s for s in (await app_client.get(f"{S}/sections", params={"terms": TERM})).json() if s["id"] == oid)
+    assert sec["labs"] == 0 and sec["suggest"]["theory"] == 3 and sec["suggest"]["labs"] == 1 and "3+1" in sec["suggest"]["text"]
+    g = (await app_client.post(f"{S}/drafts", json={"terms": [TERM], "days": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"]})).json()
+    assert any(p.get("warning") and p["offering_id"] == oid and "3+1" in p["reason"] for p in g["problems"])
+    assert sorted(s["span"] for s in g["slots"] if s["offering_id"] == oid) == [1, 1, 1, 1]
+
+    # one tap: as the catalog says
+    ok = await app_client.patch(f"{S}/sections/{oid}", json={"classes_per_week": None, "double_period": False, "labs_as_catalog": True})
+    assert ok.status_code == 200 and ok.json()["lab_classes_per_week"] is None and ok.json()["classes_per_week"] is None
+    sec = next(s for s in (await app_client.get(f"{S}/sections", params={"terms": TERM})).json() if s["id"] == oid)
+    assert sec["suggest"] is None and sec["labs"] == 1
+    g2 = (await app_client.post(f"{S}/drafts", json={"terms": [TERM], "days": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"]})).json()
+    assert sorted(s["span"] for s in g2["slots"] if s["offering_id"] == oid) == [1, 1, 1, 2]
+    assert not any(p["offering_id"] == oid and "catalog" in p["reason"] for p in g2["problems"])
+
+    # editing the split later keeps the total consistent
+    e = await app_client.patch(f"{A}/courses/{cid}", json={"lab_credit_hours": 2})
+    assert e.status_code == 200 and e.json()["credit_hours"] == 4 and e.json()["lab_credit_hours"] == 2

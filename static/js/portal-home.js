@@ -51,7 +51,7 @@
     row.className = "list-row";
     const label = dayLabel(entry.session_date);
     row.innerHTML =
-      '<div class="list-main"><strong>' + esc(entry.course_code) + " \u2014 " + esc(entry.course_title) + "</strong>" +
+      '<div class="list-main"><strong>' + esc(entry.course_code) + " \u2014 " + esc(entry.course_title) + (entry.is_lab ? ' <span class="tt-lab">Lab</span>' : "") + "</strong>" +
       '<span class="list-sub">' + esc(VA.formatTimeShort(entry.start_time)) + "\u2013" + esc(VA.formatTimeShort(entry.end_time)) +
       " \u00b7 Room " + esc(entry.room) + "</span></div>" +
       '<span class="pill' + (label === "Today" ? " pill-now" : "") + '">' + esc(label) + "</span>";

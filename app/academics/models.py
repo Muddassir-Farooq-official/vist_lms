@@ -57,7 +57,10 @@ class Course(UUIDPKMixin, TimestampMixin, Base):
 
     code: Mapped[str] = mapped_column(String(20), nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
-    credit_hours: Mapped[int] = mapped_column(Integer, nullable=False)
+    credit_hours: Mapped[int] = mapped_column(Integer, nullable=False)          # the total: theory + lab
+    # How many of the credit hours are lab / practical / skills (a "3+1" course: credit_hours 4, lab_credit_hours 1).
+    # The timetable gives a course one lab (a double period) a week per lab credit hour and one class per theory hour.
+    lab_credit_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
@@ -129,6 +132,9 @@ class CourseOffering(UUIDPKMixin, TimestampMixin, Base):
     # as a double period (two back-to-back periods, in a lab room), and the room this section prefers.
     classes_per_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
     double_period: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    # Some of the weekly classes are labs (theory + lab): this many of them are double periods in a lab room, the rest
+    # single periods. NULL / 0 = none. Ignored when double_period is on (then every class is a lab).
+    lab_classes_per_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
     home_room: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # One combined syllabus document per offering (same "one supporting

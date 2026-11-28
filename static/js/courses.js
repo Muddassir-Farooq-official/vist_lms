@@ -1,4 +1,24 @@
 (function () {
+
+  // Theory + lab credit hours (a "3+1" course): the API keeps the total and how many of them are lab.
+  function hours(px) {
+    const th = parseInt(document.getElementById(px + "-credit-hours").value, 10) || 0;
+    const lab = parseInt(document.getElementById(px + "-lab-hours").value, 10) || 0;
+    return { theory: th, lab: lab, total: th + lab };
+  }
+  function showSplit(px) {
+    const h = hours(px), el = document.getElementById(px + "-split");
+    if (!el) return;
+    el.textContent = h.lab
+      ? h.theory + "+" + h.lab + " = " + h.total + " credit hours. Timetable: " + h.theory + " theory class" + (h.theory === 1 ? "" : "es") + " and " + h.lab + " lab" + (h.lab === 1 ? "" : "s") + " (double periods) a week."
+      : h.total + " credit hours, no lab. Timetable: " + Math.min(5, h.total) + " class" + (h.total === 1 ? "" : "es") + " a week.";
+  }
+  ["ac", "ec"].forEach(function (px) {
+    ["-credit-hours", "-lab-hours"].forEach(function (f) {
+      const el = document.getElementById(px + f);
+      if (el) el.addEventListener("input", function () { showSplit(px); });
+    });
+  });
   "use strict";
 
   const VA = window.VistAdmin;
@@ -77,7 +97,7 @@
     $("courses-empty").hidden = rows.length > 0;
     coursesTbody.innerHTML = rows.map(function (c) {
       return '<tr data-course="' + esc(c.id) + '"><td class="crs-course"><span class="crs-code">' + esc(c.code) + '</span><span class="crs-title"><strong>' + esc(c.title) + "</strong>" +
-        (c.description ? "<small>" + esc(c.description) + "</small>" : "") + '</span></td><td class="num"><b class="crs-ch">' + esc(c.credit_hours) + "</b></td><td>" +
+        (c.description ? "<small>" + esc(c.description) + "</small>" : "") + '</span></td><td class="num"><b class="crs-ch">' + esc(c.credit_hours) + "</b>" + (c.lab_credit_hours ? '<small class="crs-split" title="Theory + lab">' + esc(c.credit_hours - c.lab_credit_hours) + "+" + esc(c.lab_credit_hours) + "</small>" : "") + "</td><td>" +
         (c.is_active ? '<span class="status-pill active">Active</span>' : '<span class="status-pill dropped">Inactive</span>') +
         '</td><td class="sd-act"><button type="button" class="sd-view" data-edit-course="' + esc(c.id) + '">Edit</button></td></tr>';
     }).join("");
@@ -140,7 +160,8 @@
       body: JSON.stringify({
         code: document.getElementById("ac-code").value.trim(),
         title: document.getElementById("ac-title").value.trim(),
-        credit_hours: parseInt(document.getElementById("ac-credit-hours").value, 10),
+        credit_hours: hours("ac").total,
+        lab_credit_hours: hours("ac").lab,
         description: document.getElementById("ac-description").value.trim() || null,
       }),
     });
@@ -204,7 +225,9 @@
     ecCodeHint.textContent = "";
     document.getElementById("ec-code").value = course.code;
     document.getElementById("ec-title").value = course.title;
-    document.getElementById("ec-credit-hours").value = course.credit_hours;
+    document.getElementById("ec-credit-hours").value = course.credit_hours - (course.lab_credit_hours || 0);
+    document.getElementById("ec-lab-hours").value = course.lab_credit_hours || 0;
+    showSplit("ec");
     document.getElementById("ec-description").value = course.description || "";
     document.getElementById("ec-active").value = String(course.is_active);
     loadPrereqs(course.id);
@@ -261,7 +284,8 @@
       body: JSON.stringify({
         code: document.getElementById("ec-code").value.trim().toUpperCase() || null,
         title: document.getElementById("ec-title").value.trim(),
-        credit_hours: parseInt(document.getElementById("ec-credit-hours").value, 10),
+        credit_hours: hours("ec").total,
+        lab_credit_hours: hours("ec").lab,
         description: document.getElementById("ec-description").value.trim() || null,
         is_active: document.getElementById("ec-active").value === "true",
       }),

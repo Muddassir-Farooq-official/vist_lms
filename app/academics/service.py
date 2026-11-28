@@ -42,7 +42,7 @@ from app.academics.repository import (
 from app.audit.service import AuditService
 from app.auth.models import Role, UserRole
 from app.auth.permissions import Roles
-from app.core.exceptions import BusinessRuleViolationError, DuplicateResourceError, ResourceNotFoundError
+from app.core.exceptions import BusinessRuleViolationError, DuplicateResourceError, ResourceNotFoundError, ValidationAppError
 from app.core.storage import ALLOWED_PDF_CONTENT_TYPES, MAX_CERTIFICATE_PDF_BYTES, delete_file, save_uploaded_file
 from app.employees.models import Employee
 from app.programs.models import Program
@@ -62,17 +62,26 @@ class CourseService:
             raise ResourceNotFoundError("Course not found.")
         return course
 
-    async def create(self, *, code: str, title: str, credit_hours: int, description: str | None, actor_id: uuid.UUID) -> Course:
+    @staticmethod
+    def _check_lab(credit_hours: int, lab_credit_hours: int) -> None:
+        if lab_credit_hours < 0 or lab_credit_hours > credit_hours:
+            raise ValidationAppError("Lab credit hours must be between 0 and the course's total credit hours "
+                                     f"({credit_hours}). For a 3+1 course enter 3 theory and 1 lab (4 in total).")
+
+    async def create(self, *, code: str, title: str, credit_hours: int, description: str | None, actor_id: uuid.UUID,
+                     lab_credit_hours: int = 0) -> Course:
         if await self.repo.get_by_code(code):
             raise DuplicateResourceError(f"A course with code '{code}' already exists.")
-        course = Course(code=code.strip().upper(), title=title.strip(), credit_hours=credit_hours, description=description)
+        self._check_lab(credit_hours, lab_credit_hours)
+        course = Course(code=code.strip().upper(), title=title.strip(), credit_hours=credit_hours, lab_credit_hours=lab_credit_hours,
+                        description=description)
         await self.repo.create(course)
         await self.audit.log(actor_user_id=actor_id, action="course.created", entity_type="course", entity_id=course.id, after={"code": course.code})
         return course
 
     async def update(
         self, course_id: uuid.UUID, *, title: str | None = None, credit_hours: int | None = None,
-        description: str | None = ..., is_active: bool | None = None, actor_id: uuid.UUID,
+        description: str | None = ..., is_active: bool | None = None, actor_id: uuid.UUID, lab_credit_hours: int | None = None,
     ) -> Course:
         """Deliberately does NOT allow changing `code` — same reasoning
         as roll_number/employee_code elsewhere in this codebase: a code
@@ -82,12 +91,16 @@ class CourseService:
         `description` uses the `...` sentinel (not None) so an explicit
         null can clear it, distinct from 'field not provided'."""
         course = await self.get(course_id)
-        before = {"title": course.title, "credit_hours": course.credit_hours, "is_active": course.is_active}
+        before = {"title": course.title, "credit_hours": course.credit_hours, "lab_credit_hours": course.lab_credit_hours,
+                  "is_active": course.is_active}
 
         if title is not None:
             course.title = title.strip()
-        if credit_hours is not None:
-            course.credit_hours = credit_hours
+        if credit_hours is not None or lab_credit_hours is not None:
+            total = credit_hours if credit_hours is not None else course.credit_hours
+            lab = lab_credit_hours if lab_credit_hours is not None else (course.lab_credit_hours or 0)
+            self._check_lab(total, lab)
+            course.credit_hours, course.lab_credit_hours = total, lab
         if description is not ...:
             course.description = description
         if is_active is not None:
@@ -95,7 +108,8 @@ class CourseService:
 
         await self.audit.log(
             actor_user_id=actor_id, action="course.updated", entity_type="course", entity_id=course.id,
-            before=before, after={"title": course.title, "credit_hours": course.credit_hours, "is_active": course.is_active},
+            before=before, after={"title": course.title, "credit_hours": course.credit_hours, "lab_credit_hours": course.lab_credit_hours,
+                                  "is_active": course.is_active},
         )
         return course
 
